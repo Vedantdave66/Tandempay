@@ -21,7 +21,7 @@ services:
         value: 3.11.0
       - key: CORS_ORIGINS
         fromService:
-          type: pserv
+          type: web
           name: splitease-web
           property: host
           # After deploy, manually set this to: https://splitease-web.onrender.com
@@ -35,7 +35,7 @@ services:
     envVars:
       - key: VITE_API_URL
         fromService:
-          type: pserv
+          type: web
           name: splitease-api
           property: host
           # Will resolve to: https://splitease-api.onrender.com/api
