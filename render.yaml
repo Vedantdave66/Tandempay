@@ -34,11 +34,7 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        fromService:
-          type: web
-          name: splitease-api
-          property: host
-          # Will resolve to: https://splitease-api.onrender.com/api
+        value: https://splitease-api-j2zx.onrender.com/api
     headers:
       - path: /*
         name: Cache-Control
