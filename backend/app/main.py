@@ -37,6 +37,10 @@ app.include_router(expenses.router)
 app.include_router(balance_service.router)
 
 
+@app.get("/")
+async def root():
+    return {"status": "ok", "message": "SplitEase API is running"}
+
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
