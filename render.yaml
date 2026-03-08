@@ -20,11 +20,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.0
       - key: CORS_ORIGINS
-        fromService:
-          type: web
-          name: splitease-web
-          property: host
-          # After deploy, manually set this to: https://splitease-web.onrender.com
+        value: https://splitease-web.onrender.com
 
   # --- Frontend Static Site ---
   - type: web
