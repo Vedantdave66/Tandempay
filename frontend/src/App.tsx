@@ -4,6 +4,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import GroupPage from './pages/GroupPage';
+import InvitePage from './pages/InvitePage';
 import Layout from './components/Layout';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -15,7 +16,12 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-    return user ? <>{children}</> : <Navigate to="/login" />;
+
+    // If not logged in, redirect to register but remember where they wanted to go
+    const location = window.location;
+    const returnTo = location.pathname !== '/dashboard' ? `?returnTo=${encodeURIComponent(location.pathname)}` : '';
+
+    return user ? <>{children}</> : <Navigate to={`/register${returnTo}`} />;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -39,6 +45,7 @@ export default function App() {
                     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
                     <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
+                    <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
                     <Route path="*" element={<Navigate to="/dashboard" />} />
                 </Routes>
             </AuthProvider>

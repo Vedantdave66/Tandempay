@@ -132,3 +132,37 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
         email=user_to_add.email,
         avatar_color=user_to_add.avatar_color,
     )
+
+
+@router.post("/{group_id}/join", response_model=GroupMemberOut)
+async def join_group(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    # Verify group exists
+    result = await db.execute(
+        select(Group).where(Group.id == group_id).options(selectinload(Group.members))
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+
+    # Check if already a member
+    already = any(m.user_id == current_user.id for m in group.members)
+    if already:
+        # Just return success if they are already in it instead of throwing an error
+        return GroupMemberOut(
+            user_id=current_user.id,
+            name=current_user.name,
+            email=current_user.email,
+            avatar_color=current_user.avatar_color,
+        )
+
+    # Add member
+    member = GroupMember(group_id=group_id, user_id=current_user.id)
+    db.add(member)
+    await db.flush()
+
+    return GroupMemberOut(
+        user_id=current_user.id,
+        name=current_user.name,
+        email=current_user.email,
+        avatar_color=current_user.avatar_color,
+    )

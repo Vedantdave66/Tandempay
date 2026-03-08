@@ -92,6 +92,10 @@ export const groupsApi = {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
+    join: (groupId: string) =>
+        request<GroupMember>(`/groups/${groupId}/join`, {
+            method: 'POST',
+        }),
 };
 
 // --- Expenses ---

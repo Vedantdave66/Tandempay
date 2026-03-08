@@ -7,6 +7,8 @@ import {
     Receipt,
     Handshake,
     BarChart3,
+    Link as LinkIcon,
+    CheckCircle2
 } from 'lucide-react';
 import {
     groupsApi,
@@ -39,6 +41,7 @@ export default function GroupPage() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteMsg, setInviteMsg] = useState('');
+    const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
@@ -89,6 +92,14 @@ export default function GroupPage() {
         }
     };
 
+    const handleCopyLink = () => {
+        if (!group) return;
+        const url = `${window.location.origin}/invite/${group.id}`;
+        navigator.clipboard.writeText(url);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+    };
+
     const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
         { key: 'expenses', label: 'Expenses', icon: <Receipt className="w-4 h-4" /> },
         { key: 'balances', label: 'Balances', icon: <BarChart3 className="w-4 h-4" /> },
@@ -125,17 +136,27 @@ export default function GroupPage() {
             </button>
 
             <div className="bg-surface border border-border rounded-2xl p-6 mb-6">
-                <div className="flex items-start justify-between mb-5">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-5">
                     <div>
                         <h1 className="text-2xl font-bold text-primary mb-1">{group.name}</h1>
                         <p className="text-sm text-secondary">
                             {group.members.length} member{group.members.length !== 1 ? 's' : ''} · ${totalSpent.toFixed(2)} total
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
+                        <button
+                            onClick={handleCopyLink}
+                            className={`flex items-center gap-2 text-sm font-medium px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer ${copied
+                                    ? 'bg-accent/20 text-accent border border-accent/20'
+                                    : 'bg-surface-light border border-border hover:bg-border text-primary'
+                                }`}
+                        >
+                            {copied ? <CheckCircle2 className="w-4 h-4" /> : <LinkIcon className="w-4 h-4" />}
+                            {copied ? 'Copied!' : 'Share Link'}
+                        </button>
                         <button
                             onClick={() => setShowInvite(!showInvite)}
-                            className="flex items-center gap-2 bg-surface-light hover:bg-border text-sm text-primary font-medium px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer"
+                            className="flex items-center gap-2 bg-surface-light hover:bg-border border border-border text-sm text-primary font-medium px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer"
                         >
                             <UserPlus className="w-4 h-4" />
                             Invite
@@ -195,8 +216,8 @@ export default function GroupPage() {
                         key={tab.key}
                         onClick={() => setActiveTab(tab.key)}
                         className={`flex items-center gap-2 flex-1 justify-center px-4 py-2.5 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${activeTab === tab.key
-                                ? 'bg-accent/10 text-accent'
-                                : 'text-secondary hover:text-primary'
+                            ? 'bg-accent/10 text-accent'
+                            : 'text-secondary hover:text-primary'
                             }`}
                     >
                         {tab.icon}

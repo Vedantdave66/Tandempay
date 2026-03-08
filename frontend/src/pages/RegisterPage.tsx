@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { Wallet, Eye, EyeOff } from 'lucide-react';
 
@@ -10,8 +10,15 @@ export default function RegisterPage() {
     const [showPassword, setShowPassword] = useState(false);
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const [showColdStartWarning, setShowColdStartWarning] = useState(false);
     const { register } = useAuth();
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+
+    // Clear warning when loading stops
+    useEffect(() => {
+        if (!loading) setShowColdStartWarning(false);
+    }, [loading]);
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -21,10 +28,19 @@ export default function RegisterPage() {
         }
         setLoading(true);
         setError('');
+
+        // Show warning if it takes longer than 5 seconds
+        const warningTimer = setTimeout(() => {
+            setShowColdStartWarning(true);
+        }, 5000);
+
         try {
             await register(name, email, password);
-            navigate('/dashboard');
+            clearTimeout(warningTimer);
+            const returnTo = searchParams.get('returnTo');
+            navigate(returnTo || '/dashboard');
         } catch (err: any) {
+            clearTimeout(warningTimer);
             setError(err.message);
         } finally {
             setLoading(false);
@@ -51,8 +67,15 @@ export default function RegisterPage() {
                     </div>
 
                     {error && (
-                        <div className="bg-danger/10 border border-danger/30 text-danger text-sm rounded-lg p-3 mb-5">
+                        <div className="bg-danger/10 border border-danger/30 text-danger text-sm rounded-lg p-3 mb-5 animate-pulse">
                             {error}
+                        </div>
+                    )}
+
+                    {showColdStartWarning && !error && (
+                        <div className="bg-accent/10 border border-accent/30 text-accent text-sm rounded-lg p-3 mb-5">
+                            <p className="font-semibold mb-1">Server is waking up 😴</p>
+                            <p>Since we're using a free server tier, the database spins down when not in use. This first request might take up to 50 seconds to complete. Please hang tight!</p>
                         </div>
                     )}
 
@@ -118,7 +141,7 @@ export default function RegisterPage() {
 
                 <p className="text-center text-sm text-secondary mt-6">
                     Already have an account?{' '}
-                    <Link to="/login" className="text-accent hover:text-accent-hover font-medium transition-colors">
+                    <Link to={`/login${searchParams.toString() ? `?${searchParams.toString()}` : ''}`} className="text-accent hover:text-accent-hover font-medium transition-colors">
                         Sign in
                     </Link>
                 </p>
