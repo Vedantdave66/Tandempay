@@ -25,6 +25,10 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         throw new Error(error.detail || 'Request failed');
     }
 
+    if (res.status === 204) {
+        return {} as T;
+    }
+
     return res.json();
 }
 
