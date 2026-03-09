@@ -102,12 +102,13 @@ export default function NotificationBell() {
             {/* Bell Button */}
             <button
                 onClick={handleToggle}
-                className="relative w-10 h-10 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center hover:bg-white/10 transition-all duration-200 cursor-pointer group"
-                aria-label="Notifications"
+                className="relative w-11 h-11 rounded-xl bg-surface hover:bg-surface-hover border border-border flex items-center justify-center transition-all duration-200 cursor-pointer group focus:outline-none focus:ring-2 focus:ring-accent focus:ring-offset-2 focus:ring-offset-bg shadow-sm"
+                aria-label={`Notifications ${unreadCount > 0 ? `(${unreadCount} unread)` : ''}`}
+                aria-expanded={isOpen}
             >
-                <Bell className="w-[18px] h-[18px] text-white/50 group-hover:text-white/80 transition-colors" />
+                <Bell className="w-5 h-5 text-secondary group-hover:text-primary transition-colors" />
                 {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-accent text-[10px] font-black text-[#064E3B] rounded-full flex items-center justify-center px-1 shadow-lg shadow-accent/30 animate-pulse">
+                    <span className="absolute -top-1 -right-1 min-w-[20px] h-[20px] bg-accent text-[11px] font-black text-[#064E3B] rounded-full flex items-center justify-center px-1.5 shadow-lg shadow-accent/30 animate-pulse">
                         {unreadCount > 9 ? '9+' : unreadCount}
                     </span>
                 )}
@@ -115,72 +116,84 @@ export default function NotificationBell() {
 
             {/* Panel */}
             {isOpen && (
-                <div className="absolute right-0 top-full mt-2 w-[360px] max-h-[480px] bg-[#0C0E14] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.6)] overflow-hidden z-50">
+                <div
+                    className="fixed inset-0 z-50 bg-[#0C0E14] md:absolute md:inset-auto md:right-0 md:top-full md:mt-2 md:w-[360px] md:max-h-[80vh] md:border md:border-white/10 md:rounded-2xl md:shadow-[0_20px_50px_rgba(0,0,0,0.6)] flex flex-col md:block"
+                    role="dialog"
+                    aria-label="Notifications Panel"
+                >
                     {/* Panel Header */}
-                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-                        <div className="flex items-center gap-2">
-                            <h3 className="text-sm font-bold text-white">Notifications</h3>
+                    <div className="flex items-center justify-between px-5 py-4 border-b border-white/5 shrink-0 pt-safe-top">
+                        <div className="flex items-center gap-3">
+                            <h3 className="text-base font-bold text-white">Notifications</h3>
                             {unreadCount > 0 && (
-                                <span className="px-2 py-0.5 rounded-md bg-accent/10 text-accent text-[10px] font-bold">{unreadCount} new</span>
+                                <span className="px-2.5 py-1 rounded-md bg-accent/10 border border-accent/20 text-accent text-xs font-bold">{unreadCount} new</span>
                             )}
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-3">
                             {unreadCount > 0 && (
                                 <button
                                     onClick={handleMarkAllRead}
-                                    className="flex items-center gap-1 text-[10px] text-white/40 hover:text-accent uppercase tracking-widest transition-colors cursor-pointer"
+                                    className="flex items-center gap-1.5 text-xs text-white/60 hover:text-accent font-medium px-2 py-1 rounded-lg hover:bg-white/5 transition-colors cursor-pointer"
+                                    aria-label="Mark all notifications as read"
                                 >
-                                    <Check className="w-3 h-3" /> Read all
+                                    <Check className="w-4 h-4" /> Read all
                                 </button>
                             )}
                             <button
                                 onClick={() => setIsOpen(false)}
-                                className="w-7 h-7 rounded-lg hover:bg-white/5 flex items-center justify-center transition-colors cursor-pointer"
+                                className="w-9 h-9 rounded-xl hover:bg-white/10 flex items-center justify-center transition-colors cursor-pointer border border-transparent hover:border-white/10 focus:outline-none focus:ring-2 focus:ring-accent"
+                                aria-label="Close notifications panel"
                             >
-                                <X className="w-3.5 h-3.5 text-white/40" />
+                                <X className="w-5 h-5 text-white/70" />
                             </button>
                         </div>
                     </div>
 
                     {/* Notification List */}
-                    <div className="overflow-y-auto max-h-[400px]">
+                    <div className="overflow-y-auto flex-1 md:max-h-[400px]">
                         {loading ? (
-                            <div className="flex items-center justify-center py-12">
-                                <div className="w-6 h-6 border-2 border-accent border-t-transparent rounded-full animate-spin" />
+                            <div className="flex items-center justify-center py-16">
+                                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
                             </div>
                         ) : notifications.length === 0 ? (
-                            <div className="py-12 text-center">
-                                <Bell className="w-8 h-8 text-white/10 mx-auto mb-3" />
-                                <p className="text-sm text-white/30">No notifications yet</p>
+                            <div className="py-20 text-center px-6">
+                                <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-white/10">
+                                    <Bell className="w-8 h-8 text-white/30" />
+                                </div>
+                                <p className="text-base font-medium text-white/80 mb-1">All caught up!</p>
+                                <p className="text-sm text-white/40">You have no new notifications.</p>
                             </div>
                         ) : (
-                            notifications.map((notif) => (
-                                <button
-                                    key={notif.id}
-                                    onClick={() => handleNotificationClick(notif)}
-                                    className={`w-full flex items-start gap-3 px-5 py-3.5 transition-colors cursor-pointer text-left ${notif.read
-                                            ? 'hover:bg-white/[0.02]'
-                                            : 'bg-accent/[0.03] hover:bg-accent/[0.06]'
-                                        }`}
-                                >
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${notif.read ? 'bg-white/5' : 'bg-white/[0.08]'
-                                        }`}>
-                                        {getIcon(notif.type)}
-                                    </div>
-                                    <div className="flex-1 min-w-0">
-                                        <p className={`text-xs font-semibold mb-0.5 ${notif.read ? 'text-white/50' : 'text-white/90'}`}>
-                                            {notif.title}
-                                        </p>
-                                        <p className={`text-[11px] leading-relaxed ${notif.read ? 'text-white/30' : 'text-white/50'}`}>
-                                            {notif.message}
-                                        </p>
-                                        <p className="text-[10px] text-white/20 mt-1">{getTimeAgo(notif.created_at)}</p>
-                                    </div>
-                                    {!notif.read && (
-                                        <div className="w-2 h-2 rounded-full bg-accent shrink-0 mt-2" />
-                                    )}
-                                </button>
-                            ))
+                            <div className="divide-y divide-white/5">
+                                {notifications.map((notif) => (
+                                    <button
+                                        key={notif.id}
+                                        onClick={() => handleNotificationClick(notif)}
+                                        className={`w-full flex items-start gap-4 px-6 py-4 transition-colors cursor-pointer text-left focus:outline-none focus:bg-white/10 ${notif.read
+                                            ? 'hover:bg-white/[0.04]'
+                                            : 'bg-accent/5 hover:bg-accent/10 border-l-2 border-accent'
+                                            }`}
+                                        aria-label={`${notif.read ? 'Read notification' : 'Unread notification'}: ${notif.title}`}
+                                    >
+                                        <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 mt-0.5 border ${notif.read ? 'bg-white/5 border-white/10' : 'bg-white/10 border-white/20'
+                                            }`}>
+                                            {getIcon(notif.type)}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <p className={`text-sm font-bold mb-1 ${notif.read ? 'text-white/60' : 'text-white'}`}>
+                                                {notif.title}
+                                            </p>
+                                            <p className={`text-xs leading-relaxed ${notif.read ? 'text-white/40' : 'text-white/70'}`}>
+                                                {notif.message}
+                                            </p>
+                                            <p className="text-[11px] font-medium text-white/30 mt-2 uppercase tracking-wider">{getTimeAgo(notif.created_at)}</p>
+                                        </div>
+                                        {!notif.read && (
+                                            <div className="w-2.5 h-2.5 rounded-full bg-accent shrink-0 mt-2 shadow-[0_0_8px_theme('colors.accent')]" aria-hidden="true" />
+                                        )}
+                                    </button>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 
@@ -71,19 +71,45 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 </div>
 
                 {/* Nav */}
-                <nav className="flex-1 p-4 space-y-1">
+                <nav className="flex-1 p-4 space-y-2">
                     <button
                         onClick={() => {
                             navigate('/dashboard');
                             setIsMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard'
-                            ? 'bg-accent/10 text-accent'
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/dashboard'
+                            ? 'bg-accent/10 text-accent font-bold'
                             : 'text-secondary hover:text-primary hover:bg-surface-hover'
                             }`}
                     >
                         <LayoutDashboard className="w-5 h-5" />
                         Dashboard
+                    </button>
+                    <button
+                        onClick={() => {
+                            navigate('/payments');
+                            setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/payments'
+                            ? 'bg-indigo/10 text-indigo font-bold'
+                            : 'text-secondary hover:text-primary hover:bg-surface-hover'
+                            }`}
+                    >
+                        <Wallet className="w-5 h-5" />
+                        Payments
+                    </button>
+                    <button
+                        onClick={() => {
+                            navigate('/friends');
+                            setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/friends'
+                            ? 'bg-warning/10 text-warning font-bold'
+                            : 'text-secondary hover:text-primary hover:bg-surface-hover'
+                            }`}
+                    >
+                        <Users className="w-5 h-5" />
+                        Friends
                     </button>
                 </nav>
 

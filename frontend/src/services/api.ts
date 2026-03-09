@@ -223,3 +223,17 @@ export const notificationsApi = {
     markRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'PUT' }),
     markAllRead: () => request<{ status: string }>('/notifications/read-all', { method: 'PUT' }),
 };
+
+// --- Me (Global User Data) ---
+export interface Friend {
+    id: string;
+    name: string;
+    email: string;
+    avatar_color: string;
+    shared_groups_count: number;
+}
+
+export const meApi = {
+    getPayments: () => request<SettlementRecord[]>('/me/payments'),
+    getFriends: () => request<Friend[]>('/me/friends'),
+};
