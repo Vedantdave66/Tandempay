@@ -10,34 +10,43 @@ import {
     Link as LinkIcon,
     CheckCircle2,
     Trash2,
-    Settings,
-    X as XIcon
+    X as XIcon,
+    CreditCard,
+    ArrowRight,
+    Clock,
 } from 'lucide-react';
 import {
     groupsApi,
     expensesApi,
     balancesApi,
+    settlementRecordsApi,
     Group,
     Expense,
     UserBalance,
     Settlement,
+    SettlementRecord,
 } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 import ExpenseCard from '../components/ExpenseCard';
 import BalanceBubble from '../components/BalanceBubble';
-import SettlementCard from '../components/SettlementCard';
 import AddExpenseModal from '../components/AddExpenseModal';
+import SettleUpModal from '../components/SettleUpModal';
+import PaymentRecordCard from '../components/PaymentRecordCard';
+import PaymentStatusBadge from '../components/PaymentStatusBadge';
 import Avatar from '../components/Avatar';
 
-type Tab = 'expenses' | 'balances' | 'settlements';
+type Tab = 'expenses' | 'balances' | 'settlements' | 'payments';
 
 export default function GroupPage() {
     const { groupId } = useParams<{ groupId: string }>();
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const [group, setGroup] = useState<Group | null>(null);
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [balances, setBalances] = useState<UserBalance[]>([]);
     const [settlements, setSettlements] = useState<Settlement[]>([]);
+    const [paymentRecords, setPaymentRecords] = useState<SettlementRecord[]>([]);
     const [activeTab, setActiveTab] = useState<Tab>('expenses');
     const [showAddExpense, setShowAddExpense] = useState(false);
     const [showInvite, setShowInvite] = useState(false);
@@ -50,6 +59,9 @@ export default function GroupPage() {
     // Edit expense state
     const [expenseToEdit, setExpenseToEdit] = useState<Expense | undefined>(undefined);
 
+    // Settle Up modal state
+    const [settleUpTarget, setSettleUpTarget] = useState<Settlement | null>(null);
+
     useEffect(() => {
         if (groupId) loadAll();
     }, [groupId]);
@@ -58,16 +70,18 @@ export default function GroupPage() {
         if (!groupId) return;
         setLoading(true);
         try {
-            const [g, e, b, s] = await Promise.all([
+            const [g, e, b, s, pr] = await Promise.all([
                 groupsApi.get(groupId),
                 expensesApi.list(groupId),
                 balancesApi.getBalances(groupId),
                 balancesApi.getSettlements(groupId),
+                settlementRecordsApi.list(groupId),
             ]);
             setGroup(g);
             setExpenses(e);
             setBalances(b);
             setSettlements(s);
+            setPaymentRecords(pr);
         } catch (err) {
             console.error(err);
         } finally {
@@ -146,10 +160,16 @@ export default function GroupPage() {
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const tabs: { key: Tab; label: string; icon: React.ReactNode }[] = [
+    const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
         { key: 'expenses', label: 'Expenses', icon: <Receipt className="w-4 h-4" /> },
         { key: 'balances', label: 'Balances', icon: <BarChart3 className="w-4 h-4" /> },
-        { key: 'settlements', label: 'Settle Up', icon: <Handshake className="w-4 h-4" /> },
+        { key: 'settlements', label: 'Settle Up', icon: <Handshake className="w-4 h-4" />, badge: settlements.length },
+        {
+            key: 'payments',
+            label: 'Payments',
+            icon: <CreditCard className="w-4 h-4" />,
+            badge: paymentRecords.filter(r => r.status !== 'settled').length
+        },
     ];
 
     if (loading) {
@@ -169,6 +189,9 @@ export default function GroupPage() {
     }
 
     const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+
+    // Find settlements where the current user owes money
+    const mySettlements = settlements.filter(s => s.from_user_id === user?.id);
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -248,6 +271,39 @@ export default function GroupPage() {
                     </div>
                 </div>
 
+                {/* Quick Settle Up Banner */}
+                {mySettlements.length > 0 && (
+                    <div className="mt-5 pt-5 border-t border-border">
+                        <div className="bg-gradient-to-r from-accent/5 to-indigo/5 border border-accent/10 rounded-xl p-4">
+                            <div className="flex items-center justify-between mb-2">
+                                <p className="text-xs font-bold text-white/50 uppercase tracking-widest">You Owe</p>
+                                <Clock className="w-3.5 h-3.5 text-white/20" />
+                            </div>
+                            <div className="space-y-2">
+                                {mySettlements.map((s, i) => (
+                                    <div key={i} className="flex items-center justify-between">
+                                        <div className="flex items-center gap-2">
+                                            <Avatar name={s.to_user_name} color={s.to_avatar_color} size="sm" />
+                                            <span className="text-sm text-white/70">{s.to_user_name}</span>
+                                        </div>
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-base font-black text-white">${s.amount.toFixed(2)}</span>
+                                            <button
+                                                onClick={() => {
+                                                    setSettleUpTarget(s);
+                                                }}
+                                                className="px-3 py-1.5 bg-accent/20 hover:bg-accent/30 border border-accent/20 text-accent text-xs font-bold rounded-lg transition-all cursor-pointer"
+                                            >
+                                                Settle Up
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {/* Invite form */}
                 {showInvite && (
                     <div className="mt-4 pt-4 border-t border-border">
@@ -286,7 +342,12 @@ export default function GroupPage() {
                             }`}
                     >
                         {tab.icon}
-                        {tab.label}
+                        <span className="hidden sm:inline">{tab.label}</span>
+                        {tab.badge !== undefined && tab.badge > 0 && (
+                            <span className="min-w-[18px] h-[18px] bg-accent/20 text-accent text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                                {tab.badge}
+                            </span>
+                        )}
                     </button>
                 ))}
             </div>
@@ -357,8 +418,77 @@ export default function GroupPage() {
                                 </p>
                             </div>
                             <div className="space-y-3">
-                                {settlements.map((s, i) => (
-                                    <SettlementCard key={i} settlement={s} />
+                                {settlements.map((s, i) => {
+                                    const canSettle = s.from_user_id === user?.id;
+                                    return (
+                                        <div key={i} className="bg-[#0C0E14] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all duration-300">
+                                            <div className="flex items-center gap-3 mb-3">
+                                                <Avatar name={s.from_user_name} color={s.from_avatar_color} size="md" />
+                                                <div className="flex-1 min-w-0">
+                                                    <div className="flex items-center gap-2 text-sm">
+                                                        <span className="font-semibold text-white truncate">{s.from_user_name}</span>
+                                                        <ArrowRight className="w-4 h-4 text-accent shrink-0" />
+                                                        <span className="font-semibold text-white truncate">{s.to_user_name}</span>
+                                                    </div>
+                                                    <p className="text-xs text-white/40 mt-0.5">
+                                                        owes <span className="text-accent font-bold">${s.amount.toFixed(2)}</span>
+                                                    </p>
+                                                </div>
+                                                <Avatar name={s.to_user_name} color={s.to_avatar_color} size="md" />
+                                            </div>
+
+                                            {canSettle && (
+                                                <button
+                                                    onClick={() => setSettleUpTarget(s)}
+                                                    className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent/20 to-accent/10 hover:from-accent/30 hover:to-accent/20 border border-accent/20 hover:border-accent/40 text-accent font-bold text-sm py-3 rounded-xl transition-all duration-300 cursor-pointer shadow-lg shadow-accent/5 hover:shadow-accent/10"
+                                                >
+                                                    <Handshake className="w-4 h-4" />
+                                                    Settle Up ${s.amount.toFixed(2)}
+                                                </button>
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {activeTab === 'payments' && (
+                <div>
+                    {paymentRecords.length === 0 ? (
+                        <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+                            <div className="w-14 h-14 rounded-2xl bg-indigo/10 flex items-center justify-center mx-auto mb-4">
+                                <CreditCard className="w-7 h-7 text-indigo" />
+                            </div>
+                            <h3 className="text-lg font-semibold text-primary mb-2">No payment activity</h3>
+                            <p className="text-sm text-secondary">Payment records will appear here after settling up.</p>
+                        </div>
+                    ) : (
+                        <div>
+                            {/* Status summary */}
+                            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+                                {(['pending', 'sent', 'settled', 'declined'] as const).map((status) => {
+                                    const count = paymentRecords.filter(r => r.status === status).length;
+                                    return (
+                                        <div key={status} className="bg-surface border border-border rounded-xl p-3 text-center">
+                                            <p className="text-lg font-black text-white mb-1">{count}</p>
+                                            <PaymentStatusBadge status={status} size="sm" />
+                                        </div>
+                                    );
+                                })}
+                            </div>
+
+                            <div className="space-y-3">
+                                {paymentRecords.map((record) => (
+                                    <PaymentRecordCard
+                                        key={record.id}
+                                        record={record}
+                                        currentUserId={user?.id || ''}
+                                        groupId={groupId || ''}
+                                        onUpdated={loadAll}
+                                    />
                                 ))}
                             </div>
                         </div>
@@ -378,6 +508,17 @@ export default function GroupPage() {
                     }}
                     onCreated={handleExpenseCreatedOrUpdated}
                     onUpdated={handleExpenseCreatedOrUpdated}
+                />
+            )}
+
+            {/* Settle Up Modal */}
+            {settleUpTarget && groupId && user && (
+                <SettleUpModal
+                    groupId={groupId}
+                    settlement={settleUpTarget}
+                    currentUserId={user.id}
+                    onClose={() => setSettleUpTarget(null)}
+                    onSettled={loadAll}
                 />
             )}
         </div>

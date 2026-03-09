@@ -89,7 +89,7 @@ async def get_settlements(
     user_info = {}
     for member in group.members:
         user = member.user
-        user_info[user.id] = {"name": user.name, "avatar_color": user.avatar_color}
+        user_info[user.id] = {"name": user.name, "email": user.email, "avatar_color": user.avatar_color}
 
     # Compute net balances
     net: dict[str, float] = {}
@@ -119,14 +119,16 @@ async def get_settlements(
 
         amount = round(min(credit, debt), 2)
         if amount > 0.01:
-            c_info = user_info.get(creditor_id, {"name": "Unknown", "avatar_color": "#3ECF8E"})
-            d_info = user_info.get(debtor_id, {"name": "Unknown", "avatar_color": "#3ECF8E"})
+            c_info = user_info.get(creditor_id, {"name": "Unknown", "email": "", "avatar_color": "#3ECF8E"})
+            d_info = user_info.get(debtor_id, {"name": "Unknown", "email": "", "avatar_color": "#3ECF8E"})
             settlements.append(Settlement(
                 from_user_id=debtor_id,
                 from_user_name=d_info["name"],
+                from_user_email=d_info["email"],
                 from_avatar_color=d_info["avatar_color"],
                 to_user_id=creditor_id,
                 to_user_name=c_info["name"],
+                to_user_email=c_info["email"],
                 to_avatar_color=c_info["avatar_color"],
                 amount=amount,
             ))

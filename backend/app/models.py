@@ -1,6 +1,7 @@
 import uuid
 from datetime import datetime
-from sqlalchemy import String, Float, ForeignKey, DateTime, func
+from typing import Optional
+from sqlalchemy import String, Float, ForeignKey, DateTime, Boolean, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
@@ -29,6 +30,7 @@ class Group(Base):
 
     members: Mapped[list["GroupMember"]] = relationship(back_populates="group", cascade="all, delete-orphan")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    settlement_records: Mapped[list["SettlementRecord"]] = relationship(back_populates="group", cascade="all, delete-orphan")
     creator: Mapped["User"] = relationship()
 
 
@@ -67,4 +69,42 @@ class ExpenseParticipant(Base):
     share_amount: Mapped[float] = mapped_column(Float, nullable=False)
 
     expense: Mapped["Expense"] = relationship(back_populates="participants")
+    user: Mapped["User"] = relationship()
+
+
+# --- Settlement Records ---
+class SettlementRecord(Base):
+    """Tracks actual payment transactions between users within a group."""
+    __tablename__ = "settlement_records"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    group_id: Mapped[str] = mapped_column(String, ForeignKey("groups.id", ondelete="CASCADE"), nullable=False)
+    payer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    amount: Mapped[float] = mapped_column(Float, nullable=False)
+    method: Mapped[str] = mapped_column(String(20), default="etransfer")  # in_app | etransfer
+    status: Mapped[str] = mapped_column(String(20), default="pending")    # pending | sent | settled | declined
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    group: Mapped["Group"] = relationship(back_populates="settlement_records")
+    payer: Mapped["User"] = relationship(foreign_keys=[payer_id])
+    payee: Mapped["User"] = relationship(foreign_keys=[payee_id])
+
+
+# --- Notifications ---
+class Notification(Base):
+    """In-app notification for group activity events."""
+    __tablename__ = "notifications"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False, index=True)
+    type: Mapped[str] = mapped_column(String(40), nullable=False)  # expense_added, settlement_requested, payment_sent, payment_confirmed, member_added
+    title: Mapped[str] = mapped_column(String(300), nullable=False)
+    message: Mapped[str] = mapped_column(String(500), nullable=False)
+    read: Mapped[bool] = mapped_column(Boolean, default=False)
+    reference_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # group_id or settlement_id
+    group_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
     user: Mapped["User"] = relationship()

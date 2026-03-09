@@ -4,7 +4,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
-from app.models import User, Group, GroupMember, Expense, ExpenseParticipant
+from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
 from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut
 from app.routes.auth import get_current_user
 
@@ -77,6 +77,20 @@ async def create_expense(
         participant_outs.append(ExpenseParticipantOut(
             user_id=u.id, name=u.name, share_amount=ep.share_amount, avatar_color=u.avatar_color
         ))
+
+    # Notify participants (except the creator)
+    for ep in participants:
+        if ep.user_id != current_user.id:
+            notif = Notification(
+                user_id=ep.user_id,
+                type="expense_added",
+                title="New Expense",
+                message=f"{current_user.name} added \"{data.title}\" (${data.amount:.2f}). Your share: ${ep.share_amount:.2f}",
+                group_id=group_id,
+                reference_id=expense.id,
+            )
+            db.add(notif)
+    await db.flush()
 
     return ExpenseOut(
         id=expense.id,

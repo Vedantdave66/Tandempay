@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, LogOut, Wallet, Menu, X } from 'lucide-react';
 import Avatar from './Avatar';
+import NotificationBell from './NotificationBell';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth();
@@ -25,12 +26,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </div>
                     <span className="text-lg font-bold text-primary">SplitEase</span>
                 </div>
-                <button
-                    onClick={() => setIsMobileMenuOpen(true)}
-                    className="p-2 text-secondary hover:text-primary hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
-                >
-                    <Menu className="w-6 h-6" />
-                </button>
+                <div className="flex items-center gap-2">
+                    <NotificationBell />
+                    <button
+                        onClick={() => setIsMobileMenuOpen(true)}
+                        className="p-2 text-secondary hover:text-primary hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
+                        aria-label="Open menu"
+                    >
+                        <Menu className="w-6 h-6" />
+                    </button>
+                </div>
             </header>
 
             {/* Mobile Sidebar Overlay */}
@@ -59,6 +64,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <button
                         onClick={() => setIsMobileMenuOpen(false)}
                         className="md:hidden p-2 text-secondary hover:text-primary hover:bg-surface-hover rounded-lg transition-colors cursor-pointer"
+                        aria-label="Close menu"
                     >
                         <X className="w-5 h-5" />
                     </button>
@@ -80,6 +86,11 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                         Dashboard
                     </button>
                 </nav>
+
+                {/* Notification Bell Desktop */}
+                <div className="hidden md:flex px-4 pb-2 justify-start">
+                    <NotificationBell />
+                </div>
 
                 {/* User */}
                 <div className="p-4 border-t border-border">

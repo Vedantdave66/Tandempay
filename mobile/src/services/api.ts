@@ -1,12 +1,10 @@
-let API_BASE = import.meta.env.VITE_API_URL || '/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// If Render injected just the host (e.g., "splitease-api-xyz.onrender.com")
-if (API_BASE && !API_BASE.startsWith('http') && API_BASE !== '/api') {
-    API_BASE = `https://${API_BASE}/api`;
-}
+// Replace this with the Render URL when deploying, or use your local IP for testing
+let API_BASE = 'https://splitease-api-j2zx.onrender.com/api';
 
 async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
-    const token = localStorage.getItem('token');
+    const token = await AsyncStorage.getItem('token');
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
         ...(options.headers as Record<string, string> || {}),
@@ -21,8 +19,14 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     });
 
     if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(error.detail || 'Request failed');
+        let errorMsg = 'Request failed';
+        try {
+            const error = await res.json();
+            errorMsg = error.detail || errorMsg;
+        } catch (e) {
+            // failed to parse
+        }
+        throw new Error(errorMsg);
     }
 
     if (res.status === 204) {
@@ -144,7 +148,7 @@ export const expensesApi = {
         }),
 };
 
-// --- Balances & Suggested Settlements ---
+// --- Balances & Settlements ---
 export interface UserBalance {
     user_id: string;
     name: string;
@@ -157,11 +161,9 @@ export interface UserBalance {
 export interface Settlement {
     from_user_id: string;
     from_user_name: string;
-    from_user_email: string;
     from_avatar_color: string;
     to_user_id: string;
     to_user_name: string;
-    to_user_email: string;
     to_avatar_color: string;
     amount: number;
 }
@@ -169,57 +171,4 @@ export interface Settlement {
 export const balancesApi = {
     getBalances: (groupId: string) => request<UserBalance[]>(`/groups/${groupId}/balances`),
     getSettlements: (groupId: string) => request<Settlement[]>(`/groups/${groupId}/settlements`),
-};
-
-// --- Settlement Records (actual payment tracking) ---
-export interface SettlementRecord {
-    id: string;
-    group_id: string;
-    payer_id: string;
-    payer_name: string;
-    payer_email: string;
-    payer_avatar_color: string;
-    payee_id: string;
-    payee_name: string;
-    payee_email: string;
-    payee_avatar_color: string;
-    amount: number;
-    method: string;
-    status: string; // pending | sent | settled | declined
-    created_at: string;
-    updated_at: string;
-}
-
-export const settlementRecordsApi = {
-    create: (groupId: string, data: { payee_id: string; amount: number; method: string }) =>
-        request<SettlementRecord>(`/groups/${groupId}/settlement-records`, {
-            method: 'POST',
-            body: JSON.stringify(data),
-        }),
-    list: (groupId: string) => request<SettlementRecord[]>(`/groups/${groupId}/settlement-records`),
-    updateStatus: (groupId: string, settlementId: string, status: string) =>
-        request<SettlementRecord>(`/groups/${groupId}/settlement-records/${settlementId}/status`, {
-            method: 'PUT',
-            body: JSON.stringify({ status }),
-        }),
-};
-
-// --- Notifications ---
-export interface AppNotification {
-    id: string;
-    user_id: string;
-    type: string;
-    title: string;
-    message: string;
-    read: boolean;
-    reference_id: string | null;
-    group_id: string | null;
-    created_at: string;
-}
-
-export const notificationsApi = {
-    list: () => request<AppNotification[]>('/notifications'),
-    unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
-    markRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'PUT' }),
-    markAllRead: () => request<{ status: string }>('/notifications/read-all', { method: 'PUT' }),
 };

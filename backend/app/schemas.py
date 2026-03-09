@@ -120,8 +120,58 @@ class UserBalance(BaseModel):
 class Settlement(BaseModel):
     from_user_id: str
     from_user_name: str
+    from_user_email: str
     from_avatar_color: str
     to_user_id: str
     to_user_name: str
+    to_user_email: str
     to_avatar_color: str
     amount: float
+
+
+# --- Settlement Records (actual payment tracking) ---
+class SettlementRecordCreate(BaseModel):
+    payee_id: str
+    amount: float
+    method: str = "etransfer"  # in_app | etransfer
+
+
+class SettlementRecordOut(BaseModel):
+    id: str
+    group_id: str
+    payer_id: str
+    payer_name: str
+    payer_email: str
+    payer_avatar_color: str
+    payee_id: str
+    payee_name: str
+    payee_email: str
+    payee_avatar_color: str
+    amount: float
+    method: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class SettlementStatusUpdate(BaseModel):
+    status: str  # sent | settled | declined
+
+
+# --- Notifications ---
+class NotificationOut(BaseModel):
+    id: str
+    user_id: str
+    type: str
+    title: str
+    message: str
+    read: bool
+    reference_id: str | None = None
+    group_id: str | None = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
