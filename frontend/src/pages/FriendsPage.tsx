@@ -1,22 +1,43 @@
 import { useState, useEffect } from 'react';
-import { Users, Search, UserPlus } from 'lucide-react';
-import { meApi, Friend } from '../services/api';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { Users, Search, UserPlus, Bell, Clock, Send, Check, X, ShieldAlert, CheckCheck, Receipt, Handshake, Mail } from 'lucide-react';
+import { meApi, Friend, notificationsApi, AppNotification, friendRequestsApi, FriendRequest } from '../services/api';
 import Avatar from '../components/Avatar';
 
 export default function FriendsPage() {
+    const [searchParams, setSearchParams] = useSearchParams();
+    const activeTab = searchParams.get('tab') || 'my-friends';
+    const navigate = useNavigate();
+
+    // Data states
     const [friends, setFriends] = useState<Friend[]>([]);
+    const [notifications, setNotifications] = useState<AppNotification[]>([]);
+    const [pendingRequests, setPendingRequests] = useState<{ sent: FriendRequest[], received: FriendRequest[] }>({ sent: [], received: [] });
+
+    // UI states
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+    const [addEmail, setAddEmail] = useState('');
+    const [addLoading, setAddLoading] = useState(false);
+    const [addMessage, setAddMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
-        loadFriends();
-    }, []);
+        loadTabData();
+    }, [activeTab]);
 
-    const loadFriends = async () => {
+    const loadTabData = async () => {
         setLoading(true);
         try {
-            const data = await meApi.getFriends();
-            setFriends(data);
+            if (activeTab === 'my-friends') {
+                const data = await meApi.getFriends();
+                setFriends(data);
+            } else if (activeTab === 'activity') {
+                const data = await notificationsApi.list();
+                setNotifications(data);
+            } else if (activeTab === 'pending') {
+                const data = await friendRequestsApi.getPending();
+                setPendingRequests(data);
+            }
         } catch (err) {
             console.error(err);
         } finally {
@@ -24,74 +45,336 @@ export default function FriendsPage() {
         }
     };
 
-    const filteredFriends = friends.filter((f) =>
-        f.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        f.email.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const handleTabChange = (tab: string) => {
+        setSearchParams({ tab });
+        setSearchQuery('');
+    };
+
+    // --- Tab 1: Activity (Notifications) Logic ---
+    const handleMarkAllRead = async () => {
+        await notificationsApi.markAllRead();
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    };
+
+    const handleNotificationClick = async (notif: AppNotification) => {
+        if (!notif.read) {
+            await notificationsApi.markRead(notif.id);
+            setNotifications(prev => prev.map(n => n.id === notif.id ? { ...n, read: true } : n));
+        }
+        if (notif.group_id) {
+            navigate(`/groups/${notif.group_id}`);
+        } else if (notif.type === 'friend_request') {
+            handleTabChange('pending');
+        }
+    };
+
+    const getNotifIcon = (type: string) => {
+        switch (type) {
+            case 'expense_added': return <Receipt className="w-5 h-5 text-accent" />;
+            case 'settlement_requested': return <Handshake className="w-5 h-5 text-indigo-400" />;
+            case 'payment_sent': return <Send className="w-5 h-5 text-amber-400" />;
+            case 'payment_confirmed': return <CheckCheck className="w-5 h-5 text-accent" />;
+            case 'payment_declined': return <ShieldAlert className="w-5 h-5 text-red-500" />;
+            case 'member_added': return <UserPlus className="w-5 h-5 text-indigo-400" />;
+            case 'friend_request': return <UserPlus className="w-5 h-5 text-accent" />;
+            case 'friend_accepted': return <Check className="w-5 h-5 text-accent" />;
+            default: return <Bell className="w-5 h-5 text-white/50" />;
+        }
+    };
+
+    const getTimeAgo = (dateStr: string) => {
+        const diffMin = Math.floor((new Date().getTime() - new Date(dateStr).getTime()) / 60000);
+        if (diffMin < 1) return 'Just now';
+        if (diffMin < 60) return `${diffMin}m ago`;
+        if (diffMin < 1440) return `${Math.floor(diffMin / 60)}h ago`;
+        return `${Math.floor(diffMin / 1440)}d ago`;
+    };
+
+    // --- Tab 3: Pending Requests Logic ---
+    const handleAcceptRequest = async (id: string) => {
+        try {
+            await friendRequestsApi.accept(id);
+            loadTabData(); // Reload the list
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    const handleDeclineRequest = async (id: string) => {
+        try {
+            await friendRequestsApi.decline(id);
+            loadTabData();
+        } catch (err) {
+            console.error(err);
+        }
+    };
+
+    // --- Tab 4: Add Friend Logic ---
+    const handleAddFriend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setAddLoading(true);
+        setAddMessage(null);
+        try {
+            await friendRequestsApi.send(addEmail);
+            setAddMessage({ type: 'success', text: 'Friend request sent successfully!' });
+            setAddEmail('');
+        } catch (err: any) {
+            setAddMessage({ type: 'error', text: err.message || 'Failed to send request' });
+        } finally {
+            setAddLoading(false);
+        }
+    };
 
     return (
         <div className="max-w-4xl mx-auto pb-12">
-            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
-                <div>
-                    <h1 className="text-3xl font-black text-primary mb-2">Friends</h1>
-                    <p className="text-secondary">Everyone you share expenses with across all groups.</p>
-                </div>
-                <button className="flex items-center justify-center gap-2 bg-gradient-to-br from-indigo/80 to-indigo hover:from-indigo hover:to-indigo-hover text-white text-sm font-bold px-6 py-3 rounded-xl transition-all shadow-lg shadow-indigo/20 cursor-not-allowed opacity-50">
-                    <UserPlus className="w-4 h-4" />
-                    Add Friend
-                </button>
+            <div className="mb-8">
+                <h1 className="text-3xl font-black text-primary mb-2">Network Hub</h1>
+                <p className="text-secondary">Manage your friends, track pending requests, and view all activity.</p>
             </div>
 
-            <div className="bg-surface border border-border rounded-3xl p-6 mb-8">
-                <div className="relative">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
-                    <input
-                        type="text"
-                        placeholder="Search friends by name or email..."
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                        className="w-full bg-bg border border-border/80 rounded-2xl pl-12 pr-6 py-4 text-sm font-medium text-primary placeholder-secondary/50 focus:outline-none focus:border-indigo focus:ring-1 focus:ring-indigo transition-all shadow-inner"
-                    />
-                </div>
+            {/* Custom Tabs */}
+            <div className="flex overflow-x-auto hide-scrollbar gap-2 p-1 bg-surface border border-border rounded-2xl mb-8">
+                <TabButton active={activeTab === 'activity'} onClick={() => handleTabChange('activity')} icon={<Bell />} label="Activity" />
+                <TabButton active={activeTab === 'my-friends'} onClick={() => handleTabChange('my-friends')} icon={<Users />} label="My Friends" />
+                <TabButton active={activeTab === 'pending'} onClick={() => handleTabChange('pending')} icon={<Clock />} label="Pending" />
+                <TabButton active={activeTab === 'add'} onClick={() => handleTabChange('add')} icon={<UserPlus />} label="Add Friend" />
             </div>
 
-            {loading ? (
-                <div className="flex justify-center py-20">
-                    <div className="w-8 h-8 border-2 border-indigo border-t-transparent rounded-full animate-spin" />
-                </div>
-            ) : friends.length === 0 ? (
-                <div className="bg-surface/50 border border-border/50 border-dashed rounded-[2rem] p-16 text-center backdrop-blur-sm">
-                    <div className="w-20 h-20 rounded-2xl bg-surface-light flex items-center justify-center mx-auto mb-6 shadow-inner border border-border/60">
-                        <Users className="w-8 h-8 text-secondary" />
-                    </div>
-                    <h3 className="text-xl font-bold text-primary mb-2">No friends yet</h3>
-                    <p className="text-sm text-secondary max-w-sm mx-auto">
-                        Add people to a group to start tracking expenses and sharing costs.
-                    </p>
-                </div>
-            ) : filteredFriends.length === 0 ? (
-                <div className="text-center py-20">
-                    <p className="text-secondary">No friends match your search.</p>
-                </div>
-            ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                    {filteredFriends.map((friend) => (
-                        <div key={friend.id} className="bg-surface hover:bg-surface-hover border border-border rounded-2xl p-5 transition-all duration-300 group cursor-pointer">
-                            <div className="flex items-center gap-4 mb-4">
-                                <Avatar name={friend.name} color={friend.avatar_color} size="lg" />
-                                <div className="flex-1 min-w-0">
-                                    <h3 className="text-base font-bold text-primary truncate group-hover:text-indigo transition-colors">{friend.name}</h3>
-                                    <p className="text-xs text-secondary truncate">{friend.email}</p>
-                                </div>
+            {/* Tab 1: Activity */}
+            {activeTab === 'activity' && (
+                <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+                    <div className="p-6 border-b border-border flex items-center justify-between bg-surface-light">
+                        <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center">
+                                <Bell className="w-5 h-5 text-accent" />
                             </div>
-                            <div className="pt-4 border-t border-border/50 flex items-center justify-between">
-                                <span className="text-xs font-semibold text-secondary uppercase tracking-wider">Balances</span>
-                                <span className="text-sm font-bold text-primary">View Activity &rarr;</span>
-                            </div>
+                            <h2 className="text-xl font-bold text-primary">All Activity</h2>
                         </div>
-                    ))}
+                        {notifications.some(n => !n.read) && (
+                            <button onClick={handleMarkAllRead} className="text-sm font-semibold text-accent hover:text-accent-hover transition-colors px-4 py-2 rounded-xl hover:bg-accent/10 cursor-pointer">
+                                Mark all as read
+                            </button>
+                        )}
+                    </div>
+
+                    {loading ? <LoadingSpinner /> : notifications.length === 0 ? (
+                        <EmptyState icon={<Bell />} title="You're all caught up" desc="No recent activity to show." />
+                    ) : (
+                        <div className="divide-y divide-border">
+                            {notifications.map((notif) => (
+                                <div
+                                    key={notif.id}
+                                    onClick={() => handleNotificationClick(notif)}
+                                    className={`p-6 flex items-start gap-5 transition-all duration-300 cursor-pointer ${notif.read ? 'hover:bg-surface-hover/50' : 'bg-accent/5 hover:bg-accent/10'}`}
+                                >
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border shadow-inner ${notif.read ? 'bg-surface border-border' : 'bg-surface border-accent/30 shadow-accent/10'}`}>
+                                        {getNotifIcon(notif.type)}
+                                    </div>
+                                    <div className="flex-1 min-w-0 pt-0.5">
+                                        <div className="flex items-start justify-between gap-4 mb-1">
+                                            <h3 className={`text-base font-bold truncate ${notif.read ? 'text-primary/70' : 'text-primary'}`}>{notif.title}</h3>
+                                            <span className="text-xs font-medium text-secondary/60 shrink-0 uppercase tracking-wider mt-1">{getTimeAgo(notif.created_at)}</span>
+                                        </div>
+                                        <p className={`text-sm leading-relaxed ${notif.read ? 'text-secondary/70' : 'text-secondary'}`}>{notif.message}</p>
+                                    </div>
+                                    {!notif.read && <div className="w-3 h-3 rounded-full bg-accent shrink-0 mt-3 shadow-[0_0_12px_theme('colors.accent')]" />}
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
+
+            {/* Tab 2: My Friends */}
+            {activeTab === 'my-friends' && (
+                <>
+                    <div className="bg-surface border border-border rounded-2xl p-4 mb-8">
+                        <div className="relative">
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+                            <input
+                                type="text"
+                                placeholder="Search friends by name or email..."
+                                value={searchQuery}
+                                onChange={(e) => setSearchQuery(e.target.value)}
+                                className="w-full bg-bg border border-border/80 rounded-xl pl-12 pr-6 py-3.5 text-sm font-medium text-primary placeholder-secondary/50 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
+                            />
+                        </div>
+                    </div>
+                    {loading ? <LoadingSpinner /> : (
+                        (() => {
+                            const filtered = friends.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.email.toLowerCase().includes(searchQuery.toLowerCase()));
+                            if (friends.length === 0) return <EmptyState icon={<Users />} title="No friends yet" desc="Send a friend request to get started." />;
+                            if (filtered.length === 0) return <div className="text-center py-12 text-secondary">No friends match your search.</div>;
+
+                            return (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    {filtered.map(friend => (
+                                        <div key={friend.id} className="bg-surface hover:bg-surface-hover border border-border rounded-2xl p-6 transition-all duration-300 group">
+                                            <div className="flex items-center gap-4 mb-4">
+                                                <Avatar name={friend.name} color={friend.avatar_color} size="lg" />
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-base font-bold text-primary truncate group-hover:text-indigo-400 transition-colors">{friend.name}</h3>
+                                                    <p className="text-xs text-secondary truncate">{friend.email}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between pt-4 border-t border-border/50">
+                                                <span className="text-xs font-semibold text-secondary uppercase tracking-wider px-2 py-1 rounded bg-bg text-secondary/70">{friend.shared_groups_count || 0} Shared Groups</span>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            );
+                        })()
+                    )}
+                </>
+            )}
+
+            {/* Tab 3: Pending Requests */}
+            {activeTab === 'pending' && (
+                <div className="space-y-8">
+                    {/* Received Requests */}
+                    <div>
+                        <h2 className="text-lg font-bold text-primary mb-4 px-1">Received Requests</h2>
+                        <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-xl shadow-black/20">
+                            {loading ? <LoadingSpinner /> : pendingRequests.received.length === 0 ? (
+                                <EmptyState icon={<Mail />} title="No pending invites" desc="When someone sends you a friend request, it will appear here." />
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {pendingRequests.received.map(req => (
+                                        <div key={req.id} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:bg-surface-hover/50 transition-colors">
+                                            <div className="flex items-center gap-4 flex-1 min-w-0">
+                                                <Avatar name={req.sender_name || '?'} color={req.sender_avatar || '#555'} size="lg" />
+                                                <div className="min-w-0">
+                                                    <h3 className="text-base font-bold text-primary truncate">{req.sender_name || 'Unknown User'}</h3>
+                                                    <p className="text-sm text-secondary truncate">wants to be friends with you</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
+                                                <button onClick={() => handleDeclineRequest(req.id)} className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer text-center">
+                                                    Decline
+                                                </button>
+                                                <button onClick={() => handleAcceptRequest(req.id)} className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-[#064E3B] bg-accent hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20 cursor-pointer text-center">
+                                                    Accept <span className="hidden sm:inline">Request</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Sent Requests */}
+                    <div>
+                        <h2 className="text-lg font-bold text-primary mb-4 px-1">Sent Requests <span className="text-secondary font-medium ml-2 text-sm">Waiting for response</span></h2>
+                        <div className="bg-surface border border-border rounded-3xl overflow-hidden">
+                            {loading ? <LoadingSpinner /> : pendingRequests.sent.length === 0 ? (
+                                <div className="p-8 text-center text-secondary text-sm">No sent requests pending.</div>
+                            ) : (
+                                <div className="divide-y divide-border">
+                                    {pendingRequests.sent.map(req => (
+                                        <div key={req.id} className="p-4 sm:p-5 flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-4 min-w-0">
+                                                <div className="w-10 h-10 rounded-full bg-bg border border-border flex items-center justify-center shrink-0">
+                                                    <Mail className="w-4 h-4 text-secondary/60" />
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h3 className="text-sm font-bold text-primary truncate">{req.receiver_email}</h3>
+                                                    <p className="text-xs text-secondary truncate">Requested {getTimeAgo(req.created_at)}</p>
+                                                </div>
+                                            </div>
+                                            <div className="shrink-0 px-3 py-1 rounded bg-amber-500/10 border border-amber-500/20 text-amber-500 text-xs font-bold uppercase tracking-wider">
+                                                Pending
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {/* Tab 4: Add Friend */}
+            {activeTab === 'add' && (
+                <div className="bg-surface border border-border rounded-3xl p-6 sm:p-10 shadow-2xl shadow-black/20 text-center max-w-2xl mx-auto">
+                    <div className="w-20 h-20 rounded-full bg-indigo-500/10 flex items-center justify-center mx-auto mb-6 shadow-inner border border-indigo-500/20">
+                        <UserPlus className="w-8 h-8 text-indigo-400" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-primary mb-2">Send a Friend Request</h2>
+                    <p className="text-secondary mb-8 max-w-md mx-auto leading-relaxed">
+                        Enter your friend's email address below context to send them an invite to connect on SplitEase.
+                    </p>
+
+                    {addMessage && (
+                        <div className={`p-4 rounded-xl mb-6 text-sm font-medium border text-left flex items-start gap-3 ${addMessage.type === 'success' ? 'bg-accent/10 border-accent/30 text-accent' : 'bg-red-500/10 border-red-500/30 text-red-400'
+                            }`}>
+                            {addMessage.type === 'success' ? <Check className="w-5 h-5 shrink-0" /> : <ShieldAlert className="w-5 h-5 shrink-0" />}
+                            {addMessage.text}
+                        </div>
+                    )}
+
+                    <form onSubmit={handleAddFriend} className="flex flex-col sm:flex-row gap-3">
+                        <input
+                            type="email"
+                            value={addEmail}
+                            onChange={(e) => setAddEmail(e.target.value)}
+                            placeholder="friend@example.com"
+                            required
+                            className="flex-1 bg-bg border border-border rounded-xl px-5 py-3.5 text-base text-primary placeholder-secondary/50 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
+                        />
+                        <button
+                            type="submit"
+                            disabled={addLoading || !addEmail}
+                            className="bg-gradient-to-br from-indigo-500 to-indigo-600 hover:from-indigo-400 hover:to-indigo-500 text-white font-bold px-8 py-3.5 rounded-xl transition-all shadow-lg shadow-indigo-500/20 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+                        >
+                            {addLoading ? (
+                                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                            ) : (
+                                <>
+                                    <Send className="w-4 h-4" /> Send Request
+                                </>
+                            )}
+                        </button>
+                    </form>
+                </div>
+            )}
+        </div>
+    );
+}
+
+// UI Helpers
+function TabButton({ active, onClick, icon, label }: { active: boolean, onClick: () => void, icon: React.ReactNode, label: string }) {
+    return (
+        <button
+            onClick={onClick}
+            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap focus:outline-none ${active
+                    ? 'bg-bg text-primary shadow-inner shadow-black/50 border border-border/50'
+                    : 'text-secondary/80 hover:text-primary hover:bg-white/5 border border-transparent'
+                }`}
+        >
+            <span className={`w-4 h-4 ${active ? 'text-accent' : 'text-current opacity-70'}`}>{icon}</span>
+            {label}
+        </button>
+    );
+}
+
+function LoadingSpinner() {
+    return (
+        <div className="flex justify-center py-20">
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin" />
+        </div>
+    );
+}
+
+function EmptyState({ icon, title, desc }: { icon: React.ReactNode, title: string, desc: string }) {
+    return (
+        <div className="py-24 text-center px-6">
+            <div className="w-16 h-16 bg-white/5 rounded-2xl flex items-center justify-center mx-auto mb-5 border border-white/10 shadow-inner">
+                <span className="w-8 h-8 text-white/30 [&>svg]:w-full [&>svg]:h-full">{icon}</span>
+            </div>
+            <h3 className="text-xl font-bold text-primary mb-2">{title}</h3>
+            <p className="text-sm text-secondary max-w-sm mx-auto">{desc}</p>
         </div>
     );
 }

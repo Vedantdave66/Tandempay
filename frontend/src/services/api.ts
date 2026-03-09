@@ -237,3 +237,26 @@ export const meApi = {
     getPayments: () => request<SettlementRecord[]>('/me/payments'),
     getFriends: () => request<Friend[]>('/me/friends'),
 };
+
+// --- Friend Requests ---
+export interface FriendRequest {
+    id: string;
+    sender_id: string;
+    receiver_email: string;
+    status: string;
+    created_at: string;
+    updated_at: string;
+    sender_name?: string;
+    sender_avatar?: string;
+}
+
+export const friendRequestsApi = {
+    send: (email: string) =>
+        request<FriendRequest>('/friends/requests', {
+            method: 'POST',
+            body: JSON.stringify({ email })
+        }),
+    getPending: () => request<{ sent: FriendRequest[], received: FriendRequest[] }>('/friends/requests/pending'),
+    accept: (id: string) => request<{ status: string }>(`/friends/requests/${id}/accept`, { method: 'PUT' }),
+    decline: (id: string) => request<{ status: string }>(`/friends/requests/${id}/decline`, { method: 'PUT' }),
+};

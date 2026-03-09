@@ -177,3 +177,24 @@ class NotificationOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Friend Requests ---
+class FriendRequestCreate(BaseModel):
+    email: EmailStr
+
+
+class FriendRequestOut(BaseModel):
+    id: str
+    sender_id: str
+    receiver_email: str
+    status: str
+    created_at: datetime
+    updated_at: datetime
+    
+    # Optional nested data for the frontend
+    sender_name: str | None = None
+    sender_avatar: str | None = None
+
+    class Config:
+        from_attributes = True
