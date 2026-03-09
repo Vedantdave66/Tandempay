@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X, Users } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 
@@ -103,13 +103,26 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             navigate('/friends');
                             setIsMobileMenuOpen(false);
                         }}
-                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/friends'
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/friends' && !location.search.includes('tab=activity')
                             ? 'bg-warning/10 text-warning font-bold'
                             : 'text-secondary hover:text-primary hover:bg-surface-hover'
                             }`}
                     >
                         <Users className="w-5 h-5" />
                         Friends
+                    </button>
+                    <button
+                        onClick={() => {
+                            navigate('/friends?tab=activity');
+                            setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/friends' && location.search.includes('tab=activity')
+                            ? 'bg-accent/10 text-accent font-bold'
+                            : 'text-secondary hover:text-primary hover:bg-surface-hover'
+                            }`}
+                    >
+                        <Activity className="w-5 h-5" />
+                        Activity
                     </button>
                 </nav>
 
