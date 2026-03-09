@@ -38,6 +38,7 @@ export interface User {
     name: string;
     email: string;
     avatar_color: string;
+    wallet_balance: number;
     created_at: string;
 }
 
@@ -259,4 +260,14 @@ export const friendRequestsApi = {
     getPending: () => request<{ sent: FriendRequest[], received: FriendRequest[] }>('/friends/requests/pending'),
     accept: (id: string) => request<{ status: string }>(`/friends/requests/${id}/accept`, { method: 'PUT' }),
     decline: (id: string) => request<{ status: string }>(`/friends/requests/${id}/decline`, { method: 'PUT' }),
+};
+
+// --- Wallet ---
+export const walletApi = {
+    addFunds: (amount: number, source: string) =>
+        request<User>('/wallet/add-funds', {
+            method: 'POST',
+            body: JSON.stringify({ amount, source })
+        }),
+    getBalance: () => request<User>('/wallet/balance'),
 };

@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react';
 import { CreditCard, History, Wallet, CheckCircle2, AlertCircle } from 'lucide-react';
 import { meApi, SettlementRecord, settlementRecordsApi } from '../services/api';
 import PaymentRecordCard from '../components/PaymentRecordCard';
+import AddFundsModal from '../components/AddFundsModal';
 import { useAuth } from '../context/AuthContext';
 
 export default function PaymentsPage() {
-    const { user } = useAuth();
+    const { user, refetchUser } = useAuth();
     const [payments, setPayments] = useState<SettlementRecord[]>([]);
     const [loading, setLoading] = useState(true);
+    const [isAddFundsOpen, setIsAddFundsOpen] = useState(false);
 
     useEffect(() => {
         loadPayments();
@@ -54,9 +56,12 @@ export default function PaymentsPage() {
                     </div>
                     <div className="relative z-10">
                         <p className="text-sm font-medium text-white/60 mb-1">Available Funds</p>
-                        <p className="text-4xl font-black text-white tracking-tight mb-6">$0.00</p>
+                        <p className="text-4xl font-black text-white tracking-tight mb-6">${(user?.wallet_balance || 0).toFixed(2)}</p>
                         <div className="flex gap-3">
-                            <button className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm border border-white/5 cursor-not-allowed opacity-50">
+                            <button
+                                onClick={() => setIsAddFundsOpen(true)}
+                                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm border border-white/5 cursor-pointer"
+                            >
                                 Add Funds
                             </button>
                             <button className="flex-1 bg-indigo hover:bg-indigo-hover text-white font-semibold py-2.5 rounded-xl transition-colors text-sm shadow-lg shadow-indigo/20 cursor-not-allowed opacity-50">
@@ -144,6 +149,14 @@ export default function PaymentsPage() {
                     </div>
                 </div>
             )}
+
+            <AddFundsModal
+                isOpen={isAddFundsOpen}
+                onClose={() => setIsAddFundsOpen(false)}
+                onSuccess={() => {
+                    refetchUser(); // Ensure entire app context is synced
+                }}
+            />
         </div>
     );
 }

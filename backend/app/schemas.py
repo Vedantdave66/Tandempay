@@ -25,6 +25,7 @@ class UserOut(BaseModel):
     name: str
     email: str
     avatar_color: str
+    wallet_balance: float = 0.0
     interac_email: str | None = None
     created_at: datetime
 

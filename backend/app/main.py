@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import engine, Base
-from app.routes import auth, groups, expenses, settlements, notifications, me, friends
+from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet
 from app.services import balance_service
 
 
@@ -19,6 +19,11 @@ async def lifespan(app: FastAPI):
         # Simple auto-migration for existing databases
         try:
             await conn.execute(text("ALTER TABLE users ADD COLUMN interac_email VARCHAR(255);"))
+        except Exception:
+            pass  # Ignore if column already exists
+            
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN wallet_balance FLOAT DEFAULT 0.0;"))
         except Exception:
             pass  # Ignore if column already exists
             
@@ -48,6 +53,7 @@ app.include_router(balance_service.router)
 app.include_router(settlements.router)
 app.include_router(notifications.router)
 app.include_router(friends.router)
+app.include_router(wallet.router)
 
 
 @app.get("/")
