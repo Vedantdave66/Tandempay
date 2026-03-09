@@ -8,11 +8,20 @@ from app.routes import auth, groups, expenses, settlements, notifications, me
 from app.services import balance_service
 
 
+from sqlalchemy import text
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Create tables on startup
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        
+        # Simple auto-migration for existing databases
+        try:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN interac_email VARCHAR(255);"))
+        except Exception:
+            pass  # Ignore if column already exists
+            
     yield
 
 
