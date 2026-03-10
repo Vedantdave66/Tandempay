@@ -91,13 +91,13 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
-            <div className="relative bg-[#0C0E14] border border-[#1E2230]/80 rounded-3xl w-full max-w-md mx-4 shadow-[0_25px_60px_rgba(0,0,0,0.6)] overflow-hidden">
+            <div className="relative bg-surface border border-border rounded-3xl w-full max-w-md mx-4 shadow-[0_25px_60px_rgba(0,0,0,0.6)] overflow-hidden">
                 {/* Ambient glow */}
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
                 {/* Header */}
                 <div className="relative flex items-center justify-between p-6 pb-4">
-                    <h2 className="text-lg font-bold text-white">
+                    <h2 className="text-lg font-bold text-primary">
                         {step === 'method' && 'Settle Up'}
                         {step === 'etransfer' && 'E-Transfer'}
                         {step === 'in_app_link' && 'Link Account'}
@@ -133,11 +133,11 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                     <ArrowRight className="w-5 h-5 text-accent" />
                                     <Avatar name={settlement.to_user_name} color={settlement.to_avatar_color} size="md" />
                                 </div>
-                                <p className="text-sm text-white/50 mb-1">Amount to settle</p>
-                                <p className="text-4xl font-black text-white tracking-tight">
+                                <p className="text-sm text-secondary mb-1">Amount to settle</p>
+                                <p className="text-4xl font-black text-primary tracking-tight">
                                     ${settlement.amount.toFixed(2)}
                                 </p>
-                                <p className="text-sm text-white/40 mt-2">
+                                <p className="text-sm text-secondary mt-2">
                                     {settlement.from_user_name} → {settlement.to_user_name}
                                 </p>
                             </div>
@@ -153,7 +153,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                         <Wallet className="w-6 h-6 text-accent" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <p className="text-sm font-bold text-white mb-0.5">Pay with Wallet</p>
+                                        <p className="text-sm font-bold text-primary mb-0.5">Pay with Wallet</p>
                                         <div className="flex items-center gap-2">
                                             {walletBalance !== null ? (
                                                 <>
@@ -181,8 +181,8 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                         <Building2 className="w-6 h-6 text-indigo" />
                                     </div>
                                     <div className="text-left flex-1">
-                                        <p className="text-sm font-bold text-white">E-Transfer</p>
-                                        <p className="text-xs text-white/40">Send via your banking app</p>
+                                        <p className="text-sm font-bold text-primary">E-Transfer</p>
+                                        <p className="text-xs text-secondary">Send via your banking app</p>
                                     </div>
                                     <ArrowRight className="w-4 h-4 text-white/20 group-hover:text-indigo transition-colors" />
                                 </button>
@@ -209,10 +209,10 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                 </div>
 
                                 <div className="space-y-3">
-                                    <div className="flex items-center justify-between bg-[#09090B] rounded-xl px-4 py-3 border border-white/5">
+                                    <div className="flex items-center justify-between bg-bg rounded-xl px-4 py-3 border border-border">
                                         <div>
-                                            <p className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5">Email</p>
-                                            <p className="text-sm font-bold text-white">{recipientEmail}</p>
+                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">Email</p>
+                                            <p className="text-sm font-bold text-primary">{recipientEmail}</p>
                                         </div>
                                         <button
                                             onClick={handleCopyEmail}
@@ -223,9 +223,9 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                         </button>
                                     </div>
 
-                                    <div className="flex items-center justify-between bg-[#09090B] rounded-xl px-4 py-3 border border-white/5">
+                                    <div className="flex items-center justify-between bg-bg rounded-xl px-4 py-3 border border-border">
                                         <div>
-                                            <p className="text-[10px] text-white/30 uppercase tracking-widest mb-0.5">Amount</p>
+                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">Amount</p>
                                             <p className="text-lg font-black text-accent">${settlement.amount.toFixed(2)}</p>
                                         </div>
                                     </div>

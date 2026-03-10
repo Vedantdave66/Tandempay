@@ -33,7 +33,7 @@ export default function PaymentRecordCard({ record, currentUserId, groupId, onUp
     const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
     return (
-        <div className="bg-[#0C0E14] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all duration-300">
+        <div className="bg-surface-light border border-border rounded-2xl p-5 hover:border-primary/20 transition-all duration-300">
             {/* Top: Who pays whom */}
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-3">
@@ -47,14 +47,14 @@ export default function PaymentRecordCard({ record, currentUserId, groupId, onUp
             {/* Details row */}
             <div className="flex items-center justify-between mb-4">
                 <div>
-                    <p className="text-xs text-white/40 mb-0.5">
+                    <p className="text-xs text-secondary mb-0.5">
                         {record.payer_name} → {record.payee_name}
                     </p>
-                    <p className="text-[10px] text-white/20">
+                    <p className="text-[10px] text-secondary/70">
                         {formatted} • {record.method === 'in_app' ? 'In-App' : 'E-Transfer'}
                     </p>
                 </div>
-                <p className="text-xl font-black text-white tracking-tight">
+                <p className="text-xl font-black text-primary tracking-tight">
                     ${record.amount.toFixed(2)}
                 </p>
             </div>

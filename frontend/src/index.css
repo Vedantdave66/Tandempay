@@ -39,18 +39,17 @@
 
 :root[data-theme="light"] {
   /* Light Mode */
-  --color-bg-base: #F7F9FC;
+  --color-bg-base: #F1F5F9;
   --color-surface-base: #FFFFFF;
-  --color-surface-hover-base: #F1F5F9;
+  --color-surface-hover-base: #F8FAFC;
   --color-surface-light-base: #FFFFFF;
-  --color-border-base: #E2E8F0;
-  --color-primary-base: #0F172A;
-  --color-secondary-base: #64748B;
+  --color-border-base: #CBD5E1;
+  --color-primary-base: #020617;
+  --color-secondary-base: #475569;
   --color-accent-base: #16A34A;
-  /* Slightly darker green for contrast */
   --color-accent-hover-base: #15803D;
-  --color-indigo-base: #6366F1;
-  --color-danger-base: #EF4444;
+  --color-indigo-base: #4F46E5;
+  --color-danger-base: #DC2626;
   --color-warning-base: #F59E0B;
   --color-gold-base: #D4A853;
 }
@@ -67,7 +66,7 @@ body {
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 0.3s ease, color 0.3s ease;
+  transition: background-color 0.5s ease, color 0.5s ease;
 }
 
 /* Scrollbar */

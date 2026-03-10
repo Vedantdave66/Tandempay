@@ -468,7 +468,7 @@ export default function GroupPage() {
                                             <div className="flex items-center gap-3">
                                                 <Avatar name={req.requester_name || 'User'} color={req.requester_avatar || '#fff'} size="md" />
                                                 <div>
-                                                    <p className="text-sm font-medium text-white">
+                                                    <p className="text-sm font-medium text-primary">
                                                         <span className="font-bold">{req.requester_name}</span> requested <span className="text-indigo font-bold">${req.amount.toFixed(2)}</span>
                                                     </p>
                                                     {req.note && <p className="text-xs text-secondary mt-0.5">"{req.note}"</p>}
@@ -514,16 +514,16 @@ export default function GroupPage() {
                                     {effectiveSettlements.map((s, i) => {
                                         const canSettle = s.from_user_id === user?.id;
                                         return (
-                                            <div key={i} className="bg-[#0C0E14] border border-white/[0.06] rounded-2xl p-5 hover:border-white/10 transition-all duration-300">
+                                            <div key={i} className="bg-surface-light border border-border rounded-2xl p-5 hover:border-primary/20 transition-all duration-300">
                                                 <div className="flex items-center gap-3 mb-3">
                                                     <Avatar name={s.from_user_name} color={s.from_avatar_color} size="md" />
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-center gap-2 text-sm">
-                                                            <span className="font-semibold text-white truncate">{s.from_user_name}</span>
+                                                            <span className="font-semibold text-primary truncate">{s.from_user_name}</span>
                                                             <ArrowRight className="w-4 h-4 text-accent shrink-0" />
-                                                            <span className="font-semibold text-white truncate">{s.to_user_name}</span>
+                                                            <span className="font-semibold text-primary truncate">{s.to_user_name}</span>
                                                         </div>
-                                                        <p className="text-xs text-white/40 mt-0.5">
+                                                        <p className="text-xs text-secondary mt-0.5">
                                                             owes <span className="text-accent font-bold">${s.amount.toFixed(2)}</span>
                                                         </p>
                                                     </div>
