@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
+import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import DashboardPage from './pages/DashboardPage';
 import GroupPage from './pages/GroupPage';
 import InvitePage from './pages/InvitePage';
@@ -47,6 +48,7 @@ export default function App() {
                     <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
                     <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
                     <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+                    <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
                     <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
                     <Route path="/payments" element={<ProtectedRoute><Layout><PaymentsPage /></Layout></ProtectedRoute>} />
                     <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
