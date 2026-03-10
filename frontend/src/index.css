@@ -1,23 +1,58 @@
 @import "tailwindcss";
 
 @theme {
-  --color-bg: #09090B;
-  --color-surface: #111318;
-  --color-surface-hover: #1A1D27;
-  --color-surface-light: #151821;
-  --color-border: #1E2230;
-  --color-primary: #F5F7FA;
-  --color-secondary: #A1A1AA;
-  --color-accent: #4ADE80;
-  --color-accent-hover: #22C55E;
-  --color-indigo: #818CF8;
-  --color-danger: #EF4444;
-  --color-warning: #F59E0B;
-  --color-gold: #D4A853;
+  --color-bg: var(--color-bg-base);
+  --color-surface: var(--color-surface-base);
+  --color-surface-hover: var(--color-surface-hover-base);
+  --color-surface-light: var(--color-surface-light-base);
+  --color-border: var(--color-border-base);
+  --color-primary: var(--color-primary-base);
+  --color-secondary: var(--color-secondary-base);
+  --color-accent: var(--color-accent-base);
+  --color-accent-hover: var(--color-accent-hover-base);
+  --color-indigo: var(--color-indigo-base);
+  --color-danger: var(--color-danger-base);
+  --color-warning: var(--color-warning-base);
+  --color-gold: var(--color-gold-base);
   --font-sans: 'Plus Jakarta Sans', system-ui, sans-serif;
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 8px;
+}
+
+:root {
+  /* Dark Mode (Default) */
+  --color-bg-base: #09090B;
+  --color-surface-base: #111318;
+  --color-surface-hover-base: #1A1D27;
+  --color-surface-light-base: #151821;
+  --color-border-base: #1E2230;
+  --color-primary-base: #F5F7FA;
+  --color-secondary-base: #A1A1AA;
+  --color-accent-base: #4ADE80;
+  --color-accent-hover-base: #22C55E;
+  --color-indigo-base: #818CF8;
+  --color-danger-base: #EF4444;
+  --color-warning-base: #F59E0B;
+  --color-gold-base: #D4A853;
+}
+
+:root[data-theme="light"] {
+  /* Light Mode */
+  --color-bg-base: #F7F9FC;
+  --color-surface-base: #FFFFFF;
+  --color-surface-hover-base: #F1F5F9;
+  --color-surface-light-base: #FFFFFF;
+  --color-border-base: #E2E8F0;
+  --color-primary-base: #0F172A;
+  --color-secondary-base: #64748B;
+  --color-accent-base: #16A34A;
+  /* Slightly darker green for contrast */
+  --color-accent-hover-base: #15803D;
+  --color-indigo-base: #6366F1;
+  --color-danger-base: #EF4444;
+  --color-warning-base: #F59E0B;
+  --color-gold-base: #D4A853;
 }
 
 * {
@@ -27,29 +62,35 @@
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--color-bg);
-  color: var(--color-primary);
+  background-color: var(--color-bg-base);
+  color: var(--color-primary-base);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;
 }
+
 ::-webkit-scrollbar-track {
   background: var(--color-bg);
 }
+
 ::-webkit-scrollbar-thumb {
   background: var(--color-border);
   border-radius: 3px;
 }
+
 ::-webkit-scrollbar-thumb:hover {
   background: var(--color-secondary);
 }
 
 /* Input styling */
-input, select, textarea {
+input,
+select,
+textarea {
   font-family: var(--font-sans);
 }

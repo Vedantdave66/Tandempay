@@ -4,6 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
+import ThemeToggle from './ThemeToggle';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
     const { user, logout } = useAuth();
@@ -27,6 +28,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     <span className="text-lg font-bold text-primary">SplitEase</span>
                 </div>
                 <div className="flex items-center gap-2">
+                    <ThemeToggle />
                     <NotificationBell />
                     <button
                         onClick={() => setIsMobileMenuOpen(true)}
@@ -126,9 +128,16 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     </button>
                 </nav>
 
-                {/* Notification Bell Desktop */}
-                <div className="hidden md:flex px-4 pb-2 justify-start">
-                    <NotificationBell />
+                {/* Notification Bell & Theme Desktop */}
+                <div className="hidden md:flex flex-col gap-3 px-4 pb-4 border-b border-border mb-2">
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-secondary">Theme</span>
+                        <ThemeToggle />
+                    </div>
+                    <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-secondary">Notifications</span>
+                        <NotificationBell />
+                    </div>
                 </div>
 
                 {/* User */}
