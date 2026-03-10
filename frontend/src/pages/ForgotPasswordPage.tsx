@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Wallet, Mail, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { authApi } from '../services/api';
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -11,11 +12,17 @@ export default function ForgotPasswordPage() {
         e.preventDefault();
         setLoading(true);
 
-        // Simulate API call for password reset
-        await new Promise(resolve => setTimeout(resolve, 1500));
-
-        setLoading(false);
-        setSubmitted(true);
+        try {
+            await authApi.forgotPassword(email);
+            setSubmitted(true);
+        } catch (error) {
+            console.error('Password reset request failed:', error);
+            // We usually proceed anyway to prevent email enumeration,
+            // but log it just in case.
+            setSubmitted(true);
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
