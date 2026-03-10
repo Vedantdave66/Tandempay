@@ -16,16 +16,19 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         
-        # Simple auto-migration for existing databases
-        try:
+    # Simple auto-migration for existing databases
+    # Isolated so that an error doesn't abort the entire Postgres transaction block
+    try:
+        async with engine.begin() as conn:
             await conn.execute(text("ALTER TABLE users ADD COLUMN interac_email VARCHAR(255);"))
-        except Exception:
-            pass  # Ignore if column already exists
-            
-        try:
+    except Exception:
+        pass  # Ignore if column already exists
+        
+    try:
+        async with engine.begin() as conn:
             await conn.execute(text("ALTER TABLE users ADD COLUMN wallet_balance FLOAT DEFAULT 0.0;"))
-        except Exception:
-            pass  # Ignore if column already exists
+    except Exception:
+        pass  # Ignore if column already exists
             
     yield
 
