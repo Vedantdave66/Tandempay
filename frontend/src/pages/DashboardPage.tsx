@@ -64,7 +64,7 @@ export default function DashboardPage() {
                             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                             <span className="text-xs font-semibold text-accent uppercase tracking-wider">Dashboard Overview</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-primary to-secondary mb-4 drop-shadow-sm tracking-tight">
+                        <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-4 drop-shadow-sm tracking-tight">
                             Welcome back, {user?.name?.split(' ')[0]}
                         </h1>
                         <p className="text-secondary tracking-wide text-base leading-relaxed">

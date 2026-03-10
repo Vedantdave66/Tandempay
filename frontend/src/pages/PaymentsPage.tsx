@@ -87,15 +87,15 @@ export default function PaymentsPage() {
                         <div className="w-10 h-10 bg-indigo/20 rounded-xl flex items-center justify-center border border-indigo/30">
                             <Wallet className="w-5 h-5 text-indigo" />
                         </div>
-                        <h3 className="text-lg font-bold text-white">SplitEase Balance</h3>
+                        <h3 className="text-lg font-bold text-primary">SplitEase Balance</h3>
                     </div>
                     <div className="relative z-10">
-                        <p className="text-sm font-medium text-white/60 mb-1">Available Funds</p>
-                        <p className="text-4xl font-black text-white tracking-tight mb-6">${(user?.wallet_balance || 0).toFixed(2)}</p>
+                        <p className="text-sm font-medium text-secondary mb-1">Available Funds</p>
+                        <p className="text-4xl font-black text-primary tracking-tight mb-6">${(user?.wallet_balance || 0).toFixed(2)}</p>
                         <div className="flex gap-3">
                             <button
                                 onClick={() => setIsAddFundsOpen(true)}
-                                className="flex-1 bg-white/10 hover:bg-white/20 text-white font-semibold py-2.5 rounded-xl transition-colors text-sm border border-white/5 cursor-pointer"
+                                className="flex-1 bg-surface-light border-border text-primary hover:bg-border font-semibold py-2.5 rounded-xl transition-colors text-sm border cursor-pointer"
                             >
                                 Add Funds
                             </button>
@@ -107,7 +107,7 @@ export default function PaymentsPage() {
                                 {withdrawLoading ? 'Processing...' : 'Withdraw'}
                             </button>
                         </div>
-                        <p className="text-xs text-white/40 mt-3 text-center">Powered by SplitEase Ledger</p>
+                        <p className="text-xs text-secondary mt-3 text-center">Powered by SplitEase Ledger</p>
                     </div>
                 </div>
 

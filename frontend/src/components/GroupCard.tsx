@@ -24,7 +24,7 @@ export default function GroupCard({ group }: GroupCardProps) {
                 {/* Group Avatar / Initial Container */}
                 <div className="relative shrink-0">
                     <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-surface to-bg flex items-center justify-center shadow-inner border border-border/80 group-hover:border-accent/40 transition-colors duration-500 relative z-10">
-                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-gray-400 group-hover:from-accent group-hover:to-emerald-200 transition-all duration-500">
+                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary group-hover:from-accent group-hover:to-emerald-500 transition-all duration-500">
                             {initial}
                         </span>
                     </div>
@@ -37,7 +37,7 @@ export default function GroupCard({ group }: GroupCardProps) {
                 </div>
 
                 <div className="flex-1 min-w-0 pt-1">
-                    <h3 className="text-[1.15rem] font-black text-primary truncate mb-1.5 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-white group-hover:to-accent transition-all duration-300">
+                    <h3 className="text-[1.15rem] font-black text-primary truncate mb-1.5 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-accent transition-all duration-300">
                         {group.name}
                     </h3>
                     <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg/60 border border-border/40">
