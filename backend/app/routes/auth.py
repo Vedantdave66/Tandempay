@@ -130,13 +130,18 @@ def send_reset_email_sync(to_email: str, reset_link: str):
     msg.attach(MIMEText(html, 'html'))
 
     try:
-        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT)
+        print(f"DEBUG: Attempting to send reset email to {to_email} via {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
+        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=10)
         server.starttls()
         server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
         server.send_message(msg)
         server.quit()
+        print(f"DEBUG: Reset email sent successfully to {to_email}")
     except Exception as e:
-        print(f"Failed to send email: {e}")
+        print(f"CRITICAL ERROR: Failed to send email to {to_email}: {str(e)}")
+        # If it's a login error, it might be an App Password issue
+        if "Authentication failed" in str(e) or "application-specific password" in str(e).lower():
+            print("TIP: If using Gmail, ensure you've created an App Password if 2FA is enabled.")
 
 
 @router.post("/forgot-password")
