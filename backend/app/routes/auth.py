@@ -99,15 +99,14 @@ async def me(current_user: User = Depends(get_current_user)):
     return current_user
 
 
-def send_reset_email_sync(to_email: str, reset_link: str):
-    if not settings.SMTP_USERNAME or not settings.SMTP_PASSWORD:
-        print(f"SMTP not configured. Would have sent robust reset link to {to_email}: {reset_link}")
-        return
+import resend
 
-    msg = MIMEMultipart()
-    msg['From'] = f"SplitEase <{settings.SMTP_USERNAME}>"
-    msg['To'] = to_email
-    msg['Subject'] = "Reset your SplitEase Password"
+resend.api_key = settings.RESEND_API_KEY
+
+def send_reset_email_sync(to_email: str, reset_link: str):
+    if not settings.RESEND_API_KEY:
+        print(f"RESEND_API_KEY not configured. Would have sent reset link to {to_email}: {reset_link}")
+        return
 
     html = f"""
     <html>
@@ -127,21 +126,19 @@ def send_reset_email_sync(to_email: str, reset_link: str):
       </body>
     </html>
     """
-    msg.attach(MIMEText(html, 'html'))
 
     try:
-        print(f"DEBUG: Attempting to send reset email to {to_email} via {settings.SMTP_SERVER}:{settings.SMTP_PORT}")
-        server = smtplib.SMTP(settings.SMTP_SERVER, settings.SMTP_PORT, timeout=10)
-        server.starttls()
-        server.login(settings.SMTP_USERNAME, settings.SMTP_PASSWORD)
-        server.send_message(msg)
-        server.quit()
-        print(f"DEBUG: Reset email sent successfully to {to_email}")
+        print(f"DEBUG: Attempting to send reset email to {to_email} via Resend API")
+        params = {
+            "from": "SplitEase <onboarding@resend.dev>",
+            "to": [to_email],
+            "subject": "Reset your SplitEase Password",
+            "html": html,
+        }
+        email = resend.Emails.send(params)
+        print(f"DEBUG: Reset email sent successfully to {to_email}. ID: {email['id']}")
     except Exception as e:
-        print(f"CRITICAL ERROR: Failed to send email to {to_email}: {str(e)}")
-        # If it's a login error, it might be an App Password issue
-        if "Authentication failed" in str(e) or "application-specific password" in str(e).lower():
-            print("TIP: If using Gmail, ensure you've created an App Password if 2FA is enabled.")
+        print(f"CRITICAL ERROR: Failed to send email via Resend to {to_email}: {str(e)}")
 
 
 @router.post("/forgot-password")

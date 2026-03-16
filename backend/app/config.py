@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
+    RESEND_API_KEY: str = ""
     FRONTEND_URL: str = "http://localhost:5173"
 
     # Plaid Configuration

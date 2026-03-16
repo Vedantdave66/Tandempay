@@ -11,3 +11,4 @@ python-jose[cryptography]==3.3.0
 python-dotenv==1.0.1
 stripe
 plaid-python
+resend
