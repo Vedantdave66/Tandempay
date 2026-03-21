@@ -132,9 +132,8 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
     </html>
     """
 
-    # IDENTIFIED RISK: 'onboarding@resend.dev' only works for the email associated with the Resend account
-    # if the domain is not verified.
-    from_email = "onboarding@resend.dev"
+    # Use the configured 'from' email from settings, defaulting to onboarding@resend.dev
+    from_email = settings.RESEND_FROM_EMAIL
     
     try:
         print(f"DEBUG: [RESEND] Attempting send: from={from_email}, to={to_email}, subject='Reset your SplitEase Password'")
@@ -159,8 +158,14 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
     except Exception as e:
         error_msg = str(e)
         print(f"CRITICAL ERROR: [RESEND] Exception during email send: {error_msg}")
-        # Log the type of exception which often contains detail in Resend SDK
-        print(f"DEBUG: [RESEND] Exception Type: {type(e).__name__}")
+        
+        # PROVIDE CLEARER CONTEXT FOR 403 FORBIDDEN
+        if "403" in error_msg:
+            print("IMPORTANT: Resend returned 403 Forbidden. This typically means:")
+            print(f"1. You are in Sandbox mode and trying to send to a non-owner email ({to_email}).")
+            print(f"2. Your 'from' address ({from_email}) is not from a verified domain.")
+            print("3. Your API Key is invalid or restricted.")
+
         return {"success": False, "response": None, "error": error_msg}
 
 
