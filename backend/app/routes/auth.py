@@ -103,10 +103,15 @@ import resend
 
 resend.api_key = settings.RESEND_API_KEY
 
-def send_reset_email_sync(to_email: str, reset_link: str):
+def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
+    """
+    Sends a password reset email via Resend and returns the full API response.
+    Returns a dict with {'success': bool, 'response': any, 'error': str}
+    """
     if not settings.RESEND_API_KEY:
-        print(f"RESEND_API_KEY not configured. Would have sent reset link to {to_email}: {reset_link}")
-        return
+        msg = f"RESEND_API_KEY not configured. Mocking email to {to_email}"
+        print(f"DEBUG: {msg}")
+        return {"success": False, "error": "API Key not configured", "response": None}
 
     html = f"""
     <html>
@@ -127,18 +132,59 @@ def send_reset_email_sync(to_email: str, reset_link: str):
     </html>
     """
 
+    # IDENTIFIED RISK: 'onboarding@resend.dev' only works for the email associated with the Resend account
+    # if the domain is not verified.
+    from_email = "onboarding@resend.dev"
+    
     try:
-        print(f"DEBUG: Attempting to send reset email to {to_email} via Resend API")
+        print(f"DEBUG: [RESEND] Attempting send: from={from_email}, to={to_email}, subject='Reset your SplitEase Password'")
         params = {
-            "from": "onboarding@resend.dev",
+            "from": from_email,
             "to": [to_email],
             "subject": "Reset your SplitEase Password",
             "html": html,
         }
-        email = resend.Emails.send(params)
-        print(f"DEBUG: Reset email sent successfully to {to_email}. ID: {email['id']}")
+        response = resend.Emails.send(params)
+        
+        # Log the full response for diagnosis
+        print(f"DEBUG: [RESEND] API Response: {response}")
+        
+        if "id" in response:
+            print(f"DEBUG: [RESEND] Success! Message ID: {response['id']}")
+            return {"success": True, "response": response, "error": None}
+        else:
+            print(f"DEBUG: [RESEND] API returned success but no ID found: {response}")
+            return {"success": False, "response": response, "error": "No ID in response"}
+            
     except Exception as e:
-        print(f"CRITICAL ERROR: Failed to send email via Resend to {to_email}: {str(e)}")
+        error_msg = str(e)
+        print(f"CRITICAL ERROR: [RESEND] Exception during email send: {error_msg}")
+        # Log the type of exception which often contains detail in Resend SDK
+        print(f"DEBUG: [RESEND] Exception Type: {type(e).__name__}")
+        return {"success": False, "response": None, "error": error_msg}
+
+
+@router.post("/debug/send-test-email")
+async def send_test_email(to_email: str):
+    """
+    DEBUG ONLY: Manually trigger a test email via Resend to diagnose delivery issues.
+    """
+    print(f"DEBUG: Manual test email trigger for {to_email}")
+    result = await asyncio.to_thread(send_reset_email_sync, to_email, "https://splitease.app/test-link")
+    
+    if result["success"]:
+        return {
+            "status": "success",
+            "message": "Resend accepted the request",
+            "api_response": result["response"]
+        }
+    else:
+        return {
+            "status": "error",
+            "message": "Resend request failed",
+            "error": result["error"],
+            "api_response": result["response"]
+        }
 
 
 @router.post("/forgot-password")
@@ -157,12 +203,25 @@ async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
         print(f"DEBUG: Password reset link generated for {user.email}: {reset_link}")
         
-        # Dispatch the email asynchronously so we don't block the request
-        asyncio.create_task(asyncio.to_thread(send_reset_email_sync, user.email, reset_link))
+        # Dispatch the email and AWAIT the result to ensure we catch API errors
+        # Note: In production we might still return a generic success message,
+        # but for debugging we need to know if the CALL itself failed.
+        result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
+        
+        if not result["success"]:
+            # If the CALL failed (e.g. invalid API key or domain), we should know
+            print(f"ERROR: Failed to dispatch reset email to {user.email}: {result['error']}")
+            # For debugging purposes, we'll raise an error here. 
+            # In pure production, you might still want to return 200 to prevent enumeration,
+            # but right now we are DEBUGGING why emails aren't arriving.
+            raise HTTPException(
+                status_code=500, 
+                detail=f"Email delivery service failure: {result['error']}"
+            )
     else:
         print(f"DEBUG: Password reset requested for non-existent email: {email_lower}")
     
-    # Always return success to prevent email enumeration
+    # Always return success if we got this far to prevent email enumeration
     return {"message": "If an account with that email exists, we have sent a password reset link."}
 
 
