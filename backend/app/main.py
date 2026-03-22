@@ -56,17 +56,14 @@ app = FastAPI(title="Tandem API", version="1.0.0", lifespan=lifespan)
 
 # CORS: allow local dev + production frontend URL from env
 
-cors_origins = [
-    "http://localhost:5173", 
-    "http://127.0.0.1:5173",
-    "https://splitease-web.onrender.com"
-]
-if os.environ.get("CORS_ORIGINS"):
-    cors_origins.extend([o.strip() for o in os.environ["CORS_ORIGINS"].split(",") if o.strip()])
-
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://localhost:5173",
+        "https://tandempay.ca",
+        "https://www.tandempay.ca"
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

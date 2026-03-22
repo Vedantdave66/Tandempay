@@ -1,9 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Replace this with the Render URL when deploying, or use your local IP for testing
-let API_BASE = 'https://splitease-api-j2zx.onrender.com/api';
+export const BASE_URL = "https://api.tandempay.ca";
 
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await AsyncStorage.getItem('token');
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -13,7 +12,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}${path}`, {
+    const cleanEndpoint = endpoint.replace(/^\/?(api\/)?/, '');
+    const res = await fetch(`${BASE_URL}/api/${cleanEndpoint}`, {
         ...options,
         headers,
     });

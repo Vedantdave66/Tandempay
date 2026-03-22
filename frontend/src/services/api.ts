@@ -1,11 +1,6 @@
-let API_BASE = import.meta.env.VITE_API_URL || '/api';
+export const BASE_URL = "https://api.tandempay.ca";
 
-// If Render injected just the host (e.g., "splitease-api-xyz.onrender.com")
-if (API_BASE && !API_BASE.startsWith('http') && API_BASE !== '/api') {
-    API_BASE = `https://${API_BASE}/api`;
-}
-
-async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
         'Content-Type': 'application/json',
@@ -15,7 +10,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${API_BASE}${path}`, {
+    const cleanEndpoint = endpoint.replace(/^\/?(api\/)?/, '');
+    const res = await fetch(`${BASE_URL}/api/${cleanEndpoint}`, {
         ...options,
         headers,
     });

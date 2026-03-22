@@ -32,7 +32,7 @@ services:
     staticPublishPath: frontend/dist
     envVars:
       - key: VITE_API_URL
-        value: https://splitease-api-j2zx.onrender.com/api
+        value: https://api.tandempay.ca
     headers:
       - path: /*
         name: Cache-Control
