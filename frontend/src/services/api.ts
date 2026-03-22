@@ -1,4 +1,4 @@
-export const BASE_URL = "https://api.tandempay.ca";
+export const BASE_URL = "https://api.tandempay.ca/api";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('token');
@@ -10,8 +10,7 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const cleanEndpoint = endpoint.replace(/^\/?(api\/)?/, '');
-    const res = await fetch(`${BASE_URL}/api/${cleanEndpoint}`, {
+    const res = await fetch(`${BASE_URL}${endpoint}`, {
         ...options,
         headers,
     });
@@ -45,23 +44,23 @@ export interface Token {
 
 export const authApi = {
     register: (name: string, email: string, password: string, interac_email?: string) =>
-        request<Token>('/auth/register', {
+        request<Token>('/api/auth/register', {
             method: 'POST',
             body: JSON.stringify({ name, email, password, interac_email }),
         }),
     login: (email: string, password: string) =>
-        request<Token>('/auth/login', {
+        request<Token>('/api/auth/login', {
             method: 'POST',
             body: JSON.stringify({ email, password }),
         }),
-    me: () => request<User>('/auth/me'),
+    me: () => request<User>('/api/auth/me'),
     forgotPassword: (email: string) =>
-        request<{ message: string }>('/auth/forgot-password', {
+        request<{ message: string }>('/api/auth/forgot-password', {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
     resetPassword: (token: string, new_password: string) =>
-        request<{ message: string }>('/auth/reset-password', {
+        request<{ message: string }>('/api/auth/reset-password', {
             method: 'POST',
             body: JSON.stringify({ token, new_password }),
         }),
@@ -95,22 +94,22 @@ export interface GroupListItem {
 
 export const groupsApi = {
     create: (name: string) =>
-        request<Group>('/groups', { method: 'POST', body: JSON.stringify({ name }) }),
-    list: () => request<GroupListItem[]>('/groups'),
-    get: (id: string) => request<Group>(`/groups/${id}`),
+        request<Group>('/api/groups', { method: 'POST', body: JSON.stringify({ name }) }),
+    list: () => request<GroupListItem[]>('/api/groups'),
+    get: (id: string) => request<Group>(`/api/groups/${id}`),
     addMember: (groupId: string, email: string) =>
-        request<GroupMember>(`/groups/${groupId}/members`, {
+        request<GroupMember>(`/api/groups/${groupId}/members`, {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
     join: (groupId: string) =>
-        request<GroupMember>(`/groups/${groupId}/join`, {
+        request<GroupMember>(`/api/groups/${groupId}/join`, {
             method: 'POST',
         }),
     deleteGroup: (groupId: string) =>
-        request<void>(`/groups/${groupId}`, { method: 'DELETE' }),
+        request<void>(`/api/groups/${groupId}`, { method: 'DELETE' }),
     removeMember: (groupId: string, userId: string) =>
-        request<void>(`/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
+        request<void>(`/api/groups/${groupId}/members/${userId}`, { method: 'DELETE' }),
 };
 
 // --- Expenses ---
@@ -135,18 +134,18 @@ export interface Expense {
 
 export const expensesApi = {
     create: (groupId: string, data: { title: string; amount: number; paid_by: string; participant_ids: string[] }) =>
-        request<Expense>(`/groups/${groupId}/expenses`, {
+        request<Expense>(`/api/groups/${groupId}/expenses`, {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    list: (groupId: string) => request<Expense[]>(`/groups/${groupId}/expenses`),
+    list: (groupId: string) => request<Expense[]>(`/api/groups/${groupId}/expenses`),
     update: (groupId: string, expenseId: string, data: { title: string; amount: number; paid_by: string; participant_ids: string[] }) =>
-        request<Expense>(`/groups/${groupId}/expenses/${expenseId}`, {
+        request<Expense>(`/api/groups/${groupId}/expenses/${expenseId}`, {
             method: 'PUT',
             body: JSON.stringify(data),
         }),
     delete: (groupId: string, expenseId: string) =>
-        request<void>(`/groups/${groupId}/expenses/${expenseId}`, {
+        request<void>(`/api/groups/${groupId}/expenses/${expenseId}`, {
             method: 'DELETE',
         }),
 };
@@ -174,8 +173,8 @@ export interface Settlement {
 }
 
 export const balancesApi = {
-    getBalances: (groupId: string) => request<UserBalance[]>(`/groups/${groupId}/balances`),
-    getSettlements: (groupId: string) => request<Settlement[]>(`/groups/${groupId}/settlements`),
+    getBalances: (groupId: string) => request<UserBalance[]>(`/api/groups/${groupId}/balances`),
+    getSettlements: (groupId: string) => request<Settlement[]>(`/api/groups/${groupId}/settlements`),
 };
 
 // --- Settlement Records (actual payment tracking) ---
@@ -199,13 +198,13 @@ export interface SettlementRecord {
 
 export const settlementRecordsApi = {
     create: (groupId: string, data: { payee_id: string; amount: number; method: string }) =>
-        request<SettlementRecord>(`/groups/${groupId}/settlement-records`, {
+        request<SettlementRecord>(`/api/groups/${groupId}/settlement-records`, {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    list: (groupId: string) => request<SettlementRecord[]>(`/groups/${groupId}/settlement-records`),
+    list: (groupId: string) => request<SettlementRecord[]>(`/api/groups/${groupId}/settlement-records`),
     updateStatus: (groupId: string, settlementId: string, status: string) =>
-        request<SettlementRecord>(`/groups/${groupId}/settlement-records/${settlementId}/status`, {
+        request<SettlementRecord>(`/api/groups/${groupId}/settlement-records/${settlementId}/status`, {
             method: 'PUT',
             body: JSON.stringify({ status }),
         }),
@@ -225,10 +224,10 @@ export interface AppNotification {
 }
 
 export const notificationsApi = {
-    list: () => request<AppNotification[]>('/notifications'),
-    unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
-    markRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'PUT' }),
-    markAllRead: () => request<{ status: string }>('/notifications/read-all', { method: 'PUT' }),
+    list: () => request<AppNotification[]>('/api/notifications'),
+    unreadCount: () => request<{ count: number }>('/api/notifications/unread-count'),
+    markRead: (id: string) => request<AppNotification>(`/api/notifications/${id}/read`, { method: 'PUT' }),
+    markAllRead: () => request<{ status: string }>('/api/notifications/read-all', { method: 'PUT' }),
 };
 
 // --- Me (Global User Data) ---
@@ -241,8 +240,8 @@ export interface Friend {
 }
 
 export const meApi = {
-    getPayments: () => request<SettlementRecord[]>('/me/payments'),
-    getFriends: () => request<Friend[]>('/me/friends'),
+    getPayments: () => request<SettlementRecord[]>('/api/me/payments'),
+    getFriends: () => request<Friend[]>('/api/me/friends'),
 };
 
 // --- Users (Search) ---
@@ -254,7 +253,7 @@ export interface UserSearchResult {
 }
 
 export const usersApi = {
-    search: (query: string) => request<UserSearchResult[]>(`/users/search?query=${encodeURIComponent(query)}`),
+    search: (query: string) => request<UserSearchResult[]>(`/api/users/search?query=${encodeURIComponent(query)}`),
 };
 
 // --- Friend Requests ---
@@ -271,13 +270,13 @@ export interface FriendRequest {
 
 export const friendRequestsApi = {
     send: (email: string) =>
-        request<FriendRequest>('/friends/requests', {
+        request<FriendRequest>('/api/friends/requests', {
             method: 'POST',
             body: JSON.stringify({ email })
         }),
-    getPending: () => request<{ sent: FriendRequest[], received: FriendRequest[] }>('/friends/requests/pending'),
-    accept: (id: string) => request<{ status: string }>(`/friends/requests/${id}/accept`, { method: 'PUT' }),
-    decline: (id: string) => request<{ status: string }>(`/friends/requests/${id}/decline`, { method: 'PUT' }),
+    getPending: () => request<{ sent: FriendRequest[], received: FriendRequest[] }>('/api/friends/requests/pending'),
+    accept: (id: string) => request<{ status: string }>(`/api/friends/requests/${id}/accept`, { method: 'PUT' }),
+    decline: (id: string) => request<{ status: string }>(`/api/friends/requests/${id}/decline`, { method: 'PUT' }),
 };
 
 // --- Fintech Overhaul: Providers, Ledger, and Payment Requests ---
@@ -295,28 +294,28 @@ export interface ProviderAccount {
 
 export const bankLinksApi = {
     link: (institution_name: string, account_mask: string, provider: string = 'plaid') =>
-        request<ProviderAccount>('/bank-links', {
+        request<ProviderAccount>('/api/bank-links', {
             method: 'POST',
             body: JSON.stringify({ institution_name, account_mask, provider })
         }),
-    list: () => request<ProviderAccount[]>('/bank-links'),
-    remove: (id: string) => request<void>(`/bank-links/${id}`, { method: 'DELETE' }),
+    list: () => request<ProviderAccount[]>('/api/bank-links'),
+    remove: (id: string) => request<void>(`/api/bank-links/${id}`, { method: 'DELETE' }),
 };
 
 export const plaidApi = {
-    createLinkToken: () => request<{ link_token: string }>('/plaid/create-link-token', { method: 'POST' }),
+    createLinkToken: () => request<{ link_token: string }>('/api/plaid/create-link-token', { method: 'POST' }),
     setAccessToken: (public_token: string, institution_id: string, institution_name: string, account_id: string) =>
-        request<ProviderAccount>('/plaid/set-access-token', {
+        request<ProviderAccount>('/api/plaid/set-access-token', {
             method: 'POST',
             body: JSON.stringify({ public_token, institution_id, institution_name, account_id })
         }),
 };
 
 export const stripeApi = {
-    onboard: () => request<{ url: string }>('/stripe/onboard', { method: 'POST' }),
-    getStatus: () => request<{ onboarded: boolean }>('/stripe/status'),
+    onboard: () => request<{ url: string }>('/api/stripe/onboard', { method: 'POST' }),
+    getStatus: () => request<{ onboarded: boolean }>('/api/stripe/status'),
     createPaymentIntent: (data: { amount: number; payee_id: string; provider_account_id: string }) =>
-        request<{ client_secret: string; status: string }>('/stripe/create-payment-intent', {
+        request<{ client_secret: string; status: string }>('/api/stripe/create-payment-intent', {
             method: 'POST',
             body: JSON.stringify(data)
         }),
@@ -334,17 +333,17 @@ export interface WalletTransaction {
 
 export const walletApi = {
     addFunds: (amount: number, source_account_id?: string) =>
-        request<User>('/wallet/add-funds', {
+        request<User>('/api/wallet/add-funds', {
             method: 'POST',
             body: JSON.stringify({ amount, source_account_id })
         }),
     withdraw: (data: { destination_account: string }) =>
-        request<User>('/wallet/withdraw', {
+        request<User>('/api/wallet/withdraw', {
             method: 'POST',
             body: JSON.stringify(data)
         }),
-    getBalance: () => request<User>('/wallet/balance'),
-    getTransactions: () => request<WalletTransaction[]>('/wallet/transactions'),
+    getBalance: () => request<User>('/api/wallet/balance'),
+    getTransactions: () => request<WalletTransaction[]>('/api/wallet/transactions'),
 };
 
 export interface PaymentRequestData {
@@ -367,10 +366,10 @@ export interface PaymentRequestData {
 
 export const requestsApi = {
     create: (groupId: string, data: { payer_id: string; amount: number; note?: string; due_date?: string }) =>
-        request<PaymentRequestData>(`/groups/${groupId}/requests`, {
+        request<PaymentRequestData>(`/api/groups/${groupId}/requests`, {
             method: 'POST',
             body: JSON.stringify(data)
         }),
-    list: (groupId: string) => request<PaymentRequestData[]>(`/groups/${groupId}/requests`),
-    payWithWallet: (requestId: string) => request<PaymentRequestData>(`/requests/${requestId}/pay`, { method: 'PUT' }),
+    list: (groupId: string) => request<PaymentRequestData[]>(`/api/groups/${groupId}/requests`),
+    payWithWallet: (requestId: string) => request<PaymentRequestData>(`/api/requests/${requestId}/pay`, { method: 'PUT' }),
 };
