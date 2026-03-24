@@ -266,6 +266,7 @@ export interface FriendRequest {
     updated_at: string;
     sender_name?: string;
     sender_avatar?: string;
+    sender_email?: string;
 }
 
 export const friendRequestsApi = {

@@ -72,6 +72,7 @@ async def send_friend_request(
     out = FriendRequestOut.model_validate(new_request)
     out.sender_name = current_user.name
     out.sender_avatar = current_user.avatar_color
+    out.sender_email = current_user.email
     return out
 
 
@@ -103,6 +104,7 @@ async def get_pending_requests(
         out = FriendRequestOut.model_validate(req)
         out.sender_name = current_user.name
         out.sender_avatar = current_user.avatar_color
+        out.sender_email = current_user.email
         sent.append(out)
         
     received = []
@@ -110,6 +112,7 @@ async def get_pending_requests(
         out = FriendRequestOut.model_validate(req)
         out.sender_name = sender.name
         out.sender_avatar = sender.avatar_color
+        out.sender_email = sender.email
         received.append(out)
 
     return {

@@ -207,6 +207,7 @@ class FriendRequestOut(BaseModel):
     # Optional nested data for the frontend
     sender_name: str | None = None
     sender_avatar: str | None = None
+    sender_email: str | None = None
 
     class Config:
         from_attributes = True
