@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import LoginPage from './pages/LoginPage';
@@ -11,6 +12,7 @@ import PaymentsPage from './pages/PaymentsPage';
 import FriendsPage from './pages/FriendsPage';
 import LandingPage from './pages/LandingPage';
 import Layout from './components/Layout';
+import ErrorBoundary from './components/ErrorBoundary';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -41,24 +43,44 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return user ? <Navigate to="/dashboard" /> : <>{children}</>;
 }
 
+function AuthListener({ children }: { children: React.ReactNode }) {
+    const { logout } = useAuth();
+
+    useEffect(() => {
+        const handleAuthError = () => {
+            console.warn('Handling global auth error event');
+            logout();
+        };
+
+        window.addEventListener('auth_error', handleAuthError);
+        return () => window.removeEventListener('auth_error', handleAuthError);
+    }, [logout]);
+
+    return <>{children}</>;
+}
+
 export default function App() {
     return (
-        <BrowserRouter>
-            <AuthProvider>
-                <Routes>
-                    <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
-                    <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
-                    <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
-                    <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
-                    <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
-                    <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
-                    <Route path="/payments" element={<ProtectedRoute><Layout><PaymentsPage /></Layout></ProtectedRoute>} />
-                    <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
-                    <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
-                    <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
-                    <Route path="*" element={<Navigate to="/dashboard" />} />
-                </Routes>
-            </AuthProvider>
-        </BrowserRouter>
+        <ErrorBoundary>
+            <BrowserRouter>
+                <AuthProvider>
+                    <AuthListener>
+                        <Routes>
+                            <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
+                            <Route path="/login" element={<PublicRoute><LoginPage /></PublicRoute>} />
+                            <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
+                            <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
+                            <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+                            <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
+                            <Route path="/payments" element={<ProtectedRoute><Layout><PaymentsPage /></Layout></ProtectedRoute>} />
+                            <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
+                            <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
+                            <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
+                            <Route path="*" element={<Navigate to="/dashboard" />} />
+                        </Routes>
+                    </AuthListener>
+                </AuthProvider>
+            </BrowserRouter>
+        </ErrorBoundary>
     );
 }

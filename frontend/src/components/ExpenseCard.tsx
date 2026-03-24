@@ -7,9 +7,10 @@ interface ExpenseCardProps {
     expense: Expense;
     onEdit?: (expense: Expense) => void;
     onDelete?: (expense: Expense) => void;
+    isDeleting?: boolean;
 }
 
-export default function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, onEdit, onDelete, isDeleting }: ExpenseCardProps) {
     const date = new Date(expense.created_at);
     const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
@@ -24,12 +25,13 @@ export default function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardPr
                     <div className="flex items-center justify-between mb-1">
                         <h4 className="text-sm font-semibold text-primary truncate">{expense.title}</h4>
                         <div className="flex items-center gap-3">
-                            {/* Hover Actions */}
-                            <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 mr-2">
+                            {/* Actions: Always visible on mobile, hover on desktop */}
+                            <div className={`transition-opacity flex items-center gap-1 mr-2 ${isDeleting ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
                                 {onEdit && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onEdit(expense); }}
-                                        className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-surface transition-colors cursor-pointer"
+                                        disabled={isDeleting}
+                                        className="p-1.5 rounded-lg text-secondary hover:text-primary hover:bg-surface transition-colors cursor-pointer disabled:opacity-50"
                                         title="Edit Expense"
                                     >
                                         <Edit2 className="w-3.5 h-3.5" />
@@ -38,10 +40,11 @@ export default function ExpenseCard({ expense, onEdit, onDelete }: ExpenseCardPr
                                 {onDelete && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onDelete(expense); }}
-                                        className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                        disabled={isDeleting}
+                                        className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50"
                                         title="Delete Expense"
                                     >
-                                        <Trash2 className="w-3.5 h-3.5" />
+                                        {isDeleting ? <div className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> : <Trash2 className="w-3.5 h-3.5" />}
                                     </button>
                                 )}
                             </div>

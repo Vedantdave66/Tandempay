@@ -10,9 +10,10 @@ interface PaymentRecordCardProps {
     currentUserId: string;
     groupId: string;
     onUpdated: () => void;
+    isProcessing?: boolean;
 }
 
-export default function PaymentRecordCard({ record, currentUserId, groupId, onUpdated }: PaymentRecordCardProps) {
+export default function PaymentRecordCard({ record, currentUserId, groupId, onUpdated, isProcessing }: PaymentRecordCardProps) {
     const [loading, setLoading] = useState(false);
 
     const isPayee = record.payee_id === currentUserId;
@@ -64,10 +65,10 @@ export default function PaymentRecordCard({ record, currentUserId, groupId, onUp
             {isPayer && record.status === 'pending' && (
                 <button
                     onClick={() => handleUpdateStatus('sent')}
-                    disabled={loading}
+                    disabled={loading || isProcessing}
                     className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-accent/20 to-accent/10 border border-accent/20 hover:border-accent/40 text-accent font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50"
                 >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Mark as Sent</>}
+                    {loading || isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <>Mark as Sent</>}
                 </button>
             )}
 
@@ -75,17 +76,17 @@ export default function PaymentRecordCard({ record, currentUserId, groupId, onUp
                 <div className="flex gap-2">
                     <button
                         onClick={() => handleUpdateStatus('settled')}
-                        disabled={loading}
+                        disabled={loading || isProcessing}
                         className="flex-1 flex items-center justify-center gap-2 bg-accent/10 border border-accent/20 hover:border-accent/40 text-accent font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50"
                     >
-                        {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> Confirm Received</>}
+                        {loading || isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><CheckCircle2 className="w-4 h-4" /> Confirm Received</>}
                     </button>
                     <button
                         onClick={() => handleUpdateStatus('declined')}
-                        disabled={loading}
+                        disabled={loading || isProcessing}
                         className="flex items-center justify-center gap-2 px-4 bg-red-500/5 border border-red-500/20 hover:border-red-500/30 text-red-400 font-semibold text-sm py-2.5 rounded-xl transition-all duration-200 cursor-pointer disabled:opacity-50"
                     >
-                        <XCircle className="w-4 h-4" />
+                        {loading || isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
                     </button>
                 </div>
             )}

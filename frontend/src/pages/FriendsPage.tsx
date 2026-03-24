@@ -3,8 +3,10 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Users, Search, UserPlus, Bell, Clock, Send, Check, X, ShieldAlert, CheckCheck, Receipt, Handshake, Mail } from 'lucide-react';
 import { meApi, Friend, notificationsApi, AppNotification, friendRequestsApi, FriendRequest, usersApi } from '../services/api';
 import Avatar from '../components/Avatar';
+import { useAuth } from '../context/AuthContext';
 
 export default function FriendsPage() {
+    const { user } = useAuth();
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || 'my-friends';
     const navigate = useNavigate();
@@ -19,6 +21,7 @@ export default function FriendsPage() {
     const [searchQuery, setSearchQuery] = useState('');
     const [addEmail, setAddEmail] = useState('');
     const [addLoading, setAddLoading] = useState(false);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
     const [addMessage, setAddMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null);
 
     useEffect(() => {
@@ -92,20 +95,26 @@ export default function FriendsPage() {
 
     // --- Tab 3: Pending Requests Logic ---
     const handleAcceptRequest = async (id: string) => {
+        setActionLoadingId(id);
         try {
             await friendRequestsApi.accept(id);
-            loadTabData(); // Reload the list
+            await loadTabData(); // Reload the list
         } catch (err) {
             console.error(err);
+        } finally {
+            setActionLoadingId(null);
         }
     };
 
     const handleDeclineRequest = async (id: string) => {
+        setActionLoadingId(id);
         try {
             await friendRequestsApi.decline(id);
-            loadTabData();
+            await loadTabData();
         } catch (err) {
             console.error(err);
+        } finally {
+            setActionLoadingId(null);
         }
     };
 
@@ -134,6 +143,39 @@ export default function FriendsPage() {
 
     const handleAddFriend = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Email Validation
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(addEmail)) {
+            setAddMessage({ type: 'error', text: 'Please enter a valid email address' });
+            return;
+        }
+
+        // Self-check (optional but good for UX)
+        if (addEmail.toLowerCase() === user?.email.toLowerCase()) {
+            setAddMessage({ type: 'error', text: "You can't add yourself as a friend" });
+            return;
+        }
+
+        // Check for duplicates
+        const alreadyFriend = (friends || []).some(f => f.email.toLowerCase() === addEmail.toLowerCase());
+        if (alreadyFriend) {
+            setAddMessage({ type: 'error', text: 'This user is already your friend' });
+            return;
+        }
+
+        const alreadySent = (pendingRequests.sent || []).some(r => r.receiver_email.toLowerCase() === addEmail.toLowerCase());
+        if (alreadySent) {
+            setAddMessage({ type: 'error', text: 'Friend request already sent to this user' });
+            return;
+        }
+
+        const alreadyReceived = (pendingRequests.received || []).some(r => (r.sender_email || '').toLowerCase() === addEmail.toLowerCase());
+        if (alreadyReceived) {
+            setAddMessage({ type: 'error', text: 'This user has already sent you a friend request' });
+            return;
+        }
+
         setAddLoading(true);
         setAddMessage(null);
         try {
@@ -142,6 +184,7 @@ export default function FriendsPage() {
             setAddEmail('');
             setSuggestions([]);
             setShowSuggestions(false);
+            await loadTabData(); // Refresh lists to show the new pending request
         } catch (err: any) {
             setAddMessage({ type: 'error', text: err.message || 'Failed to send request' });
         } finally {
@@ -181,11 +224,11 @@ export default function FriendsPage() {
                         )}
                     </div>
 
-                    {loading ? <LoadingSpinner /> : notifications.length === 0 ? (
+                    {loading ? <LoadingSpinner /> : (notifications || []).length === 0 ? (
                         <EmptyState icon={<Bell />} title="You're all caught up" desc="No recent activity to show." />
                     ) : (
                         <div className="divide-y divide-border">
-                            {notifications.map((notif) => (
+                            {(notifications || []).map((notif) => (
                                 <div
                                     key={notif.id}
                                     onClick={() => handleNotificationClick(notif)}
@@ -226,8 +269,9 @@ export default function FriendsPage() {
                     </div>
                     {loading ? <LoadingSpinner /> : (
                         (() => {
-                            const filtered = friends.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.email.toLowerCase().includes(searchQuery.toLowerCase()));
-                            if (friends.length === 0) return <EmptyState icon={<Users />} title="No friends yet" desc="Send a friend request to get started." />;
+                            const currentFriends = friends || [];
+                            const filtered = currentFriends.filter(f => f.name.toLowerCase().includes(searchQuery.toLowerCase()) || f.email.toLowerCase().includes(searchQuery.toLowerCase()));
+                            if (currentFriends.length === 0) return <EmptyState icon={<Users />} title="No friends yet" desc="Send a friend request to get started." />;
                             if (filtered.length === 0) return <div className="text-center py-12 text-secondary">No friends match your search.</div>;
 
                             return (
@@ -260,11 +304,11 @@ export default function FriendsPage() {
                     <div>
                         <h2 className="text-lg font-bold text-primary mb-4 px-1">Received Requests</h2>
                         <div className="bg-surface border border-border rounded-3xl overflow-hidden shadow-xl shadow-black/20">
-                            {loading ? <LoadingSpinner /> : pendingRequests.received.length === 0 ? (
+                            {loading ? <LoadingSpinner /> : (pendingRequests.received || []).length === 0 ? (
                                 <EmptyState icon={<Mail />} title="No pending invites" desc="When someone sends you a friend request, it will appear here." />
                             ) : (
                                 <div className="divide-y divide-border">
-                                    {pendingRequests.received.map(req => (
+                                    {(pendingRequests.received || []).map(req => (
                                         <div key={req.id} className="p-6 flex flex-col sm:flex-row items-start sm:items-center gap-4 hover:bg-surface-hover/50 transition-colors">
                                             <div className="flex items-center gap-4 flex-1 min-w-0">
                                                 <Avatar name={req.sender_name || '?'} color={req.sender_avatar || '#555'} size="lg" />
@@ -274,11 +318,19 @@ export default function FriendsPage() {
                                                 </div>
                                             </div>
                                             <div className="flex items-center gap-3 w-full sm:w-auto mt-4 sm:mt-0">
-                                                <button onClick={() => handleDeclineRequest(req.id)} className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer text-center">
-                                                    Decline
+                                                <button 
+                                                    onClick={() => handleDeclineRequest(req.id)} 
+                                                    disabled={!!actionLoadingId}
+                                                    className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-white bg-white/5 border border-white/10 hover:bg-white/10 transition-colors cursor-pointer text-center disabled:opacity-50"
+                                                >
+                                                    {actionLoadingId === req.id ? '...' : 'Decline'}
                                                 </button>
-                                                <button onClick={() => handleAcceptRequest(req.id)} className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-[#064E3B] bg-accent hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20 cursor-pointer text-center">
-                                                    Accept <span className="hidden sm:inline">Request</span>
+                                                <button 
+                                                    onClick={() => handleAcceptRequest(req.id)} 
+                                                    disabled={!!actionLoadingId}
+                                                    className="flex-1 sm:flex-none px-4 py-2.5 rounded-xl text-sm font-bold text-[#064E3B] bg-accent hover:bg-accent-hover transition-colors shadow-lg shadow-accent/20 cursor-pointer text-center disabled:opacity-50"
+                                                >
+                                                    {actionLoadingId === req.id ? '...' : <>Accept <span className="hidden sm:inline">Request</span></>}
                                                 </button>
                                             </div>
                                         </div>
@@ -292,11 +344,11 @@ export default function FriendsPage() {
                     <div>
                         <h2 className="text-lg font-bold text-primary mb-4 px-1">Sent Requests <span className="text-secondary font-medium ml-2 text-sm">Waiting for response</span></h2>
                         <div className="bg-surface border border-border rounded-3xl overflow-hidden">
-                            {loading ? <LoadingSpinner /> : pendingRequests.sent.length === 0 ? (
+                            {loading ? <LoadingSpinner /> : (pendingRequests.sent || []).length === 0 ? (
                                 <div className="p-8 text-center text-secondary text-sm">No sent requests pending.</div>
                             ) : (
                                 <div className="divide-y divide-border">
-                                    {pendingRequests.sent.map(req => (
+                                    {(pendingRequests.sent || []).map(req => (
                                         <div key={req.id} className="p-4 sm:p-5 flex items-center justify-between gap-4">
                                             <div className="flex items-center gap-4 min-w-0">
                                                 <div className="w-10 h-10 rounded-full bg-bg border border-border flex items-center justify-center shrink-0">

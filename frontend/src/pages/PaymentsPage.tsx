@@ -18,6 +18,7 @@ export default function PaymentsPage() {
     const [withdrawLoading, setWithdrawLoading] = useState(false);
     const [stripeOnboarded, setStripeOnboarded] = useState(false);
     const [stripeLoading, setStripeLoading] = useState(false);
+    const [unlinkingId, setUnlinkingId] = useState<string | null>(null);
 
     useEffect(() => {
         loadAll();
@@ -175,13 +176,16 @@ export default function PaymentsPage() {
                                         <button
                                             onClick={async () => {
                                                 if (window.confirm(`Unlink ${account.provider}?`)) {
+                                                    setUnlinkingId(account.id);
                                                     try {
                                                         await bankLinksApi.remove(account.id);
                                                         await loadAll();
                                                     } catch (err: any) { alert(err.message); }
+                                                    finally { setUnlinkingId(null); }
                                                 }
                                             }}
-                                            className="p-2 rounded-lg text-red-500/50 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer"
+                                            disabled={unlinkingId === account.id}
+                                            className="p-2 rounded-lg text-red-500/50 hover:text-red-500 hover:bg-red-500/10 transition-colors cursor-pointer disabled:opacity-50"
                                             title="Unlink Account"
                                         >
                                             <LogOut className="w-4 h-4" />
@@ -236,7 +240,7 @@ export default function PaymentsPage() {
                                 Action Required
                             </h2>
                             <div className="space-y-3">
-                                {pendingConfirmation.map((p) => (
+                                {(pendingConfirmation || []).map((p) => (
                                     <PaymentRecordCard
                                         key={p.id}
                                         record={p}
@@ -245,7 +249,7 @@ export default function PaymentsPage() {
                                         onUpdated={loadAll}
                                     />
                                 ))}
-                                {needToSend.map((p) => (
+                                {(needToSend || []).map((p) => (
                                     <PaymentRecordCard
                                         key={p.id}
                                         record={p}
@@ -264,14 +268,14 @@ export default function PaymentsPage() {
                             <History className="w-5 h-5 text-secondary" />
                             Ledger History
                         </h2>
-                        {transactions.length === 0 ? (
+                        {(transactions || []).length === 0 ? (
                             <div className="bg-surface border border-border rounded-2xl p-10 text-center">
                                 <History className="w-10 h-10 text-border mx-auto mb-3" />
                                 <p className="text-secondary text-sm">No transactions yet.</p>
                             </div>
                         ) : (
                             <div className="space-y-3">
-                                {transactions.map((t) => (
+                                {(transactions || []).map((t) => (
                                     <div key={t.id} className="flex items-center justify-between p-4 bg-surface border border-border rounded-2xl flex-wrap gap-4">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shrink-0

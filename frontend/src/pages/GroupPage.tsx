@@ -61,6 +61,7 @@ export default function GroupPage() {
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
     const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
+    const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
     // Edit expense state
     const [expenseToEdit, setExpenseToEdit] = useState<Expense | undefined>(undefined);
@@ -111,11 +112,14 @@ export default function GroupPage() {
 
     const handleDeleteExpense = async (expense: Expense) => {
         if (!groupId || !window.confirm('Are you sure you want to delete this expense?')) return;
+        setActionLoadingId(expense.id);
         try {
             await expensesApi.delete(groupId, expense.id);
             await loadAll();
         } catch (err: any) {
             alert(err.message || 'Failed to delete expense');
+        } finally {
+            setActionLoadingId(null);
         }
     };
 
@@ -123,11 +127,14 @@ export default function GroupPage() {
         if (!groupId || !group) return;
         if (!window.confirm(`Are you sure you want to delete "${group.name}"? This action cannot be undone and will delete all expenses.`)) return;
 
+        setActionLoadingId(groupId);
         try {
             await groupsApi.deleteGroup(groupId);
             navigate('/dashboard');
         } catch (err: any) {
             alert(err.message || 'Failed to delete group. You may not have permission.');
+        } finally {
+            setActionLoadingId(null);
         }
     };
 
@@ -135,11 +142,14 @@ export default function GroupPage() {
         if (!groupId) return;
         if (!window.confirm(`Are you sure you want to remove ${userName} from the group?`)) return;
 
+        setActionLoadingId(userId);
         try {
             await groupsApi.removeMember(groupId, userId);
             await loadAll();
         } catch (err: any) {
             alert(err.message || 'Failed to remove member. You may not have permission, or they may be involved in active expenses.');
+        } finally {
+            setActionLoadingId(null);
         }
     };
 
@@ -189,10 +199,10 @@ export default function GroupPage() {
         }
     };
 
-    const totalSpent = expenses.reduce((s, e) => s + e.amount, 0);
+    const totalSpent = (expenses || []).reduce((s, e) => s + e.amount, 0);
 
-    const effectiveSettlements = settlements.map(s => {
-        const pendingOrSentAmount = paymentRecords
+    const effectiveSettlements = (settlements || []).map(s => {
+        const pendingOrSentAmount = (paymentRecords || [])
             .filter(r => r.payer_id === s.from_user_id && r.payee_id === s.to_user_id && (r.status === 'pending' || r.status === 'sent'))
             .reduce((sum, r) => sum + r.amount, 0);
         return { ...s, amount: s.amount - pendingOrSentAmount };
@@ -201,7 +211,7 @@ export default function GroupPage() {
     // Find settlements where the current user owes money
     const mySettlements = effectiveSettlements.filter(s => s.from_user_id === user?.id);
 
-    const uniquePaymentRecords = paymentRecords.filter((record, index, self) => {
+    const uniquePaymentRecords = (paymentRecords || []).filter((record, index, self) => {
         if (record.status === 'settled' || record.status === 'declined') return true;
         return index === self.findIndex((t) => (
             t.payer_id === record.payer_id &&
@@ -214,7 +224,7 @@ export default function GroupPage() {
     const tabs: { key: Tab; label: string; icon: React.ReactNode; badge?: number }[] = [
         { key: 'expenses', label: 'Expenses', icon: <Receipt className="w-4 h-4" /> },
         { key: 'balances', label: 'Balances', icon: <BarChart3 className="w-4 h-4" /> },
-        { key: 'settlements', label: 'Pay Balance', icon: <Handshake className="w-4 h-4" />, badge: settlements.length },
+        { key: 'settlements', label: 'Pay Balance', icon: <Handshake className="w-4 h-4" />, badge: (settlements || []).length },
         {
             key: 'payments',
             label: 'Payments',
@@ -259,14 +269,15 @@ export default function GroupPage() {
                             <h1 className="text-2xl font-bold text-primary">{group.name}</h1>
                             <button
                                 onClick={handleDeleteGroup}
-                                className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer"
+                                disabled={actionLoadingId === groupId}
+                                className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50"
                                 title="Delete Group"
                             >
                                 <Trash2 className="w-4 h-4" />
                             </button>
                         </div>
                         <p className="text-sm text-secondary">
-                            {group.members.length} member{group.members.length !== 1 ? 's' : ''} · ${formatCurrency(totalSpent)} total
+                            {(group.members || []).length} member{(group.members || []).length !== 1 ? 's' : ''} · ${formatCurrency(totalSpent)} total
                         </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
@@ -310,16 +321,17 @@ export default function GroupPage() {
                 {/* Members */}
                 <div className="flex items-center gap-2">
                     <div className="flex flex-wrap gap-2">
-                        {group.members.map((m) => (
+                        {(group.members || []).map((m) => (
                             <div key={m.user_id} className="flex items-center gap-1.5 bg-bg border border-border/50 rounded-full pl-1 pr-2 py-1">
                                 <Avatar name={m.name} color={m.avatar_color} size="sm" />
                                 <span className="text-xs font-medium text-secondary">{m.name.split(' ')[0]}</span>
                                 <button
                                     onClick={() => handleRemoveMember(m.user_id, m.name)}
-                                    className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-danger/10 text-secondary hover:text-danger transition-colors cursor-pointer ml-1"
+                                    disabled={actionLoadingId === m.user_id}
+                                    className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-danger/10 text-secondary hover:text-danger transition-colors cursor-pointer ml-1 disabled:opacity-50"
                                     title={`Remove ${m.name}`}
                                 >
-                                    <XIcon className="w-3 h-3" />
+                                    {actionLoadingId === m.user_id ? <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" /> : <XIcon className="w-3 h-3" />}
                                 </button>
                             </div>
                         ))}
@@ -410,7 +422,7 @@ export default function GroupPage() {
             {/* Tab content */}
             {activeTab === 'expenses' && (
                 <div>
-                    {expenses.length === 0 ? (
+                    {(expenses || []).length === 0 ? (
                         <div className="bg-surface border border-border rounded-2xl p-12 text-center">
                             <div className="w-14 h-14 rounded-2xl bg-surface-light flex items-center justify-center mx-auto mb-4">
                                 <Receipt className="w-7 h-7 text-secondary" />
@@ -426,12 +438,13 @@ export default function GroupPage() {
                         </div>
                     ) : (
                         <div className="space-y-3">
-                            {expenses.map((exp) => (
+                            {(expenses || []).map((exp) => (
                                 <ExpenseCard
                                     key={exp.id}
                                     expense={exp}
                                     onEdit={handleEditExpense}
                                     onDelete={handleDeleteExpense}
+                                    isDeleting={actionLoadingId === exp.id}
                                 />
                             ))}
                         </div>
@@ -441,13 +454,13 @@ export default function GroupPage() {
 
             {activeTab === 'balances' && (
                 <div>
-                    {balances.length === 0 ? (
+                    {(balances || []).length === 0 ? (
                         <div className="bg-surface border border-border rounded-2xl p-12 text-center">
                             <p className="text-secondary">No balances to show. Add some expenses first.</p>
                         </div>
                     ) : (
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                            {balances.map((b) => (
+                            {(balances || []).map((b) => (
                                 <BalanceBubble key={b.user_id} balance={b} />
                             ))}
                         </div>
@@ -458,11 +471,11 @@ export default function GroupPage() {
             {activeTab === 'settlements' && (
                 <div className="space-y-6">
                     {/* Active Peer-to-Peer Requests */}
-                    {paymentRequests.length > 0 && (
+                    {(paymentRequests || []).length > 0 && (
                         <div>
                             <h3 className="text-lg font-bold text-primary mb-3">Direct Requests</h3>
                             <div className="space-y-3">
-                                {paymentRequests.map((req) => {
+                                {(paymentRequests || []).map((req) => {
                                     const isPayer = req.payer_id === user?.id;
                                     return (
                                         <div key={req.id} className="bg-surface-light border border-indigo/20 rounded-2xl p-5 flex items-center justify-between shadow-lg shadow-indigo/5">
@@ -478,7 +491,7 @@ export default function GroupPage() {
                                             {isPayer ? (
                                                 <button
                                                     onClick={() => handlePayRequest(req)}
-                                                    disabled={payingRequestId === req.id}
+                                                    disabled={payingRequestId === req.id || !!actionLoadingId}
                                                     className="px-4 py-2 bg-indigo hover:bg-indigo-hover text-white text-sm font-bold rounded-xl transition-colors cursor-pointer disabled:opacity-50"
                                                 >
                                                     {payingRequestId === req.id ? 'Paying...' : 'Pay Now'}
@@ -583,6 +596,7 @@ export default function GroupPage() {
                                         currentUserId={user?.id || ''}
                                         groupId={groupId || ''}
                                         onUpdated={loadAll}
+                                        isProcessing={actionLoadingId === record.id}
                                     />
                                 ))}
                             </div>

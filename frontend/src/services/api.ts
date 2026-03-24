@@ -10,21 +10,40 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
         headers['Authorization'] = `Bearer ${token}`;
     }
 
-    const res = await fetch(`${BASE_URL}${endpoint}`, {
-        ...options,
-        headers,
-    });
+    try {
+        const res = await fetch(`${BASE_URL}${endpoint}`, {
+            ...options,
+            headers,
+        });
 
-    if (!res.ok) {
-        const error = await res.json().catch(() => ({ detail: 'Request failed' }));
-        throw new Error(error.detail || 'Request failed');
+        if (res.status === 401) {
+            // Global auth failure - redirect to login
+            window.dispatchEvent(new CustomEvent('auth_error'));
+            throw new Error('Session expired. Please login again.');
+        }
+
+        if (!res.ok) {
+            const error = await res.json().catch(() => ({ detail: 'Request failed' }));
+            throw new Error(error.detail || 'Request failed');
+        }
+
+        if (res.status === 204) {
+            return {} as T;
+        }
+
+        // Handle potentially malformed JSON or empty responses
+        const text = await res.text();
+        try {
+            return text ? JSON.parse(text) : {} as T;
+        } catch (e) {
+            console.error('Failed to parse API response as JSON:', text);
+            throw new Error('Invalid server response. Please try again later.');
+        }
+    } catch (err: any) {
+        // Log error but re-throw for component handling
+        console.error(`API Error [${endpoint}]:`, err.message);
+        throw err;
     }
-
-    if (res.status === 204) {
-        return {} as T;
-    }
-
-    return res.json();
 }
 
 // --- Auth ---
