@@ -15,17 +15,22 @@ import {
     CreditCard,
     ArrowRight,
     Clock,
+    Mail,
+    Users,
+    Loader2,
 } from 'lucide-react';
 import {
     groupsApi,
     expensesApi,
     balancesApi,
     settlementRecordsApi,
+    meApi,
     Group,
     Expense,
     UserBalance,
     Settlement,
     SettlementRecord,
+    Friend,
     requestsApi,
     PaymentRequestData
 } from '../services/api';
@@ -58,6 +63,9 @@ export default function GroupPage() {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [inviteMsg, setInviteMsg] = useState('');
+    const [friends, setFriends] = useState<Friend[]>([]);
+    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
     const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
@@ -163,11 +171,48 @@ export default function GroupPage() {
             setInviteMsg(`${member.name} has been added!`);
             setInviteEmail('');
             await loadAll();
+            // Refresh friends list to update "already in group" state
+            loadFriends();
             setTimeout(() => setInviteMsg(''), 3000);
         } catch (err: any) {
             setInviteMsg(err.message);
         } finally {
             setInviteLoading(false);
+        }
+    };
+
+    const loadFriends = async () => {
+        setFriendsLoading(true);
+        try {
+            const f = await meApi.getFriends();
+            setFriends(f);
+        } catch {
+            // Silently fail
+        } finally {
+            setFriendsLoading(false);
+        }
+    };
+
+    const handleToggleInvite = () => {
+        const willShow = !showInvite;
+        setShowInvite(willShow);
+        if (willShow) loadFriends();
+    };
+
+    const handleAddFriend = async (friend: Friend) => {
+        if (!groupId) return;
+        setAddingFriendId(friend.id);
+        setInviteMsg('');
+        try {
+            const member = await groupsApi.addMember(groupId, friend.email);
+            setInviteMsg(`${member.name} has been added!`);
+            await loadAll();
+            loadFriends();
+            setTimeout(() => setInviteMsg(''), 3000);
+        } catch (err: any) {
+            setInviteMsg(err.message);
+        } finally {
+            setAddingFriendId(null);
         }
     };
 
@@ -292,7 +337,7 @@ export default function GroupPage() {
                             {copied ? 'Copied!' : 'Share Link'}
                         </button>
                         <button
-                            onClick={() => setShowInvite(!showInvite)}
+                            onClick={handleToggleInvite}
                             className="flex items-center gap-2 bg-surface-light hover:bg-border border border-border text-sm text-primary font-medium px-4 py-2.5 rounded-xl transition-all duration-200 cursor-pointer"
                         >
                             <UserPlus className="w-4 h-4" />
@@ -371,17 +416,76 @@ export default function GroupPage() {
                     </div>
                 )}
 
-                {/* Invite form */}
+                {/* Invite panel */}
                 {showInvite && (
-                    <div className="mt-4 pt-4 border-t border-border">
+                    <div className="mt-4 pt-4 border-t border-border space-y-4">
+                        {/* Friends list */}
+                        <div>
+                            <div className="flex items-center gap-2 mb-3">
+                                <Users className="w-4 h-4 text-accent" />
+                                <span className="text-sm font-semibold text-primary">Your Friends</span>
+                            </div>
+                            {friendsLoading ? (
+                                <div className="flex items-center justify-center py-4">
+                                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                                </div>
+                            ) : (() => {
+                                const memberIds = new Set((group?.members || []).map(m => m.user_id));
+                                const availableFriends = friends.filter(f => !memberIds.has(f.id));
+                                if (availableFriends.length === 0) {
+                                    return (
+                                        <p className="text-xs text-secondary py-2">
+                                            {friends.length === 0 ? 'No friends yet. Add some from the Friends page!' : 'All your friends are already in this group.'}
+                                        </p>
+                                    );
+                                }
+                                return (
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {availableFriends.map(f => (
+                                            <button
+                                                key={f.id}
+                                                onClick={() => handleAddFriend(f)}
+                                                disabled={addingFriendId === f.id}
+                                                className="flex items-center gap-3 bg-bg hover:bg-surface-light border border-border hover:border-accent/30 rounded-xl px-3 py-2.5 transition-all duration-200 cursor-pointer disabled:opacity-50 group/friend"
+                                            >
+                                                <Avatar name={f.name} color={f.avatar_color} size="sm" />
+                                                <div className="flex-1 min-w-0 text-left">
+                                                    <p className="text-sm font-medium text-primary truncate">{f.name}</p>
+                                                    <p className="text-xs text-secondary truncate">{f.email}</p>
+                                                </div>
+                                                <div className="shrink-0">
+                                                    {addingFriendId === f.id ? (
+                                                        <Loader2 className="w-4 h-4 text-accent animate-spin" />
+                                                    ) : (
+                                                        <Plus className="w-4 h-4 text-secondary group-hover/friend:text-accent transition-colors" />
+                                                    )}
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                );
+                            })()}
+                        </div>
+
+                        {/* Divider */}
+                        <div className="flex items-center gap-3">
+                            <div className="flex-1 h-px bg-border" />
+                            <span className="text-xs text-secondary font-medium">or invite by email</span>
+                            <div className="flex-1 h-px bg-border" />
+                        </div>
+
+                        {/* Email invite */}
                         <form onSubmit={handleInvite} className="flex items-center gap-3">
-                            <input
-                                type="email"
-                                value={inviteEmail}
-                                onChange={(e) => setInviteEmail(e.target.value)}
-                                placeholder="Enter email to invite"
-                                className="flex-1 bg-bg border border-border rounded-xl px-4 py-2.5 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
-                            />
+                            <div className="relative flex-1">
+                                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary" />
+                                <input
+                                    type="email"
+                                    value={inviteEmail}
+                                    onChange={(e) => setInviteEmail(e.target.value)}
+                                    placeholder="Enter email to invite"
+                                    className="w-full bg-bg border border-border rounded-xl pl-10 pr-4 py-2.5 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
+                                />
+                            </div>
                             <button
                                 type="submit"
                                 disabled={inviteLoading}
@@ -390,8 +494,9 @@ export default function GroupPage() {
                                 {inviteLoading ? 'Adding...' : 'Add'}
                             </button>
                         </form>
+
                         {inviteMsg && (
-                            <p className="text-sm text-accent mt-2">{inviteMsg}</p>
+                            <p className="text-sm text-accent mt-1">{inviteMsg}</p>
                         )}
                     </div>
                 )}
