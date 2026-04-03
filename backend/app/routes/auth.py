@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from jose import jwt, JWTError
+from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi.security import OAuth2PasswordBearer
 
 from app.database import get_db
@@ -21,6 +21,8 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/login")
 settings = get_settings()
 
 AVATAR_COLORS = ["#3ECF8E", "#6366F1", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6", "#F97316"]
+
+recent_reset_requests = {}
 
 
 def hash_password(password: str) -> str:
@@ -215,12 +217,24 @@ async def send_test_email(to_email: str):
 @router.post("/forgot-password")
 async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     email_lower = data.email.lower()
+    
+    # Rate Limiting
+    now = datetime.now(timezone.utc)
+    if email_lower in recent_reset_requests:
+        last_request = recent_reset_requests[email_lower]
+        if (now - last_request) < timedelta(minutes=2):
+            raise HTTPException(
+                status_code=429,
+                detail="Please wait a couple of minutes before requesting another reset link."
+            )
+    recent_reset_requests[email_lower] = now
+
     result = await db.execute(select(User).where(User.email == email_lower))
     user = result.scalar_one_or_none()
     
     if user:
-        # Generate a short-lived token for password reset (15 minutes)
-        expire = datetime.now(timezone.utc) + timedelta(minutes=15)
+        # Generate a short-lived token for password reset (30 minutes)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=30)
         to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
         reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
@@ -260,6 +274,49 @@ async def reset_password(data: PasswordResetConfirm, db: AsyncSession = Depends(
         
         if user_id is None or token_type != "password_reset":
             print(f"DEBUG: Invalid token payload: user_id={user_id}, type={token_type}")
+            raise credentials_exception
+    except ExpiredSignatureError as e:
+        print(f"DEBUG: JWT Expired: {e}")
+        try:
+            unverified_payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
+            user_id = unverified_payload.get("sub")
+            if not user_id:
+                raise credentials_exception
+                
+            result = await db.execute(select(User).where(User.id == user_id))
+            user = result.scalar_one_or_none()
+            if not user:
+                raise credentials_exception
+                
+            # Rate limit auto-resend
+            now = datetime.now(timezone.utc)
+            if user.email in recent_reset_requests:
+                last_request = recent_reset_requests[user.email]
+                if (now - last_request) < timedelta(minutes=2):
+                    raise HTTPException(
+                        status_code=400,
+                        detail="Your reset link expired. A fresh link was sent recently, please check your email."
+                    )
+            recent_reset_requests[user.email] = now
+            
+            # Send a new email
+            expire = datetime.now(timezone.utc) + timedelta(minutes=30)
+            to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
+            reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
+            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+            
+            email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
+            if email_result["success"]:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Your reset link expired. We have automatically sent a fresh link to your email!"
+                )
+            else:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Your reset link expired, and we failed to send a new one. Please request a new link manually."
+                )
+        except JWTError:
             raise credentials_exception
     except JWTError as e:
         print(f"DEBUG: JWT Decode Error during password reset: {e}")
