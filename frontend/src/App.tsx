@@ -5,6 +5,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
 import ResetPasswordPage from './pages/ResetPasswordPage';
+import TutorialPage from './pages/TutorialPage';
 import DashboardPage from './pages/DashboardPage';
 import GroupPage from './pages/GroupPage';
 import InvitePage from './pages/InvitePage';
@@ -71,6 +72,7 @@ export default function App() {
                             <Route path="/register" element={<PublicRoute><RegisterPage /></PublicRoute>} />
                             <Route path="/forgot-password" element={<PublicRoute><ForgotPasswordPage /></PublicRoute>} />
                             <Route path="/reset-password" element={<PublicRoute><ResetPasswordPage /></PublicRoute>} />
+                            <Route path="/tutorial" element={<PublicRoute><TutorialPage /></PublicRoute>} />
                             <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
                             <Route path="/payments" element={<ProtectedRoute><Layout><PaymentsPage /></Layout></ProtectedRoute>} />
                             <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
