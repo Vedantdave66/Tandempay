@@ -114,6 +114,23 @@ class Notification(Base):
     user: Mapped["User"] = relationship()
 
 
+# --- Expense Reminders ---
+class ExpenseReminder(Base):
+    """Recurring reminder for an expense. Only the payer can create one."""
+    __tablename__ = "expense_reminders"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    expense_id: Mapped[str] = mapped_column(String, ForeignKey("expenses.id", ondelete="CASCADE"), nullable=False, unique=True)
+    created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    interval_days: Mapped[int] = mapped_column(nullable=False)
+    next_reminder_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    expense: Mapped["Expense"] = relationship()
+    creator: Mapped["User"] = relationship()
+
+
 # --- Friend Requests ---
 class FriendRequest(Base):
     """Tracks friend requests sent via email."""

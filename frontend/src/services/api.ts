@@ -393,3 +393,28 @@ export const requestsApi = {
     list: (groupId: string) => request<PaymentRequestData[]>(`/groups/${groupId}/requests`),
     payWithWallet: (requestId: string) => request<PaymentRequestData>(`/requests/${requestId}/pay`, { method: 'PUT' }),
 };
+
+// --- Expense Reminders ---
+export interface Reminder {
+    id: string;
+    expense_id: string;
+    created_by: string;
+    interval_days: number;
+    next_reminder_at: string;
+    is_active: boolean;
+    created_at: string;
+}
+
+export const remindersApi = {
+    create: (groupId: string, expenseId: string, interval_days: number) =>
+        request<Reminder>(`/groups/${groupId}/expenses/${expenseId}/reminder`, {
+            method: 'POST',
+            body: JSON.stringify({ interval_days }),
+        }),
+    get: (groupId: string, expenseId: string) =>
+        request<Reminder | null>(`/groups/${groupId}/expenses/${expenseId}/reminder`),
+    delete: (groupId: string, expenseId: string) =>
+        request<void>(`/groups/${groupId}/expenses/${expenseId}/reminder`, {
+            method: 'DELETE',
+        }),
+};

@@ -442,6 +442,8 @@ export default function GroupPage() {
                                 <ExpenseCard
                                     key={exp.id}
                                     expense={exp}
+                                    groupId={groupId}
+                                    currentUserId={user?.id}
                                     onEdit={handleEditExpense}
                                     onDelete={handleDeleteExpense}
                                     isDeleting={actionLoadingId === exp.id}

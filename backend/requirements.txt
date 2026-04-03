@@ -12,6 +12,7 @@ python-dotenv==1.0.1
 stripe
 plaid-python
 resend
+apscheduler
 pytest
 pytest-asyncio
 httpx

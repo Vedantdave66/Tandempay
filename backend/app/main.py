@@ -1,13 +1,20 @@
 import os
+import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.database import engine, Base
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users
+from app.routes import reminders
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
+from app.services.reminder_scheduler import process_due_reminders
 from app.idempotency import IdempotencyKey  # noqa: F401 — ensures table is created
+
+logger = logging.getLogger("tandempay.main")
 
 
 from sqlalchemy import text
@@ -50,7 +57,23 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Start the reminder scheduler
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        process_due_reminders,
+        trigger=IntervalTrigger(minutes=60),
+        id="reminder_tick",
+        name="Process due expense reminders",
+        replace_existing=True,
+    )
+    scheduler.start()
+    logger.info("Reminder scheduler started (60-min interval).")
+
     yield
+
+    # Shutdown scheduler
+    scheduler.shutdown(wait=False)
+    logger.info("Reminder scheduler stopped.")
 
 app = FastAPI(title="Tandem API", version="1.0.0", lifespan=lifespan)
 
@@ -83,6 +106,7 @@ app.include_router(requests.router)
 app.include_router(plaid_routes.router)
 app.include_router(stripe_routes.router)
 app.include_router(users.router)
+app.include_router(reminders.router)
 app.include_router(reconciliation_router)
 
 @app.get("/")

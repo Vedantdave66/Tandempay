@@ -270,3 +270,21 @@ class PaymentRequestOut(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+# --- Expense Reminders ---
+class ReminderCreate(BaseModel):
+    interval_days: int  # minimum 1
+
+
+class ReminderOut(BaseModel):
+    id: str
+    expense_id: str
+    created_by: str
+    interval_days: int
+    next_reminder_at: datetime
+    is_active: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True

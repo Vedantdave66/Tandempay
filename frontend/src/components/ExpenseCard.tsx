@@ -1,18 +1,22 @@
 import { Expense } from '../services/api';
 import { formatCurrency } from '../utils/currency';
 import Avatar from './Avatar';
+import ReminderPopover from './ReminderPopover';
 import { Receipt, Edit2, Trash2 } from 'lucide-react';
 
 interface ExpenseCardProps {
     expense: Expense;
+    groupId?: string;
+    currentUserId?: string;
     onEdit?: (expense: Expense) => void;
     onDelete?: (expense: Expense) => void;
     isDeleting?: boolean;
 }
 
-export default function ExpenseCard({ expense, onEdit, onDelete, isDeleting }: ExpenseCardProps) {
+export default function ExpenseCard({ expense, groupId, currentUserId, onEdit, onDelete, isDeleting }: ExpenseCardProps) {
     const date = new Date(expense.created_at);
     const formatted = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    const isPayer = currentUserId === expense.paid_by;
 
     return (
         <div className="group bg-surface border border-border rounded-xl p-4 hover:bg-surface-hover transition-all duration-200">
@@ -27,6 +31,10 @@ export default function ExpenseCard({ expense, onEdit, onDelete, isDeleting }: E
                         <div className="flex items-center gap-3">
                             {/* Actions: Always visible on mobile, hover on desktop */}
                             <div className={`transition-opacity flex items-center gap-1 mr-2 ${isDeleting ? 'opacity-100' : 'opacity-100 md:opacity-0 md:group-hover:opacity-100'}`}>
+                                {/* Reminder bell — only visible to the payer */}
+                                {isPayer && groupId && (
+                                    <ReminderPopover groupId={groupId} expenseId={expense.id} />
+                                )}
                                 {onEdit && (
                                     <button
                                         onClick={(e) => { e.stopPropagation(); onEdit(expense); }}
