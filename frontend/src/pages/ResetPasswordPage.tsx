@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Wallet, Lock, ArrowLeft, CheckCircle2 } from 'lucide-react';
+import { Wallet, Lock, ArrowLeft, CheckCircle2, Eye, EyeOff } from 'lucide-react';
 import { authApi } from '../services/api';
 
 export default function ResetPasswordPage() {
@@ -13,6 +13,8 @@ export default function ResetPasswordPage() {
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [errorMsg, setErrorMsg] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirm, setShowConfirm] = useState(false);
 
     useEffect(() => {
         if (!token) {
@@ -82,15 +84,23 @@ export default function ResetPasswordPage() {
                                             <Lock className="h-4 w-4 text-secondary/60" />
                                         </div>
                                         <input
-                                            type="password"
+                                            type={showPassword ? 'text' : 'password'}
                                             value={password}
                                             onChange={(e) => setPassword(e.target.value)}
                                             placeholder="••••••••"
                                             required
                                             minLength={6}
                                             disabled={!token}
-                                            className="w-full bg-bg border border-border rounded-xl pl-11 pr-4 py-3 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
+                                            className="w-full bg-bg border border-border rounded-xl pl-11 pr-11 py-3 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-secondary/60 hover:text-primary transition-colors cursor-pointer"
+                                            tabIndex={-1}
+                                        >
+                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
                                     </div>
                                 </div>
                                 <div>
@@ -100,15 +110,23 @@ export default function ResetPasswordPage() {
                                             <Lock className="h-4 w-4 text-secondary/60" />
                                         </div>
                                         <input
-                                            type="password"
+                                            type={showConfirm ? 'text' : 'password'}
                                             value={confirmPassword}
                                             onChange={(e) => setConfirmPassword(e.target.value)}
                                             placeholder="••••••••"
                                             required
                                             minLength={6}
                                             disabled={!token}
-                                            className="w-full bg-bg border border-border rounded-xl pl-11 pr-4 py-3 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
+                                            className="w-full bg-bg border border-border rounded-xl pl-11 pr-11 py-3 text-sm text-primary placeholder-secondary/50 focus:outline-none focus:border-accent transition-colors"
                                         />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowConfirm(!showConfirm)}
+                                            className="absolute inset-y-0 right-0 pr-4 flex items-center text-secondary/60 hover:text-primary transition-colors cursor-pointer"
+                                            tabIndex={-1}
+                                        >
+                                            {showConfirm ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
                                     </div>
                                 </div>
                                 <button
