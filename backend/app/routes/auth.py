@@ -237,11 +237,14 @@ async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends
                 status_code=500, 
                 detail=f"Email delivery service failure: {result['error']}"
             )
+            
+        return {"message": "Password reset link sent"}
     else:
         print(f"DEBUG: Password reset requested for non-existent email: {email_lower}")
-    
-    # Always return success to prevent email enumeration
-    return {"message": "If an account with that email exists, we have sent a password reset link."}
+        raise HTTPException(
+            status_code=404,
+            detail="No account found with that email address"
+        )
 
 
 @router.post("/reset-password")

@@ -7,19 +7,19 @@ export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
+    const [error, setError] = useState('');
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
+        setError('');
 
         try {
             await authApi.forgotPassword(email);
             setSubmitted(true);
-        } catch (error) {
-            console.error('Password reset request failed:', error);
-            // We usually proceed anyway to prevent email enumeration,
-            // but log it just in case.
-            setSubmitted(true);
+        } catch (err: any) {
+            console.error('Password reset request failed:', err);
+            setError(err.message || 'No account found with this email address.');
         } finally {
             setLoading(false);
         }
@@ -44,10 +44,16 @@ export default function ForgotPasswordPage() {
                 <div className="bg-surface border border-border rounded-2xl p-8 shadow-2xl shadow-black/20">
                     {!submitted ? (
                         <>
-                            <div className="mb-8">
+                            <div className="mb-6">
                                 <h1 className="text-xl font-bold text-primary mb-1">Reset password</h1>
                                 <p className="text-sm text-secondary">Enter your email and we'll send you a link to reset your password.</p>
                             </div>
+
+                            {error && (
+                                <div className="mb-6 p-4 bg-danger/10 border border-danger/20 rounded-xl">
+                                    <p className="text-sm text-danger">{error}</p>
+                                </div>
+                            )}
 
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div>
