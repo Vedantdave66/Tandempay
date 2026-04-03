@@ -93,3 +93,109 @@ select,
 textarea {
   font-family: var(--font-sans);
 }
+
+/* ═══════════════════════════════════════════ */
+/* Auth Page Animations                        */
+/* ═══════════════════════════════════════════ */
+
+/* Entrance animation — slide up + fade in */
+@keyframes auth-entrance {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.auth-entrance {
+  opacity: 0;
+  animation: auth-entrance 0.7s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Logo pulse glow */
+@keyframes logo-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(74, 222, 128, 0.3), 0 8px 24px rgba(74, 222, 128, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 32px rgba(74, 222, 128, 0.5), 0 8px 32px rgba(74, 222, 128, 0.25);
+  }
+}
+
+.auth-logo-pulse {
+  animation: logo-pulse 3s ease-in-out infinite;
+}
+
+/* Glassmorphic card */
+.auth-card {
+  background: rgba(17, 19, 24, 0.7);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(30, 34, 48, 0.8);
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow:
+    0 0 0 1px rgba(74, 222, 128, 0.03),
+    0 20px 50px rgba(0, 0, 0, 0.4),
+    0 0 80px rgba(74, 222, 128, 0.03);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Subtle gradient shimmer on card top edge */
+.auth-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(74, 222, 128, 0.3),
+    rgba(129, 140, 248, 0.2),
+    transparent
+  );
+}
+
+/* Light mode glassmorphic card */
+:root[data-theme="light"] .auth-card {
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  box-shadow:
+    0 0 0 1px rgba(22, 163, 74, 0.03),
+    0 20px 50px rgba(0, 0, 0, 0.08),
+    0 0 80px rgba(22, 163, 74, 0.03);
+}
+
+:root[data-theme="light"] .auth-card::before {
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(22, 163, 74, 0.3),
+    rgba(79, 70, 229, 0.2),
+    transparent
+  );
+}
+
+/* Staggered form field entrance */
+.auth-field {
+  opacity: 0;
+  animation: auth-entrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Input focus glow */
+.auth-input:focus {
+  border-color: var(--color-accent-base);
+  box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.1), 0 0 16px rgba(74, 222, 128, 0.05);
+}
+
+:root[data-theme="light"] .auth-input:focus {
+  box-shadow: 0 0 0 3px rgba(22, 163, 74, 0.1), 0 0 16px rgba(22, 163, 74, 0.05);
+}
