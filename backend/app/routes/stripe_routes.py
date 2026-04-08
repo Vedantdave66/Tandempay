@@ -88,56 +88,61 @@ from app.models import Payment
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
-    payload = await request.body()
-    sig_header = request.headers.get("Stripe-Signature", "")
-    endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
-    
+    import traceback
     try:
-        event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid payload")
-    except stripe.error.SignatureVerificationError:
-        raise HTTPException(status_code=400, detail="Invalid signature")
-
-    if event.type == 'payment_intent.succeeded':
-        intent = event.data.object
-        metadata = getattr(intent, 'metadata', {})
-        payment_id = metadata.get("payment_id") if metadata else None
+        payload = await request.body()
+        sig_header = request.headers.get("Stripe-Signature", "")
+        endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
         
-        result = await db.execute(select(Payment).where(Payment.id == payment_id))
-        payment = result.scalars().first()
-        
-        # Requirement 2: Webhook safely ignores duplicate or repeated events
-        if payment and payment.status == "succeeded":
-            return {"status": "success", "message": "Already succeeded"}
+        try:
+            event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid payload")
+        except stripe.error.SignatureVerificationError:
+            raise HTTPException(status_code=400, detail="Invalid signature")
 
-        if payment and payment.status != "succeeded":
-            payment.status = "succeeded"
+        if event.type == 'payment_intent.succeeded':
+            intent = event.data.object
+            metadata = getattr(intent, 'metadata', {})
+            payment_id = metadata.get("payment_id") if metadata else None
             
-            # Settlement tracking integration (NO WALLET LOGIC)
-            if payment.settlement_id and payment.settlement_id != "none":
-                settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
-                settlement = settlement_res.scalars().first()
-                if settlement:
-                    settlement.status = "settled"
-
-            # Execute explicit database commit tracking status only
-            await db.commit()
-
-    elif event.type == 'payment_intent.payment_failed':
-        intent = event.data.object
-        metadata = getattr(intent, 'metadata', {})
-        payment_id = metadata.get("payment_id") if metadata else None
-        
-        result = await db.execute(select(Payment).where(Payment.id == payment_id))
-        payment = result.scalars().first()
-        
-        # Requirement 2: Handle failed duplicate events identically
-        if payment and payment.status == "failed":
-            return {"status": "success", "message": "Already failed"}
+            result = await db.execute(select(Payment).where(Payment.id == payment_id))
+            payment = result.scalars().first()
             
-        if payment and payment.status not in ["succeeded", "failed"]:
-            payment.status = "failed"
-            await db.commit()
+            # Requirement 2: Webhook safely ignores duplicate or repeated events
+            if payment and payment.status == "succeeded":
+                return {"status": "success", "message": "Already succeeded"}
 
-    return {"status": "success"}
+            if payment and payment.status != "succeeded":
+                payment.status = "succeeded"
+                
+                # Settlement tracking integration (NO WALLET LOGIC)
+                if payment.settlement_id and payment.settlement_id != "none":
+                    settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
+                    settlement = settlement_res.scalars().first()
+                    if settlement:
+                        settlement.status = "settled"
+
+                # Execute explicit database commit tracking status only
+                await db.commit()
+
+        elif event.type == 'payment_intent.payment_failed':
+            intent = event.data.object
+            metadata = getattr(intent, 'metadata', {})
+            payment_id = metadata.get("payment_id") if metadata else None
+            
+            result = await db.execute(select(Payment).where(Payment.id == payment_id))
+            payment = result.scalars().first()
+            
+            # Requirement 2: Handle failed duplicate events identically
+            if payment and payment.status == "failed":
+                return {"status": "success", "message": "Already failed"}
+                
+            if payment and payment.status not in ["succeeded", "failed"]:
+                payment.status = "failed"
+                await db.commit()
+
+        return {"status": "success"}
+    except Exception as e:
+        error_msg = traceback.format_exc()
+        raise HTTPException(status_code=400, detail=error_msg)
