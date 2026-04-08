@@ -10,7 +10,9 @@ from app.database import get_db
 from app.models import User, Payment
 from app.routes.auth import get_current_user
 from app.idempotency import idempotent
-from app.config import settings
+from app.config import get_settings
+
+settings = get_settings()
 
 router = APIRouter(prefix="/api/payments", tags=["Payments"])
 
