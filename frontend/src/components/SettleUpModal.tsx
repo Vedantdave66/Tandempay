@@ -91,34 +91,6 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         }
     };
 
-    const handleInAppConfirm = async () => {
-        if (!selectedBank) return;
-        setStep('in_app_processing');
-        setError('');
-        try {
-            // First create a record so we have a paper trail
-            const record = await settlementRecordsApi.create(groupId, {
-                payee_id: settlement.to_user_id,
-                amount: settlement.amount,
-                method: 'in_app'
-            });
-
-            // Call Stripe to execute the ACH transfer
-            await stripeApi.createPaymentIntent({
-                amount: settlement.amount,
-                payee_id: settlement.to_user_id,
-                provider_account_id: selectedBank.id
-            });
-
-            // If Stripe succeeds, mark it settled/processing
-            await settlementRecordsApi.updateStatus(groupId, record.id, 'settled');
-            
-            setStep('in_app_success');
-        } catch (err: any) {
-            setError(err.message || "Failed to process Stripe transfer");
-            setStep('in_app_confirm');
-        }
-    };
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
