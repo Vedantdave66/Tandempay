@@ -391,7 +391,12 @@ export const requestsApi = {
 // --- Strict Stripe Payments ---
 export const paymentsApi = {
     create: (data: { payee_id: string; amount: number; settlement_id?: string }) =>
-        request<{ client_secret: string; payment_id: string }>('/payments/create', {
+        request<{ 
+            client_secret: string; 
+            payment_id: string; 
+            status: string; 
+            resumed?: boolean 
+        }>('/payments/create', {
             method: 'POST',
             body: JSON.stringify(data)
         }),

@@ -57,6 +57,13 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Add UniqueConstraint to Payment if it doesn't exist
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE payments ADD CONSTRAINT uq_payment_settlement_payer UNIQUE (settlement_id, payer_id);"))
+    except Exception:
+        pass
+
     # Start the reconciliation scheduler
     from app.services.payment_reconciliation import run_payment_reconciliation
     scheduler = AsyncIOScheduler()

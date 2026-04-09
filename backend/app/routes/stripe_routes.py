@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import User, ProviderAccount, WalletTransaction, SettlementRecord
+from app.models import User, ProviderAccount, WalletTransaction, SettlementRecord, Payment, StripeEvent
 from app.routes.auth import get_current_user
 from app.config import get_settings
 from app.idempotency import idempotent
@@ -86,13 +86,11 @@ async def get_onboarding_status(
         return {"onboarded": False}
 
 
-from app.models import Payment
 
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     import traceback
     import logging
-    from app.models import StripeEvent
     logger = logging.getLogger("splitease.webhooks")
     
     try:
