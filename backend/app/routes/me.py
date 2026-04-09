@@ -61,28 +61,50 @@ async def get_my_payments(current_user: User = Depends(get_current_user), db: As
 
 @router.get("/friends", response_model=list[dict])
 async def get_my_friends(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Get all users the current user shares a group with, and aggregate their net balance."""
+    """Get all users the current user shares a group with OR has an accepted friend request with."""
+    from app.models import FriendRequest
     
+    friends_dict = {}
+
     # 1. Find all groups the user is part of
     my_groups_result = await db.execute(select(GroupMember.group_id).where(GroupMember.user_id == current_user.id))
     my_group_ids = [g for g in my_groups_result.scalars().all()]
     
-    if not my_group_ids:
-        return []
-        
-    # 2. Find all unique members in those groups (excluding the current user)
-    friends_result = await db.execute(
-        select(User).join(GroupMember, User.id == GroupMember.user_id)
-        .where(GroupMember.group_id.in_(my_group_ids), User.id != current_user.id)
-        .distinct()
+    if my_group_ids:
+        # Find all unique members in those groups (excluding the current user)
+        group_friends_result = await db.execute(
+            select(User).join(GroupMember, User.id == GroupMember.user_id)
+            .where(GroupMember.group_id.in_(my_group_ids), User.id != current_user.id)
+            .distinct()
+        )
+        for f in group_friends_result.scalars().all():
+            friends_dict[f.id] = f
+
+    # 2. Find friends from sent accepted friend requests
+    sent_requests_stmt = select(User).join(
+        FriendRequest, func.lower(User.email) == func.lower(FriendRequest.receiver_email)
+    ).where(
+        FriendRequest.sender_id == current_user.id,
+        FriendRequest.status == 'accepted'
     )
-    friends = friends_result.scalars().all()
-    
-    # We could calculate the net balance. For simplicity, we just return the friend info for now.
-    # A true 'net balance' cross-group calculation requires evaluating every expense between the two users.
-    # Since the frontend will use this to list connections, we can return just the users.
+    sent_friends_result = await db.execute(sent_requests_stmt)
+    for f in sent_friends_result.scalars().all():
+        friends_dict[f.id] = f
+        
+    # 3. Find friends from received accepted friend requests
+    received_requests_stmt = select(User).join(
+        FriendRequest, User.id == FriendRequest.sender_id
+    ).where(
+        func.lower(FriendRequest.receiver_email) == func.lower(current_user.email),
+        FriendRequest.status == 'accepted'
+    )
+    received_friends_result = await db.execute(received_requests_stmt)
+    for f in received_friends_result.scalars().all():
+        friends_dict[f.id] = f
+
+    # Format output
     out = []
-    for f in friends:
+    for f_id, f in friends_dict.items():
         out.append({
             "id": f.id,
             "name": f.name,
