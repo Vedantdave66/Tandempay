@@ -226,3 +226,12 @@ class Payment(Base):
     payer: Mapped["User"] = relationship(foreign_keys=[payer_id])
     payee: Mapped["User"] = relationship(foreign_keys=[payee_id])
     settlement: Mapped["SettlementRecord"] = relationship(foreign_keys=[settlement_id])
+
+
+class StripeEvent(Base):
+    """Tracks processed Stripe event IDs to ensure webhook idempotency."""
+    __tablename__ = "stripe_events"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True)  # This will be the actual Stripe event ID
+    type: Mapped[str] = mapped_column(String(100), nullable=False)
+    processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

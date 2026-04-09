@@ -92,6 +92,7 @@ from app.models import Payment
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     import traceback
     import logging
+    from app.models import StripeEvent
     logger = logging.getLogger("splitease.webhooks")
     
     try:
@@ -106,6 +107,12 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         except stripe.error.SignatureVerificationError:
             raise HTTPException(status_code=400, detail="Invalid signature")
 
+        # 1. Webhook Idempotency: Check if already processed
+        event_check = await db.execute(select(StripeEvent).where(StripeEvent.id == event.id))
+        if event_check.scalars().first():
+            logger.info(f"Ignoring duplicate webhook event: {event.id}")
+            return {"status": "ignored", "reason": "duplicate"}
+
         event_logger = f"event_id={event.id} type={event.type}"
         logger.info(f"Processing webhook: {event_logger}")
 
@@ -116,52 +123,37 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             
             if not payment_id:
                 logger.warning(f"No payment_id found in metadata for {event_logger}")
-                return {"status": "ignored"}
+            else:
+                result = await db.execute(select(Payment).where(Payment.id == payment_id))
+                payment = result.scalars().first()
+                
+                if payment:
+                    if payment.status != "succeeded":
+                        # STRICT TRANSFER VALIDATION
+                        try:
+                            latest_charge_id = intent.get("latest_charge")
+                            if latest_charge_id:
+                                charge = stripe.Charge.retrieve(latest_charge_id)
+                                transfer_id = charge.get("transfer")
+                                if transfer_id:
+                                    transfer = stripe.Transfer.retrieve(transfer_id)
+                                    if transfer.status != "succeeded":
+                                        logger.error(f"Transfer {transfer_id} failed for payment {payment_id}")
+                                        payment.status = "failed"
+                                        await db.commit()
+                                        return {"status": "failed"}
+                                    logger.info(f"Transfer {transfer_id} verified as succeeded")
+                        except Exception as transfer_err:
+                            logger.error(f"Transfer validation error: {str(transfer_err)}")
 
-            result = await db.execute(select(Payment).where(Payment.id == payment_id))
-            payment = result.scalars().first()
-            
-            if not payment:
-                logger.error(f"Payment {payment_id} not found in DB for {event_logger}")
-                return {"status": "error", "message": "Payment not found"}
-
-            if payment.status == "succeeded":
-                logger.info(f"Payment {payment_id} already marked as succeeded")
-                return {"status": "success", "message": "Already succeeded"}
-
-            # STRICT TRANSFER VALIDATION
-            # Verify the destination account actually received funds
-            try:
-                # Retrieve the latest charge to verify the transfer status
-                latest_charge_id = intent.get("latest_charge")
-                if latest_charge_id:
-                    charge = stripe.Charge.retrieve(latest_charge_id)
-                    transfer_id = charge.get("transfer")
-                    if transfer_id:
-                        transfer = stripe.Transfer.retrieve(transfer_id)
-                        if transfer.status != "succeeded":
-                            logger.error(f"Transfer {transfer_id} for payment {payment_id} failed with status: {transfer.status}")
-                            payment.status = "failed"
-                            await db.commit()
-                            return {"status": "failed", "message": "Transfer failed"}
-                        logger.info(f"Transfer {transfer_id} verified as succeeded for payment {payment_id}")
-                    else:
-                        logger.warning(f"No transfer ID found on charge {latest_charge_id} for payment {payment_id}")
-            except Exception as transfer_err:
-                logger.error(f"Error validating transfer for {payment_id}: {str(transfer_err)}")
-                # We don't fail the whole webhook yet, but we log heavily
-
-            payment.status = "succeeded"
-            
-            if payment.settlement_id and payment.settlement_id != "none":
-                settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
-                settlement = settlement_res.scalars().first()
-                if settlement:
-                    settlement.status = "settled"
-
-            await db.commit()
-            logger.info(f"Payment {payment_id} successfully transitioned to succeeded")
-
+                        payment.status = "succeeded"
+                        if payment.settlement_id and payment.settlement_id != "none":
+                            settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
+                            settlement = settlement_res.scalars().first()
+                            if settlement:
+                                settlement.status = "settled"
+                        logger.info(f"Payment {payment_id} marked as succeeded")
+        
         elif event.type == 'payment_intent.payment_failed':
             intent = event.data.object
             metadata = intent.get('metadata', {})
@@ -169,23 +161,38 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             
             result = await db.execute(select(Payment).where(Payment.id == payment_id))
             payment = result.scalars().first()
-            
             if payment and payment.status not in ["succeeded", "failed"]:
                 payment.status = "failed"
-                await db.commit()
-                logger.info(f"Payment {payment_id} transitioned to failed via webhook")
+                logger.info(f"Payment {payment_id} marked as failed")
 
+        elif event.type == 'payment_intent.canceled':
+            intent = event.data.object
+            metadata = intent.get('metadata', {})
+            payment_id = metadata.get("payment_id")
+            
+            result = await db.execute(select(Payment).where(Payment.id == payment_id))
+            payment = result.scalars().first()
+            if payment:
+                payment.status = "expired"
+                logger.info(f"Payment {payment_id} marked as expired via cancellation")
+
+        # 2. Commit transaction and record the event for idempotency
+        new_event = StripeEvent(id=event.id, type=event.type)
+        db.add(new_event)
+        await db.commit()
         return {"status": "success"}
+
     except Exception as e:
         error_msg = traceback.format_exc()
-        logger.error(f"Webhook processing error: {error_msg}")
-        raise HTTPException(status_code=400, detail="Webhook internal error")
+        logger.error(f"Webhook error: {error_msg}")
+        await db.rollback()
+        raise HTTPException(status_code=400, detail="Webhook error")
 
 @router.post("/reconcile/{payment_id}")
 async def reconcile_payment(payment_id: str, db: AsyncSession = Depends(get_db)):
     """
-    Manually reconcile a payment that stayed in 'processing' too long.
-    Queries Stripe API as the source of truth.
+    Manually reconcile a payment using Stripe as the source of truth.
+    Ensures absolute DB-Stripe synchronization.
     """
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     payment = result.scalars().first()
@@ -193,14 +200,16 @@ async def reconcile_payment(payment_id: str, db: AsyncSession = Depends(get_db))
     if not payment:
         raise HTTPException(status_code=404, detail="Payment not found")
         
-    if payment.status in ["succeeded", "failed"]:
-        return {"status": payment.status, "message": "Already in terminal state"}
+    if payment.status == "succeeded":
+        return {"status": "succeeded", "resolved": True}
         
     if not payment.stripe_payment_intent_id:
-        raise HTTPException(status_code=400, detail="No Stripe intent ID associated with this payment")
+        raise HTTPException(status_code=400, detail="No Stripe intent ID")
 
     try:
         intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
+        logger = logging.getLogger("splitease.reconciliation")
+        logger.info(f"Reconciling {payment_id}: Stripe status={intent.status}")
         
         if intent.status == "succeeded":
             payment.status = "succeeded"
@@ -212,15 +221,26 @@ async def reconcile_payment(payment_id: str, db: AsyncSession = Depends(get_db))
             await db.commit()
             return {"status": "succeeded", "resolved": True}
             
-        elif intent.status in ["canceled", "requires_payment_method"]:
+        elif intent.status == "canceled":
+            payment.status = "expired"
+            await db.commit()
+            return {"status": "expired", "resolved": True}
+
+        elif intent.status == "requires_payment_method":
+            # If it's requires_payment_method, it likely failed or timed out
             payment.status = "failed"
             await db.commit()
             return {"status": "failed", "resolved": True}
+
+        elif intent.status == "processing":
+            payment.status = "processing"
+            await db.commit()
+            return {"status": "processing", "resolved": False}
             
-        return {"status": intent.status, "resolved": False, "message": "Still in non-terminal Stripe state"}
+        return {"status": intent.status, "resolved": False}
         
     except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Stripe retrieval failed: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Reconciliation failed: {str(e)}")
 
 @router.post("/cleanup")
 async def cleanup_payments(db: AsyncSession = Depends(get_db)):

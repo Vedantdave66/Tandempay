@@ -8,6 +8,8 @@ import { formatCurrency } from '../utils/currency';
 // Stripe public key - ideally loaded from env
 const stripePromise = loadStripe((import.meta.env.VITE_STRIPE_PUBLIC_KEY as string) || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
 
+type UIState = 'idle' | 'submitting' | 'verifying' | 'success' | 'error' | 'timeout';
+
 function CheckoutForm({ 
     amount, 
     paymentId,
@@ -21,172 +23,147 @@ function CheckoutForm({
 }) {
     const stripe = useStripe();
     const elements = useElements();
-    const [isPaying, setIsPaying] = useState(false);
+    const [state, setState] = useState<UIState>('idle');
     const [errorMessage, setErrorMessage] = useState<string | null>(null);
-    const [step, setStep] = useState<'form' | 'processing' | 'success' | 'stuck'>('form');
 
-    const startPolling = async () => {
-        let attempts = 0;
-        const maxAttempts = 12; // 60 seconds (12 * 5s)
+    const startPolling = async (pid: string) => {
+        setState('verifying');
+        const startTime = Date.now();
         
         const interval = setInterval(async () => {
-            attempts++;
+            const elapsed = Date.now() - startTime;
+            
             try {
-                const res = await paymentsApi.reconcile(paymentId);
+                const res = await paymentsApi.reconcile(pid);
                 if (res.status === 'succeeded') {
                     clearInterval(interval);
-                    setStep('success');
-                    setTimeout(onSuccess, 1500);
-                } else if (res.status === 'failed') {
+                    setState('success');
+                    setTimeout(onSuccess, 2000);
+                } else if (res.status === 'failed' || res.status === 'expired') {
                     clearInterval(interval);
-                    setErrorMessage("Payment failed. Please try again.");
-                    setStep('form');
-                    setIsPaying(false);
+                    setErrorMessage(res.status === 'expired' ? "Payment session expired. Please restart." : "Payment failed. Please try another card.");
+                    setState('error');
                 }
             } catch (err) {
                 console.error("Polling error:", err);
             }
 
-            if (attempts >= maxAttempts) {
-                clearInterval(interval);
-                setStep('stuck');
+            // Timeout after 10 seconds -> Move to 'timeout' state but keep polling in background if helpful
+            // Requirement says "Show 'Still processing', Trigger reconciliation, Continue polling"
+            if (elapsed > 10000 && state === 'verifying') {
+                setState('timeout');
+                // We keep the interval running
             }
-        }, 5000);
+        }, 2000); // 2-3s interval as requested
+        
+        return () => clearInterval(interval);
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!stripe || !elements || state !== 'idle') return;
 
-        if (!stripe || !elements || isPaying) return;
-
-        setIsPaying(true);
+        setState('submitting');
         setErrorMessage(null);
 
-        // 1. Submit the form to Stripe first (validates inputs)
+        // STEP 1: Strict elements.submit()
         const { error: submitError } = await elements.submit();
         if (submitError) {
-            setErrorMessage(submitError.message || "Please check your card details.");
-            setIsPaying(false);
+            setErrorMessage(submitError.message || "Validation failed.");
+            setState('idle');
             return;
         }
 
-        // 2. Confirm the payment
+        // STEP 2: confirmPayment()
         const { error, paymentIntent } = await stripe.confirmPayment({
             elements,
             confirmParams: {
-                return_url: window.location.href,
+                return_url: window.location.href, // Fallback for redirects
             },
             redirect: "if_required",
         });
 
         if (error) {
-            setErrorMessage(error.message || "An unexpected error occurred.");
-            setIsPaying(false);
-        } else if (paymentIntent) {
-            // 3. Strict status machine
-            switch (paymentIntent.status) {
-                case "succeeded":
-                    setStep('success');
-                    setTimeout(onSuccess, 1500);
-                    break;
-                case "processing":
-                    setStep('processing');
-                    startPolling();
-                    break;
-                case "requires_action":
-                    // Stripe will handle the redirect/popup automatically
-                    break;
-                case "requires_payment_method":
-                    setErrorMessage("Payment failed. Please try another card.");
-                    setIsPaying(false);
-                    break;
-                default:
-                    setStep('processing');
-                    startPolling();
+            // Check if it's a real error or just a redirect happening
+            if (error.type === "card_error" || error.type === "validation_error") {
+                setErrorMessage(error.message || "An error occurred.");
+                setState('idle');
+            } else {
+                // For other errors, we might be in an uncertain state, start verifying
+                startPolling(paymentId);
             }
+        } else if (paymentIntent) {
+            // STEP 3: Move to verifying ONLY. NEVER success immediately.
+            startPolling(paymentId);
         }
     };
 
-    if (step === 'success') {
+    if (state === 'success') {
         return (
-            <div className="py-8 text-center animate-in fade-in zoom-in duration-300">
-                <div className="w-16 h-16 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <CheckCircle2 className="w-8 h-8 text-accent" />
+            <div className="py-8 text-center animate-in fade-in zoom-in duration-500">
+                <div className="w-20 h-20 bg-accent/20 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 className="w-10 h-10 text-accent" />
                 </div>
-                <h3 className="text-xl font-bold text-primary mb-2">Payment Successful!</h3>
-                <p className="text-sm text-secondary">Your payment is processing and will arrive shortly.</p>
+                <h3 className="text-2xl font-bold text-primary mb-2">Payment Confirmed</h3>
+                <p className="text-sm text-secondary">Stripe and TandemPay have finalized your transaction.</p>
             </div>
         );
     }
 
-    if (step === 'processing') {
+    if (state === 'verifying' || state === 'timeout') {
         return (
-            <div className="py-12 text-center animate-in fade-in zoom-in">
-                <Loader2 className="w-10 h-10 text-indigo animate-spin mx-auto mb-4" />
-                <h3 className="text-lg font-bold text-primary mb-1">Confirming Payment...</h3>
-                <p className="text-sm text-secondary">We're verifying the transaction with your bank. This usually takes a few seconds.</p>
-            </div>
-        );
-    }
-
-    if (step === 'stuck') {
-        return (
-            <div className="py-8 text-center animate-in fade-in zoom-in">
-                <div className="w-16 h-16 bg-warning/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Loader2 className="w-8 h-8 text-warning animate-pulse" />
-                </div>
-                <h3 className="text-lg font-bold text-primary mb-2">Still Processing...</h3>
-                <p className="text-sm text-secondary mb-6">
-                    We're still waiting for confirmation from the payment provider. 
-                    It's safe to close this; the status will update in your dashboard shortly.
+            <div className="py-12 text-center animate-in fade-in">
+                <Loader2 className="w-12 h-12 text-indigo animate-spin mx-auto mb-6" />
+                <h3 className="text-xl font-bold text-primary mb-2">
+                    {state === 'timeout' ? "Still Processing..." : "Verifying with Stripe..."}
+                </h3>
+                <p className="text-sm text-secondary max-w-xs mx-auto">
+                    {state === 'timeout' 
+                        ? "We're waiting for the payment confirmation. You can safely close this; we'll update your dashboard." 
+                        : "Almost there! We're confirming the transfer with your bank."}
                 </p>
-                <div className="flex flex-col gap-2">
-                    <button
-                        onClick={() => { setStep('processing'); startPolling(); }}
-                        className="w-full py-3 bg-indigo text-white font-bold rounded-xl"
-                    >
-                        Re-check Status
-                    </button>
+                {state === 'timeout' && (
                     <button
                         onClick={onCancel}
-                        className="w-full py-3 bg-surface text-primary font-bold rounded-xl"
+                        className="mt-8 px-8 py-3 bg-surface text-primary font-bold rounded-xl border border-border"
                     >
-                        Close
+                        Close & Check Later
                     </button>
-                </div>
+                )}
             </div>
         );
     }
 
     return (
         <form onSubmit={handleSubmit} className="space-y-6">
-            <PaymentElement className="mb-4" />
+            <PaymentElement 
+                options={{ 
+                    wallets: { applePay: 'never', googlePay: 'never' },
+                    layout: 'tabs'
+                }} 
+            />
             
             {errorMessage && (
-                <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-sm font-medium text-danger animate-in fade-in">
+                <div className="p-4 bg-danger/10 border border-danger/20 rounded-xl text-sm font-medium text-danger animate-in shake">
                     {errorMessage}
                 </div>
             )}
 
-            <div className="flex items-center gap-3 pt-2">
+            <div className="flex gap-3 pt-2">
                 <button
                     type="button"
                     onClick={onCancel}
-                    disabled={isPaying}
-                    className="flex-1 py-3 px-4 bg-surface hover:bg-border text-primary font-bold rounded-xl transition-colors disabled:opacity-50"
+                    disabled={state === 'submitting'}
+                    className="flex-1 py-4 bg-surface hover:bg-border text-primary font-bold rounded-2xl transition-all"
                 >
-                    Cancel
+                    Back
                 </button>
                 <button
                     type="submit"
-                    disabled={!stripe || isPaying}
-                    className="flex-1 py-3 px-4 bg-indigo hover:bg-indigo-hover text-white font-bold rounded-xl flex items-center justify-center transition-colors shadow-lg shadow-indigo/20 disabled:opacity-50"
+                    disabled={!stripe || state !== 'idle'}
+                    className="flex-[2] py-4 bg-indigo hover:bg-indigo-hover text-white font-bold rounded-2xl flex items-center justify-center shadow-xl shadow-indigo/20 disabled:opacity-50"
                 >
-                    {isPaying ? (
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                    ) : (
-                        `Pay $${formatCurrency(amount)}`
-                    )}
+                    {state === 'submitting' ? <Loader2 className="w-6 h-6 animate-spin" /> : `Pay $${formatCurrency(amount)}`}
                 </button>
             </div>
         </form>
@@ -213,18 +190,26 @@ export default function StripePaymentModal({
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
+    // PERSISTENT RECOVERY (CRITICAL)
     useEffect(() => {
         const initPayment = async () => {
             try {
                 const res = await paymentsApi.create({
                     payee_id: payeeId,
-                    amount: Math.round(amount * 100), // Convert to cents
+                    amount: Math.round(amount * 100),
                     settlement_id: settlementId,
                 });
+                
+                if (res.status === 'already_completed') {
+                    onSuccess();
+                    onClose();
+                    return;
+                }
+
                 setClientSecret(res.client_secret);
                 setPaymentId(res.payment_id);
             } catch (err: any) {
-                setError(err.message || 'Failed to initialize payment');
+                setError(err.message || 'Payment initialization failed.');
             } finally {
                 setLoading(false);
             }
@@ -235,15 +220,14 @@ export default function StripePaymentModal({
         }
     }, [payeeId, amount, settlementId]);
 
-    // Added: Redirect Recovery
-    // We move the redirect check into a sub-component that is wrapped in <Elements>
     const RedirectHandler = () => {
         const stripe = useStripe();
         useEffect(() => {
             if (!stripe) return;
-            const clientSecretURL = new URLSearchParams(window.location.search).get("payment_intent_client_secret");
-            if (clientSecretURL) {
-                stripe.retrievePaymentIntent(clientSecretURL).then(({paymentIntent}) => {
+            const params = new URLSearchParams(window.location.search);
+            const cs = params.get("payment_intent_client_secret");
+            if (cs) {
+                stripe.retrievePaymentIntent(cs).then(({paymentIntent}) => {
                     if (paymentIntent?.status === "succeeded") {
                         onSuccess();
                         onClose();
@@ -255,54 +239,47 @@ export default function StripePaymentModal({
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-bg border border-border w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
-                <div className="flex items-center justify-between p-5 border-b border-border bg-surface/50">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-bg/80 backdrop-blur-md">
+            <div className="bg-bg border border-border w-full max-w-md rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <div className="flex items-center justify-between p-7 border-b border-border bg-surface/30">
                     <div>
-                        <h2 className="text-xl font-bold text-primary">Complete Payment</h2>
-                        <div className="flex items-center gap-1.5 mt-1">
+                        <h2 className="text-2xl font-black text-primary tracking-tight">Secure Payment</h2>
+                        <div className="flex items-center gap-1.5 mt-1 bg-accent/10 px-2 py-0.5 rounded-full w-fit">
                             <ShieldCheck className="w-3.5 h-3.5 text-accent" />
-                            <span className="text-xs font-medium text-secondary">Secured by Stripe</span>
+                            <span className="text-[10px] uppercase font-bold text-accent tracking-wider">Processed by Stripe</span>
                         </div>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 rounded-xl text-secondary hover:text-primary hover:bg-border transition-colors focus:outline-none"
-                    >
+                    <button onClick={onClose} className="p-3 bg-surface hover:bg-border rounded-2xl transition-all">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
 
-                <div className="p-6">
+                <div className="p-8">
                     {loading ? (
-                        <div className="flex flex-col items-center justify-center py-12">
-                            <Loader2 className="w-8 h-8 text-indigo animate-spin mb-4" />
-                            <p className="text-sm text-secondary font-medium animate-pulse">Initializing secure connection...</p>
+                        <div className="py-16 text-center">
+                            <Loader2 className="w-12 h-12 text-indigo animate-spin mx-auto mb-6" />
+                            <p className="text-secondary font-bold animate-pulse">Establishing Secure Tunnel...</p>
                         </div>
                     ) : error ? (
-                        <div className="text-center py-8">
-                            <div className="w-12 h-12 bg-danger/10 rounded-xl flex items-center justify-center mx-auto mb-4">
-                                <X className="w-6 h-6 text-danger" />
+                        <div className="py-8 text-center">
+                            <div className="w-16 h-16 bg-danger/10 rounded-full flex items-center justify-center mx-auto mb-6 text-danger">
+                                <X className="w-8 h-8" />
                             </div>
-                            <h3 className="text-lg font-bold text-primary mb-2">Payment Error</h3>
-                            <p className="text-sm text-secondary mb-6">{error}</p>
-                            <button
-                                onClick={onClose}
-                                className="px-6 py-2 bg-surface hover:bg-border text-primary font-bold rounded-xl transition-colors"
-                            >
-                                Close
-                            </button>
+                            <h3 className="text-xl font-bold text-primary mb-2">Initialization Failed</h3>
+                            <p className="text-sm text-secondary mb-8">{error}</p>
+                            <button onClick={onClose} className="w-full py-4 bg-primary text-bg font-bold rounded-2xl">Return</button>
                         </div>
                     ) : clientSecret && (
-                        <Elements stripe={stripePromise} options={{ clientSecret, appearance: { theme: 'night' } }}>
+                        <Elements 
+                            key={clientSecret} 
+                            stripe={stripePromise} 
+                            options={{ clientSecret, appearance: { theme: 'night', variables: { colorPrimary: '#3ECF8E' } } }}
+                        >
                             <RedirectHandler />
                             <CheckoutForm 
                                 amount={amount} 
                                 paymentId={paymentId || ''}
-                                onSuccess={() => {
-                                    onSuccess();
-                                    onClose();
-                                }} 
+                                onSuccess={() => { onSuccess(); onClose(); }} 
                                 onCancel={onClose} 
                             />
                         </Elements>
