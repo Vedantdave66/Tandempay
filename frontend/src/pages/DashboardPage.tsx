@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { formatCurrency } from '../utils/currency';
 import { Plus, TrendingUp, Receipt, Users, ArrowRight } from 'lucide-react';
 import { groupsApi, GroupListItem } from '../services/api';
 import GroupCard from '../components/GroupCard';
