@@ -219,7 +219,7 @@ class Payment(Base):
     payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False) # cents
     status: Mapped[str] = mapped_column(String(50), default="pending")  # pending, processing, succeeded, failed, expired
-    settlement_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("settlement_records.id"), nullable=True)
+    settlement_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("settlement_records.id", ondelete="CASCADE"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

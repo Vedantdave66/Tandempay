@@ -2,12 +2,14 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.orm import selectinload
+import logging
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense
 from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, GroupMemberOut
 from app.routes.auth import get_current_user
 
+logger = logging.getLogger("tandempay.groups")
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 
@@ -179,8 +181,15 @@ async def delete_group(group_id: str, current_user: User = Depends(get_current_u
     if group.created_by != current_user.id:
         raise HTTPException(status_code=403, detail="Only the creator can delete the group")
 
-    await db.delete(group)
-    await db.flush()
+    try:
+        await db.delete(group)
+        await db.flush()
+    except Exception as e:
+        logger.error(f"Error deleting group {group_id}: {e}")
+        raise HTTPException(
+            status_code=500, 
+            detail="Failed to delete group. Ensure all associated Stripe payments are completed or settled first."
+        )
     return None
 
 

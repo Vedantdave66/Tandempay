@@ -40,7 +40,10 @@ async function request<T>(endpoint: string, options: RequestInit = {}): Promise<
             throw new Error('Invalid server response. Please try again later.');
         }
     } catch (err: any) {
-        // Log error but re-throw for component handling
+        if (err.message === 'Failed to fetch') {
+            console.error(`Network or CORS Error [${endpoint}]:`, err);
+            throw new Error('Connection failed. This may be a server issue or permission problem.');
+        }
         console.error(`API Error [${endpoint}]:`, err.message);
         throw err;
     }

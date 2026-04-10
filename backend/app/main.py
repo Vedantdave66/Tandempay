@@ -57,6 +57,15 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    # Handle Payment Settlement CASCADE for Group deletion
+    try:
+        async with engine.begin() as conn:
+            # Re-create the constraint with CASCADE to allow group deletion when Stripe payments exist
+            await conn.execute(text("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_settlement_id_fkey;"))
+            await conn.execute(text("ALTER TABLE payments ADD CONSTRAINT payments_settlement_id_fkey FOREIGN KEY (settlement_id) REFERENCES settlement_records(id) ON DELETE CASCADE;"))
+    except Exception as e:
+        logger.warning(f"Could not update payments cascade constraint: {e}")
+
     # Add UniqueConstraint to Payment if it doesn't exist
     try:
         async with engine.begin() as conn:
