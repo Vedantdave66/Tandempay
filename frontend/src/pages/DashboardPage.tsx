@@ -44,7 +44,7 @@ export default function DashboardPage() {
         }
     };
 
-    const totalSpending = groups.reduce((sum, g) => sum + g.total_expenses, 0);
+    const totalSpending = groups.reduce((sum, g) => sum + Number(g.total_expenses || 0), 0);
     const totalGroups = groups.length;
 
     return (
