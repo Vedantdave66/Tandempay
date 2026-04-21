@@ -2,7 +2,7 @@
 
 A modern, dark-mode fintech-style app for tracking shared expenses, simplifying debts, and settling up with friends.
 
-**[Live Demo →](tandempay.ca)**
+**[Live Demo →](tandempay.ca)** *Tandempay.ca*
 
 ## ✨ Features
 
