@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/currency';
 import { useParams, useNavigate } from 'react-router-dom';
 import {
@@ -46,6 +46,7 @@ import RequestMoneyModal from '../components/RequestMoneyModal';
 import StripePaymentModal from '../components/StripePaymentModal';
 import StripeOnboardingModal from '../components/StripeOnboardingModal';
 import { computeUserBalances, deriveSuggestedSettlements, isAllSettled } from '../utils/balances';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 type Tab = 'expenses' | 'balances' | 'settlements' | 'payments';
 
@@ -90,9 +91,9 @@ export default function GroupPage() {
         if (groupId) loadAll();
     }, [groupId]);
 
-    const loadAll = async () => {
+    const loadAll = useCallback(async () => {
         if (!groupId) return;
-        setLoading(true);
+        setLoading(prev => prev); // preserve loading state on background refresh
         try {
             const [g, e, pr, reqs] = await Promise.all([
                 groupsApi.get(groupId),
@@ -109,7 +110,10 @@ export default function GroupPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [groupId]);
+
+    // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
+    useAutoRefresh(loadAll, 30000, !!groupId && !loading);
 
     const handleExpenseCreatedOrUpdated = () => {
         setShowAddExpense(false);

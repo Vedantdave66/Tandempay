@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Users, Search, UserPlus, Bell, Clock, Send, Check, X, ShieldAlert, CheckCheck, Receipt, Handshake, Mail } from 'lucide-react';
 import { meApi, Friend, notificationsApi, AppNotification, friendRequestsApi, FriendRequest, usersApi } from '../services/api';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 export default function FriendsPage() {
     const { user } = useAuth();
@@ -28,8 +29,8 @@ export default function FriendsPage() {
         loadTabData();
     }, [activeTab]);
 
-    const loadTabData = async () => {
-        setLoading(true);
+    const loadTabData = useCallback(async () => {
+        setLoading(prev => prev); // preserve loading on background refresh
         try {
             if (activeTab === 'my-friends') {
                 const data = await meApi.getFriends();
@@ -46,7 +47,10 @@ export default function FriendsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, [activeTab]);
+
+    // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
+    useAutoRefresh(loadTabData, 30000, !loading);
 
     const handleTabChange = (tab: string) => {
         setSearchParams({ tab });

@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/currency';
 import { Plus, TrendingUp, Receipt, Users, ArrowRight } from 'lucide-react';
 import { groupsApi, GroupListItem } from '../services/api';
 import GroupCard from '../components/GroupCard';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -17,7 +18,7 @@ export default function DashboardPage() {
         loadGroups();
     }, []);
 
-    const loadGroups = async () => {
+    const loadGroups = useCallback(async () => {
         try {
             const data = await groupsApi.list();
             setGroups(data);
@@ -26,7 +27,10 @@ export default function DashboardPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
+    useAutoRefresh(loadGroups, 30000, !loading);
 
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();

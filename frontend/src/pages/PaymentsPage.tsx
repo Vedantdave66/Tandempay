@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/currency';
 import { CreditCard, History, Wallet, ArrowRightLeft, ArrowDownRight, ArrowUpRight, AlertCircle, ExternalLink, CheckCircle } from 'lucide-react';
 import { meApi, SettlementRecord, walletApi, stripeApi, WalletTransaction } from '../services/api';
 import PaymentRecordCard from '../components/PaymentRecordCard';
 import { useAuth } from '../context/AuthContext';
+import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 export default function PaymentsPage() {
     const { user, refetchUser } = useAuth();
@@ -17,8 +18,7 @@ export default function PaymentsPage() {
         loadAll();
     }, []);
 
-    const loadAll = async () => {
-        setLoading(true);
+    const loadAll = useCallback(async () => {
         try {
             const [payData, transData, stripeData] = await Promise.all([
                 meApi.getPayments(),
@@ -33,7 +33,10 @@ export default function PaymentsPage() {
         } finally {
             setLoading(false);
         }
-    };
+    }, []);
+
+    // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
+    useAutoRefresh(loadAll, 30000, !loading);
 
     const handleStripeOnboard = async () => {
         setStripeLoading(true);
