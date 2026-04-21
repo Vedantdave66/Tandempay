@@ -515,8 +515,39 @@ export default function GroupPage() {
                             <p className="text-sm text-accent mt-1">{inviteMsg}</p>
                         )}
                     </div>
+                    </div>
                 )}
             </div>
+
+            {/* Setup Payments Banner */}
+            {!user?.stripe_account_id && !hasDismissedOnboarding && (
+                <div className="bg-indigo/10 border border-indigo/20 rounded-2xl p-4 mb-6 flex flex-col sm:flex-row items-center gap-4 animate-in fade-in slide-in-from-top-4">
+                    <div className="w-12 h-12 bg-indigo/20 rounded-xl flex items-center justify-center shrink-0">
+                        <Handshake className="w-6 h-6 text-indigo" />
+                    </div>
+                    <div className="flex-1 text-center sm:text-left">
+                        <h3 className="text-sm font-bold text-primary">Get paid instantly</h3>
+                        <p className="text-xs text-secondary mt-0.5">Connect your bank account securely to receive money from your friends.</p>
+                    </div>
+                    <div className="flex gap-2 w-full sm:w-auto">
+                        <button
+                            onClick={() => {
+                                setHasDismissedOnboarding(true);
+                                sessionStorage.setItem('dismissed_stripe_onboarding', 'true');
+                            }}
+                            className="flex-1 sm:flex-none px-4 py-2 bg-surface hover:bg-border text-secondary text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+                        >
+                            Later
+                        </button>
+                        <button
+                            onClick={() => setShowStripeOnboarding(true)}
+                            className="flex-[2] sm:flex-none px-5 py-2 bg-indigo hover:bg-indigo-hover text-white text-xs font-bold rounded-lg transition-colors shadow-lg shadow-indigo/20 cursor-pointer"
+                        >
+                            Set up payments
+                        </button>
+                    </div>
+                </div>
+            )}
 
             {/* Tabs */}
             <div className="flex items-center gap-1 bg-surface border border-border rounded-xl p-1 mb-6">
