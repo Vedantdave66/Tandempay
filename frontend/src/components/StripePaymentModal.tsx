@@ -7,7 +7,19 @@ import { formatCurrency } from '../utils/currency';
 import { useAuth } from '../context/AuthContext';
 
 // Stripe public key
-const stripePromise = loadStripe((import.meta.env.VITE_STRIPE_PUBLIC_KEY as string) || 'pk_test_TYooMQauvdEDq54NiTphI7jx');
+const STRIPE_PK = (import.meta.env.VITE_STRIPE_PUBLIC_KEY as string) || 'pk_test_TYooMQauvdEDq54NiTphI7jx';
+// Cache stripe instances per connected account
+const stripeCache: Record<string, ReturnType<typeof loadStripe>> = {};
+function getStripeForAccount(stripeAccountId?: string | null) {
+    const key = stripeAccountId || '__platform__';
+    if (!stripeCache[key]) {
+        stripeCache[key] = stripeAccountId
+            ? loadStripe(STRIPE_PK, { stripeAccount: stripeAccountId })
+            : loadStripe(STRIPE_PK);
+    }
+    return stripeCache[key];
+}
+
 
 type UIState = 'idle' | 'submitting' | 'verifying' | 'success' | 'error' | 'timeout';
 
@@ -272,6 +284,7 @@ export default function StripePaymentModal({
 }: StripePaymentModalProps) {
     const [clientSecret, setClientSecret] = useState<string | null>(null);
     const [paymentId, setPaymentId] = useState<string | null>(null);
+    const [stripeAccountId, setStripeAccountId] = useState<string | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [isPendingClaim, setIsPendingClaim] = useState(false);
@@ -279,6 +292,7 @@ export default function StripePaymentModal({
     const [showTrustScreen, setShowTrustScreen] = useState(user ? !user.has_completed_payment : false);
     const [trustSaving, setTrustSaving] = useState(false);
     const initRef = useRef(false);
+    const stripePromise = getStripeForAccount(stripeAccountId);
 
     const acceptTrustScreen = async () => {
         setTrustSaving(true);
@@ -330,6 +344,7 @@ export default function StripePaymentModal({
 
                 setClientSecret(res.client_secret);
                 setPaymentId(res.payment_id);
+                if (res.stripe_account_id) setStripeAccountId(res.stripe_account_id);
             } catch (err: any) {
                 console.error('[StripePayment] initPayment error:', err);
                 setError(err.message || 'Payment initialization failed.');

@@ -405,7 +405,8 @@ export const paymentsApi = {
             client_secret: string; 
             payment_id: string; 
             status: string; 
-            resumed?: boolean 
+            resumed?: boolean;
+            stripe_account_id?: string | null;
         }>('/payments/create', {
             method: 'POST',
             body: JSON.stringify(data)

@@ -186,7 +186,8 @@ async def create_payment(
         response = {
             "client_secret": intent.client_secret, 
             "payment_id": new_payment.id,
-            "status": "created"
+            "status": "created",
+            "stripe_account_id": payee.stripe_account_id,
         }
         logger.info(f"[{correlation_id}] Returning to frontend: payment_id={new_payment.id} secret_prefix={intent.client_secret[:20]}...")
         return response
