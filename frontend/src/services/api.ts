@@ -57,6 +57,8 @@ export interface User {
     avatar_color: string;
     wallet_balance: number;
     stripe_account_id: string | null;
+    interac_email: string | null;
+    has_completed_payment: boolean;
     created_at: string;
 }
 
@@ -86,6 +88,11 @@ export const authApi = {
         request<{ message: string }>('/auth/reset-password', {
             method: 'POST',
             body: JSON.stringify({ token, new_password }),
+        }),
+    updateMe: (data: { has_completed_payment?: boolean; interac_email?: string; name?: string }) =>
+        request<User>('/auth/me', {
+            method: 'PATCH',
+            body: JSON.stringify(data),
         }),
 };
 

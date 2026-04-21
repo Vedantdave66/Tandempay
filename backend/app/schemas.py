@@ -39,10 +39,23 @@ class UserOut(BaseModel):
     wallet_balance: Decimal = 0.0
     interac_email: str | None = None
     stripe_account_id: str | None = None
+    has_completed_payment: bool = False
     created_at: datetime
 
     class Config:
         from_attributes = True
+
+
+class UserUpdate(BaseModel):
+    """Safe partial-update schema for PATCH /api/auth/me.
+
+    Only these three fields may be updated via this endpoint.
+    Email, password, financial fields, and role flags are explicitly
+    excluded — they have dedicated, higher-scrutiny endpoints.
+    """
+    has_completed_payment: bool | None = None
+    interac_email: str | None = None
+    name: str | None = None
 
 
 # --- Groups ---

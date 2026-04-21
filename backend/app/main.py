@@ -57,6 +57,12 @@ async def lifespan(app: FastAPI):
     except Exception:
         pass
 
+    try:
+        async with engine.begin() as conn:
+            await conn.execute(text("ALTER TABLE users ADD COLUMN has_completed_payment BOOLEAN DEFAULT FALSE;"))
+    except Exception:
+        pass  # Column already exists
+
     # Handle Payment Settlement CASCADE for Group deletion
     try:
         async with engine.begin() as conn:

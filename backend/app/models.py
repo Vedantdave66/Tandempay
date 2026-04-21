@@ -18,6 +18,7 @@ class User(Base):
     wallet_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2, asdecimal=True), default=Decimal('0.00'))
     interac_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     stripe_account_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    has_completed_payment: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     groups: Mapped[list["GroupMember"]] = relationship(back_populates="user")

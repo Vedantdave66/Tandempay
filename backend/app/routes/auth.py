@@ -10,7 +10,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.database import get_db
 from app.config import get_settings
 from app.models import User
-from app.schemas import UserRegister, UserLogin, Token, UserOut, PasswordResetRequest, PasswordResetConfirm
+from app.schemas import UserRegister, UserLogin, Token, UserOut, UserUpdate, PasswordResetRequest, PasswordResetConfirm
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -117,6 +117,39 @@ async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
 
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
+    return current_user
+
+
+@router.patch("/me", response_model=UserOut)
+async def update_me(
+    data: UserUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Partial update of the current user's profile.
+
+    Only the following fields may be patched:
+      - has_completed_payment  (bool)   — set after first Stripe payment to suppress trust screen
+      - interac_email          (str)    — Interac e-Transfer email address
+      - name                   (str)    — display name
+
+    Explicitly forbidden: email, hashed_password, wallet_balance,
+    stripe_account_id, avatar_color, id, created_at.
+    """
+    if data.has_completed_payment is not None:
+        current_user.has_completed_payment = data.has_completed_payment
+    if data.interac_email is not None:
+        current_user.interac_email = data.interac_email.strip() or None
+    if data.name is not None:
+        stripped = data.name.strip()
+        if not stripped:
+            raise HTTPException(status_code=422, detail="name cannot be blank")
+        current_user.name = stripped
+
+    await db.flush()
+    await db.commit()
+    await db.refresh(current_user)
     return current_user
 
 
