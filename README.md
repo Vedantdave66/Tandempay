@@ -2,7 +2,7 @@
 
 A modern, dark-mode fintech-style app for tracking shared expenses, simplifying debts, and settling up with friends.
 
-**[Live Demo →](https://splitease-web.onrender.com)** *(update with your URL after deploying)*
+**[Live Demo →](tandempay.ca)**
 
 ## ✨ Features
 
