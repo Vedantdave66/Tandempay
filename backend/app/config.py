@@ -35,9 +35,11 @@ class Settings(BaseSettings):
 
     @property
     def effective_database_url(self) -> str:
-        # HARDCODED direct connection URL (port 5432) to bypass Vercel env vars 
-        # AND bypass the Supabase Pooler (which causes random hangs on AWS Lambda).
-        return "postgresql+psycopg://postgres.gazgcmcvcajxqnxlwjmv:MessiwonWC2022$@db.gazgcmcvcajxqnxlwjmv.supabase.co:5432/postgres"
+        # HARDCODED override. We MUST use the Supabase IPv4 Pooler URL because Vercel/AWS Lambda
+        # fails to resolve the IPv6 direct connection (db.project-ref...).
+        # However, we use port 5432 (Session Pool) instead of 6543 (Transaction Pool) 
+        # so psycopg3's prepared statements work flawlessly without hanging.
+        return "postgresql+psycopg://postgres.gazgcmcvcajxqnxlwjmv:MessiwonWC2022$@aws-1-ca-central-1.pooler.supabase.com:5432/postgres?sslmode=require"
 
 
 @lru_cache()
