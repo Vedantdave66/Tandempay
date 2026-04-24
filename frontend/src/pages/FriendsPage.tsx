@@ -197,14 +197,14 @@ export default function FriendsPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto pb-12">
-            <div className="mb-8">
-                <h1 className="text-3xl font-black text-primary mb-2">Network Hub</h1>
-                <p className="text-secondary">Manage your friends, track pending requests, and view all activity.</p>
+        <div className="max-w-4xl mx-auto pb-16 px-1">
+            <div className="mb-10">
+                <h1 className="text-4xl font-black text-primary mb-2 tracking-tight">Network Hub</h1>
+                <p className="text-secondary text-base">Manage your friends, track pending requests, and view all activity.</p>
             </div>
 
-            {/* Custom Tabs */}
-            <div className="flex overflow-x-auto hide-scrollbar gap-2 p-1 bg-surface border border-border rounded-2xl mb-8">
+            {/* Polished Tabs */}
+            <div className="flex overflow-x-auto hide-scrollbar gap-1.5 p-1.5 bg-surface border border-border rounded-2xl mb-8 shadow-sm">
                 <TabButton active={activeTab === 'activity'} onClick={() => handleTabChange('activity')} icon={<Bell />} label="Activity" />
                 <TabButton active={activeTab === 'my-friends'} onClick={() => handleTabChange('my-friends')} icon={<Users />} label="My Friends" />
                 <TabButton active={activeTab === 'pending'} onClick={() => handleTabChange('pending')} icon={<Clock />} label="Pending" />
@@ -259,15 +259,15 @@ export default function FriendsPage() {
             {/* Tab 2: My Friends */}
             {activeTab === 'my-friends' && (
                 <>
-                    <div className="bg-surface border border-border rounded-2xl p-4 mb-8">
+                    <div className="mb-6">
                         <div className="relative">
-                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-secondary" />
+                            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-secondary/60" />
                             <input
                                 type="text"
                                 placeholder="Search friends by name or email..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
-                                className="w-full bg-bg border border-border/80 rounded-xl pl-12 pr-6 py-3.5 text-sm font-medium text-primary placeholder-secondary/50 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all shadow-inner"
+                                className="w-full bg-surface border border-border rounded-2xl pl-12 pr-6 py-4 text-sm font-medium text-primary placeholder-secondary/40 focus:outline-none focus:border-indigo-500/60 focus:ring-2 focus:ring-indigo-500/20 transition-all duration-200 shadow-sm"
                             />
                         </div>
                     </div>
@@ -281,16 +281,19 @@ export default function FriendsPage() {
                             return (
                                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                                     {filtered.map(friend => (
-                                        <div key={friend.id} className="bg-surface hover:bg-surface-hover border border-border rounded-2xl p-6 transition-all duration-300 group">
-                                            <div className="flex items-center gap-4 mb-4">
-                                                <Avatar name={friend.name} color={friend.avatar_color} size="lg" />
+                                        <div key={friend.id} className="group bg-surface hover:bg-surface-hover border border-border hover:border-indigo-500/30 rounded-3xl p-6 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-black/10 cursor-default">
+                                            <div className="flex items-center gap-4 mb-5">
+                                                <div className="relative">
+                                                    <Avatar name={friend.name} color={friend.avatar_color} size="lg" />
+                                                    <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full bg-accent border-2 border-surface" />
+                                                </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-base font-bold text-primary truncate group-hover:text-indigo-400 transition-colors">{friend.name}</h3>
-                                                    <p className="text-xs text-secondary truncate">{friend.email}</p>
+                                                    <h3 className="text-base font-bold text-primary truncate group-hover:text-indigo-400 transition-colors duration-200">{friend.name}</h3>
+                                                    <p className="text-xs text-secondary/70 truncate mt-0.5">{friend.email}</p>
                                                 </div>
                                             </div>
-                                            <div className="flex items-center justify-between pt-4 border-t border-border/50">
-                                                <span className="text-xs font-semibold text-secondary uppercase tracking-wider px-2 py-1 rounded bg-bg text-secondary/70">{friend.shared_groups_count || 0} Shared Groups</span>
+                                            <div className="flex items-center justify-between pt-4 border-t border-border/40">
+                                                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-secondary/70 px-3 py-1.5 rounded-xl bg-primary/5 border border-border/60">{friend.shared_groups_count || 0} shared groups</span>
                                             </div>
                                         </div>
                                     ))}
@@ -468,13 +471,15 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
     return (
         <button
             onClick={onClick}
-            className={`flex items-center gap-2.5 px-5 py-3 rounded-xl text-sm font-bold transition-all duration-300 cursor-pointer whitespace-nowrap focus:outline-none ${active
-                ? 'bg-bg text-primary shadow-inner shadow-black/50 border border-border/50'
-                : 'text-secondary/80 hover:text-primary hover:bg-white/5 border border-transparent'
-                }`}
+            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap focus:outline-none flex-1 justify-center sm:flex-none sm:justify-start ${
+                active
+                    ? 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 text-indigo-400 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
+                    : 'text-secondary hover:text-primary hover:bg-primary/5 border border-transparent'
+            }`}
         >
-            <span className={`w-4 h-4 ${active ? 'text-accent' : 'text-current opacity-70'}`}>{icon}</span>
+            <span className={`w-4 h-4 transition-colors duration-200 ${active ? 'text-indigo-400' : 'text-secondary/60'}`}>{icon}</span>
             {label}
+            {active && <span className="absolute inset-0 rounded-xl ring-1 ring-inset ring-indigo-500/20 pointer-events-none" />}
         </button>
     );
 }
