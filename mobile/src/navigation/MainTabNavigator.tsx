@@ -2,8 +2,9 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import DashboardScreen from '../screens/DashboardScreen';
 import PaymentsScreen from '../screens/PaymentsScreen';
+import GroupsScreen from '../screens/GroupsScreen';
 import FriendsScreen from '../screens/FriendsScreen';
-import NotificationsScreen from '../screens/NotificationsScreen';
+import ActivityScreen from '../screens/ActivityScreen';
 import CustomTabBar from '../components/CustomTabBar';
 
 const Tab = createBottomTabNavigator();
@@ -14,14 +15,14 @@ export default function MainTabNavigator() {
             tabBar={(props) => <CustomTabBar {...props} />}
             screenOptions={{
                 headerShown: false,
-                // Ensures the screens draw behind the absolute positioned transparent tab bar
                 lazy: true,
             }}
         >
             <Tab.Screen name="Home" component={DashboardScreen} />
+            <Tab.Screen name="Groups" component={GroupsScreen} />
             <Tab.Screen name="Payments" component={PaymentsScreen} />
             <Tab.Screen name="Friends" component={FriendsScreen} />
-            <Tab.Screen name="Activity" component={NotificationsScreen} />
+            <Tab.Screen name="Activity" component={ActivityScreen} />
         </Tab.Navigator>
     );
 }

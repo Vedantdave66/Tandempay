@@ -9,15 +9,18 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import LandingScreen from '../screens/LandingScreen';
+import CreateGroupScreen from '../screens/CreateGroupScreen';
+import AddExpenseScreen from '../screens/AddExpenseScreen';
+import AddFriendScreen from '../screens/AddFriendScreen';
 
 const Stack = createNativeStackNavigator();
 
 export default function RootNavigator() {
     const { user, loading } = useAuth();
-    const { theme, colors, isDark } = useTheme();
+    const { colors, isDark } = useTheme();
 
     if (loading) {
-        return null; // Or a splash screen
+        return null;
     }
 
     const navigationTheme = {
@@ -34,24 +37,48 @@ export default function RootNavigator() {
 
     return (
         <NavigationContainer theme={navigationTheme}>
-            <Stack.Navigator 
-                screenOptions={{ 
+            <Stack.Navigator
+                screenOptions={{
                     headerShown: false,
-                    contentStyle: { backgroundColor: colors.background }
+                    contentStyle: { backgroundColor: colors.background },
+                    // Modal presentation for creation flows
+                    animation: 'slide_from_bottom',
                 }}
             >
                 {!user ? (
-                    // Unauthenticated Stack
-                    <Stack.Group>
+                    <Stack.Group screenOptions={{ animation: 'fade' }}>
                         <Stack.Screen name="Landing" component={LandingScreen} />
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Register" component={RegisterScreen} />
                     </Stack.Group>
                 ) : (
-                    // Authenticated Stack
                     <Stack.Group>
-                        <Stack.Screen name="MainTabs" component={MainTabNavigator} />
-                        <Stack.Screen name="Group" component={GroupDetailScreen} />
+                        {/* Main tab app */}
+                        <Stack.Screen
+                            name="MainTabs"
+                            component={MainTabNavigator}
+                            options={{ animation: 'fade' }}
+                        />
+
+                        {/* Full-screen detail screens */}
+                        <Stack.Screen name="Group" component={GroupDetailScreen} options={{ animation: 'slide_from_right' }} />
+
+                        {/* Modal-style creation screens */}
+                        <Stack.Screen
+                            name="CreateGroup"
+                            component={CreateGroupScreen}
+                            options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="AddExpense"
+                            component={AddExpenseScreen}
+                            options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="AddFriend"
+                            component={AddFriendScreen}
+                            options={{ presentation: 'modal' }}
+                        />
                     </Stack.Group>
                 )}
             </Stack.Navigator>

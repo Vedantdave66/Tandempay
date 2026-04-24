@@ -143,7 +143,8 @@ export default function DashboardScreen({ navigation }: any) {
 
             <TouchableOpacity
                 style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
-            // Later: onPress={() => setModalVisible(true)}
+                onPress={() => navigation.navigate('CreateGroup')}
+                activeOpacity={0.8}
             >
                 <Plus color={isDark ? "#064E3B" : "white"} size={28} />
             </TouchableOpacity>

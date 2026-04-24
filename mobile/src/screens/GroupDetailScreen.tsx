@@ -211,10 +211,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             </ScrollView>
 
             {/* Combined Add FAB */}
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
+                onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
+                activeOpacity={0.8}
             >
-                <Plus size={28} color="white" />
+                <Plus size={28} color={isDark ? '#064E3B' : 'white'} />
             </TouchableOpacity>
 
             {/* SETTLE UP MODAL */}
