@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/currency';
-import { CreditCard, History, Wallet, ArrowRightLeft, ArrowDownRight, ArrowUpRight, AlertCircle, ExternalLink, CheckCircle } from 'lucide-react';
+import { CreditCard, History, Wallet, ArrowRightLeft, ArrowDownRight, ArrowUpRight, AlertCircle, ExternalLink, CheckCircle, Unlink, ShieldCheck } from 'lucide-react';
 import { meApi, SettlementRecord, walletApi, stripeApi, WalletTransaction } from '../services/api';
 import PaymentRecordCard from '../components/PaymentRecordCard';
 import { useAuth } from '../context/AuthContext';
@@ -11,7 +11,13 @@ export default function PaymentsPage() {
     const [payments, setPayments] = useState<SettlementRecord[]>([]);
     const [transactions, setTransactions] = useState<WalletTransaction[]>([]);
     const [loading, setLoading] = useState(true);
-    const [stripeOnboarded, setStripeOnboarded] = useState(false);
+    const [stripeStatus, setStripeStatus] = useState<{
+        onboarded: boolean;
+        account_id: string | null;
+        email: string | null;
+        payouts_enabled: boolean;
+        dashboard_url: string | null;
+    }>({ onboarded: false, account_id: null, email: null, payouts_enabled: false, dashboard_url: null });
     const [stripeLoading, setStripeLoading] = useState(false);
 
     useEffect(() => {
@@ -27,7 +33,7 @@ export default function PaymentsPage() {
             ]);
             setPayments(payData);
             setTransactions(transData);
-            setStripeOnboarded(stripeData.onboarded);
+            setStripeStatus(stripeData);
         } catch (err) {
             console.error(err);
         } finally {
@@ -71,20 +77,67 @@ export default function PaymentsPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-10">
 
                 {/* Stripe Connect Section */}
-                <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-between">
-                    <div>
-                        <div className="w-10 h-10 bg-[#635BFF]/10 rounded-xl flex items-center justify-center border border-[#635BFF]/30 mb-4">
+                <div className="bg-surface border border-border rounded-3xl p-6 flex flex-col justify-between gap-6">
+                    <div className="flex items-start gap-4">
+                        <div className="w-10 h-10 bg-[#635BFF]/10 rounded-xl flex items-center justify-center border border-[#635BFF]/30 shrink-0">
                             <CreditCard className="w-5 h-5 text-[#635BFF]" />
                         </div>
-                        <h3 className="text-lg font-bold text-primary mb-2">Receive Payments</h3>
-                        <p className="text-sm text-secondary mb-6">
-                            Connect your bank with Stripe to receive instant payouts from friends.
-                        </p>
+                        <div>
+                            <h3 className="text-lg font-bold text-primary mb-1">Receive Payments</h3>
+                            <p className="text-sm text-secondary">
+                                {stripeStatus.onboarded
+                                    ? 'Your Stripe account is connected. You can receive payouts from friends.'
+                                    : 'Connect your bank with Stripe to receive instant payouts from friends.'}
+                            </p>
+                        </div>
                     </div>
-                    {stripeOnboarded ? (
-                        <div className="flex items-center gap-3 p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
-                            <CheckCircle className="w-5 h-5 text-emerald-500" />
-                            <p className="text-sm font-bold text-emerald-500">Stripe Connected</p>
+
+                    {stripeStatus.onboarded ? (
+                        <div className="space-y-3">
+                            {/* Connected status badge */}
+                            <div className="flex items-center gap-3 p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
+                                <CheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-bold text-emerald-500">Connected</p>
+                                    {stripeStatus.email && (
+                                        <p className="text-xs text-emerald-500/70 truncate">{stripeStatus.email}</p>
+                                    )}
+                                </div>
+                                <ShieldCheck className="w-4 h-4 text-emerald-500/60 shrink-0" />
+                            </div>
+
+                            {/* Payouts status */}
+                            <div className="flex items-center justify-between px-1">
+                                <span className="text-xs text-secondary">Payouts</span>
+                                <span className={`text-xs font-bold ${
+                                    stripeStatus.payouts_enabled ? 'text-emerald-500' : 'text-amber-500'
+                                }`}>
+                                    {stripeStatus.payouts_enabled ? 'Enabled ✓' : 'Pending review'}
+                                </span>
+                            </div>
+
+                            {/* Actions */}
+                            <div className="flex gap-2 pt-1">
+                                {stripeStatus.dashboard_url && (
+                                    <a
+                                        href={stripeStatus.dashboard_url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-[#635BFF] border border-[#635BFF]/30 hover:bg-[#635BFF]/10 transition-colors"
+                                    >
+                                        <ExternalLink className="w-3.5 h-3.5" />
+                                        Stripe Dashboard
+                                    </a>
+                                )}
+                                <button
+                                    onClick={handleStripeOnboard}
+                                    disabled={stripeLoading}
+                                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-xs font-bold text-secondary border border-border hover:bg-surface-hover hover:text-primary transition-colors disabled:opacity-50"
+                                >
+                                    <Unlink className="w-3.5 h-3.5" />
+                                    Reconnect
+                                </button>
+                            </div>
                         </div>
                     ) : (
                         <button
@@ -92,7 +145,7 @@ export default function PaymentsPage() {
                             disabled={stripeLoading}
                             className="w-full flex items-center justify-center gap-2 py-3 bg-[#635BFF] hover:bg-[#524BFF] text-white rounded-xl text-sm font-semibold transition-all shadow-md shadow-[#635BFF]/20 cursor-pointer disabled:opacity-50"
                         >
-                            {stripeLoading ? 'Connecting...' : 'Connect Stripe'} 
+                            {stripeLoading ? 'Connecting...' : 'Connect Stripe'}
                             {!stripeLoading && <ExternalLink className="w-4 h-4" />}
                         </button>
                     )}

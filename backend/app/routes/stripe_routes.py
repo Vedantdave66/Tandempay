@@ -74,10 +74,11 @@ async def onboard_user(
 
 @router.get("/status")
 async def get_onboarding_status(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
 ):
     if not current_user.stripe_account_id:
-        return {"onboarded": False}
+        return {"onboarded": False, "account_id": None, "email": None, "payouts_enabled": False, "dashboard_url": None}
         
     try:
         account = stripe.Account.retrieve(current_user.stripe_account_id)
@@ -115,9 +116,23 @@ async def get_onboarding_status(
                 
                 await db.commit()
                 
-        return {"onboarded": account.details_submitted}
-    except Exception as e:
-        return {"onboarded": False}
+        # Build Stripe Express dashboard link (optional, non-fatal)
+        dashboard_url = None
+        try:
+            login_link = stripe.Account.create_login_link(current_user.stripe_account_id)
+            dashboard_url = login_link.url
+        except Exception:
+            pass
+
+        return {
+            "onboarded": account.details_submitted,
+            "account_id": current_user.stripe_account_id,
+            "email": account.email,
+            "payouts_enabled": account.payouts_enabled,
+            "dashboard_url": dashboard_url,
+        }
+    except Exception:
+        return {"onboarded": False, "account_id": None, "email": None, "payouts_enabled": False, "dashboard_url": None}
 
 
 
