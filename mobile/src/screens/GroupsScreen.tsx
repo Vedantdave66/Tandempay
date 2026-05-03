@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatCurrency } from '../utils/formatCurrency';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     SafeAreaView, RefreshControl, ActivityIndicator
@@ -15,10 +16,17 @@ export default function GroupsScreen({ navigation }: any) {
 
     const load = async () => {
         try {
-            const data = await groupsApi.list();
-            setGroups(data || []);
+            const raw = await groupsApi.list();
+            console.log('[Groups] Raw API response:', JSON.stringify(raw));
+            // Handle both plain array and wrapped { groups: [...] } responses
+            const data: GroupListItem[] = Array.isArray(raw)
+                ? raw
+                : Array.isArray((raw as any)?.groups)
+                    ? (raw as any).groups
+                    : [];
+            setGroups(data);
         } catch (err) {
-            console.log(err);
+            console.log('[Groups] Fetch error:', err);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -56,7 +64,7 @@ export default function GroupsScreen({ navigation }: any) {
                 </View>
                 <View style={styles.right}>
                     <Text style={[styles.amount, { color: colors.text }]}>
-                        ${(Number(item.total_expenses) || 0).toFixed(2)}
+                        ${formatCurrency(item.total_expenses)}
                     </Text>
                     <ArrowRight color={colors.secondaryText} size={16} />
                 </View>

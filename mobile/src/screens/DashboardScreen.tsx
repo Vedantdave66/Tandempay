@@ -15,10 +15,17 @@ export default function DashboardScreen({ navigation }: any) {
 
     const loadGroups = async () => {
         try {
-            const data = await groupsApi.list();
-            setGroups(data || []);
+            const raw = await groupsApi.list();
+            console.log('[Dashboard] Raw groups response:', JSON.stringify(raw));
+            // Defensive: handle both plain array and wrapped { groups: [...] } shapes
+            const data: GroupListItem[] = Array.isArray(raw)
+                ? raw
+                : Array.isArray((raw as any)?.groups)
+                    ? (raw as any).groups
+                    : [];
+            setGroups(data);
         } catch (err) {
-            console.log('Failed to load groups', err);
+            console.log('[Dashboard] Failed to load groups:', err);
         } finally {
             setLoading(false);
             setRefreshing(false);

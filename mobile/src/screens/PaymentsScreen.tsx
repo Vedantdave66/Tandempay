@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatCurrency } from '../utils/formatCurrency';
 import { 
     View, 
     Text, 
@@ -47,7 +48,8 @@ export default function PaymentsScreen() {
                     walletApi.getBalance(),
                     walletApi.getTransactions()
                 ]);
-                setWalletBalance(balanceData.wallet_balance || 0);
+                console.log('[Wallet] Raw balance response:', JSON.stringify(balanceData));
+                setWalletBalance(Number(balanceData?.wallet_balance) || 0);
                 setWalletTransactions(txData);
             }
         } catch (err) {
@@ -139,7 +141,7 @@ export default function PaymentsScreen() {
                         </View>
                     </View>
                     <Text style={[styles.amount, { color: isPayer ? colors.danger : colors.accent }]}>
-                        ${parseFloat(payment.amount.toString()).toFixed(2)}
+                        ${formatCurrency(payment.amount)}
                     </Text>
                 </View>
 
@@ -212,7 +214,7 @@ export default function PaymentsScreen() {
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
                     <Text style={[styles.ledgerAmount, { color: isPositive ? colors.accent : colors.text }]}>
-                        {isPositive ? '+' : ''}${Math.abs(tx.amount).toFixed(2)}
+                        {isPositive ? '+' : '-'}${formatCurrency(Math.abs(tx.amount))}
                     </Text>
                     <Text style={[styles.ledgerStatus, { color: tx.status === 'completed' ? colors.accent : '#F59E0B' }]}>
                         {tx.status.toUpperCase()}
@@ -301,7 +303,7 @@ export default function PaymentsScreen() {
                                     <Text style={styles.walletCardTitle}>Tandem Balance</Text>
                                 </View>
                                 <Text style={styles.walletAvailable}>Available Funds</Text>
-                                <Text style={styles.walletBalanceText}>${walletBalance.toFixed(2)}</Text>
+                                <Text style={styles.walletBalanceText}>${formatCurrency(walletBalance)}</Text>
                                 <View style={styles.walletButtons}>
                                     <TouchableOpacity style={[styles.walletBtn, { backgroundColor: 'white' }]} onPress={() => openFundModal('add')}>
                                         <Text style={[styles.walletBtnText, { color: '#4F46E5' }]}>Add Funds</Text>
@@ -371,7 +373,7 @@ export default function PaymentsScreen() {
                             </TouchableOpacity>
                         </View>
                         <Text style={{ color: colors.secondaryText, marginBottom: 16 }}>
-                            {fundModalType === 'add' ? 'Enter amount to deposit into your Tandem wallet.' : `Enter amount to withdraw. Available: $${walletBalance.toFixed(2)}`}
+                            {fundModalType === 'add' ? 'Enter amount to deposit into your Tandem wallet.' : `Enter amount to withdraw. Available: $${formatCurrency(walletBalance)}`}
                         </Text>
 
                         <View style={[styles.inputContainer, { borderColor: colors.border, backgroundColor: colors.background }]}>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { formatCurrency } from '../utils/formatCurrency';
 import { 
   View, 
   Text, 
@@ -64,7 +65,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const handleInitiateSettlement = async (payeeId: string, amount: number) => {
         Alert.alert(
             "Confirm Payment",
-            `Do you want to record a $${amount.toFixed(2)} payment to this user? They will receive a notification.`,
+            `Do you want to record a $${formatCurrency(amount)} payment to this user? They will receive a notification.`,
             [
                 { text: "Cancel", style: "cancel" },
                 { 
@@ -101,7 +102,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         {item.name.split(' ')[0]}
                     </Text>
                     <Text style={[styles.balanceAmount, { color: bubbleColor }]}>
-                        {isNegative ? '-' : '+'}${Math.abs(item.net_balance).toFixed(2)}
+                        {isNegative ? '-' : '+'}${formatCurrency(Math.abs(item.net_balance))}
                     </Text>
                 </View>
             </View>
@@ -121,7 +122,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     </Text>
                 </View>
                 <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                    ${item.amount.toFixed(2)}
+                    ${formatCurrency(item.amount)}
                 </Text>
             </TouchableOpacity>
         );
@@ -164,7 +165,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <View style={[styles.statRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     <View style={styles.statItem}>
                         <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Group Spending</Text>
-                        <Text style={[styles.statValue, { color: colors.text }]}>${group?.total_expenses.toFixed(2)}</Text>
+                        <Text style={[styles.statValue, { color: colors.text }]}>${formatCurrency(group?.total_expenses)}</Text>
                     </View>
                     <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
                     <View style={styles.statItem}>
@@ -254,7 +255,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                                 <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}>{debt.to_user_name}</Text>
                                             </View>
                                             <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
-                                                <Text style={{ color: colors.danger, fontSize: 18, fontWeight: '900' }}>${debt.amount.toFixed(2)}</Text>
+                                                <Text style={{ color: colors.danger, fontSize: 18, fontWeight: '900' }}>${formatCurrency(debt.amount)}</Text>
                                                 <ChevronRight size={20} color={colors.secondaryText} />
                                             </View>
                                         </TouchableOpacity>
