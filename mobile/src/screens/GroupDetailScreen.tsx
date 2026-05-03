@@ -1,22 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  FlatList, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  ActivityIndicator, 
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  SafeAreaView,
+  ActivityIndicator,
   RefreshControl,
   ScrollView,
   Modal,
-  Alert
+  Alert,
+  TextInput,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { groupsApi, expensesApi, balancesApi, settlementsApi, Group, Expense, UserBalance, Settlement } from '../services/api';
-import { ArrowLeft, Plus, Users, Receipt, Send, ChevronRight, X, CheckCircle2 } from 'lucide-react-native';
+import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
+import { ArrowLeft, Plus, Users, Receipt, Send, ChevronRight, X, CheckCircle2, Mail, UserPlus } from 'lucide-react-native';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
@@ -30,8 +31,17 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    
+
     const [settleModalVisible, setSettleModalVisible] = useState(false);
+
+    // Members modal
+    const [membersModalVisible, setMembersModalVisible] = useState(false);
+    const [membersTab, setMembersTab] = useState<'friends' | 'invite'>('friends');
+    const [friends, setFriends] = useState<Friend[]>([]);
+    const [friendsLoading, setFriendsLoading] = useState(false);
+    const [inviteEmail, setInviteEmail] = useState('');
+    const [inviteLoading, setInviteLoading] = useState(false);
+    const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -60,6 +70,55 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const onRefresh = () => {
         setRefreshing(true);
         loadData();
+    };
+
+    const openMembersModal = async () => {
+        setMembersModalVisible(true);
+        setMembersTab('friends');
+        setFriendsLoading(true);
+        try {
+            const data = await friendsApi.getMyFriends();
+            // Filter out people already in the group
+            const memberIds = new Set(group?.members.map(m => m.user_id) || []);
+            setFriends((data || []).filter(f => !memberIds.has(f.id)));
+        } catch (e) {
+            console.error('Failed to load friends', e);
+        } finally {
+            setFriendsLoading(false);
+        }
+    };
+
+    const handleAddFriend = async (friend: Friend) => {
+        setAddingFriendId(friend.id);
+        try {
+            await groupsApi.addMember(groupId, friend.email);
+            setFriends(prev => prev.filter(f => f.id !== friend.id));
+            Alert.alert('Added!', `${friend.name} has been added to the group.`);
+            loadData();
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Could not add member.');
+        } finally {
+            setAddingFriendId(null);
+        }
+    };
+
+    const handleInviteByEmail = async () => {
+        const email = inviteEmail.trim().toLowerCase();
+        if (!email || !email.includes('@')) {
+            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+            return;
+        }
+        setInviteLoading(true);
+        try {
+            await groupsApi.addMember(groupId, email);
+            setInviteEmail('');
+            Alert.alert('Success', `${email} has been added to the group.`);
+            loadData();
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Could not add member. Make sure they have a TandemPay account.');
+        } finally {
+            setInviteLoading(false);
+        }
     };
 
     const handleInitiateSettlement = async (payeeId: string, amount: number) => {
@@ -152,8 +211,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         {group?.name || 'Group Details'}
                     </Text>
                 </View>
-                <TouchableOpacity style={styles.iconButton}>
-                    <Users size={22} color={colors.secondaryText} />
+                <TouchableOpacity style={styles.iconButton} onPress={openMembersModal}>
+                    <Users size={22} color={colors.accent} />
                 </TouchableOpacity>
             </View>
 
@@ -262,6 +321,99 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     ))}
                                 </ScrollView>
                             </>
+                        )}
+                    </View>
+                </View>
+            </Modal>
+            {/* MEMBERS MODAL */}
+            <Modal visible={membersModalVisible} animationType="slide" transparent={true}>
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+                        <View style={styles.modalHeader}>
+                            <Text style={[styles.modalTitle, { color: colors.text }]}>Members</Text>
+                            <TouchableOpacity onPress={() => setMembersModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
+                                <X size={20} color={colors.text} />
+                            </TouchableOpacity>
+                        </View>
+
+                        {/* Tab switcher */}
+                        <View style={[styles.tabRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                            <TouchableOpacity
+                                style={[styles.tabBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
+                                onPress={() => setMembersTab('friends')}
+                            >
+                                <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
+                                <Text style={[styles.tabBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.tabBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
+                                onPress={() => setMembersTab('invite')}
+                            >
+                                <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
+                                <Text style={[styles.tabBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
+                            </TouchableOpacity>
+                        </View>
+
+                        {membersTab === 'friends' ? (
+                            <ScrollView style={{ marginTop: 16 }}>
+                                {friendsLoading ? (
+                                    <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+                                ) : friends.length === 0 ? (
+                                    <View style={{ alignItems: 'center', padding: 32 }}>
+                                        <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: 12 }} />
+                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>All friends added!</Text>
+                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: 13 }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
+                                    </View>
+                                ) : (
+                                    friends.map(friend => (
+                                        <View key={friend.id} style={[styles.friendRow, { borderColor: colors.border }]}>
+                                            <View style={[styles.friendAvatar, { backgroundColor: friend.avatar_color || colors.accent }]}>
+                                                <Text style={styles.friendAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
+                                            </View>
+                                            <View style={{ flex: 1 }}>
+                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>{friend.name}</Text>
+                                                <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{friend.email}</Text>
+                                            </View>
+                                            <TouchableOpacity
+                                                style={[styles.addBtn, { backgroundColor: addingFriendId === friend.id ? colors.border : colors.accent }]}
+                                                onPress={() => handleAddFriend(friend)}
+                                                disabled={addingFriendId === friend.id}
+                                            >
+                                                {addingFriendId === friend.id
+                                                    ? <ActivityIndicator size="small" color="#fff" />
+                                                    : <UserPlus size={16} color="#fff" />
+                                                }
+                                            </TouchableOpacity>
+                                        </View>
+                                    ))
+                                )}
+                            </ScrollView>
+                        ) : (
+                            <View style={{ marginTop: 20 }}>
+                                <Text style={{ color: colors.secondaryText, fontSize: 13, marginBottom: 12 }}>Enter their email address. They must have a TandemPay account.</Text>
+                                <View style={[styles.emailInputRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
+                                    <Mail size={18} color={colors.secondaryText} style={{ marginRight: 10 }} />
+                                    <TextInput
+                                        style={[styles.emailInput, { color: colors.text }]}
+                                        placeholder="friend@example.com"
+                                        placeholderTextColor={colors.secondaryText}
+                                        keyboardType="email-address"
+                                        autoCapitalize="none"
+                                        value={inviteEmail}
+                                        onChangeText={setInviteEmail}
+                                    />
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.inviteBtn, { backgroundColor: colors.accent, opacity: inviteLoading ? 0.7 : 1 }]}
+                                    onPress={handleInviteByEmail}
+                                    disabled={inviteLoading}
+                                >
+                                    {inviteLoading
+                                        ? <ActivityIndicator color="#fff" />
+                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Add to Group</Text>
+                                    }
+                                </TouchableOpacity>
+                            </View>
                         )}
                     </View>
                 </View>
@@ -426,5 +578,66 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: 12,
-    }
+    },
+    // Members modal
+    tabRow: {
+        flexDirection: 'row',
+        borderRadius: 12,
+        borderWidth: 1,
+        padding: 4,
+        gap: 4,
+    },
+    tabBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 9,
+        borderRadius: 8,
+    },
+    tabBtnText: {
+        fontSize: 13,
+        fontWeight: '600',
+    },
+    friendRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        gap: 12,
+    },
+    friendAvatar: {
+        width: 42,
+        height: 42,
+        borderRadius: 21,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    addBtn: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emailInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1.5,
+        borderRadius: 14,
+        paddingHorizontal: 14,
+        height: 52,
+        marginBottom: 16,
+    },
+    emailInput: {
+        flex: 1,
+        fontSize: 15,
+    },
+    inviteBtn: {
+        height: 52,
+        borderRadius: 26,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
 });

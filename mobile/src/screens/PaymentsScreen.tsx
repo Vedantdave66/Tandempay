@@ -15,7 +15,7 @@ import {
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, Landmark, CreditCard, Plus, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
+import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, Plus, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
 import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut, User } from '../services/api';
 
 export default function PaymentsScreen() {
@@ -110,8 +110,8 @@ export default function PaymentsScreen() {
         setFundModalVisible(true);
     };
 
-    const handleMockConnect = (service: string) => {
-        Alert.alert(`${service} Connect`, `Connecting to ${service} is limited in the Expo Go environment. Use the Web App at tandempay.ca to link securely.`);
+    const handleStripeConnect = () => {
+        Alert.alert('Stripe Connect', 'Connect your bank with Stripe to receive instant payouts. Use the Web App at tandempay.ca to link securely.');
     };
 
     const renderInitials = (name: string) => {
@@ -315,19 +315,6 @@ export default function PaymentsScreen() {
                                 <Text style={styles.walletPowered}>Powered by Tandem Ledger</Text>
                             </View>
 
-                            {/* Plaid Linked Accounts Card */}
-                            <View style={[styles.walletCard, { backgroundColor: isDark ? colors.surface : 'white', borderColor: colors.border }]}>
-                                <View style={[styles.walletIconBox, { backgroundColor: 'rgba(107, 114, 128, 0.1)', alignSelf: 'center', marginBottom: 12 }]}>
-                                    <Landmark size={24} color="#6B7280" />
-                                </View>
-                                <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>Linked Accounts</Text>
-                                <Text style={[styles.walletDesc, { color: colors.secondaryText }]}>Connect your bank to add funds or withdraw your balance securely.</Text>
-                                <TouchableOpacity style={[styles.walletBtnFull, { backgroundColor: '#4F46E5', marginTop: 'auto' }]} onPress={() => handleMockConnect('Plaid')}>
-                                    <Landmark size={14} color="white" style={{ marginRight: 6 }} />
-                                    <Text style={[styles.walletBtnText, { color: 'white' }]}>Link Bank Account</Text>
-                                </TouchableOpacity>
-                            </View>
-
                             {/* Stripe Receiving Card */}
                             <View style={[styles.walletCard, { backgroundColor: isDark ? colors.surface : 'white', borderColor: colors.border }]}>
                                 <View style={[styles.walletIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)', alignSelf: 'center', marginBottom: 12 }]}>
@@ -335,7 +322,7 @@ export default function PaymentsScreen() {
                                 </View>
                                 <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>Receive Payments</Text>
                                 <Text style={[styles.walletDesc, { color: colors.secondaryText }]}>Connect your bank with Stripe to receive instant payouts from friends.</Text>
-                                <TouchableOpacity style={[styles.walletBtnFull, { backgroundColor: '#6366F1', marginTop: 'auto' }]} onPress={() => handleMockConnect('Stripe')}>
+                                <TouchableOpacity style={[styles.walletBtnFull, { backgroundColor: '#6366F1', marginTop: 'auto' }]} onPress={handleStripeConnect}>
                                     <Text style={[styles.walletBtnText, { color: 'white' }]}>Connect Stripe ↗</Text>
                                 </TouchableOpacity>
                             </View>
