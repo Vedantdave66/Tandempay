@@ -66,7 +66,7 @@ export default function DashboardScreen({ navigation }: any) {
                 activeOpacity={0.8}
             >
                 <View style={[styles.groupIcon, { backgroundColor: bgColor }]}>
-                    <Users color={isDark ? '#F5F7FA' : colors.accent} size={24} />
+                    <Users color={isDark ? '#A8D5A2' : '#6BBF67'} size={22} />
                 </View>
                 <View style={styles.groupInfo}>
                     <Text style={[styles.groupName, { color: colors.text }]}>{item.name}</Text>
@@ -149,11 +149,11 @@ export default function DashboardScreen({ navigation }: any) {
             />
 
             <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
+                style={[styles.fab, { backgroundColor: colors.accent }]}
                 onPress={() => navigation.navigate('CreateGroup')}
                 activeOpacity={0.8}
             >
-                <Plus color={isDark ? "#064E3B" : "white"} size={28} />
+                <Plus color={'#1A1A1A'} size={24} />
             </TouchableOpacity>
         </SafeAreaView>
     );
@@ -173,20 +173,22 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'flex-start',
         paddingHorizontal: 24,
-        paddingTop: 24,
-        paddingBottom: 16,
+        paddingTop: 28,
+        paddingBottom: 20,
     },
     headerActions: {
         flexDirection: 'row',
         gap: 8,
     },
     greeting: {
-        fontSize: 24,
-        fontWeight: 'bold',
-        marginBottom: 4,
+        fontSize: 26,
+        fontWeight: '700',
+        letterSpacing: -0.3,
+        marginBottom: 3,
     },
     subtitle: {
         fontSize: 14,
+        fontWeight: '400',
     },
     iconButton: {
         width: 40,
@@ -195,25 +197,36 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     statsContainer: {
         paddingHorizontal: 24,
-        marginBottom: 24,
+        marginBottom: 28,
     },
     statCardPrimary: {
-        borderRadius: 24,
+        borderRadius: 20,
         padding: 24,
         marginBottom: 12,
-        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 16,
+        elevation: 4,
     },
     statLabelPrimary: {
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: '600',
-        marginBottom: 8,
+        marginBottom: 6,
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
     },
     statValuePrimary: {
         fontSize: 40,
-        fontWeight: '900',
+        fontWeight: '800',
         letterSpacing: -1,
     },
     statRow: {
@@ -222,37 +235,48 @@ const styles = StyleSheet.create({
     },
     statCardSecondary: {
         flex: 1,
-        borderRadius: 20,
-        padding: 20,
-        borderWidth: 1,
+        borderRadius: 18,
+        padding: 18,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     statLabelSecondary: {
         fontSize: 12,
-        marginBottom: 8,
+        marginBottom: 6,
+        fontWeight: '500',
+        letterSpacing: 0.2,
     },
     statValueSecondary: {
         fontSize: 24,
-        fontWeight: 'bold',
+        fontWeight: '700',
     },
     listHeader: {
         paddingHorizontal: 24,
-        marginBottom: 16,
+        marginBottom: 14,
     },
     listTitle: {
-        fontSize: 20,
-        fontWeight: 'bold',
+        fontSize: 18,
+        fontWeight: '700',
+        letterSpacing: -0.2,
     },
     listContent: {
         paddingHorizontal: 24,
-        paddingBottom: 140, // accommodate fab and custom tab bar
+        paddingBottom: 140,
     },
     groupCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 20,
+        borderRadius: 18,
         padding: 16,
         marginBottom: 12,
-        borderWidth: 1,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        elevation: 3,
     },
     groupIcon: {
         width: 48,
@@ -260,57 +284,63 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 16,
+        marginRight: 14,
     },
     groupInfo: {
         flex: 1,
     },
     groupName: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        marginBottom: 4,
+        fontSize: 15,
+        fontWeight: '700',
+        marginBottom: 3,
     },
     groupMeta: {
         fontSize: 12,
+        fontWeight: '400',
     },
     groupAmountContainer: {
         alignItems: 'flex-end',
         flexDirection: 'row',
-        gap: 8,
+        gap: 6,
     },
     groupAmount: {
-        fontSize: 16,
-        fontWeight: 'bold',
+        fontSize: 15,
+        fontWeight: '700',
     },
     emptyState: {
         padding: 40,
         alignItems: 'center',
-        borderRadius: 24,
-        borderWidth: 1,
+        borderRadius: 20,
         marginTop: 12,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.04,
+        shadowRadius: 8,
+        elevation: 2,
     },
     emptyTitle: {
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 8,
+        fontSize: 17,
+        fontWeight: '700',
+        marginBottom: 6,
     },
     emptySubtitle: {
-        fontSize: 14,
+        fontSize: 13,
         textAlign: 'center',
+        lineHeight: 20,
     },
     fab: {
         position: 'absolute',
-        bottom: 100, // Move above the bottom tab bar
+        bottom: 110,
         right: 24,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
         alignItems: 'center',
         justifyContent: 'center',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-        elevation: 10,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.2,
+        shadowRadius: 12,
+        elevation: 8,
     },
 });
 

@@ -8,11 +8,10 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     const { colors, isDark } = useTheme();
 
     return (
-        <View style={styles.tabBarContainer}>
-            <View 
-                style={[styles.blurStyle, { 
-                    backgroundColor: isDark ? 'rgba(17, 19, 24, 0.85)' : 'rgba(255, 255, 255, 0.95)',
-                    borderColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+        <View style={styles.wrapper}>
+            <View
+                style={[styles.bar, {
+                    backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF',
                 }]}
             >
                 {state.routes.map((route, index) => {
@@ -25,17 +24,13 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                             target: route.key,
                             canPreventDefault: true,
                         });
-
                         if (!isFocused && !event.defaultPrevented) {
                             navigation.navigate(route.name, route.params);
                         }
                     };
 
                     const onLongPress = () => {
-                        navigation.emit({
-                            type: 'tabLongPress',
-                            target: route.key,
-                        });
+                        navigation.emit({ type: 'tabLongPress', target: route.key });
                     };
 
                     let IconComponent = Home;
@@ -43,6 +38,9 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                     else if (route.name === 'Payments') IconComponent = Send;
                     else if (route.name === 'Friends') IconComponent = Users;
                     else if (route.name === 'Activity') IconComponent = Bell;
+
+                    // Dark text on green pill so it's always readable
+                    const iconColor = isFocused ? '#1A1A1A' : colors.tabIconDefault;
 
                     return (
                         <TouchableOpacity
@@ -54,18 +52,16 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                             onPress={onPress}
                             onLongPress={onLongPress}
                             style={styles.tabItem}
-                            activeOpacity={0.7}
+                            activeOpacity={0.75}
                         >
                             <View style={[
-                                styles.iconWrapper, 
-                                isFocused && { 
-                                    backgroundColor: colors.accent + '20', // 20% opacity of accent
-                                }
+                                styles.iconWrap,
+                                isFocused && styles.iconWrapActive,
                             ]}>
-                                <IconComponent 
-                                    size={24} 
-                                    color={isFocused ? colors.accent : colors.secondaryText} 
-                                    strokeWidth={isFocused ? 2.5 : 2}
+                                <IconComponent
+                                    size={22}
+                                    color={iconColor}
+                                    strokeWidth={isFocused ? 2.5 : 1.8}
                                 />
                             </View>
                         </TouchableOpacity>
@@ -77,34 +73,24 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
 }
 
 const styles = StyleSheet.create({
-    tabBarContainer: {
+    wrapper: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 30 : 20,
-        left: 20,
-        right: 20,
-        height: 65,
-        borderRadius: 35,
-        ...Platform.select({
-            ios: {
-                shadowColor: '#000',
-                shadowOffset: { width: 0, height: 10 },
-                shadowOpacity: 0.15,
-                shadowRadius: 20,
-            },
-            android: {
-                elevation: 10,
-            }
-        }),
+        bottom: Platform.OS === 'ios' ? 28 : 18,
+        left: 24,
+        right: 24,
     },
-    blurStyle: {
+    bar: {
         flexDirection: 'row',
-        height: '100%',
+        height: 68,
+        borderRadius: 40,
         alignItems: 'center',
-        justifyContent: 'space-between',
-        paddingHorizontal: 15,
-        borderWidth: 1,
-        borderRadius: 35,
-        overflow: 'hidden',
+        justifyContent: 'space-around',
+        paddingHorizontal: 8,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.1,
+        shadowRadius: 24,
+        elevation: 12,
     },
     tabItem: {
         flex: 1,
@@ -112,11 +98,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         height: '100%',
     },
-    iconWrapper: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+    iconWrap: {
+        width: 48,
+        height: 48,
+        borderRadius: 24,
         alignItems: 'center',
         justifyContent: 'center',
-    }
+    },
+    iconWrapActive: {
+        backgroundColor: '#A8D5A2',
+    },
 });
