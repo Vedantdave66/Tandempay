@@ -12,6 +12,7 @@ import LandingScreen from '../screens/LandingScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
+import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -50,6 +51,7 @@ export default function RootNavigator() {
                         <Stack.Screen name="Landing" component={LandingScreen} />
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Register" component={RegisterScreen} />
+                        <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     </Stack.Group>
                 ) : (
                     <Stack.Group>

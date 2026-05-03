@@ -14,6 +14,20 @@ export default function RegisterScreen({ navigation }: any) {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
+    // Password strength
+    const getStrength = (pw: string): { label: string; color: string; score: number } => {
+        if (!pw) return { label: '', color: 'transparent', score: 0 };
+        let score = 0;
+        if (pw.length >= 8)              score++;
+        if (/[A-Z]/.test(pw))           score++;
+        if (/[0-9]/.test(pw))           score++;
+        if (/[^A-Za-z0-9]/.test(pw))   score++;
+        if (score <= 1) return { label: 'Weak',   color: '#E05252', score: 1 };
+        if (score === 2) return { label: 'Fair',  color: '#F59E0B', score: 2 };
+        return { label: 'Strong', color: '#A8D5A2', score: 3 };
+    };
+    const strength = getStrength(password);
+
     const handleRegister = async () => {
         if (!name || !email || !password) {
             setError('Please fill in all fields');
@@ -92,6 +106,29 @@ export default function RegisterScreen({ navigation }: any) {
                             onChangeText={setPassword}
                             secureTextEntry
                         />
+
+                        {/* Password strength indicator */}
+                        {password.length > 0 && (
+                            <View style={styles.strengthContainer}>
+                                <View style={styles.strengthBars}>
+                                    {[1, 2, 3].map(i => (
+                                        <View
+                                            key={i}
+                                            style={[
+                                                styles.strengthBar,
+                                                { backgroundColor: i <= strength.score ? strength.color : colors.border }
+                                            ]}
+                                        />
+                                    ))}
+                                </View>
+                                <Text style={[styles.strengthLabel, { color: strength.color }]}>
+                                    {strength.label}
+                                </Text>
+                            </View>
+                        )}
+                        <Text style={[styles.pwHint, { color: colors.secondaryText }]}>
+                            Use 8+ characters with a mix of letters, numbers &amp; symbols
+                        </Text>
 
                         <TouchableOpacity
                             style={[styles.button, { backgroundColor: colors.accent }, loading && styles.buttonDisabled]}
@@ -182,17 +219,40 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     button: {
-        borderRadius: 12,
+        borderRadius: 28,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 8,
     },
-    buttonDisabled: {
-        opacity: 0.7,
+    buttonDisabled: { opacity: 0.7 },
+    buttonText: { fontSize: 16, fontWeight: '700' },
+    strengthContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        marginTop: -14,
+        marginBottom: 8,
     },
-    buttonText: {
-        fontSize: 16,
-        fontWeight: 'bold',
+    strengthBars: {
+        flexDirection: 'row',
+        gap: 4,
+        flex: 1,
+    },
+    strengthBar: {
+        flex: 1,
+        height: 4,
+        borderRadius: 2,
+    },
+    strengthLabel: {
+        fontSize: 12,
+        fontWeight: '700',
+        width: 44,
+        textAlign: 'right',
+    },
+    pwHint: {
+        fontSize: 11,
+        lineHeight: 16,
+        marginBottom: 12,
     },
     errorBox: {
         borderWidth: 1,

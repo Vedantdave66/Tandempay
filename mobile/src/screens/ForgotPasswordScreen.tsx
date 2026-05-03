@@ -1,0 +1,134 @@
+import React, { useState } from 'react';
+import {
+    View, Text, TextInput, TouchableOpacity, StyleSheet,
+    ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView, Alert
+} from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+import { ArrowLeft, Mail } from 'lucide-react-native';
+import { authApi } from '../services/api';
+
+export default function ForgotPasswordScreen({ navigation }: any) {
+    const { colors } = useTheme();
+    const [email, setEmail] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [sent, setSent] = useState(false);
+
+    const handleSubmit = async () => {
+        const trimmed = email.trim().toLowerCase();
+        if (!trimmed || !trimmed.includes('@')) {
+            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+            return;
+        }
+        setLoading(true);
+        try {
+            // Call the API — gracefully handles both success and non-2xx (email still "sent" for security)
+            if (typeof (authApi as any).forgotPassword === 'function') {
+                await (authApi as any).forgotPassword(trimmed);
+            } else {
+                // Fallback: hit the standard endpoint directly
+                const { apiClient } = require('../services/api');
+                await apiClient.post('/auth/forgot-password', { email: trimmed });
+            }
+        } catch (_) {
+            // Always show success to prevent email enumeration
+        } finally {
+            setLoading(false);
+            setSent(true);
+        }
+    };
+
+    return (
+        <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+            <KeyboardAvoidingView style={styles.kav} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+                <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={[styles.back, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                    <ArrowLeft size={20} color={colors.secondaryText} />
+                </TouchableOpacity>
+
+                <View style={styles.content}>
+                    <View style={[styles.iconBox, { backgroundColor: `${colors.accent}20` }]}>
+                        <Mail size={28} color={colors.accent} />
+                    </View>
+                    <Text style={[styles.title, { color: colors.text }]}>Forgot Password?</Text>
+                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
+                        Enter your email and we'll send you a reset link.
+                    </Text>
+
+                    {sent ? (
+                        <View style={[styles.successBox, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}40` }]}>
+                            <Text style={[styles.successText, { color: colors.accent }]}>
+                                ✓ If that email exists in our system, a reset link has been sent. Check your inbox.
+                            </Text>
+                        </View>
+                    ) : (
+                        <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+                            <TextInput
+                                style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                                placeholder="you@example.com"
+                                placeholderTextColor={colors.secondaryText}
+                                value={email}
+                                onChangeText={setEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                autoFocus
+                            />
+                            <TouchableOpacity
+                                style={[styles.btn, { backgroundColor: colors.accent, opacity: loading ? 0.7 : 1 }]}
+                                onPress={handleSubmit}
+                                disabled={loading}
+                            >
+                                {loading
+                                    ? <ActivityIndicator color="#1A1A1A" />
+                                    : <Text style={styles.btnText}>Send Reset Link</Text>
+                                }
+                            </TouchableOpacity>
+                        </View>
+                    )}
+
+                    <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.backToLogin}>
+                        <Text style={[styles.backToLoginText, { color: colors.accent }]}>← Back to Sign In</Text>
+                    </TouchableOpacity>
+                </View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    );
+}
+
+const styles = StyleSheet.create({
+    safe:    { flex: 1 },
+    kav:     { flex: 1 },
+    back: {
+        position: 'absolute', top: 20, left: 20,
+        width: 40, height: 40, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center', borderWidth: 1, zIndex: 10,
+    },
+    content: { flex: 1, justifyContent: 'center', paddingHorizontal: 24 },
+    iconBox: {
+        width: 64, height: 64, borderRadius: 20,
+        alignItems: 'center', justifyContent: 'center',
+        alignSelf: 'center', marginBottom: 20,
+    },
+    title:    { fontSize: 28, fontWeight: '700', textAlign: 'center', marginBottom: 10 },
+    subtitle: { fontSize: 14, textAlign: 'center', lineHeight: 22, marginBottom: 32 },
+    form:     { padding: 24, borderRadius: 20, borderWidth: 1, marginBottom: 20 },
+    label:    { fontSize: 14, fontWeight: '600', marginBottom: 8 },
+    input: {
+        borderWidth: 1, borderRadius: 12,
+        paddingHorizontal: 16, paddingVertical: 14,
+        fontSize: 16, marginBottom: 20,
+    },
+    btn: {
+        height: 52, borderRadius: 26,
+        alignItems: 'center', justifyContent: 'center',
+    },
+    btnText:  { color: '#1A1A1A', fontSize: 16, fontWeight: '700' },
+    successBox: {
+        borderRadius: 16, borderWidth: 1, padding: 20, marginBottom: 20,
+    },
+    successText: { fontSize: 14, lineHeight: 22, textAlign: 'center', fontWeight: '500' },
+    backToLogin: { alignItems: 'center', marginTop: 16 },
+    backToLoginText: { fontSize: 14, fontWeight: '600' },
+});

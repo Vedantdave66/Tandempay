@@ -83,14 +83,21 @@ export default function LoginScreen({ navigation }: any) {
                         />
 
                         <TouchableOpacity
+                            onPress={() => navigation.navigate('ForgotPassword')}
+                            style={styles.forgotRow}
+                        >
+                            <Text style={[styles.forgotText, { color: colors.accent }]}>Forgot Password?</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
                             style={[styles.button, { backgroundColor: colors.accent }, loading && styles.buttonDisabled]}
                             onPress={handleLogin}
                             disabled={loading}
                         >
                             {loading ? (
-                                <ActivityIndicator color={isDark ? "#064E3B" : "white"} />
+                                <ActivityIndicator color="#1A1A1A" />
                             ) : (
-                                <Text style={[styles.buttonText, { color: isDark ? "#064E3B" : "white" }]}>Sign In</Text>
+                                <Text style={[styles.buttonText, { color: '#1A1A1A' }]}>Sign In</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -171,17 +178,24 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     button: {
-        borderRadius: 12,
+        borderRadius: 28,
         paddingVertical: 16,
         alignItems: 'center',
         marginTop: 8,
     },
-    buttonDisabled: {
-        opacity: 0.7,
-    },
+    buttonDisabled: { opacity: 0.7 },
     buttonText: {
         fontSize: 16,
-        fontWeight: 'bold',
+        fontWeight: '700',
+    },
+    forgotRow: {
+        alignItems: 'flex-end',
+        marginTop: -12,
+        marginBottom: 16,
+    },
+    forgotText: {
+        fontSize: 13,
+        fontWeight: '600',
     },
     errorBox: {
         borderWidth: 1,
