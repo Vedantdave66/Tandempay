@@ -12,3 +12,4 @@ stripe
 plaid-python
 resend
 apscheduler
+asyncpg==0.29.0
