@@ -225,27 +225,6 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
         return {"success": False, "response": None, "error": error_msg}
 
 
-@router.post("/debug/send-test-email")
-async def send_test_email(to_email: str):
-    """
-    DEBUG ONLY: Manually trigger a test email via Resend to diagnose delivery issues.
-    """
-    print(f"DEBUG: Manual test email trigger for {to_email}")
-    result = await asyncio.to_thread(send_reset_email_sync, to_email, "https://tandempay.ca/test-link")
-    
-    if result["success"]:
-        return {
-            "status": "success",
-            "message": "Resend accepted the request",
-            "api_response": result["response"]
-        }
-    else:
-        return {
-            "status": "error",
-            "message": "Resend request failed",
-            "error": result["error"],
-            "api_response": result["response"]
-        }
 
 
 @router.post("/forgot-password")

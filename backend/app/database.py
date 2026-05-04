@@ -6,7 +6,7 @@ from app.config import get_settings
 settings = get_settings()
 
 engine = create_async_engine(
-    settings.effective_database_url, 
+    settings.DATABASE_URL,
     echo=False,
     poolclass=NullPool,
     # prepare_threshold=None completely disables prepared statements.
