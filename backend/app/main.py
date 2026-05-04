@@ -128,14 +128,11 @@ app = FastAPI(title="Tandem API", version="1.0.0", lifespan=lifespan)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        # Local dev
-        "http://localhost:3000",
-        "http://localhost:5173",
-        # Production frontend
         "https://tandempay.ca",
         "https://www.tandempay.ca",
-        # API subdomain (needed for same-origin requests via api.tandempay.ca)
-        "https://api.tandempay.ca",
+        "http://localhost:3000",
+        "http://localhost:8081",
+        "exp://localhost:8081",
     ],
     allow_credentials=True,
     allow_methods=["*"],
