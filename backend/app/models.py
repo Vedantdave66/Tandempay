@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer
+from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from decimal import Decimal
 from app.database import Base
@@ -95,6 +95,25 @@ class SettlementRecord(Base):
     group: Mapped["Group"] = relationship(back_populates="settlement_records")
     payer: Mapped["User"] = relationship(foreign_keys=[payer_id])
     payee: Mapped["User"] = relationship(foreign_keys=[payee_id])
+
+    # PARTIAL unique index (PostgreSQL only — not enforced on SQLite in tests).
+    # Blocks a second 'pending' or 'sent' row for the same payer→payee pair in
+    # the same group, preventing double-payment initiation.
+    # Does NOT block historical rows with status 'settled' or 'declined', so
+    # the same pair can settle multiple debts over the lifetime of a group.
+    #
+    # This index is created by Alembic migration ad04bfa3ca33 via op.execute().
+    # SQLAlchemy defines it here so that autogenerate can detect future drift.
+    __table_args__ = (
+        Index(
+            "uq_active_settlement_per_pair",
+            "group_id",
+            "payer_id",
+            "payee_id",
+            unique=True,
+            postgresql_where="status IN ('pending', 'sent')",
+        ),
+    )
 
 
 # --- Notifications ---
@@ -205,7 +224,6 @@ class PaymentRequest(Base):
     payer: Mapped["User"] = relationship(foreign_keys=[payer_id])
 
 
-from sqlalchemy import UniqueConstraint
 
 class Payment(Base):
     """Core transaction tracker representing a real Stripe PaymentIntent."""

@@ -5,7 +5,7 @@ from sqlalchemy.orm import selectinload
 from decimal import Decimal
 
 from app.database import get_db
-from app.models import User, Group, GroupMember, Expense, ExpenseParticipant
+from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, SettlementRecord
 from app.schemas import UserBalance, Settlement
 from app.routes.auth import get_current_user
 
@@ -26,8 +26,18 @@ async def _verify_membership(group_id: str, user_id: str, db: AsyncSession) -> G
 
 
 async def _compute_balances(group_id: str, db: AsyncSession) -> dict:
-    """Compute net balance for each user in the group."""
-    # Get all expenses with participants
+    """Compute net balance for each user in the group.
+
+    Returns a dict with three keys:
+      - total_paid:             amount each user paid across all expenses
+      - total_owed:             amount each user owes across all expenses
+      - settlement_adjustments: net adjustment per user from confirmed settlements
+                                (positive = debt reduced, negative = credit consumed)
+
+    Callers must apply settlement_adjustments when computing net balance:
+        net = total_paid[uid] - total_owed[uid] + settlement_adjustments[uid]
+    """
+    # --- Step 1: Accumulate expense debts ---
     result = await db.execute(
         select(Expense)
         .where(Expense.group_id == group_id)
@@ -35,19 +45,52 @@ async def _compute_balances(group_id: str, db: AsyncSession) -> dict:
     )
     expenses = result.scalars().all()
 
-    # Track total paid and total owed per user
     total_paid: dict[str, Decimal] = {}
     total_owed: dict[str, Decimal] = {}
 
     for expense in expenses:
-        # The payer paid the full amount
+        # The payer paid the full expense amount
         total_paid[expense.paid_by] = total_paid.get(expense.paid_by, Decimal("0")) + expense.amount
 
-        # Each participant owes their share
+        # Each participant owes their individual share
         for p in expense.participants:
             total_owed[p.user_id] = total_owed.get(p.user_id, Decimal("0")) + p.share_amount
 
-    return {"total_paid": total_paid, "total_owed": total_owed}
+    # --- Step 2: Subtract confirmed settlements from the net balance ---
+    # Only rows with status == "settled" are counted. "pending", "sent", and
+    # "declined" records are intentionally excluded because the payee has not
+    # yet confirmed receipt, so the debt is not yet legally cleared.
+    #
+    # For each confirmed settlement (payer → payee, amount):
+    #   • payer's net improves by `amount`  — their debt is cleared
+    #   • payee's net decreases by `amount` — they consumed their credit
+    #
+    # These are stored separately (not merged into total_paid/total_owed) so
+    # that the raw expense figures remain accurate for display purposes.
+    sr_result = await db.execute(
+        select(SettlementRecord).where(
+            SettlementRecord.group_id == group_id,
+            SettlementRecord.status == "settled",
+        )
+    )
+    settled_records = sr_result.scalars().all()
+
+    settlement_adjustments: dict[str, Decimal] = {}
+    for sr in settled_records:
+        # Payer paid off debt → their net balance improves
+        settlement_adjustments[sr.payer_id] = (
+            settlement_adjustments.get(sr.payer_id, Decimal("0")) + sr.amount
+        )
+        # Payee received payment → their net credit is consumed
+        settlement_adjustments[sr.payee_id] = (
+            settlement_adjustments.get(sr.payee_id, Decimal("0")) - sr.amount
+        )
+
+    return {
+        "total_paid": total_paid,
+        "total_owed": total_owed,
+        "settlement_adjustments": settlement_adjustments,
+    }
 
 
 @router.get("/balances", response_model=list[UserBalance])
@@ -64,7 +107,8 @@ async def get_balances(
         user = member.user
         paid = data["total_paid"].get(user.id, Decimal("0"))
         owed = data["total_owed"].get(user.id, Decimal("0"))
-        net = paid - owed
+        adj  = data["settlement_adjustments"].get(user.id, Decimal("0"))
+        net  = paid - owed + adj
         balances.append(UserBalance(
             user_id=user.id,
             name=user.name,
@@ -94,13 +138,20 @@ async def get_settlements(
         email_to_use = user.interac_email if user.interac_email else user.email
         user_info[user.id] = {"name": user.name, "email": email_to_use, "avatar_color": user.avatar_color}
 
-    # Compute net balances
+    # Compute net balances, including any confirmed settlement adjustments.
+    # settlement_adjustments user IDs are included in the universe so that a
+    # user who appears only in settlements (and no expenses) is still considered.
     net: dict[str, Decimal] = {}
-    all_user_ids = set(data["total_paid"].keys()) | set(data["total_owed"].keys())
+    all_user_ids = (
+        set(data["total_paid"].keys())
+        | set(data["total_owed"].keys())
+        | set(data["settlement_adjustments"].keys())
+    )
     for uid in all_user_ids:
-        paid = data["total_paid"].get(uid, Decimal("0"))
-        owed = data["total_owed"].get(uid, Decimal("0"))
-        balance = paid - owed
+        paid    = data["total_paid"].get(uid, Decimal("0"))
+        owed    = data["total_owed"].get(uid, Decimal("0"))
+        adj     = data["settlement_adjustments"].get(uid, Decimal("0"))
+        balance = paid - owed + adj
         if abs(balance) > Decimal("0.01"):
             net[uid] = balance
 

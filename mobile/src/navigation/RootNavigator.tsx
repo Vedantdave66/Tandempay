@@ -13,6 +13,7 @@ import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
+import TutorialScreen from '../screens/TutorialScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -79,6 +80,11 @@ export default function RootNavigator() {
                         <Stack.Screen
                             name="AddFriend"
                             component={AddFriendScreen}
+                            options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="Tutorial"
+                            component={TutorialScreen}
                             options={{ presentation: 'modal' }}
                         />
                     </Stack.Group>

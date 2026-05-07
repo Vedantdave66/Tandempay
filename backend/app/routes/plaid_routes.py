@@ -19,6 +19,7 @@ from app.config import get_settings
 
 router = APIRouter(prefix="/api/plaid", tags=["Plaid"])
 settings = get_settings()
+logger = __import__("logging").getLogger("tandempay.plaid")
 
 configuration = plaid.Configuration(
     host=plaid.Environment.Sandbox if settings.PLAID_ENV == 'sandbox' else plaid.Environment.Production,
@@ -105,5 +106,5 @@ async def set_access_token(
         }
         
     except plaid.ApiException as e:
-        print("Plaid Exception:", e)
+        logger.warning(f"set_access_token: Plaid API exception: {type(e).__name__} status={e.status}")
         raise HTTPException(status_code=400, detail="Failed to link bank account with Plaid")

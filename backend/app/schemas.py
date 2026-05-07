@@ -1,14 +1,18 @@
 from datetime import datetime
 from decimal import Decimal
 from pydantic import condecimal
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 # --- Auth ---
 class UserRegister(BaseModel):
     name: str
     email: EmailStr
-    password: str
+    password: str = Field(
+        min_length=8,
+        description="Must be at least 8 characters",
+        json_schema_extra={"error_messages": {"min_length": "Password must be at least 8 characters"}},
+    )
     interac_email: EmailStr | None = None
 
 

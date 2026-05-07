@@ -1,5 +1,5 @@
 import stripe
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from decimal import Decimal
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -247,11 +247,18 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Webhook error")
 
 @router.post("/reconcile/{payment_id}")
-async def reconcile_payment(payment_id: str, db: AsyncSession = Depends(get_db)):
+async def reconcile_payment(
+    payment_id: str,
+    db: AsyncSession = Depends(get_db),
+    x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
+):
     """
-    Manually reconcile a payment using Stripe as the source of truth.
+    Admin-only: manually reconcile a payment using Stripe as the source of truth.
     Ensures absolute DB-Stripe synchronization.
+    Protected by the X-Admin-Secret header — same mechanism as auth admin routes.
     """
+    if x_admin_secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
     result = await db.execute(select(Payment).where(Payment.id == payment_id))
     payment = result.scalars().first()
     
@@ -312,10 +319,16 @@ async def reconcile_payment(payment_id: str, db: AsyncSession = Depends(get_db))
         raise HTTPException(status_code=400, detail=f"Reconciliation failed: {str(e)}")
 
 @router.post("/cleanup")
-async def cleanup_payments(db: AsyncSession = Depends(get_db)):
+async def cleanup_payments(
+    db: AsyncSession = Depends(get_db),
+    x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
+):
     """
-    Background job equivalent: Expire payments older than 24h that never reached terminal state.
+    Admin-only: expire payments older than 24 h that never reached a terminal state.
+    Protected by the X-Admin-Secret header — same mechanism as auth admin routes.
     """
+    if x_admin_secret != settings.ADMIN_SECRET:
+        raise HTTPException(status_code=403, detail="Invalid admin secret")
     from datetime import datetime, timedelta
     twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
     

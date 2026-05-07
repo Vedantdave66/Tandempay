@@ -11,5 +11,7 @@ python-dotenv==1.0.1
 stripe
 plaid-python
 resend
+slowapi
+alembic
 apscheduler
 asyncpg==0.29.0

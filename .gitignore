@@ -12,7 +12,12 @@ dist/
 
 # Environment
 .env
+*.env
+*.env.*
 *.local
+backend/.env
+frontend/.env
+mobile/.env
 
 # IDE
 .vscode/

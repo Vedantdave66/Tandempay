@@ -1,7 +1,7 @@
 import random
 import bcrypt
 from datetime import datetime, timedelta, timezone
-from fastapi import APIRouter, Depends, HTTPException, status, Header
+from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from jose import jwt, JWTError, ExpiredSignatureError
@@ -15,14 +15,16 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import asyncio
+import logging
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
 settings = get_settings()
+logger = logging.getLogger("tandempay.auth")
+
+from app.limiter import limiter
 
 AVATAR_COLORS = ["#3ECF8E", "#6366F1", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6", "#F97316"]
-
-recent_reset_requests = {}
 
 
 def hash_password(password: str) -> str:
@@ -33,8 +35,7 @@ def verify_password(password: str, hashed: str) -> bool:
     try:
         return bcrypt.checkpw(password.encode("utf-8"), hashed.encode("utf-8"))
     except Exception as e:
-        print(f"DEBUG: bcrypt.checkpw raised an exception: {e}")
-        print(f"DEBUG: Hash prefix: {hashed[:10]}... (len={len(hashed)})")
+        logger.warning(f"verify_password: bcrypt raised an unexpected exception: {type(e).__name__}")
         return False
 
 
@@ -91,28 +92,29 @@ async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/login", response_model=Token)
-async def login(data: UserLogin, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute", error_message="Too many login attempts. Please try again later.")
+async def login(request: Request, data: UserLogin, db: AsyncSession = Depends(get_db)):
     email_lower = data.email.lower()
     result = await db.execute(select(User).where(User.email == email_lower))
     user = result.scalar_one_or_none()
     
     if not user:
-        print(f"DEBUG: Login failed — no user found for email: {email_lower}")
+        logger.warning("login: failed — email not found")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
-    # Debug: check the hash format to detect corruption
+    # Check the hash format to detect corruption
     hash_str = user.hashed_password
     is_valid_bcrypt = hash_str and hash_str.startswith("$2") and len(hash_str) >= 59
     if not is_valid_bcrypt:
-        print(f"DEBUG: Login failed — CORRUPTED hash for {email_lower}: prefix='{hash_str[:20] if hash_str else 'NULL'}', len={len(hash_str) if hash_str else 0}")
+        logger.warning("login: failed — corrupted bcrypt hash detected (no hash content logged)")
         raise HTTPException(status_code=401, detail="Invalid email or password")
     
     if not verify_password(data.password, hash_str):
-        print(f"DEBUG: Login failed — bcrypt verification failed for {email_lower} (hash looks valid, password mismatch)")
+        logger.warning("login: failed — password mismatch")
         raise HTTPException(status_code=401, detail="Invalid email or password")
 
     token = create_access_token({"sub": user.id})
-    print(f"DEBUG: Login success for {email_lower}")
+    logger.info("login: success")
     return Token(access_token=token)
 
 
@@ -164,8 +166,7 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
     Returns a dict with {'success': bool, 'response': any, 'error': str}
     """
     if not settings.RESEND_API_KEY:
-        msg = f"RESEND_API_KEY not configured. Mocking email to {to_email}"
-        print(f"DEBUG: {msg}")
+        logger.warning("send_reset_email_sync: RESEND_API_KEY not configured — email not sent")
         return {"success": False, "error": "API Key not configured", "response": None}
 
     html = f"""
@@ -192,7 +193,7 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
     FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "noreply@send.tandempay.ca")
     
     try:
-        print(f"DEBUG: [RESEND] Attempting send: from={FROM_EMAIL}, to={to_email}, subject='Reset your Tandem Password'")
+        logger.info(f"send_reset_email_sync: dispatching to={to_email} from={FROM_EMAIL}")
         params = {
             "from": f"{FROM_NAME} <{FROM_EMAIL}>",
             "to": [to_email],
@@ -201,26 +202,22 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
         }
         response = resend.Emails.send(params)
         
-        # Log the full response for diagnosis
-        print(f"DEBUG: [RESEND] API Response: {response}")
-        
         if "id" in response:
-            print(f"DEBUG: [RESEND] Success! Message ID: {response['id']}")
+            logger.info(f"send_reset_email_sync: success — message_id={response['id']}")
             return {"success": True, "response": response, "error": None}
         else:
-            print(f"DEBUG: [RESEND] API returned success but no ID found: {response}")
+            logger.warning(f"send_reset_email_sync: API returned no message ID — response keys: {list(response.keys())}")
             return {"success": False, "response": response, "error": "No ID in response"}
             
     except Exception as e:
         error_msg = str(e)
-        print(f"CRITICAL ERROR: [RESEND] Exception during email send: {error_msg}")
+        logger.error(f"send_reset_email_sync: exception during send: {type(e).__name__}: {error_msg}")
         
-        # PROVIDE CLEARER CONTEXT FOR 403 FORBIDDEN
         if "403" in error_msg:
-            print("IMPORTANT: Resend returned 403 Forbidden. This typically means:")
-            print(f"1. Your 'from' address ({FROM_EMAIL}) is not from a verified domain.")
-            print("2. Your API Key is invalid or restricted.")
-            print(f"3. Ensure 'tandempay.ca' is verified in the Resend dashboard.")
+            logger.warning(
+                f"send_reset_email_sync: Resend returned 403 Forbidden. "
+                f"Verify that '{FROM_EMAIL}' belongs to a domain verified in the Resend dashboard."
+            )
 
         return {"success": False, "response": None, "error": error_msg}
 
@@ -228,19 +225,9 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
 
 
 @router.post("/forgot-password")
-async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("3/hour", error_message="Too many reset requests. Please try again later.")
+async def forgot_password(request: Request, data: PasswordResetRequest, db: AsyncSession = Depends(get_db)):
     email_lower = data.email.lower()
-    
-    # Rate Limiting
-    now = datetime.now(timezone.utc)
-    if email_lower in recent_reset_requests:
-        last_request = recent_reset_requests[email_lower]
-        if (now - last_request) < timedelta(minutes=2):
-            raise HTTPException(
-                status_code=429,
-                detail="Please wait a couple of minutes before requesting another reset link."
-            )
-    recent_reset_requests[email_lower] = now
 
     result = await db.execute(select(User).where(User.email == email_lower))
     user = result.scalar_one_or_none()
@@ -251,15 +238,15 @@ async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends
         to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
         reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
         
-        # Build the reset link
+        # Build the reset link — never log this value
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-        print(f"DEBUG: Password reset link generated for {user.email}: {reset_link}")
+        logger.info(f"forgot_password: reset link generated for user_id={user.id}")
         
         # Dispatch the email
         result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
         
         if not result["success"]:
-            print(f"ERROR: Failed to dispatch reset email to {user.email}: {result['error']}")
+            logger.warning(f"forgot_password: email dispatch failed — {result['error']}")
             raise HTTPException(
                 status_code=500, 
                 detail=f"Email delivery service failure: {result['error']}"
@@ -267,7 +254,7 @@ async def forgot_password(data: PasswordResetRequest, db: AsyncSession = Depends
             
         return {"message": "Password reset link sent"}
     else:
-        print(f"DEBUG: Password reset requested for non-existent email: {email_lower}")
+        logger.info("forgot_password: reset requested for unregistered email (not disclosed to caller)")
         raise HTTPException(
             status_code=404,
             detail="No account found with that email address"
@@ -286,10 +273,10 @@ async def reset_password(data: PasswordResetConfirm, db: AsyncSession = Depends(
         token_type: str = payload.get("type")
         
         if user_id is None or token_type != "password_reset":
-            print(f"DEBUG: Invalid token payload: user_id={user_id}, type={token_type}")
+            logger.warning("reset_password: invalid token payload — missing sub or wrong type")
             raise credentials_exception
-    except ExpiredSignatureError as e:
-        print(f"DEBUG: JWT Expired: {e}")
+    except ExpiredSignatureError:
+        logger.info("reset_password: token expired — attempting auto-resend")
         try:
             unverified_payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
             user_id = unverified_payload.get("sub")
@@ -332,7 +319,7 @@ async def reset_password(data: PasswordResetConfirm, db: AsyncSession = Depends(
         except JWTError:
             raise credentials_exception
     except JWTError as e:
-        print(f"DEBUG: JWT Decode Error during password reset: {e}")
+        logger.warning(f"reset_password: JWT decode error — {type(e).__name__}")
         raise credentials_exception
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -385,17 +372,18 @@ async def admin_reset_all_passwords(
             reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
             
             reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-            print(f"DEBUG: [MASS RESET] Sending reset to {user.email}: {reset_link}")
+            # Never log reset_link — contains a live credential
+            logger.info(f"[MASS RESET] dispatching to user_id={user.id}")
             
             email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
             
             if email_result["success"]:
                 sent += 1
-                print(f"DEBUG: [MASS RESET] ✓ Sent to {user.email}")
+                logger.info(f"[MASS RESET] sent ok — user_id={user.id}")
             else:
                 failed += 1
                 failures.append({"email": user.email, "error": email_result["error"]})
-                print(f"DEBUG: [MASS RESET] ✗ Failed for {user.email}: {email_result['error']}")
+                logger.warning(f"[MASS RESET] failed for user_id={user.id}: {email_result['error']}")
             
             # Rate limit: small delay between sends to avoid hitting Resend limits
             await asyncio.sleep(0.5)
@@ -403,7 +391,7 @@ async def admin_reset_all_passwords(
         except Exception as e:
             failed += 1
             failures.append({"email": user.email, "error": str(e)})
-            print(f"DEBUG: [MASS RESET] ✗ Exception for {user.email}: {e}")
+            logger.error(f"[MASS RESET] exception for user_id={user.id}: {type(e).__name__}")
     
     return {
         "message": f"Mass password reset complete",

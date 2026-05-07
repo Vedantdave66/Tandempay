@@ -33,7 +33,14 @@ async def create_expense(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    # --- Input validation: fail fast before any DB operations ---
+    if data.amount <= Decimal("0"):
+        raise HTTPException(status_code=400, detail="Expense amount must be greater than zero")
+    if len(data.participant_ids) == 0:
+        raise HTTPException(status_code=400, detail="At least one participant is required")
+
     group = await _verify_membership(group_id, current_user.id, db)
+
 
     # Verify payer is a member
     member_ids = {m.user_id for m in group.members}
