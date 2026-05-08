@@ -234,6 +234,86 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 payment.status = "expired"
                 logger.info(f"Payment {payment_id} marked as expired via cancellation")
 
+        elif event.type == 'payment_intent.requires_action':
+            # 3DS challenge pending — the user must complete authentication.
+            # We mark the DB so the scheduled cleanup can expire it later if they abandon.
+            intent = event.data.object
+            metadata = intent.get('metadata', {})
+            payment_id = metadata.get("payment_id")
+
+            if not payment_id:
+                logger.warning(f"payment_intent.requires_action: no payment_id in metadata for {event_logger}")
+            else:
+                result = await db.execute(select(Payment).where(Payment.id == payment_id))
+                payment = result.scalars().first()
+                if payment and payment.status not in ("succeeded", "failed", "expired"):
+                    payment.status = "requires_action"
+                    logger.info(f"Payment {payment_id} requires 3DS action (intent={intent.get('id')})")
+
+        elif event.type == 'charge.dispute.created':
+            # A chargeback has been opened — mark the payment disputed and alert ops.
+            dispute = event.data.object
+            charge_id = dispute.get("charge")
+            dispute_id = dispute.get("id")
+            dispute_amount = dispute.get("amount", 0) / 100  # Stripe amounts are in cents
+
+            # Look up the Payment by charge ID via the PaymentIntent
+            payment = None
+            if charge_id:
+                import asyncio as _asyncio
+                try:
+                    charge = await _asyncio.to_thread(
+                        lambda: stripe.Charge.retrieve(charge_id)
+                    )
+                    pi_id = charge.get("payment_intent")
+                    if pi_id:
+                        result = await db.execute(
+                            select(Payment).where(Payment.stripe_payment_intent_id == pi_id)
+                        )
+                        payment = result.scalars().first()
+                except Exception as dispute_err:
+                    logger.error(f"charge.dispute.created: could not retrieve charge {charge_id}: {dispute_err}")
+
+            if payment:
+                payment.status = "disputed"
+                logger.critical(
+                    f"DISPUTE CREATED — dispute_id={dispute_id} "
+                    f"payment_id={payment.id} "
+                    f"amount=${dispute_amount:.2f} "
+                    f"charge={charge_id} — IMMEDIATE REVIEW REQUIRED"
+                )
+            else:
+                logger.critical(
+                    f"DISPUTE CREATED — dispute_id={dispute_id} "
+                    f"charge={charge_id} amount=${dispute_amount:.2f} "
+                    f"— could not find matching Payment record"
+                )
+
+        elif event.type == 'account.updated':
+            # Stripe Connect: a connected account's status changed.
+            # If charges_enabled goes False, payouts are suspended — alert ops immediately.
+            import asyncio as _asyncio
+            account = event.data.object
+            account_id = account.get("id")
+            charges_enabled = account.get("charges_enabled", True)
+
+            if not charges_enabled:
+                # Identify whose account this is for log context
+                try:
+                    result = await db.execute(
+                        select(User).where(User.stripe_account_id == account_id)
+                    )
+                    affected_user = result.scalars().first()
+                    user_ref = f"user_id={affected_user.id}" if affected_user else "unknown user"
+                except Exception:
+                    user_ref = "unknown user"
+
+                logger.critical(
+                    f"STRIPE CONNECT ACCOUNT SUSPENDED — "
+                    f"account_id={account_id} {user_ref} "
+                    f"charges_enabled=False — payouts are suspended, IMMEDIATE REVIEW REQUIRED"
+                )
+
         # 2. Commit transaction and record the event for idempotency
         new_event = StripeEvent(id=event.id, type=event.type)
         db.add(new_event)
