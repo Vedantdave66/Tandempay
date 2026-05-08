@@ -1,18 +1,33 @@
+import logging
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
 from app.config import get_settings
 
+logger = logging.getLogger("tandempay.database")
 settings = get_settings()
 
+# DATABASE_URL must use the asyncpg driver scheme on Vercel:
+#   postgresql+asyncpg://USER:PASSWORD@HOST:6543/postgres
+# Plain postgres:// or postgresql:// will crash create_async_engine at import.
+# For Supabase, use the Transaction Pooler host (...pooler.supabase.com:6543).
+_db_url = settings.DATABASE_URL
+_scheme = _db_url.split("://", 1)[0] if "://" in _db_url else "<missing>"
+logger.info("Initializing async engine with scheme=%s", _scheme)
+
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    _db_url,
     echo=False,
     poolclass=NullPool,
-    # prepare_threshold=None completely disables prepared statements.
-    # Required for Supabase Transaction Pooler (PgBouncer).
-    # Note: 0 means "always prepare", None means "never prepare".
-    connect_args={"prepare_threshold": None},
+    # asyncpg + Supabase Transaction Pooler (PgBouncer) requires:
+    #   - prepared-statement caches disabled (PgBouncer recycles connections,
+    #     so cached statements break across them)
+    #   - SSL required (Supabase rejects plaintext)
+    connect_args={
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "ssl": "require",
+    },
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 

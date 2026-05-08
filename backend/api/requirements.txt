@@ -1,7 +1,7 @@
 fastapi==0.115.0
 uvicorn==0.30.0
 sqlalchemy[asyncio]==2.0.35
-psycopg[binary]==3.1.18
+asyncpg==0.29.0
 pydantic[email]>=2.7.0
 pydantic-settings
 bcrypt==4.2.0
@@ -13,4 +13,3 @@ resend
 slowapi
 alembic
 apscheduler
-asyncpg==0.29.0
