@@ -176,6 +176,15 @@ async def update_expense(
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
 
+    # Ownership check: only the user who paid for (created) this expense
+    # may edit it. Checked after the 404 guard so non-members who somehow
+    # reach this point cannot distinguish "doesn't exist" from "not yours".
+    if expense.paid_by != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only edit expenses you created",
+        )
+
     member_ids = {m.user_id for m in group.members}
     if data.paid_by not in member_ids:
         raise HTTPException(status_code=400, detail="Payer is not a group member")
@@ -245,6 +254,14 @@ async def delete_expense(
     expense = result.scalar_one_or_none()
     if not expense:
         raise HTTPException(status_code=404, detail="Expense not found")
+
+    # Ownership check: only the user who paid for (created) this expense
+    # may delete it. Same 404/403 ordering as the edit endpoint.
+    if expense.paid_by != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only edit expenses you created",
+        )
 
     await db.delete(expense)
     await db.flush()
