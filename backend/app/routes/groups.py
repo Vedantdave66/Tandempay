@@ -6,7 +6,7 @@ import logging
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense
-from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, GroupMemberOut
+from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, JoinGroup, GroupMemberOut
 from app.routes.auth import get_current_user
 
 logger = logging.getLogger("tandempay.groups")
@@ -36,6 +36,8 @@ async def create_group(data: GroupCreate, current_user: User = Depends(get_curre
         created_at=group.created_at,
         members=members_out,
         total_expenses=0,
+        # Always show token to creator — they need it to share with invitees.
+        invite_token=group.invite_token,
     )
 
 
@@ -96,6 +98,9 @@ async def get_group(group_id: str, current_user: User = Depends(get_current_user
         created_at=group.created_at,
         members=members_out,
         total_expenses=total,
+        # Expose invite_token to the creator only; None for all other members
+        # so the token is never leaked to non-creators via this endpoint.
+        invite_token=group.invite_token if group.created_by == current_user.id else None,
     )
 
 
@@ -137,8 +142,18 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
 
 
 @router.post("/{group_id}/join", response_model=GroupMemberOut)
-async def join_group(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    # Verify group exists
+async def join_group(
+    group_id: str,
+    data: JoinGroup,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Join a group using its invite token.
+
+    The invite token is shared by the group creator and must match the
+    token stored on the group. Without it, group IDs alone are not enough
+    to join — prevents enumeration attacks where anyone with a UUID joins.
+    """
     result = await db.execute(
         select(Group).where(Group.id == group_id).options(selectinload(Group.members))
     )
@@ -146,10 +161,17 @@ async def join_group(group_id: str, current_user: User = Depends(get_current_use
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
 
-    # Check if already a member
+    # Validate invite token before revealing anything about membership state.
+    # Use a constant-time comparison to prevent timing attacks.
+    import secrets as _secrets
+    if not group.invite_token or not _secrets.compare_digest(
+        group.invite_token, data.invite_token
+    ):
+        raise HTTPException(status_code=403, detail="Invalid invite token")
+
+    # Check if already a member — silently succeed so retries are safe.
     already = any(m.user_id == current_user.id for m in group.members)
     if already:
-        # Just return success if they are already in it instead of throwing an error
         return GroupMemberOut(
             user_id=current_user.id,
             name=current_user.name,
@@ -157,7 +179,6 @@ async def join_group(group_id: str, current_user: User = Depends(get_current_use
             avatar_color=current_user.avatar_color,
         )
 
-    # Add member
     member = GroupMember(group_id=group_id, user_id=current_user.id)
     db.add(member)
     await db.flush()

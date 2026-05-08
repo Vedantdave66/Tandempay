@@ -71,6 +71,11 @@ class MemberAdd(BaseModel):
     email: EmailStr
 
 
+class JoinGroup(BaseModel):
+    """Request body for POST /api/groups/{group_id}/join."""
+    invite_token: str
+
+
 class GroupMemberOut(BaseModel):
     user_id: str
     name: str
@@ -88,6 +93,8 @@ class GroupOut(BaseModel):
     created_at: datetime
     members: list[GroupMemberOut] = []
     total_expenses: Decimal = 0
+    # Only populated for the group creator. None for all other members.
+    invite_token: str | None = None
 
     class Config:
         from_attributes = True

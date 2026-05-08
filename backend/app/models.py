@@ -1,4 +1,5 @@
 import uuid
+import secrets
 from datetime import datetime
 from typing import Optional
 from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index
@@ -32,6 +33,10 @@ class Group(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     created_by: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    # Randomly generated at creation time. Required to join via the invite link.
+    # nullable=True so the column can be added to an existing table without a DEFAULT;
+    # the migration backfills existing rows. All new rows receive a token from the lambda.
+    invite_token: Mapped[str] = mapped_column(String(32), nullable=True, default=lambda: secrets.token_urlsafe(16))
 
     members: Mapped[list["GroupMember"]] = relationship(back_populates="group", cascade="all, delete-orphan")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="group", cascade="all, delete-orphan")
