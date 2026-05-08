@@ -8,6 +8,7 @@ from app.database import get_db
 from app.models import User, Group, GroupMember, Expense
 from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, JoinGroup, GroupMemberOut
 from app.routes.auth import get_current_user
+from app.services.balance_service import _compute_balances
 
 logger = logging.getLogger("tandempay.groups")
 router = APIRouter(prefix="/api/groups", tags=["groups"])
@@ -245,10 +246,24 @@ async def remove_member(group_id: str, user_id: str, current_user: User = Depend
     if user_id == group.created_by:
         raise HTTPException(status_code=400, detail="Cannot remove the group creator")
 
-    # Prevent removing if they mapped to an active expense
-    # For a fully robust app we'd do a check here. For now, since user wants the ability to remove,
-    # we'll just delete the membership. Expenses they were part of will still have them as participants 
-    # (unless we explicitly cascade, but we aren't cascading member deletion to expenses by default).
+    # PRIMARY GUARD: block removal if the member has any unsettled balance.
+    # We pass the current active member set explicitly so _compute_balances
+    # doesn't need an extra DB round-trip to fetch the member list.
+    from decimal import Decimal
+    active_member_ids = {m.user_id for m in group.members}
+    balance_data = await _compute_balances(group_id, db, active_member_ids=active_member_ids)
+
+    paid = balance_data["total_paid"].get(user_id, Decimal("0"))
+    owed = balance_data["total_owed"].get(user_id, Decimal("0"))
+    adj  = balance_data["settlement_adjustments"].get(user_id, Decimal("0"))
+    net_balance = paid - owed + adj
+
+    # Use a $0.01 threshold to tolerate floating-point rounding artefacts.
+    if abs(net_balance) > Decimal("0.01"):
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot remove a member with unsettled balances. Settle their debts first.",
+        )
 
     await db.delete(member_record)
     await db.flush()

@@ -25,7 +25,11 @@ async def _verify_membership(group_id: str, user_id: str, db: AsyncSession) -> G
     return group
 
 
-async def _compute_balances(group_id: str, db: AsyncSession) -> dict:
+async def _compute_balances(
+    group_id: str,
+    db: AsyncSession,
+    active_member_ids: set[str] | None = None,
+) -> dict:
     """Compute net balance for each user in the group.
 
     Returns a dict with three keys:
@@ -36,7 +40,23 @@ async def _compute_balances(group_id: str, db: AsyncSession) -> dict:
 
     Callers must apply settlement_adjustments when computing net balance:
         net = total_paid[uid] - total_owed[uid] + settlement_adjustments[uid]
+
+    Args:
+        active_member_ids: if provided, expense participants whose user_id is NOT
+            in this set are excluded from totals. This is a defensive safety net
+            for the case where a member was removed but their ExpenseParticipant
+            rows remain (financial history is preserved; ghost debt is filtered).
+            The primary guard against non-zero-balance removal lives in groups.py.
     """
+    # --- Resolve active member set (used as a defensive filter below) ----------
+    # If the caller did not supply the member set, fetch it from the DB so the
+    # filter is always applied and we never silently include removed members.
+    if active_member_ids is None:
+        member_result = await db.execute(
+            select(GroupMember.user_id).where(GroupMember.group_id == group_id)
+        )
+        active_member_ids = {row[0] for row in member_result.all()}
+
     # --- Step 1: Accumulate expense debts ---
     result = await db.execute(
         select(Expense)
@@ -49,11 +69,21 @@ async def _compute_balances(group_id: str, db: AsyncSession) -> dict:
     total_owed: dict[str, Decimal] = {}
 
     for expense in expenses:
-        # The payer paid the full expense amount
+        # The payer paid the full expense amount.
+        # NOTE: We do NOT filter paid_by by active_member_ids here because a
+        # removed payer's credit must still be visible to remaining debtors.
+        # The primary guard (balance check before removal) ensures payers can
+        # only be removed once they are fully settled.
         total_paid[expense.paid_by] = total_paid.get(expense.paid_by, Decimal("0")) + expense.amount
 
-        # Each participant owes their individual share
+        # Each participant owes their individual share.
+        # DEFENSIVE SAFETY NET: skip participants who are no longer active members.
+        # This prevents "ghost debt" from appearing in balance/settlement views
+        # if a member was somehow removed while still having an unsettled share.
+        # The real guard against this state is the balance check in remove_member().
         for p in expense.participants:
+            if p.user_id not in active_member_ids:
+                continue  # ghost participant — skip (row kept for audit history)
             total_owed[p.user_id] = total_owed.get(p.user_id, Decimal("0")) + p.share_amount
 
     # --- Step 2: Subtract confirmed settlements from the net balance ---
