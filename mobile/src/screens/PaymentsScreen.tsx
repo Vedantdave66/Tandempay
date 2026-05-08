@@ -142,7 +142,9 @@ export default function PaymentsScreen() {
             // Step 1: create PaymentIntent on the backend
             const { client_secret } = await paymentsApi.createPaymentIntent({
                 payee_id: payment.payee_id,
-                amount: Number(payment.amount),
+                // Backend expects amount in CENTS (int). payment.amount is dollars from the DB.
+                // e.g. $25.50 → 2550 cents. Math.round handles any floating-point edge cases.
+                amount: Math.round(Number(payment.amount) * 100),
                 settlement_id: payment.id,
             });
 

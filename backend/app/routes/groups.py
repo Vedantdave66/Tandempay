@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.orm import selectinload
+from decimal import Decimal
 import logging
 
 from app.database import get_db
@@ -249,7 +250,6 @@ async def remove_member(group_id: str, user_id: str, current_user: User = Depend
     # PRIMARY GUARD: block removal if the member has any unsettled balance.
     # We pass the current active member set explicitly so _compute_balances
     # doesn't need an extra DB round-trip to fetch the member list.
-    from decimal import Decimal
     active_member_ids = {m.user_id for m in group.members}
     balance_data = await _compute_balances(group_id, db, active_member_ids=active_member_ids)
 

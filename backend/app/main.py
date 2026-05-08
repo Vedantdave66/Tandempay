@@ -9,7 +9,7 @@ from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.database import engine
+from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
 from app.routes import reminders
 from app.services import balance_service
