@@ -9,6 +9,9 @@ from app.database import get_db
 from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
 from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut
 from app.routes.auth import get_current_user
+import logging
+
+logger = logging.getLogger("tandempay.expenses")
 
 router = APIRouter(prefix="/api/groups/{group_id}/expenses", tags=["expenses"])
 
@@ -75,10 +78,8 @@ async def create_expense(
 
     # Invariant: shares must sum to the total amount. If this fires, there is an
     # arithmetic bug that must never silently persist in the DB.
-    import logging as _logging
-    _log = _logging.getLogger("tandempay.expenses")
     if sum(shares) != data.amount:
-        _log.error(
+        logger.error(
             f"Share sum invariant violated: sum={sum(shares)} != amount={data.amount} "
             f"(n={n}, base={base_share}, remainder={remainder})"
         )
@@ -230,10 +231,8 @@ async def update_expense(
     shares = [base_share] * n
     shares[0] += remainder
 
-    import logging as _logging
-    _log = _logging.getLogger("tandempay.expenses")
     if sum(shares) != data.amount:
-        _log.error(
+        logger.error(
             f"Share sum invariant violated (update): sum={sum(shares)} != amount={data.amount} "
             f"(n={n}, base={base_share}, remainder={remainder})"
         )
