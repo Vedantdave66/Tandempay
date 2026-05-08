@@ -72,6 +72,30 @@ app = FastAPI(title="Tandem API", version="1.0.0", lifespan=lifespan)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
+
+# ── Diagnostic: log every unhandled exception ────────────────────────────────
+# Without this, FastAPI's default 500 handler swallows tracebacks on Vercel
+# (the runtime doesn't capture starlette's internal logger). This surfaces
+# them through our `tandempay.*` logger which IS captured.
+import traceback
+from fastapi import Request
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(Exception)
+async def _log_unhandled_exception(request: Request, exc: Exception):
+    logger.error(
+        "UNHANDLED %s on %s %s: %s\n%s",
+        type(exc).__name__,
+        request.method,
+        request.url.path,
+        exc,
+        traceback.format_exc(),
+    )
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error", "error_type": type(exc).__name__},
+    )
+
 # CORS: allow local dev + production frontend URL from env
 
 app.add_middleware(
