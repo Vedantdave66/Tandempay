@@ -311,3 +311,27 @@ export const walletApi = {
             body: JSON.stringify({ amount, destination })
         })
 };
+
+// --- Stripe Payments ---
+export interface CreatePaymentIntentResponse {
+    client_secret: string;
+    payment_intent_id: string;
+}
+
+export const paymentsApi = {
+    /**
+     * Create a Stripe PaymentIntent for a settlement.
+     * Returns a client_secret that is passed to the Stripe payment sheet.
+     * Backend route: POST /api/payments/create
+     */
+    createPaymentIntent: (params: {
+        payee_id: string;
+        amount: number;
+        settlement_id: string;
+    }) =>
+        request<CreatePaymentIntentResponse>('/payments/create', {
+            method: 'POST',
+            body: JSON.stringify(params),
+        }),
+};
+

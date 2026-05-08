@@ -13,10 +13,11 @@ import {
     Modal,
     TextInput
 } from 'react-native';
+import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, Plus, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
-import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut, User } from '../services/api';
+import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, Plus, ArrowDownToLine, X, RotateCcw, Zap } from 'lucide-react-native';
+import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut, User, paymentsApi } from '../services/api';
 
 export default function PaymentsScreen() {
     const { colors, isDark } = useTheme();
@@ -31,6 +32,12 @@ export default function PaymentsScreen() {
     
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Tracks which settlement_id is currently being paid via Stripe sheet.
+    // Non-null means the sheet is initialising or open — disables the button.
+    const [stripePayingId, setStripePayingId] = useState<string | null>(null);
+
+    const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
     // Modal state for Add Funds / Withdraw
     const [fundModalVisible, setFundModalVisible] = useState(false);
@@ -114,6 +121,64 @@ export default function PaymentsScreen() {
         Alert.alert('Stripe Connect', 'Connect your bank with Stripe to receive instant payouts. Use the Web App at tandempay.ca to link securely.');
     };
 
+    /**
+     * Open the Stripe payment sheet for a specific settlement.
+     *
+     * Flow:
+     *  1. POST /api/payments/create  →  { client_secret }
+     *  2. initPaymentSheet({ paymentIntentClientSecret: client_secret })
+     *  3. presentPaymentSheet()
+     *  4a. Success  → alert + refresh list
+     *  4b. Cancelled → silent (user dismissed intentionally)
+     *  4c. Error    → Alert with message
+     *
+     * The existing "Mark as Sent" / "Confirm" flow is untouched — this is an
+     * additional payment path for users who want to pay via card.
+     */
+    const handleStripePayment = async (payment: SettlementRecordOut) => {
+        if (stripePayingId) return; // prevent double-tap
+        setStripePayingId(payment.id);
+        try {
+            // Step 1: create PaymentIntent on the backend
+            const { client_secret } = await paymentsApi.createPaymentIntent({
+                payee_id: payment.payee_id,
+                amount: Number(payment.amount),
+                settlement_id: payment.id,
+            });
+
+            // Step 2: initialise the payment sheet
+            const { error: initError } = await initPaymentSheet({
+                paymentIntentClientSecret: client_secret,
+                merchantDisplayName: 'TandemPay',
+                // Apple Pay / Google Pay config (optional but recommended)
+                applePay: { merchantCountryCode: 'CA' },
+                googlePay: { merchantCountryCode: 'CA', testEnv: true },
+            });
+            if (initError) {
+                Alert.alert('Payment Error', initError.message);
+                return;
+            }
+
+            // Step 3: present the sheet to the user
+            const { error: presentError } = await presentPaymentSheet();
+
+            if (!presentError) {
+                // 4a: Success
+                Alert.alert('✅ Payment Successful', `$${formatCurrency(payment.amount)} sent to ${payment.payee_name}.`);
+                loadData(); // refresh the list
+            } else if (presentError.code === 'Canceled') {
+                // 4b: User dismissed — do nothing
+            } else {
+                // 4c: Real error
+                Alert.alert('Payment Failed', presentError.message);
+            }
+        } catch (err: any) {
+            Alert.alert('Payment Error', err.message || 'Something went wrong. Please try again.');
+        } finally {
+            setStripePayingId(null);
+        }
+    };
+
     const renderInitials = (name: string) => {
         return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     };
@@ -156,13 +221,35 @@ export default function PaymentsScreen() {
                 {settleTab === 'pending' && (
                     <View style={styles.actions}>
                         {isPayer && payment.status === 'pending' && (
-                            <TouchableOpacity 
-                                style={[styles.actionBtn, { backgroundColor: colors.accent }]}
-                                onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'sent')}
-                            >
-                                <Send size={16} color="white" />
-                                <Text style={styles.actionText}>Mark as Sent</Text>
-                            </TouchableOpacity>
+                            <View style={{ gap: 8 }}>
+                                {/* Existing: mark as sent (e-transfer / Interac flow) */}
+                                <TouchableOpacity 
+                                    style={[styles.actionBtn, { backgroundColor: colors.accent }]}
+                                    onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'sent')}
+                                >
+                                    <Send size={16} color="white" />
+                                    <Text style={styles.actionText}>Mark as Sent</Text>
+                                </TouchableOpacity>
+
+                                {/* NEW: pay instantly via Stripe card sheet */}
+                                <TouchableOpacity 
+                                    style={[
+                                        styles.actionBtn,
+                                        { backgroundColor: '#6366F1', opacity: stripePayingId === payment.id ? 0.6 : 1 }
+                                    ]}
+                                    onPress={() => handleStripePayment(payment)}
+                                    disabled={stripePayingId !== null}
+                                >
+                                    {stripePayingId === payment.id ? (
+                                        <ActivityIndicator size="small" color="white" />
+                                    ) : (
+                                        <>
+                                            <Zap size={16} color="white" />
+                                            <Text style={styles.actionText}>Pay with Card</Text>
+                                        </>
+                                    )}
+                                </TouchableOpacity>
+                            </View>
                         )}
                         {isPayer && payment.status === 'sent' && (
                             <Text style={[styles.waitingText, { color: colors.secondaryText }]}>
