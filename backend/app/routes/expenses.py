@@ -3,7 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
-from decimal import Decimal
+from decimal import Decimal, ROUND_DOWN
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
@@ -63,10 +63,29 @@ async def create_expense(
     db.add(expense)
     await db.flush()
 
-    # Split equally among participants
-    share = (data.amount / Decimal(len(data.participant_ids))).quantize(Decimal("0.01"))
+    # Split equally among participants with penny-remainder correction.
+    # Using ROUND_DOWN so truncated cents are never lost to rounding up:
+    #   $10.00 / 3 = $3.33 base, remainder = $0.01 assigned to participant[0]
+    #   $10.00 / 3 = [$3.34, $3.33, $3.33] — sums to exactly $10.00
+    n = len(data.participant_ids)
+    base_share = (data.amount / Decimal(n)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    remainder = data.amount - (base_share * n)
+    shares = [base_share] * n
+    shares[0] += remainder  # first participant absorbs the remainder cents
+
+    # Invariant: shares must sum to the total amount. If this fires, there is an
+    # arithmetic bug that must never silently persist in the DB.
+    import logging as _logging
+    _log = _logging.getLogger("tandempay.expenses")
+    if sum(shares) != data.amount:
+        _log.error(
+            f"Share sum invariant violated: sum={sum(shares)} != amount={data.amount} "
+            f"(n={n}, base={base_share}, remainder={remainder})"
+        )
+        raise HTTPException(status_code=500, detail="Internal error: share calculation failed")
+
     participants = []
-    for pid in data.participant_ids:
+    for pid, share in zip(data.participant_ids, shares):
         ep = ExpenseParticipant(expense_id=expense.id, user_id=pid, share_amount=share)
         db.add(ep)
         participants.append(ep)
@@ -204,9 +223,24 @@ async def update_expense(
         await db.delete(p)
     await db.flush()
 
-    share = (data.amount / Decimal(len(data.participant_ids))).quantize(Decimal("0.01"))
+    # Penny-remainder correction (same logic as create_expense).
+    n = len(data.participant_ids)
+    base_share = (data.amount / Decimal(n)).quantize(Decimal("0.01"), rounding=ROUND_DOWN)
+    remainder = data.amount - (base_share * n)
+    shares = [base_share] * n
+    shares[0] += remainder
+
+    import logging as _logging
+    _log = _logging.getLogger("tandempay.expenses")
+    if sum(shares) != data.amount:
+        _log.error(
+            f"Share sum invariant violated (update): sum={sum(shares)} != amount={data.amount} "
+            f"(n={n}, base={base_share}, remainder={remainder})"
+        )
+        raise HTTPException(status_code=500, detail="Internal error: share calculation failed")
+
     new_participants = []
-    for pid in data.participant_ids:
+    for pid, share in zip(data.participant_ids, shares):
         ep = ExpenseParticipant(expense_id=expense.id, user_id=pid, share_amount=share)
         db.add(ep)
         new_participants.append(ep)

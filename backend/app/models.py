@@ -82,7 +82,11 @@ class ExpenseParticipant(Base):
     user: Mapped["User"] = relationship()
 
 
-# --- Settlement Records ---
+# ARCHITECTURE NOTE: TandemPay has two settlement tracking models.
+# SettlementRecord: tracks the intent to pay (manual/etransfer/in_app method)
+# Payment: tracks an actual Stripe PaymentIntent (in_app only)
+# A SettlementRecord with method='in_app' SHOULD have a linked Payment record.
+# Do not add features to either model until this dual-model architecture is consolidated.
 class SettlementRecord(Base):
     """Tracks actual payment transactions between users within a group."""
     __tablename__ = "settlement_records"
