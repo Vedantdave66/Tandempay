@@ -9,7 +9,7 @@ from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
-from app.database import engine, Base
+from app.database import engine
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
 from app.routes import reminders
 from app.services import balance_service
@@ -20,77 +20,17 @@ from app.idempotency import IdempotencyKey  # noqa: F401 — ensures table is cr
 logger = logging.getLogger("tandempay.main")
 
 
-from sqlalchemy import text
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     is_serverless = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
 
+    # Database migrations managed by Alembic. Run: alembic upgrade head
+    # Schema changes must be made via: alembic revision --autogenerate -m "description"
+    # Never add raw ALTER TABLE statements here — they are not idempotent under
+    # concurrent gunicorn workers and leave no migration history.
+
     try:
-        # Create tables on startup
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.create_all)
-            
-        # Simple auto-migration for existing databases
-        # Isolated so that an error doesn't abort the entire Postgres transaction block
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN interac_email VARCHAR(255);"))
-        except Exception:
-            pass  # Ignore if column already exists
-            
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN wallet_balance FLOAT DEFAULT 0.0;"))
-        except Exception:
-            pass  # Ignore if column already exists
-            
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE provider_accounts ADD COLUMN access_token VARCHAR(255);"))
-        except Exception:
-            pass
-
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN stripe_account_id VARCHAR(255);"))
-        except Exception:
-            pass
-            
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE wallet_transactions ADD COLUMN stripe_payment_id VARCHAR(255);"))
-        except Exception:
-            pass
-
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE users ADD COLUMN has_completed_payment BOOLEAN DEFAULT FALSE;"))
-        except Exception:
-            pass  # Column already exists
-
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE payments ADD COLUMN payout_arrival_date VARCHAR(50);"))
-        except Exception:
-            pass
-
-        # Handle Payment Settlement CASCADE for Group deletion
-        try:
-            async with engine.begin() as conn:
-                # Re-create the constraint with CASCADE to allow group deletion when Stripe payments exist
-                await conn.execute(text("ALTER TABLE payments DROP CONSTRAINT IF EXISTS payments_settlement_id_fkey;"))
-                await conn.execute(text("ALTER TABLE payments ADD CONSTRAINT payments_settlement_id_fkey FOREIGN KEY (settlement_id) REFERENCES settlement_records(id) ON DELETE CASCADE;"))
-        except Exception as e:
-            logger.warning(f"Could not update payments cascade constraint: {e}")
-
-        # Add UniqueConstraint to Payment if it doesn't exist
-        try:
-            async with engine.begin() as conn:
-                await conn.execute(text("ALTER TABLE payments ADD CONSTRAINT uq_payment_settlement_payer UNIQUE (settlement_id, payer_id);"))
-        except Exception:
-            pass
-
         # APScheduler only works in long-running servers, not serverless
         if not is_serverless:
             from app.services.payment_reconciliation import run_payment_reconciliation
