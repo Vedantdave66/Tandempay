@@ -8,7 +8,7 @@ This guide covers everything you need to know about accessing, viewing, and mani
 
 In your local environment, TandemPay uses a lightweight file-based database. 
 
-*   **Database File:** `backend/splitease.db`
+*   **Database File:** `backend/tandempay.db`
 *   **Engine:** SQLite (accessed via `aiosqlite` in FastAPI)
 
 ### How to View & Edit Data Locally
@@ -18,11 +18,11 @@ Because it's a simple `.db` file, you can't access it via a web URL. Instead, yo
 **Option A: VS Code Extension (Recommended)**
 1. Open VS Code extensions and search for **"SQLite Viewer"** (by Florian Klampfer).
 2. Install it.
-3. In your VS Code file explorer, click on `backend/splitease.db`. It will open in a beautiful grid inside VS Code where you can view tables, edit rows, and run custom queries instantly.
+3. In your VS Code file explorer, click on `backend/tandempay.db`. It will open in a beautiful grid inside VS Code where you can view tables, edit rows, and run custom queries instantly.
 
 **Option B: Standalone App**
 1. Download [DB Browser for SQLite](https://sqlitebrowser.org/).
-2. Open the app, click "Open Database", and select your `splitease.db` file.
+2. Open the app, click "Open Database", and select your `tandempay.db` file.
 3. You can browse data, execute SQL, and modify structures.
 
 ---
@@ -100,7 +100,7 @@ If you add new fields to your models in `app/models.py` (e.g., adding `phone_num
 
 ## Technical Summary 
 
-- **Local URL:** `sqlite+aiosqlite:///./splitease.db`
+- **Local URL:** `sqlite+aiosqlite:///./tandempay.db`
 - **Prod URL Structure:** `postgresql+asyncpg://user:password@host/dbname`
 - **ORM:** SQLAlchemy 2.0 (Async)
 - **Migrations:** Alembic

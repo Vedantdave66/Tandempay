@@ -32,7 +32,7 @@ from app.ledger import (
     compute_wallet_balance,
 )
 
-logger = logging.getLogger("splitease.wallet")
+logger = logging.getLogger("tandempay.wallet")
 
 router = APIRouter(prefix="/api/wallet", tags=["wallet"])
 

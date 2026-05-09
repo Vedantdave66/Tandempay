@@ -98,7 +98,7 @@ async def get_onboarding_status(
             if pending_claims:
                 from app.models import Notification
                 import logging
-                logger = logging.getLogger("splitease.onboarding")
+                logger = logging.getLogger("tandempay.onboarding")
                 
                 for p in pending_claims:
                     # Mark it so we don't double-notify
@@ -142,7 +142,7 @@ async def get_onboarding_status(
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     import traceback
     import logging
-    logger = logging.getLogger("splitease.webhooks")
+    logger = logging.getLogger("tandempay.webhooks")
     
     try:
         payload = await request.body()
@@ -355,7 +355,7 @@ async def reconcile_payment(
 
     try:
         intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
-        logger = logging.getLogger("splitease.reconciliation")
+        logger = logging.getLogger("tandempay.reconciliation")
         logger.info(f"Reconciling {payment_id}: Stripe status={intent.status}")
         
         if intent.status == "succeeded":

@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, WalletTransaction
 
-logger = logging.getLogger("splitease.ledger")
+logger = logging.getLogger("tandempay.ledger")
 
 
 async def compute_wallet_balance(user_id: str, db: AsyncSession) -> Decimal:

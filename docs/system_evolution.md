@@ -1,4 +1,4 @@
-# SplitEase Backend — System Evolution Document
+# TandemPay Backend — System Evolution Document
 
 > **Audience**: Engineers, technical interviewers, and portfolio reviewers.
 > **Scope**: Full architectural evolution from MVP to production-grade fintech backend.
@@ -9,7 +9,7 @@
 
 ### Original Architecture
 
-SplitEase started as a standard **FastAPI + SQLAlchemy** expense-splitting app with:
+TandemPay started as a standard **FastAPI + SQLAlchemy** expense-splitting app with:
 
 | Layer | Technology |
 |-------|-----------|
@@ -34,7 +34,7 @@ SplitEase started as a standard **FastAPI + SQLAlchemy** expense-splitting app w
 |------|-------------|
 | **No idempotency** | Duplicate POST requests could create duplicate expenses, settlements, or wallet transactions |
 | **No row-level locking** | Concurrent requests could read stale balances and produce incorrect mutations |
-| **Float arithmetic** | [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_idempotency_concurrency.py#138-143) was `Float` — accumulating `0.01` across 10,000 transactions produces `100.00000000000014` |
+| **Float arithmetic** | [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_idempotency_concurrency.py#138-143) was `Float` — accumulating `0.01` across 10,000 transactions produces `100.00000000000014` |
 | **No ledger** | Balance was a mutable column with no audit trail — impossible to detect or recover from corruption |
 | **No transaction boundaries** | Partial failures could leave the system in inconsistent states |
 
@@ -69,7 +69,7 @@ Between steps 1 and 3, another concurrent request could also read `status = "pen
 
 ### Issue 3: Float Precision Errors
 
-**What**: [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_idempotency_concurrency.py#138-143) was stored as `Float`. Python's `float` cannot represent `0.1` exactly — it's stored as `0.1000000000000000055511151231257827021181583404541015625`.
+**What**: [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_idempotency_concurrency.py#138-143) was stored as `Float`. Python's `float` cannot represent `0.1` exactly — it's stored as `0.1000000000000000055511151231257827021181583404541015625`.
 
 **Why dangerous**: After 10,000 transactions of $0.01:
 ```python
@@ -82,7 +82,7 @@ This "drift" accumulates silently. Reconciliation reports show phantom discrepan
 
 ### Issue 4: Stripe Idempotency Key Shadowing Bug
 
-**What**: In the original [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py), the idempotency key from the HTTP header was being read into a local variable that was shadowed before reaching the Stripe API call. The key was never forwarded to Stripe's `PaymentIntent.create()`.
+**What**: In the original [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py), the idempotency key from the HTTP header was being read into a local variable that was shadowed before reaching the Stripe API call. The key was never forwarded to Stripe's `PaymentIntent.create()`.
 
 **Why dangerous**: If the server crashed after Stripe charged the user's bank account but before our DB committed, the client retry would call Stripe **again** — creating a **duplicate bank debit**. The user is charged twice for one payment. Stripe's idempotency protection was completely bypassed.
 
@@ -107,9 +107,9 @@ db.add(Notification(...))       # Mutation 3
 
 ### 3.1 Idempotency Redesign
 
-**What changed**: Added a full [idempotency infrastructure](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/idempotency.py) with:
+**What changed**: Added a full [idempotency infrastructure](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/idempotency.py) with:
 
-- **[IdempotencyKey](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/idempotency.py#44-61) model** with `UniqueConstraint("key", "user_id", "endpoint")`
+- **[IdempotencyKey](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/idempotency.py#44-61) model** with `UniqueConstraint("key", "user_id", "endpoint")`
 - **`@idempotent` decorator** wrapping payment-critical route handlers
 - **SHA-256 request body hashing** to detect payload conflicts (same key, different body → HTTP 422)
 - **24-hour TTL** for key expiration
@@ -134,7 +134,7 @@ Request arrives with Idempotency-Key header
 
 ### 3.2 Row-Level Locking Strategy
 
-**What changed**: Added [lock_users_sorted](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#L158-L166) — pessimistic `SELECT FOR UPDATE` with **deterministic sorted ordering** to prevent deadlocks.
+**What changed**: Added [lock_users_sorted](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#L158-L166) — pessimistic `SELECT FOR UPDATE` with **deterministic sorted ordering** to prevent deadlocks.
 
 **How it works**:
 ```python
@@ -153,7 +153,7 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### 3.3 Payment Flow Redesign (9-Step Protocol)
 
-**What changed**: The [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py#L133-L331) handler was redesigned into a 9-step protocol:
+**What changed**: The [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py#L133-L331) handler was redesigned into a 9-step protocol:
 
 | Step | Action | Purpose |
 |------|--------|---------|
@@ -174,18 +174,18 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### 3.4 Double-Entry Ledger
 
-**What changed**: Added [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#L152-L167) model as the **single source of truth** for all money movement.
+**What changed**: Added [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#L152-L167) model as the **single source of truth** for all money movement.
 
 **Design principles**:
-- [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_idempotency_concurrency.py#138-143) on [User](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#10-25) is a **cache** — it can always be recomputed from the ledger
-- Every money movement creates a [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#152-168) with type ([deposit](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_idempotency_concurrency.py#145-157), `withdrawal`, `transfer_in`, `transfer_out`)
+- [wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_idempotency_concurrency.py#138-143) on [User](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#10-25) is a **cache** — it can always be recomputed from the ledger
+- Every money movement creates a [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#152-168) with type ([deposit](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_idempotency_concurrency.py#145-157), `withdrawal`, `transfer_in`, `transfer_out`)
 - Transactions start as `pending` and are promoted to `completed` only within the atomic commit
-- The [compute_wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#L24-L38) function derives the true balance: `SUM(amount) WHERE status = 'completed'`
+- The [compute_wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#L24-L38) function derives the true balance: `SUM(amount) WHERE status = 'completed'`
 
 **Invariant checks**:
-- [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#L41-L61): Assert `cached == ledger` BEFORE any mutation (catches pre-existing corruption)
-- [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#L64-L81): Assert `cached == ledger` AFTER mutation (catches bugs in the current transaction)
-- [assert_conservation_of_money](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#L84-L120): Assert `total_before == total_after` for every transfer
+- [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#L41-L61): Assert `cached == ledger` BEFORE any mutation (catches pre-existing corruption)
+- [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#L64-L81): Assert `cached == ledger` AFTER mutation (catches bugs in the current transaction)
+- [assert_conservation_of_money](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#L84-L120): Assert `total_before == total_after` for every transfer
 
 ---
 
@@ -193,7 +193,7 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 **What changed**: All financial columns migrated from `Float` to `Numeric(12, 2, asdecimal=True)`. All application math uses `Decimal` with explicit `quantize(Decimal("0.01"))`.
 
-**Files affected**: [models.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py) (6 columns across [User](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#10-25), [Expense](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#52-66), [ExpenseParticipant](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#68-77), [SettlementRecord](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#80-97), [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#152-168), [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#170-188)), [ledger.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py), [wallet.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/wallet.py), [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py), [balance_service.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/balance_service.py).
+**Files affected**: [models.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py) (6 columns across [User](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#10-25), [Expense](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#52-66), [ExpenseParticipant](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#68-77), [SettlementRecord](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#80-97), [WalletTransaction](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#152-168), [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#170-188)), [ledger.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py), [wallet.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/wallet.py), [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py), [balance_service.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/balance_service.py).
 
 **Result**: `Decimal("0.01") * 10000 == Decimal("100.00")` — exactly, always.
 
@@ -201,18 +201,18 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### 3.6 Stripe Idempotency Key Fix
 
-**What changed**: In [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py#L113-L158), the idempotency key is now:
+**What changed**: In [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py#L113-L158), the idempotency key is now:
 1. Extracted from `request.headers.get("Idempotency-Key")` into `stripe_idem_key`
 2. Passed directly to `stripe.PaymentIntent.create(**stripe_kwargs)` via `idempotency_key=stripe_idem_key`
 3. A warning is logged if the key is missing
 
-**End-to-end protection**: Client → SplitEase API (our `@idempotent` decorator) → Stripe API (Stripe's native idempotency). Both layers are protected.
+**End-to-end protection**: Client → TandemPay API (our `@idempotent` decorator) → Stripe API (Stripe's native idempotency). Both layers are protected.
 
 ---
 
 ### 3.7 Reconciliation Service
 
-**What changed**: Added [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/reconciliation.py) providing:
+**What changed**: Added [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/reconciliation.py) providing:
 - `GET /api/admin/reconciliation` — compare every user's cached balance vs. ledger sum
 - `POST /api/admin/reconciliation/fix` — auto-correct drifted balances
 
@@ -224,7 +224,7 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### Stage 1: Sequential Testing (SQLite)
 
-**Files**: [test_idempotency_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_idempotency_concurrency.py), [test_payment_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_payment_concurrency.py), [test_financial_precision.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_financial_precision.py), [test_stripe_idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_stripe_idempotency.py)
+**Files**: [test_idempotency_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_idempotency_concurrency.py), [test_payment_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_payment_concurrency.py), [test_financial_precision.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_financial_precision.py), [test_stripe_idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_stripe_idempotency.py)
 
 **What was tested**:
 - Idempotency key reuse → cached response (6 tests: same payload, different payload, multiple retries, no key, different keys, withdraw)
@@ -233,7 +233,7 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 - Stripe key forwarding: retry safety, missing key warning, crash simulation
 
 **Limitations**:
-- All requests were **sequential** ([for](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/auth.py#144-167) loops with `await`) — not concurrent
+- All requests were **sequential** ([for](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/auth.py#144-167) loops with `await`) — not concurrent
 - SQLite's `FOR UPDATE` is a **no-op** — row-level locking was never actually exercised
 - SQLite serializes all writes — true race conditions were impossible to trigger
 - These tests prove **logic correctness**, not **concurrency safety**
@@ -244,7 +244,7 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### Stage 2: Real Concurrency Testing (PostgreSQL + asyncio.gather)
 
-**File**: [test_pg_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_pg_concurrency.py)
+**File**: [test_pg_concurrency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_pg_concurrency.py)
 
 **Infrastructure**: Docker Compose with PostgreSQL 16 on port 5433 (tmpfs-backed for speed).
 
@@ -270,15 +270,15 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 
 ### Stage 3: Failure Injection Testing
 
-**File**: [test_pg_failure_injection.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_pg_failure_injection.py)
+**File**: [test_pg_failure_injection.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_pg_failure_injection.py)
 
 **What was tested** (4 tests):
 
 | Test | Failure Simulated | Injection Method |
 |------|-------------------|-----------------|
-| A: Crash after commit | Server dies after `session.commit()` but before HTTP response | Custom [get_db_crashable](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_pg_failure_injection.py#108-132) that raises after commit |
+| A: Crash after commit | Server dies after `session.commit()` but before HTTP response | Custom [get_db_crashable](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_pg_failure_injection.py#108-132) that raises after commit |
 | B: In-flight retry | Overlapping requests (second arrives while first is processing) | `asyncio.gather` with 50ms stagger |
-| C: Partial failure | Exception between `db.flush()` and `db.commit()` | `mock.patch` on [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#64-82) |
+| C: Partial failure | Exception between `db.flush()` and `db.commit()` | `mock.patch` on [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#64-82) |
 | D: Retry storm | 5 staggered retries at 50ms intervals | `asyncio.gather` with delays |
 
 **Confidence gained**:
@@ -296,11 +296,11 @@ async def lock_users_sorted(user_ids: list[str], db: AsyncSession) -> dict[str, 
 | **No double-payment for a request** | `SELECT FOR UPDATE` on PaymentRequest + status re-check | PG concurrency Test B |
 | **No negative balances** | `SELECT FOR UPDATE` on User + balance check under lock | PG concurrency Test C (wallet drain) |
 | **No balance drift** | `Numeric(12,2)` + `Decimal` math throughout | Financial precision Tests A/B/C |
-| **Atomic transactions** | All mutations in single [get_db](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/database.py#15-35) session; exception → full rollback | Failure Test C (partial failure) |
-| **Cached balance == ledger** | [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#41-62) + [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#64-82) invariant checks | Every PG test via [assert_ledger_consistency()](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/tests/test_pg_concurrency.py#318-327) |
-| **Conservation of money** | [assert_conservation_of_money](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#84-121) checks `total_before == total_after` | Enforced in [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py#133-332) Step 7 |
+| **Atomic transactions** | All mutations in single [get_db](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/database.py#15-35) session; exception → full rollback | Failure Test C (partial failure) |
+| **Cached balance == ledger** | [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#41-62) + [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#64-82) invariant checks | Every PG test via [assert_ledger_consistency()](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/tests/test_pg_concurrency.py#318-327) |
+| **Conservation of money** | [assert_conservation_of_money](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#84-121) checks `total_before == total_after` | Enforced in [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py#133-332) Step 7 |
 | **Idempotent external API calls** | Client Idempotency-Key forwarded to Stripe's `PaymentIntent.create()` | Stripe idempotency Tests A/B/C |
-| **Deadlock prevention** | [lock_users_sorted](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#158-167) acquires locks in deterministic sorted order | Architectural guarantee |
+| **Deadlock prevention** | [lock_users_sorted](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#158-167) acquires locks in deterministic sorted order | Architectural guarantee |
 | **Crash recovery** | Idempotency record committed with business data; retry finds cache | Failure Test A |
 
 ---
@@ -368,7 +368,7 @@ Server calls Stripe with Idempotency-Key → Stripe charges bank
 | **No multi-instance testing** | Row-level locks work within a single DB, but the app hasn't been tested behind a load balancer with multiple FastAPI instances | PostgreSQL locks are connection-scoped, not process-scoped — this should work, but hasn't been proven |
 | **No large-scale load testing** | Tests use 5-10 concurrent requests. Production might see 100+ simultaneous wallet operations | Need k6/Locust load test with sustained throughput |
 | **No distributed transaction testing** | Stripe + DB commit are not in a two-phase commit. A crash between Stripe charge and DB commit relies on Stripe's idempotency | True 2PC would require a transaction coordinator (e.g., Saga pattern) |
-| **Auto-migration is fragile** | [main.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/main.py) uses raw `ALTER TABLE` with `try/except` for schema changes | Should use Alembic for production migrations |
+| **Auto-migration is fragile** | [main.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/main.py) uses raw `ALTER TABLE` with `try/except` for schema changes | Should use Alembic for production migrations |
 | **Reconciliation is manual** | Admin must call `/api/admin/reconciliation` to detect drift | Should be a scheduled job (cron/Celery beat) |
 | **No rate limiting on retries** | A malicious client could send thousands of unique idempotency keys to flood the system | Need per-user rate limiting on financial endpoints |
 | **SQLite ↔ PostgreSQL parity** | Sequential SQLite tests don't exercise PG-specific behavior (advisory locks, MVCC conflicts) | PG tests exist but must be run separately via Docker |
@@ -490,4 +490,4 @@ Rather than detecting and recovering from deadlocks (reactive), sorting the lock
 
 ### 7. The ledger is the source of truth, the balance column is a cache
 
-Making this distinction explicit (and enforcing it with [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#41-62) and [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#64-82)) means that even if a bug corrupts the cache, the system can always recover by recomputing from the ledger. The reconciliation service exists precisely for this purpose — but ideally, the invariant checks ensure it's never needed.
+Making this distinction explicit (and enforcing it with [pre_validate_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#41-62) and [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#64-82)) means that even if a bug corrupts the cache, the system can always recover by recomputing from the ledger. The reconciliation service exists precisely for this purpose — but ideally, the invariant checks ensure it's never needed.

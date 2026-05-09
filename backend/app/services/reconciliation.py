@@ -12,7 +12,7 @@ from app.config import get_settings
 
 settings = get_settings()
 
-logger = logging.getLogger("splitease.reconciliation")
+logger = logging.getLogger("tandempay.reconciliation")
 
 router = APIRouter(prefix="/api/admin", tags=["Reconciliation"])
 stripe.api_key = settings.STRIPE_SECRET_KEY

@@ -10,7 +10,7 @@ from app.config import get_settings
 
 settings = get_settings()
 stripe.api_key = settings.STRIPE_SECRET_KEY
-logger = logging.getLogger("splitease.reconciliation")
+logger = logging.getLogger("tandempay.reconciliation")
 
 async def run_payment_reconciliation():
     """

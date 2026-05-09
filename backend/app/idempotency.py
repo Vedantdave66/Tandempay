@@ -38,7 +38,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.database import Base
 
-logger = logging.getLogger("splitease.idempotency")
+logger = logging.getLogger("tandempay.idempotency")
 
 
 class IdempotencyKey(Base):

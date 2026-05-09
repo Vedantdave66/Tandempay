@@ -1,4 +1,4 @@
-# 🔥 Adversarial Security Audit — SplitEase Payment System
+# 🔥 Adversarial Security Audit — TandemPay Payment System
 
 **Auditor Stance:** Assume the system is broken. Find proof.
 
@@ -21,7 +21,7 @@
 
 **Category:** Concurrency × Idempotency  
 **Severity:** 🔴 CRITICAL — money duplication possible  
-**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/idempotency.py) lines 100-110
+**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/idempotency.py) lines 100-110
 
 ### Scenario
 Two identical requests arrive simultaneously with the **same idempotency key** before either commits.
@@ -66,14 +66,14 @@ Additionally, on PostgreSQL, use `SELECT ... FOR UPDATE SKIP LOCKED` or advisory
 
 ---
 
-## 🧪 TEST CASE 2 — CRITICAL: Stripe [request](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/frontend/src/services/api.ts#8-34) Variable Shadowed
+## 🧪 TEST CASE 2 — CRITICAL: Stripe [request](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/frontend/src/services/api.ts#8-34) Variable Shadowed
 
 **Category:** Data Integrity (Bug)  
 **Severity:** 🔴 CRITICAL — Stripe idempotency silently broken  
-**File:** [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py) lines 114, 133
+**File:** [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py) lines 114, 133
 
 ### Scenario
-The [create_payment_intent](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py#85-162) handler receives `request: Request` as a parameter, but on line 114, a local variable also named [request](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/frontend/src/services/api.ts#8-34) is created:
+The [create_payment_intent](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py#85-162) handler receives `request: Request` as a parameter, but on line 114, a local variable also named [request](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/frontend/src/services/api.ts#8-34) is created:
 
 ```python
 # Line 89: request: Request parameter (FastAPI)
@@ -85,7 +85,7 @@ The [create_payment_intent](file:///c:/Users/vedan/.gemini/antigravity/playgroun
 Stripe receives the client's idempotency key for end-to-end protection.
 
 ### Actual Likely Behavior
-`request.headers` on line 133 calls `.headers` on the **Plaid `ProcessorStripeBankAccountTokenCreateRequest`** object, not the FastAPI [Request](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#117-129). This either:
+`request.headers` on line 133 calls `.headers` on the **Plaid `ProcessorStripeBankAccountTokenCreateRequest`** object, not the FastAPI [Request](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#117-129). This either:
 - Returns `None` (Plaid object has no `.headers` attribute with `.get` method)
 - Raises `AttributeError` → caught by the broad `except Exception` on line 159 → returns generic "Failed to initiate secure bank transfer" — **silently swallowing the real error**
 
@@ -109,7 +109,7 @@ plaid_response = plaid_client.processor_stripe_bank_account_token_create(plaid_r
 
 **Category:** Stuck Transactions  
 **Severity:** 🔴 CRITICAL — permanent balance corruption possible  
-**File:** [wallet.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/wallet.py) lines 86-93, [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py) lines 211-228
+**File:** [wallet.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/wallet.py) lines 86-93, [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py) lines 211-228
 
 ### Scenario
 Server crashes (OOM, power loss, Render restart) **after** flushing pending transactions to the DB but **before** promoting them to "completed".
@@ -149,7 +149,7 @@ If the application crashes **between flush and commit**, and the DB connection i
 
 **Category:** Partial Failure  
 **Severity:** 🔴 CRITICAL — retry after crash causes duplicate payment  
-**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/idempotency.py) lines 159-168
+**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/idempotency.py) lines 159-168
 
 ### Scenario
 The handler executes successfully (money moves), but the commit fails (network blip to DB, disk full, etc.).
@@ -190,7 +190,7 @@ This is **exactly the intended behavior**. ✅
 
 **Category:** Concurrency  
 **Severity:** 🟠 HIGH — race condition on concurrent status updates  
-**File:** [settlements.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/settlements.py) lines 158-186
+**File:** [settlements.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/settlements.py) lines 158-186
 
 ### Scenario
 Payer marks settlement "sent" at the exact same time payee marks it "settled".
@@ -228,11 +228,11 @@ result = await db.execute(
 
 ---
 
-## 🧪 TEST CASE 6 — HIGH: [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py#132-314) Reads Request Status Before Lock
+## 🧪 TEST CASE 6 — HIGH: [pay_request_with_wallet](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py#132-314) Reads Request Status Before Lock
 
 **Category:** Concurrency (TOCTOU)  
 **Severity:** 🟠 HIGH — double-payment on same request possible  
-**File:** [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/requests.py) lines 153-173
+**File:** [requests.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/requests.py) lines 153-173
 
 ### Scenario
 Two tabs/devices pay the same PaymentRequest simultaneously.
@@ -250,7 +250,7 @@ T7: Tab B creates ANOTHER set of ledger entries → DOUBLE PAYMENT
 ```
 
 ### Root Cause
-The [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#169-187) status is checked on line 171 **BEFORE** acquiring the row lock on line 184. After the lock is acquired, [pr](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#37-57) is stale — it was loaded in a different snapshot.
+The [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#169-187) status is checked on line 171 **BEFORE** acquiring the row lock on line 184. After the lock is acquired, [pr](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#37-57) is stale — it was loaded in a different snapshot.
 
 ### Financial Integrity Preserved: **NO** ❌
 
@@ -276,7 +276,7 @@ if not pr or pr.status in ["settled", "completed", "cancelled"]:
 
 **Category:** Data Integrity (Access Control)  
 **Severity:** 🟠 HIGH — anyone can run reconciliation/fix  
-**File:** [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/reconciliation.py) lines 98-142
+**File:** [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/reconciliation.py) lines 98-142
 
 ### Scenario
 Any unauthenticated user can call:
@@ -303,7 +303,7 @@ async def run_reconciliation(
 
 **Category:** Partial Failure  
 **Severity:** 🟠 HIGH — Stripe can deliver webhooks multiple times  
-**File:** [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py) lines 163-197
+**File:** [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py) lines 163-197
 
 ### Scenario
 Stripe delivers `payment_intent.succeeded` webhook twice (which Stripe explicitly documents as possible).
@@ -330,7 +330,7 @@ When this handler is eventually implemented to update SettlementRecords or credi
 
 **Category:** Data Integrity — Rounding  
 **Severity:** 🔴 CRITICAL — cumulative rounding errors over time  
-**File:** [models.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py) lines 158 (WalletTransaction.amount), wallet_balance on User
+**File:** [models.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py) lines 158 (WalletTransaction.amount), wallet_balance on User
 
 ### Scenario
 Splitting $10.00 among 3 users: `10.0 / 3 = 3.3333333333...`
@@ -347,7 +347,7 @@ Splitting $10.00 among 3 users: `10.0 / 3 = 3.3333333333...`
 ```
 
 ### Actual Likely Behavior
-The `0.01` tolerance in [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#59-77) masks small rounding errors. But after thousands of transactions, accumulated float drift could exceed the tolerance threshold and **block all wallet operations** for that user (pre-validation fails permanently).
+The `0.01` tolerance in [validate_balance_integrity](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#59-77) masks small rounding errors. But after thousands of transactions, accumulated float drift could exceed the tolerance threshold and **block all wallet operations** for that user (pre-validation fails permanently).
 
 ### Financial Integrity Preserved: **NO** ❌ (not money loss, but operational failure)
 
@@ -368,10 +368,10 @@ wallet_balance: Mapped[float] = mapped_column(Numeric(12, 2), default=0.0)
 
 **Category:** Idempotency  
 **Severity:** 🟡 MEDIUM  
-**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/idempotency.py)
+**File:** [idempotency.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/idempotency.py)
 
 ### Scenario
-Attacker captures the body of an [add_funds](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/wallet.py#44-139) request and replays it with a **different** idempotency key.
+Attacker captures the body of an [add_funds](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/wallet.py#44-139) request and replays it with a **different** idempotency key.
 
 ### Actual Behavior
 The system treats this as a **new, legitimate request** and processes it. The attacker successfully deposits funds again.
@@ -394,10 +394,10 @@ This is **by design** for idempotency systems (Stripe works the same way). Diffe
 
 **Category:** Stuck Transactions × Data Integrity  
 **Severity:** 🔴 CRITICAL — orphaned pending ledger entries  
-**File:** [ledger.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py) lines 28-34
+**File:** [ledger.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py) lines 28-34
 
 ### Scenario
-[compute_wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/ledger.py#23-35) only counts transactions with `status == "completed"`. Pending transactions are invisible.
+[compute_wallet_balance](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/ledger.py#23-35) only counts transactions with `status == "completed"`. Pending transactions are invisible.
 
 ### Timeline
 ```
@@ -409,7 +409,7 @@ T4: Over time, orphaned pending transactions accumulate
 ```
 
 ### Actual Likely Behavior
-In practice, if the app crashes before commit, the entire transaction rolls back (including the pending entry) — so orphaned entries **shouldn't exist** under normal conditions. However, if using connection pooling with PgBouncer and `statement` or [transaction](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/wallet.py#255-268) pooling modes, a dangling connection could leave a committed "pending" row.
+In practice, if the app crashes before commit, the entire transaction rolls back (including the pending entry) — so orphaned entries **shouldn't exist** under normal conditions. However, if using connection pooling with PgBouncer and `statement` or [transaction](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/wallet.py#255-268) pooling modes, a dangling connection could leave a committed "pending" row.
 
 ### Financial Integrity Preserved: **MOSTLY YES** ✅ (with caveat about connection pool edge cases)
 
@@ -433,14 +433,14 @@ async def cleanup_stuck_pending(db: AsyncSession, max_age_minutes: int = 5):
 
 ---
 
-## 🧪 TEST CASE 12 — MEDIUM: Reconciliation [auto_fix](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/reconciliation.py#69-96) Has Double-Commit Bug
+## 🧪 TEST CASE 12 — MEDIUM: Reconciliation [auto_fix](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/reconciliation.py#69-96) Has Double-Commit Bug
 
 **Category:** Data Integrity  
 **Severity:** 🟡 MEDIUM  
-**File:** [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/reconciliation.py) line 93
+**File:** [reconciliation.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/reconciliation.py) line 93
 
 ### Scenario
-[auto_fix_balances](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/services/reconciliation.py#69-96) calls `await db.commit()` on line 93. But the [get_db](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/database.py#15-35) dependency ALSO calls `await session.commit()` when the request ends (line 31 of database.py). This results in a double-commit.
+[auto_fix_balances](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/services/reconciliation.py#69-96) calls `await db.commit()` on line 93. But the [get_db](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/database.py#15-35) dependency ALSO calls `await session.commit()` when the request ends (line 31 of database.py). This results in a double-commit.
 
 ### Actual Likely Behavior
 The second commit is a no-op (nothing to commit). **No data integrity issue**, but it indicates a pattern violation that could cause subtle bugs if the route does additional work between the auto_fix commit and the session close.
@@ -461,7 +461,7 @@ if fixed:
 | # | Vulnerability | Severity | Money at Risk? | Fix Complexity |
 |---|-------------|----------|---------------|----------------|
 | 1 | Idempotency race condition (no UNIQUE constraint) | 🔴 CRITICAL | YES — duplicate deposits | Low |
-| 2 | Stripe [request](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/frontend/src/services/api.ts#8-34) variable shadowed | 🔴 CRITICAL | YES — Stripe idem broken | Low |
+| 2 | Stripe [request](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/frontend/src/services/api.ts#8-34) variable shadowed | 🔴 CRITICAL | YES — Stripe idem broken | Low |
 | 6 | PaymentRequest TOCTOU (status checked before lock) | 🟠 HIGH | YES — double payment | Low |
 | 9 | `float` used for money (rounding drift) | 🔴 CRITICAL | Operational failure | Medium |
 | 7 | Admin endpoints unauthenticated | 🟠 HIGH | PII leak + balance manipulation | Low |
@@ -481,8 +481,8 @@ if fixed:
 > Fix these BEFORE processing any real money:
 
 1. **TC-1**: Add `UniqueConstraint` on `idempotency_keys` (prevents double deposits)
-2. **TC-2**: Rename shadowed [request](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/frontend/src/services/api.ts#8-34) variable in [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/routes/stripe_routes.py) (restores Stripe idempotency)
-3. **TC-6**: Re-load [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/splitease/backend/app/models.py#169-187) with `FOR UPDATE` after acquiring user locks (prevents double payment)
+2. **TC-2**: Rename shadowed [request](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/frontend/src/services/api.ts#8-34) variable in [stripe_routes.py](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/routes/stripe_routes.py) (restores Stripe idempotency)
+3. **TC-6**: Re-load [PaymentRequest](file:///c:/Users/vedan/.gemini/antigravity/playground/TandemPay/backend/app/models.py#169-187) with `FOR UPDATE` after acquiring user locks (prevents double payment)
 4. **TC-9**: Switch from `Float` to `Numeric(12, 2)` for all money columns
 
 > [!IMPORTANT]

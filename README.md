@@ -388,7 +388,7 @@ Scan the QR code with Expo Go (iOS or Android), or press `i` for the iOS simulat
 
 ```bash
 docker-compose up -d    # Starts PostgreSQL on port 5432
-# Then set DATABASE_URL=postgresql+asyncpg://splitease:splitease@localhost/splitease in backend/.env
+# Then set DATABASE_URL=postgresql+asyncpg://tandempay:tandempay@localhost/tandempay in backend/.env
 ```
 
 ---
@@ -400,9 +400,9 @@ This project includes a `render.yaml` Blueprint for one-click deployment.
 1. Push this repo to GitHub
 2. Go to [Render Dashboard](https://dashboard.render.com) → **New** → **Blueprint**
 3. Connect your GitHub repo — Render auto-detects `render.yaml` and creates:
-   - `splitease-api` — Python web service (Gunicorn + Uvicorn)
-   - `splitease-web` — Static site (React)
-   - `splitease-db` — Free PostgreSQL database
+   - `tandempay-api` — Python web service (Gunicorn + Uvicorn)
+   - `tandempay-web` — Static site (React)
+   - `tandempay-db` — Free PostgreSQL database
 4. Set secret env vars manually on the API service:
    - `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`
    - `PLAID_CLIENT_ID`, `PLAID_SECRET`

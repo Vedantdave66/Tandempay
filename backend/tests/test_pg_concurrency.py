@@ -95,13 +95,13 @@ logging.basicConfig(
     format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
     datefmt="%H:%M:%S",
 )
-logger = logging.getLogger("splitease.pg_concurrency_tests")
+logger = logging.getLogger("tandempay.pg_concurrency_tests")
 
 # Ensure app-level loggers are also verbose during tests
-logging.getLogger("splitease.wallet").setLevel(logging.DEBUG)
-logging.getLogger("splitease.requests").setLevel(logging.DEBUG)
-logging.getLogger("splitease.ledger").setLevel(logging.DEBUG)
-logging.getLogger("splitease.idempotency").setLevel(logging.DEBUG)
+logging.getLogger("tandempay.wallet").setLevel(logging.DEBUG)
+logging.getLogger("tandempay.requests").setLevel(logging.DEBUG)
+logging.getLogger("tandempay.ledger").setLevel(logging.DEBUG)
+logging.getLogger("tandempay.idempotency").setLevel(logging.DEBUG)
 
 # Override app's DB dependency to use our PG test database
 app.dependency_overrides[get_db] = pg_override_get_db

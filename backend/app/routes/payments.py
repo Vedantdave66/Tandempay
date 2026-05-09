@@ -14,7 +14,7 @@ import logging
 from datetime import datetime, timedelta
 from app.config import get_settings
 
-logger = logging.getLogger("splitease.payments")
+logger = logging.getLogger("tandempay.payments")
 
 settings = get_settings()
 

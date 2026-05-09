@@ -34,7 +34,7 @@ from app.ledger import (
     verify_post_commit,
 )
 
-logger = logging.getLogger("splitease.requests")
+logger = logging.getLogger("tandempay.requests")
 
 router = APIRouter(prefix="/api", tags=["Payment Requests"])
 

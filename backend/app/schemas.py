@@ -11,8 +11,10 @@ class UserRegister(BaseModel):
     password: str = Field(
         min_length=8,
         description="Must be at least 8 characters",
-        json_schema_extra={"error_messages": {"min_length": "Password must be at least 8 characters"}},
     )
+    # NOTE: Pydantic v2 doesn't honor `json_schema_extra={"error_messages": ...}`,
+    # so the 422 will use Pydantic's default ("String should have at least 8 characters").
+    # If a custom message is needed, use a @field_validator.
     interac_email: EmailStr | None = None
 
 
@@ -307,9 +309,3 @@ class ReminderOut(BaseModel):
     expense_id: str
     created_by: str
     interval_days: int
-    next_reminder_at: datetime
-    is_active: bool
-    created_at: datetime
-
-    class Config:
-        from_attributes = True
