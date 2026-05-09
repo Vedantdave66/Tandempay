@@ -2,9 +2,9 @@ services:
   db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: splitease
-      POSTGRES_PASSWORD: splitease
-      POSTGRES_DB: splitease
+      POSTGRES_USER: tandempay
+      POSTGRES_PASSWORD: tandempay
+      POSTGRES_DB: tandempay
     ports:
       - "5432:5432"
     volumes:

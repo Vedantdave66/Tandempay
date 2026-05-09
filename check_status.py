@@ -3,7 +3,7 @@ import json
 import sys
 
 try:
-    url = "https://api.github.com/repos/Vedantdave66/splitease/commits/main/status"
+    url = "https://api.github.com/repos/Vedantdave66/Tandempay/commits/main/status"
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
     with urllib.request.urlopen(req) as response:
         data = json.loads(response.read().decode())

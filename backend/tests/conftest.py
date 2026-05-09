@@ -13,7 +13,7 @@ so they are completely unaffected by this conftest.
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 # ─── PostgreSQL Test Connection ───
-PG_TEST_URL = "postgresql+asyncpg://test:test@localhost:5433/splitease_test"
+PG_TEST_URL = "postgresql+asyncpg://test:test@localhost:5433/tandempay_test"
 
 pg_engine = create_async_engine(PG_TEST_URL, echo=False, pool_size=20, max_overflow=30)
 PgSessionLocal = async_sessionmaker(pg_engine, class_=AsyncSession, expire_on_commit=False)
