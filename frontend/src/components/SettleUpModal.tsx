@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { formatCurrency } from '../utils/currency';
-import { X, Send, Building2, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, Landmark } from 'lucide-react';
-import { Settlement, settlementRecordsApi, walletApi, stripeApi } from '../services/api';
+import { X, Send, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { Settlement, settlementRecordsApi } from '../services/api';
 import Avatar from './Avatar';
 import StripePaymentModal from './StripePaymentModal';
 
@@ -13,14 +13,13 @@ interface SettleUpModalProps {
     onSettled: () => void;
 }
 
-type Step = 'method' | 'etransfer' | 'select_bank' | 'in_app_confirm' | 'in_app_processing' | 'in_app_success' | 'sent_confirmation';
+type Step = 'method' | 'etransfer' | 'sent_confirmation';
 
 export default function SettleUpModal({ groupId, settlement, currentUserId, onClose, onSettled }: SettleUpModalProps) {
     const [step, setStep] = useState<Step>('method');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState(false);
     const [error, setError] = useState('');
-    const [walletBalance, setWalletBalance] = useState<number | null>(null);
     const [showStripeModal, setShowStripeModal] = useState(false);
     const [activeRecordId, setActiveRecordId] = useState<string | undefined>(undefined);
 
@@ -29,13 +28,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
     const recipientEmail = isPayer ? settlement.to_user_email : settlement.from_user_email;
     const recipientColor = isPayer ? settlement.to_avatar_color : settlement.from_avatar_color;
 
-    useEffect(() => {
-        if (isPayer) {
-            walletApi.getBalance().then(u => setWalletBalance(u.wallet_balance)).catch(console.error);
-        }
-    }, [isPayer]);
-
-
+    const stripeFee = (settlement.amount * 0.029 + 0.30).toFixed(2);
 
     const handleCopyEmail = () => {
         navigator.clipboard.writeText(recipientEmail);
@@ -43,27 +36,34 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleInitiateSettlement = async (method: string) => {
+    const handleSelectEtransfer = async () => {
         setLoading(true);
         setError('');
         try {
-            if (method === 'etransfer') {
-                await settlementRecordsApi.create(groupId, {
-                    payee_id: settlement.to_user_id,
-                    amount: settlement.amount,
-                    method,
-                });
-                setStep('etransfer');
-            } else if (method === 'stripe') {
-                // Instantly create a paper trail and open Stripe
-                const record = await settlementRecordsApi.create(groupId, {
-                    payee_id: settlement.to_user_id,
-                    amount: settlement.amount,
-                    method: 'stripe'
-                });
-                setActiveRecordId(record.id);
-                setShowStripeModal(true);
-            }
+            await settlementRecordsApi.create(groupId, {
+                payee_id: settlement.to_user_id,
+                amount: settlement.amount,
+                method: 'etransfer',
+            });
+            setStep('etransfer');
+        } catch (err: any) {
+            setError(err.message || 'Failed to initiate settlement');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleSelectStripe = async () => {
+        setLoading(true);
+        setError('');
+        try {
+            const record = await settlementRecordsApi.create(groupId, {
+                payee_id: settlement.to_user_id,
+                amount: settlement.amount,
+                method: 'stripe',
+            });
+            setActiveRecordId(record.id);
+            setShowStripeModal(true);
         } catch (err: any) {
             let msg = err.message || 'Failed to initiate settlement';
             if (msg.includes('Recipient must connect')) {
@@ -95,7 +95,6 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         }
     };
 
-
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
@@ -103,12 +102,18 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
             <div className="relative bg-surface border border-border rounded-3xl w-full max-w-md mx-4 shadow-[0_25px_60px_rgba(0,0,0,0.6)] overflow-hidden">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
 
+                {/* ── HEADER ── */}
                 <div className="relative flex items-center justify-between p-6 pb-4">
-                    <h2 className="text-lg font-bold text-primary">
-                        {step === 'method' && 'Pay Balance'}
-                        {step === 'etransfer' && 'E-Transfer'}
-                        {step === 'sent_confirmation' && 'Payment Marked'}
-                    </h2>
+                    <div className="flex items-center gap-3">
+                        <Avatar name={recipientName} color={recipientColor} size="sm" />
+                        <div>
+                            <p className="text-xs text-secondary">Settling with</p>
+                            <p className="text-sm font-bold text-primary">{recipientName}</p>
+                        </div>
+                        <p className="text-2xl font-black text-primary ml-2">
+                            ${formatCurrency(settlement?.amount)}
+                        </p>
+                    </div>
                     <button
                         onClick={onClose}
                         className="w-9 h-9 rounded-xl bg-surface-light border border-border flex items-center justify-center hover:bg-border transition-colors cursor-pointer"
@@ -125,61 +130,54 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                         </div>
                     )}
 
-                    {/* METHOD SELECTION */}
+                    {/* ── METHOD SELECTION ── */}
                     {step === 'method' && (
-                        <div className="space-y-5">
-                            <div className="text-center py-4">
-                                <div className="flex items-center justify-center gap-3 mb-4">
-                                    <Avatar name={settlement.from_user_name} color={settlement.from_avatar_color} size="md" />
-                                    <ArrowRight className="w-5 h-5 text-accent" />
-                                    <Avatar name={settlement.to_user_name} color={settlement.to_avatar_color} size="md" />
+                        <div className="space-y-3">
+                            {/* PRIMARY — Interac */}
+                            <button
+                                onClick={handleSelectEtransfer}
+                                disabled={loading}
+                                className="w-full text-left p-5 rounded-2xl bg-gradient-to-br from-accent/10 to-accent/5 border-2 border-accent/40 hover:border-accent/70 transition-all duration-300 cursor-pointer group disabled:opacity-50"
+                            >
+                                <div className="flex items-start justify-between mb-1">
+                                    <p className="text-sm font-bold text-primary">Send via Interac e-Transfer</p>
+                                    {loading
+                                        ? <Loader2 className="w-4 h-4 text-accent animate-spin mt-0.5" />
+                                        : <ArrowRight className="w-4 h-4 text-accent/50 group-hover:text-accent transition-colors mt-0.5" />
+                                    }
                                 </div>
-                                <p className="text-sm text-secondary mb-1">Amount to settle</p>
-                                <p className="text-4xl font-black text-primary tracking-tight">
-                                    ${formatCurrency(settlement?.amount)}
-                                </p>
-                                <p className="text-sm text-secondary mt-2">
-                                    {settlement.from_user_name} → {settlement.to_user_name}
-                                </p>
-                            </div>
+                                <p className="text-xs text-accent font-medium mb-3">Free&nbsp; • &nbsp;Arrives in ~30 seconds</p>
+                                <div className="flex items-start gap-1.5">
+                                    <Sparkles className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
+                                    <p className="text-[11px] text-secondary leading-snug">
+                                        We'll auto-confirm this payment when your bank sends the receipt email — no need to come back here.
+                                    </p>
+                                </div>
+                            </button>
 
-                            <div className="space-y-3">
-                                <button
-                                    onClick={() => handleInitiateSettlement('stripe')}
-                                    disabled={loading}
-                                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-gradient-to-r from-accent/10 to-accent/5 border border-accent/20 hover:border-accent/40 transition-all duration-300 cursor-pointer group disabled:opacity-50"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-accent/20 flex items-center justify-center group-hover:bg-accent/30 transition-colors">
-                                        <CreditCard className="w-6 h-6 text-accent" />
-                                    </div>
-                                    <div className="text-left flex-1">
-                                        <p className="text-sm font-bold text-primary mb-0.5">Pay with Card / Apple Pay</p>
-                                        <p className="text-xs text-accent">Secure payment via Stripe</p>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-accent/40 group-hover:text-accent transition-colors" />
-                                </button>
+                            {/* SECONDARY — Card */}
+                            <button
+                                onClick={handleSelectStripe}
+                                disabled={loading}
+                                className="w-full text-left px-4 py-3 rounded-xl bg-surface-light border border-border hover:border-border/60 transition-all duration-200 cursor-pointer group disabled:opacity-50 flex items-center gap-3"
+                            >
+                                <CreditCard className="w-4 h-4 text-secondary shrink-0" />
+                                <div className="flex-1">
+                                    <p className="text-sm font-medium text-secondary group-hover:text-primary transition-colors">Pay with card instead</p>
+                                    <p className="text-[11px] text-secondary/60">${stripeFee} fee&nbsp; • &nbsp;Arrives in 2 business days</p>
+                                </div>
+                                <ArrowRight className="w-3.5 h-3.5 text-secondary/30 group-hover:text-secondary transition-colors" />
+                            </button>
 
-                                <button
-                                    onClick={() => handleInitiateSettlement('etransfer')}
-                                    disabled={loading}
-                                    className="w-full flex items-center gap-4 p-4 rounded-2xl bg-surface-light border border-border hover:border-indigo/30 transition-all duration-300 cursor-pointer group disabled:opacity-50"
-                                >
-                                    <div className="w-12 h-12 rounded-xl bg-indigo/10 flex items-center justify-center group-hover:bg-indigo/20 transition-colors">
-                                        <Landmark className="w-6 h-6 text-indigo" />
-                                    </div>
-                                    <div className="text-left flex-1">
-                                        <p className="text-sm font-bold text-primary">E-Transfer</p>
-                                        <p className="text-xs text-secondary">Send manually outside the app</p>
-                                    </div>
-                                    <ArrowRight className="w-4 h-4 text-secondary/30 group-hover:text-indigo transition-colors" />
-                                </button>
-                            </div>
+                            {/* FOOTER disclaimer */}
+                            <p className="text-[11px] text-secondary/50 text-center pt-1 leading-snug">
+                                {recipientName} receives the full ${formatCurrency(settlement?.amount)} via Interac.
+                                Card payments include the processor fee.
+                            </p>
                         </div>
                     )}
 
-
-
-                    {/* E-TRANSFER */}
+                    {/* ── E-TRANSFER DETAIL ── */}
                     {step === 'etransfer' && (
                         <div className="space-y-5">
                             <div className="bg-surface-light border border-border rounded-2xl p-5">
@@ -220,21 +218,21 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                 disabled={loading}
                                 className="w-full bg-gradient-to-r from-accent to-emerald-500 hover:from-accent-hover hover:to-emerald-600 text-[#064E3B] font-bold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 cursor-pointer shadow-lg shadow-accent/20"
                             >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "I've Sent the Money"}
+                                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "I sent it on my banking app"}
                             </button>
                         </div>
                     )}
 
-                    {/* SENT CONFIRMATION (E-Transfer) */}
+                    {/* ── SENT CONFIRMATION ── */}
                     {step === 'sent_confirmation' && (
                         <div className="py-8 text-center space-y-5">
-                            <div className="w-20 h-20 rounded-full bg-indigo/10 border-2 border-indigo/30 flex items-center justify-center mx-auto">
-                                <Send className="w-9 h-9 text-indigo" />
+                            <div className="w-20 h-20 rounded-full bg-accent/10 border-2 border-accent/30 flex items-center justify-center mx-auto">
+                                <Send className="w-9 h-9 text-accent" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-primary mb-1">Payment Marked as Sent</h3>
+                                <h3 className="text-xl font-black text-primary mb-1">Payment marked as sent</h3>
                                 <p className="text-sm text-secondary">
-                                    {recipientName} will be notified to confirm when they receive it.
+                                    We'll auto-confirm once your bank email arrives. No action needed.
                                 </p>
                             </div>
                             <button
@@ -247,17 +245,17 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                     )}
                 </div>
             </div>
-            
+
             {showStripeModal && activeRecordId && (
-                <StripePaymentModal 
+                <StripePaymentModal
                     payeeId={settlement.to_user_id}
                     amount={settlement.amount}
                     settlementId={activeRecordId}
                     onClose={() => setShowStripeModal(false)}
-                    onSuccess={() => { 
-                        setShowStripeModal(false); 
-                        onSettled(); 
-                        onClose(); 
+                    onSuccess={() => {
+                        setShowStripeModal(false);
+                        onSettled();
+                        onClose();
                     }}
                 />
             )}
