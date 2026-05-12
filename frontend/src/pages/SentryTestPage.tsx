@@ -7,13 +7,15 @@ import * as Sentry from '@sentry/react'
 export default function SentryTestPage() {
   const dsn = import.meta.env.VITE_SENTRY_DSN as string | undefined
 
-  function handleCaptureMessage() {
+  async function handleCaptureMessage() {
     if (!dsn) {
       alert('VITE_SENTRY_DSN is not set — Sentry is inactive.')
       return
     }
     Sentry.captureMessage('Frontend Sentry test', 'info')
-    alert('✅ Sentry.captureMessage() sent. Check your Sentry dashboard (Issues → "Frontend Sentry test").')
+    // flush() guarantees the event is delivered before the alert fires.
+    await Sentry.flush(2000)
+    alert('✅ Sentry.captureMessage() sent and flushed. Check your Sentry dashboard (Issues → "Frontend Sentry test").')
   }
 
   function handleThrowError() {
