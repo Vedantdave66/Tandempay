@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
 
+    # Sentry — leave empty to disable monitoring entirely (safe for local dev)
+    SENTRY_DSN: str = ""
+    ENVIRONMENT: str = "development"  # override to "production" on Vercel
+
     class Config:
         env_file = ".env"
 

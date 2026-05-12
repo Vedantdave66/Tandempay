@@ -8,6 +8,7 @@ from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+import sentry_sdk
 
 from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
@@ -23,6 +24,34 @@ logger = logging.getLogger("tandempay.main")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # ── Sentry error monitoring ─────────────────────────────────────────
+    # Only active when SENTRY_DSN is set. Safe to leave empty in local dev or
+    # on fresh clones — no DSN means no Sentry, no error, no overhead.
+    from app.config import get_settings
+    settings = get_settings()
+
+    if settings.SENTRY_DSN:
+        _FORBIDDEN_TERMS = (
+            "password", "token", "secret",
+            "hashed_password", "stripe_payment_intent", "interac",
+        )
+
+        def _before_send(event, hint):
+            """Drop any event whose serialised text contains sensitive keywords."""
+            text = str(event).lower()
+            if any(term in text for term in _FORBIDDEN_TERMS):
+                return None  # discard — never send
+            return event
+
+        sentry_sdk.init(
+            dsn=settings.SENTRY_DSN,
+            traces_sample_rate=0.1,        # 10% of transactions for perf monitoring
+            environment=settings.ENVIRONMENT,
+            send_default_pii=False,        # never capture IPs, cookies, or user agents
+            before_send=_before_send,
+        )
+        logger.info("Sentry initialised (env=%s).", settings.ENVIRONMENT)
+
     is_serverless = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
 
     # Database migrations managed by Alembic. Run: alembic upgrade head

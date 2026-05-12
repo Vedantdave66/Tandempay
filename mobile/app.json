@@ -32,7 +32,8 @@
       "eas": {
         "projectId": "c598b2bd-d7cd-4290-9db2-567f63c8b8eb"
       },
-      "stripePublishableKey": "pk_test_51TQvxoI93VMSMTqXsJ01P3dcT7dxTqU1nfFpUvnmMdOgtGHFl4nnI8tlFkVORboMHU7LGcwuyWl0iuBpnjAqixtk00myRKZWCc"
+      "stripePublishableKey": "pk_test_51TQvxoI93VMSMTqXsJ01P3dcT7dxTqU1nfFpUvnmMdOgtGHFl4nnI8tlFkVORboMHU7LGcwuyWl0iuBpnjAqixtk00myRKZWCc",
+      "sentryDsn": ""
     },
     "owner": "dv66"
   }

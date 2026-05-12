@@ -1,11 +1,39 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
+import * as Sentry from '@sentry/react-native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import RootNavigator from './src/navigation/RootNavigator';
+
+// ── Sentry error monitoring ──────────────────────────────────────────────────
+// DSN is read from app.json extra.sentryDsn so it can be swapped per
+// environment without code changes. Leave the field empty (or omit it) to
+// disable Sentry entirely — safe for local dev and open-source clones.
+const _SENTRY_DSN: string =
+  Constants.expoConfig?.extra?.sentryDsn ?? '';
+
+if (_SENTRY_DSN) {
+  const FORBIDDEN = [
+    'password', 'token', 'secret',
+    'hashed_password', 'stripe_payment_intent', 'interac',
+  ];
+
+  Sentry.init({
+    dsn: _SENTRY_DSN,
+    tracesSampleRate: 0.1,                       // 10% of transactions
+    environment: __DEV__ ? 'development' : 'production',
+    beforeSend(event) {
+      // Drop any event whose serialised text contains sensitive keywords
+      const text = JSON.stringify(event).toLowerCase();
+      if (FORBIDDEN.some((term) => text.includes(term))) return null;
+      return event;
+    },
+    // Replay is intentionally NOT enabled — privacy-invasive
+  });
+}
 
 function ConnectedApp() {
   const { isDark } = useTheme();
@@ -37,4 +65,5 @@ export default function App() {
     </ThemeProvider>
   );
 }
+
 
