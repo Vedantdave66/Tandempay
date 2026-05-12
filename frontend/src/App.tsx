@@ -14,6 +14,7 @@ import FriendsPage from './pages/FriendsPage';
 import LandingPage from './pages/LandingPage';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import SentryTestPage from './pages/SentryTestPage'; // TODO(sentry-validation): TEMPORARY — remove after validation
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
@@ -78,6 +79,8 @@ export default function App() {
                             <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
                             <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
                             <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
+                            {/* TODO(sentry-validation): TEMPORARY — remove after validation */}
+                            <Route path="/sentry-test" element={<SentryTestPage />} />
                             <Route path="*" element={<Navigate to="/dashboard" />} />
                         </Routes>
                     </AuthListener>

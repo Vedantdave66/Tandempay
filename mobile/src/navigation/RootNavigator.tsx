@@ -14,6 +14,8 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import TutorialScreen from '../screens/TutorialScreen';
+// TODO(sentry-validation): TEMPORARY — remove import + Stack.Screen after validation
+import SentryTestScreen from '../screens/SentryTestScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -87,6 +89,14 @@ export default function RootNavigator() {
                             component={TutorialScreen}
                             options={{ presentation: 'modal' }}
                         />
+                        {/* TODO(sentry-validation): TEMPORARY — remove after validation */}
+                        {__DEV__ && (
+                            <Stack.Screen
+                                name="SentryTest"
+                                component={SentryTestScreen}
+                                options={{ presentation: 'modal', title: 'Sentry Test' }}
+                            />
+                        )}
                     </Stack.Group>
                 )}
             </Stack.Navigator>
