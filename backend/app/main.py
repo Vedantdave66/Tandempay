@@ -9,6 +9,8 @@ from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import sentry_sdk
+from sentry_sdk.integrations.starlette import StarletteIntegration
+from sentry_sdk.integrations.fastapi import FastApiIntegration
 
 from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
@@ -21,37 +23,58 @@ from app.idempotency import IdempotencyKey  # noqa: F401 — ensures table is cr
 
 logger = logging.getLogger("tandempay.main")
 
+# ── Sentry — module-level init ───────────────────────────────────────────────
+# Must be at module level so it runs on every serverless cold start.
+# Mangum (Vercel) imports this module directly; lifespan() is not always
+# guaranteed to execute before the first request on a cold start.
+# If SENTRY_DSN is empty or missing, sentry_sdk.init() is never called and
+# Sentry is completely inactive — safe for local dev and fresh clones.
+_SENTRY_DSN = os.environ.get("SENTRY_DSN", "")
+_SENTRY_ENV = os.environ.get("ENVIRONMENT", "production")
+
+if _SENTRY_DSN:
+    # Forbidden terms are checked against exception *values* and *messages* only.
+    # Do NOT serialise the full event dict — that includes request URLs which
+    # contain query-param names like '?token=...' and would silently drop
+    # every single event (the original bug).
+    _SENTRY_FORBIDDEN = (
+        "password", "hashed_password", "stripe_payment_intent", "interac",
+    )
+
+    def _before_send(event, hint):
+        """Drop events whose exception message or log message contains sensitive data."""
+        # Check exception values (one per chained exception)
+        for exc_val in event.get("exception", {}).get("values", []):
+            val = str(exc_val.get("value", "")).lower()
+            if any(term in val for term in _SENTRY_FORBIDDEN):
+                return None
+        # Check top-level log message (captureMessage events)
+        msg = str(event.get("message", "")).lower()
+        if any(term in msg for term in _SENTRY_FORBIDDEN):
+            return None
+        return event
+
+    sentry_sdk.init(
+        dsn=_SENTRY_DSN,
+        traces_sample_rate=0.1,          # 10 % of transactions for perf monitoring
+        environment=_SENTRY_ENV,
+        send_default_pii=False,          # never capture IPs, cookies, or user agents
+        before_send=_before_send,
+        integrations=[
+            StarletteIntegration(),      # captures ASGI-level request context
+            FastApiIntegration(),        # captures FastAPI route/handler context
+        ],
+    )
+    logger.info("Sentry enabled (environment=%s).", _SENTRY_ENV)
+else:
+    logger.info("Sentry disabled — SENTRY_DSN not set.")
+
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # ── Sentry error monitoring ─────────────────────────────────────────
-    # Only active when SENTRY_DSN is set. Safe to leave empty in local dev or
-    # on fresh clones — no DSN means no Sentry, no error, no overhead.
-    from app.config import get_settings
-    settings = get_settings()
-
-    if settings.SENTRY_DSN:
-        _FORBIDDEN_TERMS = (
-            "password", "token", "secret",
-            "hashed_password", "stripe_payment_intent", "interac",
-        )
-
-        def _before_send(event, hint):
-            """Drop any event whose serialised text contains sensitive keywords."""
-            text = str(event).lower()
-            if any(term in text for term in _FORBIDDEN_TERMS):
-                return None  # discard — never send
-            return event
-
-        sentry_sdk.init(
-            dsn=settings.SENTRY_DSN,
-            traces_sample_rate=0.1,        # 10% of transactions for perf monitoring
-            environment=settings.ENVIRONMENT,
-            send_default_pii=False,        # never capture IPs, cookies, or user agents
-            before_send=_before_send,
-        )
-        logger.info("Sentry initialised (env=%s).", settings.ENVIRONMENT)
+    # Sentry is initialised at module level above (not here) so it runs on
+    # every serverless cold start before any request is handled.
 
     is_serverless = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
 
@@ -121,6 +144,14 @@ async def _log_unhandled_exception(request: Request, exc: Exception):
         exc,
         traceback.format_exc(),
     )
+    # Explicitly forward to Sentry — the FastAPI exception handler converts
+    # the exception into a JSONResponse, which means Sentry's ASGI middleware
+    # never sees it as an unhandled exception. Calling capture_exception() here
+    # guarantees delivery. flush() is required on serverless (Vercel) because
+    # the function may exit before Sentry's background thread sends the event.
+    if _SENTRY_DSN:
+        sentry_sdk.capture_exception(exc)
+        sentry_sdk.flush(timeout=2)
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "error_type": type(exc).__name__},

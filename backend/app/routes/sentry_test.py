@@ -51,4 +51,7 @@ async def sentry_test_message(
     """
     _check_token(x_sentry_test_token or token)
     sentry_sdk.capture_message("Sentry backend test message", level="info")
+    # flush() is mandatory on Vercel serverless — without it, the function
+    # may exit before Sentry's background sender thread delivers the event.
+    sentry_sdk.flush(timeout=2)
     return {"detail": "Sentry test message sent. Check your Sentry dashboard."}
