@@ -33,7 +33,7 @@
         "projectId": "c598b2bd-d7cd-4290-9db2-567f63c8b8eb"
       },
       "stripePublishableKey": "pk_test_51TQvxoI93VMSMTqXsJ01P3dcT7dxTqU1nfFpUvnmMdOgtGHFl4nnI8tlFkVORboMHU7LGcwuyWl0iuBpnjAqixtk00myRKZWCc",
-      "sentryDsn": ""
+      "sentryDsn": "https://b75161d5a3a8b88f37c07de910c42c99@o4511378080202752.ingest.us.sentry.io/4511378381799424"
     },
     "owner": "dv66"
   }
