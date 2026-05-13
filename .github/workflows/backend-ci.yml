@@ -1,0 +1,67 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "backend/**"
+
+jobs:
+  test:
+    name: Pytest (SQLite)
+    runs-on: ubuntu-latest
+
+    # ── No Postgres service container here ────────────────────────────────────
+    # The test suite is split into two tiers:
+    #
+    #   SQLite (no external service needed — run in this job):
+    #     tests/test_financial_precision.py
+    #     tests/test_idempotency_concurrency.py
+    #     tests/test_payment_concurrency.py
+    #
+    #   PostgreSQL-required (skipped automatically via pytest.skip at module level):
+    #     tests/test_pg_concurrency.py
+    #     tests/test_pg_failure_injection.py
+    #     tests/test_settlement_constraints.py   ← self-skips when DATABASE_URL != postgresql://
+    #     tests/test_stripe_idempotency.py
+    #
+    # TODO: add a second CI job with a postgres service container (port 5433)
+    # to run the full PG test suite once DATABASE_URL secret is configured.
+    # Reference: backend/docker-compose.test.yml for the Postgres config.
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-test.txt
+
+      - name: Install dependencies
+        working-directory: backend
+        run: |
+          pip install -r requirements.txt -r requirements-test.txt
+
+      - name: Run tests
+        working-directory: backend
+        run: |
+          pytest tests/ -v --tb=short \
+            --ignore=tests/test_pg_concurrency.py \
+            --ignore=tests/test_pg_failure_injection.py \
+            --ignore=tests/test_stripe_idempotency.py
+        env:
+          # Provide dummy values for settings that the app reads at import time.
+          # Tests override DATABASE_URL at the module level (SQLite), but pydantic-settings
+          # will raise on startup if SECRET_KEY / ADMIN_SECRET are missing.
+          SECRET_KEY: "ci-test-secret-key-not-used-in-production"
+          ADMIN_SECRET: "ci-test-admin-secret"
+          DATABASE_URL: "sqlite+aiosqlite:///./ci_test.db"

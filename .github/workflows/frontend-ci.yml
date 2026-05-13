@@ -1,0 +1,52 @@
+# TODO: add mobile CI when EAS credentials are configured in GitHub Secrets.
+#       Reference: mobile/app.json for the EAS project slug and owner.
+
+name: Frontend CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "frontend/**"
+  pull_request:
+    branches: [main]
+    paths:
+      - "frontend/**"
+
+jobs:
+  typecheck-and-build:
+    name: TypeScript + Vite Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Type-check (tsc --noEmit)
+        # Catches TypeScript errors independently of the build step.
+        # npm run build already runs `tsc -b` but that can short-circuit on
+        # incremental cache hits; --noEmit here always does a full type pass.
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      - name: Build (Vite)
+        # Confirms Vite can bundle the app — catches missing imports, broken
+        # CSS plugins, and runtime env-var issues that tsc won't catch.
+        # VITE_SENTRY_DSN is optional (main.tsx gates on `if (_SENTRY_DSN)`),
+        # so an empty string is safe and won't crash the build.
+        working-directory: frontend
+        run: npm run build
+        env:
+          VITE_SENTRY_DSN: ""
+          VITE_API_URL: "https://api.tandempay.ca"
