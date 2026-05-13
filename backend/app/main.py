@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -240,6 +241,33 @@ async def _log_unhandled_exception(request: Request, exc: Exception):
     return JSONResponse(
         status_code=500,
         content={"detail": "Internal server error", "error_type": type(exc).__name__},
+    )
+
+
+# ── Validation error handler ──────────────────────────────────────────────────
+# Replaces FastAPI's default verbose 422 body with a clean, consistent shape:
+#   {"error": "validation_error", "detail": [{"field": "amount", "msg": "..."}]}
+# The WARNING log ensures bad inputs are visible in Vercel logs with request_id
+# attached automatically via JsonFormatter → request_id_var.
+@app.exception_handler(RequestValidationError)
+async def _validation_error_handler(request: Request, exc: RequestValidationError):
+    errors = []
+    for err in exc.errors():
+        # loc is a tuple like ('body', 'amount') or ('body', 'participant_ids', 0)
+        # Join all parts after 'body'/'query'/'path' to form a readable field path.
+        loc = err.get("loc", ())
+        field = ".".join(str(part) for part in loc[1:]) if len(loc) > 1 else str(loc[0]) if loc else "unknown"
+        errors.append({"field": field, "msg": err.get("msg", "invalid value")})
+
+    logger.warning(
+        "Validation error on %s %s: %s",
+        request.method,
+        request.url.path,
+        errors,
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"error": "validation_error", "detail": errors},
     )
 
 # CORS: allow local dev + production frontend URL from env

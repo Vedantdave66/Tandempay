@@ -1,26 +1,94 @@
+"""
+TandemPay Pydantic v2 schemas.
+
+REQUEST schemas enforce strict input constraints — these are the first line of
+defence before any data reaches the database:
+  - Amount fields: gt=0, le=999_999.99, decimal_places=2 (Decimal, not float)
+  - String fields: min_length, max_length, strip_whitespace=True
+  - Enum / Literal fields: only accepted values, never raw str
+  - List fields: min_length, max_length, no duplicate UUIDs
+
+RESPONSE schemas (Out) are permissive — they describe DB data going out,
+not untrusted input coming in.  No strip_whitespace on output fields.
+"""
+
+from __future__ import annotations
+
 from datetime import datetime
 from decimal import Decimal
-from pydantic import condecimal
-from pydantic import BaseModel, EmailStr, Field
+from enum import Enum
+from typing import Annotated, Optional
+
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    EmailStr,
+    Field,
+    StringConstraints,
+    field_validator,
+)
 
 
-# --- Auth ---
+# ── Shared annotated types ────────────────────────────────────────────────────
+
+# CAD currency amount used on every financial request body.
+# - gt=0              : no zero or negative amounts
+# - le=999_999.99     : reasonable ceiling for a roommate app
+# - decimal_places=2  : reject 33.333 at the schema level
+# - max_digits=8      : 999999.99 fits in 8 significant digits
+CadAmount = Annotated[
+    Decimal,
+    Field(gt=Decimal("0"), le=Decimal("999999.99"), decimal_places=2, max_digits=8),
+]
+
+# Short human-readable name (group name, display name)
+ShortName = Annotated[str, StringConstraints(min_length=1, max_length=100, strip_whitespace=True)]
+
+# Expense / memo title
+Title = Annotated[str, StringConstraints(min_length=1, max_length=255, strip_whitespace=True)]
+
+# Free-text note / memo (payment request note etc.)
+MemoText = Annotated[str, StringConstraints(min_length=1, max_length=1000, strip_whitespace=True)]
+
+# Invite tokens are fixed-length opaque strings; cap length to prevent payload inflation.
+InviteToken = Annotated[str, StringConstraints(min_length=1, max_length=64)]
+
+
+# ── Enums for fixed-vocabulary fields ─────────────────────────────────────────
+
+class SplitType(str, Enum):
+    equal = "equal"
+    # extend here when custom splits land (e.g. percentage, exact)
+
+
+class PaymentMethod(str, Enum):
+    etransfer = "etransfer"
+    in_app = "in_app"
+
+
+class SettlementStatus(str, Enum):
+    """Valid *incoming* status transitions from a client PUT request."""
+    sent = "sent"          # payer marks as sent
+    settled = "settled"    # payee confirms receipt
+    declined = "declined"  # payee rejects
+
+
+# ── Auth ──────────────────────────────────────────────────────────────────────
+
 class UserRegister(BaseModel):
-    name: str
+    name: ShortName
     email: EmailStr
     password: str = Field(
         min_length=8,
+        max_length=128,
         description="Must be at least 8 characters",
     )
-    # NOTE: Pydantic v2 doesn't honor `json_schema_extra={"error_messages": ...}`,
-    # so the 422 will use Pydantic's default ("String should have at least 8 characters").
-    # If a custom message is needed, use a @field_validator.
-    interac_email: EmailStr | None = None
+    interac_email: Optional[EmailStr] = None
 
 
 class UserLogin(BaseModel):
     email: EmailStr
-    password: str
+    password: str = Field(min_length=1, max_length=128)
 
 
 class PasswordResetRequest(BaseModel):
@@ -28,8 +96,8 @@ class PasswordResetRequest(BaseModel):
 
 
 class PasswordResetConfirm(BaseModel):
-    token: str
-    new_password: str
+    token: str = Field(min_length=1, max_length=512)
+    new_password: str = Field(min_length=8, max_length=128)
 
 
 class Token(BaseModel):
@@ -38,18 +106,17 @@ class Token(BaseModel):
 
 
 class UserOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     email: str
     avatar_color: str
-    wallet_balance: Decimal = 0.0
-    interac_email: str | None = None
-    stripe_account_id: str | None = None
+    wallet_balance: Decimal = Decimal("0.00")
+    interac_email: Optional[str] = None
+    stripe_account_id: Optional[str] = None
     has_completed_payment: bool = False
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class UserUpdate(BaseModel):
@@ -59,14 +126,15 @@ class UserUpdate(BaseModel):
     Email, password, financial fields, and role flags are explicitly
     excluded — they have dedicated, higher-scrutiny endpoints.
     """
-    has_completed_payment: bool | None = None
-    interac_email: str | None = None
-    name: str | None = None
+    has_completed_payment: Optional[bool] = None
+    interac_email: Optional[EmailStr] = None
+    name: Optional[ShortName] = None
 
 
-# --- Groups ---
+# ── Groups ────────────────────────────────────────────────────────────────────
+
 class GroupCreate(BaseModel):
-    name: str
+    name: ShortName
 
 
 class MemberAdd(BaseModel):
@@ -75,65 +143,75 @@ class MemberAdd(BaseModel):
 
 class JoinGroup(BaseModel):
     """Request body for POST /api/groups/{group_id}/join."""
-    invite_token: str
+    invite_token: InviteToken
 
 
 class GroupMemberOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: str
     name: str
     email: str
     avatar_color: str
 
-    class Config:
-        from_attributes = True
-
 
 class GroupOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     created_by: str
     created_at: datetime
     members: list[GroupMemberOut] = []
-    total_expenses: Decimal = 0
+    total_expenses: Decimal = Decimal("0")
     # Only populated for the group creator. None for all other members.
-    invite_token: str | None = None
-
-    class Config:
-        from_attributes = True
+    invite_token: Optional[str] = None
 
 
 class GroupListOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     name: str
     created_by: str
     created_at: datetime
     member_count: int = 0
-    total_expenses: Decimal = 0
-
-    class Config:
-        from_attributes = True
+    total_expenses: Decimal = Decimal("0")
 
 
-# --- Expenses ---
+# ── Expenses ──────────────────────────────────────────────────────────────────
+
 class ExpenseCreate(BaseModel):
-    title: str
-    amount: Decimal
-    paid_by: str
-    participant_ids: list[str]
-    split_type: str = "equal"
+    title: Title
+    amount: CadAmount
+    paid_by: str = Field(min_length=1, max_length=64)
+    participant_ids: list[str] = Field(
+        min_length=1,
+        max_length=50,
+        description="At least one participant required; max 50; no duplicates",
+    )
+    split_type: SplitType = SplitType.equal
+
+    @field_validator("participant_ids")
+    @classmethod
+    def no_duplicate_participants(cls, v: list[str]) -> list[str]:
+        if len(v) != len(set(v)):
+            raise ValueError("participant_ids must not contain duplicate user IDs")
+        return v
 
 
 class ExpenseParticipantOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     user_id: str
     name: str
     share_amount: Decimal
     avatar_color: str = "#3ECF8E"
 
-    class Config:
-        from_attributes = True
-
 
 class ExpenseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     title: str
     amount: Decimal
@@ -144,11 +222,9 @@ class ExpenseOut(BaseModel):
     created_at: datetime
     participants: list[ExpenseParticipantOut] = []
 
-    class Config:
-        from_attributes = True
 
+# ── Balances & Settlements ────────────────────────────────────────────────────
 
-# --- Balances & Settlements ---
 class UserBalance(BaseModel):
     user_id: str
     name: str
@@ -170,14 +246,17 @@ class Settlement(BaseModel):
     amount: Decimal
 
 
-# --- Settlement Records (actual payment tracking) ---
+# ── Settlement Records (actual payment tracking) ──────────────────────────────
+
 class SettlementRecordCreate(BaseModel):
-    payee_id: str
-    amount: Decimal
-    method: str = "etransfer"  # in_app | etransfer
+    payee_id: str = Field(min_length=1, max_length=64)
+    amount: CadAmount
+    method: PaymentMethod = PaymentMethod.etransfer
 
 
 class SettlementRecordOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     group_id: str
     payer_id: str
@@ -194,55 +273,55 @@ class SettlementRecordOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class SettlementStatusUpdate(BaseModel):
-    status: str  # sent | settled | declined
+    """Client-initiated status transition.  Only the three valid moves are accepted."""
+    status: SettlementStatus
 
 
-# --- Notifications ---
+# ── Notifications ─────────────────────────────────────────────────────────────
+
 class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     type: str
     title: str
     message: str
     read: bool
-    reference_id: str | None = None
-    group_id: str | None = None
+    reference_id: Optional[str] = None
+    group_id: Optional[str] = None
     created_at: datetime
 
-    class Config:
-        from_attributes = True
 
+# ── Friend Requests ───────────────────────────────────────────────────────────
 
-# --- Friend Requests ---
 class FriendRequestCreate(BaseModel):
     email: EmailStr
 
 
 class FriendRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     sender_id: str
     receiver_email: str
     status: str
     created_at: datetime
     updated_at: datetime
-    
+
     # Optional nested data for the frontend
-    sender_name: str | None = None
-    sender_avatar: str | None = None
-    sender_email: str | None = None
-
-    class Config:
-        from_attributes = True
+    sender_name: Optional[str] = None
+    sender_avatar: Optional[str] = None
+    sender_email: Optional[str] = None
 
 
-# --- Fintech Platform Overhaul: Providers & Ledger ---
+# ── Fintech Platform Overhaul: Providers & Ledger ─────────────────────────────
 
 class ProviderAccountOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     provider: str
@@ -252,56 +331,52 @@ class ProviderAccountOut(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        from_attributes = True
-
 
 class WalletTransactionOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     user_id: str
     type: str
     amount: Decimal
     status: str
-    reference_id: str | None = None
+    reference_id: Optional[str] = None
     created_at: datetime
-    completed_at: datetime | None = None
-
-    class Config:
-        from_attributes = True
+    completed_at: Optional[datetime] = None
 
 
 class PaymentRequestCreate(BaseModel):
-    payer_id: str
-    amount: Decimal
-    note: str | None = None
-    due_date: datetime | None = None
+    payer_id: str = Field(min_length=1, max_length=64)
+    amount: CadAmount
+    note: Optional[MemoText] = None
+    due_date: Optional[datetime] = None
 
 
 class PaymentRequestOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
     id: str
     group_id: str
     requester_id: str
     payer_id: str
     amount: Decimal
-    note: str | None = None
-    due_date: datetime | None = None
+    note: Optional[str] = None
+    due_date: Optional[datetime] = None
     status: str
     created_at: datetime
     updated_at: datetime
-    
+
     # Nested display data
-    requester_name: str | None = None
-    requester_avatar: str | None = None
-    payer_name: str | None = None
-    payer_avatar: str | None = None
-
-    class Config:
-        from_attributes = True
+    requester_name: Optional[str] = None
+    requester_avatar: Optional[str] = None
+    payer_name: Optional[str] = None
+    payer_avatar: Optional[str] = None
 
 
-# --- Expense Reminders ---
+# ── Expense Reminders ─────────────────────────────────────────────────────────
+
 class ReminderCreate(BaseModel):
-    interval_days: int  # minimum 1
+    interval_days: int = Field(ge=1, le=365, description="Reminder interval in days (1–365)")
 
 
 class ReminderOut(BaseModel):
