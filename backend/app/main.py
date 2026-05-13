@@ -15,7 +15,6 @@ from sentry_sdk.integrations.fastapi import FastApiIntegration
 from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
 from app.routes import reminders
-from app.routes import sentry_test  # TODO(sentry-validation): TEMPORARY — remove after validation
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
 from app.services.reminder_scheduler import process_due_reminders
@@ -190,7 +189,6 @@ app.include_router(users.router)
 app.include_router(reminders.router)
 app.include_router(payments.router)
 app.include_router(reconciliation_router)
-app.include_router(sentry_test.router)  # TODO(sentry-validation): TEMPORARY — remove after validation
 
 @app.get("/")
 async def root():
