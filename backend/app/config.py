@@ -33,6 +33,11 @@ class Settings(BaseSettings):
     SENTRY_DSN: str = ""
     ENVIRONMENT: str = "development"  # override to "production" on Vercel
 
+    # Logging — controls the root logger level applied by JsonFormatter setup in main.py.
+    # Valid values: DEBUG | INFO | WARNING | ERROR | CRITICAL
+    # Leave at INFO for production; set DEBUG locally when chasing a bug.
+    LOG_LEVEL: str = "INFO"
+
     class Config:
         env_file = ".env"
 

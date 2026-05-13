@@ -8,6 +8,8 @@ from app.models import User, Group, GroupMember, SettlementRecord, Notification
 from app.schemas import SettlementRecordCreate, SettlementRecordOut, SettlementStatusUpdate
 from app.routes.auth import get_current_user
 from app.idempotency import idempotent
+from app.services.audit import log_action
+from app.audit_log import AuditActions
 
 router = APIRouter(prefix="/api/groups/{group_id}/settlement-records", tags=["settlement-records"])
 
@@ -107,6 +109,19 @@ async def create_settlement(
     )
     db.add(notif)
     await db.flush()
+
+    await log_action(
+        db=db,
+        actor_id=current_user.id,
+        action=AuditActions.SETTLEMENT_INITIATED,
+        entity_type="settlement",
+        entity_id=record.id,
+        group_id=group_id,
+        metadata={
+            "amount": float(data.amount),
+            "method": data.method,
+        },
+    )
 
     return _build_settlement_out(record, current_user, payee)
 
@@ -224,4 +239,29 @@ async def update_settlement_status(
         db.add(notif)
 
     await db.flush()
+
+    # Derive audit action from the new status value.
+    # "sent" is a payer-internal step; only payee-driven transitions
+    # (settled → confirmed, declined → rejected) produce audit entries.
+    _AUDIT_STATUS_MAP = {
+        "settled": AuditActions.SETTLEMENT_CONFIRMED,
+        "declined": AuditActions.SETTLEMENT_REJECTED,
+    }
+    audit_action = _AUDIT_STATUS_MAP.get(data.status)
+    if audit_action:
+        await log_action(
+            db=db,
+            actor_id=current_user.id,
+            action=audit_action,
+            entity_type="settlement",
+            entity_id=record.id,
+            group_id=group_id,
+            metadata={
+                "amount": float(record.amount),
+                "method": record.method,
+                "status_from": transition[0],
+                "status_to": data.status,
+            },
+        )
+
     return _build_settlement_out(record, payer, payee)

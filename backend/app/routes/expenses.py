@@ -1,6 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from decimal import Decimal, ROUND_DOWN
@@ -9,6 +8,8 @@ from app.database import get_db
 from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
 from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut
 from app.routes.auth import get_current_user
+from app.services.audit import log_action
+from app.audit_log import AuditActions
 import logging
 
 logger = logging.getLogger("tandempay.expenses")
@@ -120,6 +121,21 @@ async def create_expense(
             )
             db.add(notif)
     await db.flush()
+
+    await log_action(
+        db=db,
+        actor_id=current_user.id,
+        action=AuditActions.EXPENSE_CREATED,
+        entity_type="expense",
+        entity_id=expense.id,
+        group_id=group_id,
+        metadata={
+            "amount": float(data.amount),
+            "description": data.title,
+            "split_type": data.split_type,
+            "participant_count": len(data.participant_ids),
+        },
+    )
 
     return ExpenseOut(
         id=expense.id,
@@ -247,6 +263,21 @@ async def update_expense(
     await db.flush()
     await db.refresh(expense)
 
+    await log_action(
+        db=db,
+        actor_id=current_user.id,
+        action=AuditActions.EXPENSE_UPDATED,
+        entity_type="expense",
+        entity_id=expense.id,
+        group_id=group_id,
+        metadata={
+            "amount": float(data.amount),
+            "description": data.title,
+            "split_type": data.split_type,
+            "participant_count": len(data.participant_ids),
+        },
+    )
+
     # 4. Fetch updated names for output
     payer_result = await db.execute(select(User).where(User.id == expense.paid_by))
     payer = payer_result.scalar_one()
@@ -296,6 +327,24 @@ async def delete_expense(
             detail="You can only edit expenses you created",
         )
 
+    # Capture metadata before deletion so the audit row has context.
+    deleted_expense_id = expense.id
+    deleted_amount = float(expense.amount)
+    deleted_title = expense.title
+
     await db.delete(expense)
     await db.flush()
+
+    await log_action(
+        db=db,
+        actor_id=current_user.id,
+        action=AuditActions.EXPENSE_DELETED,
+        entity_type="expense",
+        entity_id=deleted_expense_id,
+        group_id=group_id,
+        metadata={
+            "amount": deleted_amount,
+            "description": deleted_title,
+        },
+    )
     return None

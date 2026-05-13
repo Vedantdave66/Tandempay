@@ -1,8 +1,13 @@
-import os
+import json
 import logging
+import os
+import uuid
 from contextlib import asynccontextmanager
-from fastapi import FastAPI
+from datetime import datetime, timezone
+
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
@@ -12,13 +17,77 @@ import sentry_sdk
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
+from app.config import get_settings
+from app.context import request_id_var
 from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
 from app.routes import reminders
+from app.routes import audit_log
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
 from app.services.reminder_scheduler import process_due_reminders
 from app.idempotency import IdempotencyKey  # noqa: F401 — ensures table is created
+
+
+# ── Structured JSON logging ──────────────────────────────────────────────────
+# Stdlib-only — no structlog / python-json-logger dependencies.
+# Every log record becomes a single-line JSON object with a consistent schema,
+# making Vercel log viewer and any future aggregator (Datadog, Logtail) able
+# to filter by level, logger, request_id, etc. without text-grepping.
+
+class JsonFormatter(logging.Formatter):
+    """
+    Emits one JSON object per log record on a single line.
+
+    Fields:
+        timestamp  — ISO 8601 UTC  e.g. "2026-05-13T04:22:11.123Z"
+        level      — "INFO", "WARNING", "ERROR", ...
+        logger     — record.name  e.g. "tandempay.expenses"
+        message    — formatted log message
+        request_id — UUID from request_id_var ContextVar; null when outside a request
+        exc_info   — formatted traceback string; key is OMITTED when no exception
+    """
+
+    def format(self, record: logging.LogRecord) -> str:
+        payload: dict = {
+            "timestamp": datetime.fromtimestamp(record.created, tz=timezone.utc)
+                         .strftime("%Y-%m-%dT%H:%M:%S.") + f"{record.msecs:03.0f}Z",
+            "level":     record.levelname,
+            "logger":    record.name,
+            "message":   record.getMessage(),
+            "request_id": request_id_var.get(),
+        }
+        if record.exc_info:
+            payload["exc_info"] = self.formatException(record.exc_info)
+        return json.dumps(payload, ensure_ascii=False)
+
+
+def _configure_logging() -> None:
+    """
+    Replace the root logger's handlers with a single StreamHandler that uses
+    JsonFormatter.  Level is read from settings.LOG_LEVEL (default "INFO").
+
+    Called once at module load time (below).  Safe to call multiple times —
+    idempotent because we clear existing handlers first.
+    """
+    settings = get_settings()
+    level = getattr(logging, settings.LOG_LEVEL.upper(), logging.INFO)
+
+    handler = logging.StreamHandler()
+    handler.setFormatter(JsonFormatter())
+
+    root = logging.getLogger()
+    root.handlers.clear()
+    root.addHandler(handler)
+    root.setLevel(level)
+
+    # Silence overly chatty third-party loggers that would otherwise flood
+    # the structured feed with noise at DEBUG/INFO level.
+    logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler").setLevel(logging.WARNING)
+
+
+_configure_logging()
 
 logger = logging.getLogger("tandempay.main")
 
@@ -125,23 +194,40 @@ app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 
+# ── Request-ID middleware ────────────────────────────────────────────────────
+# Reads X-Request-ID from the incoming request (set by the caller, e.g. the
+# mobile app or an upstream proxy) or generates a fresh UUID4 if absent.
+# Stores the value in request_id_var so every log line emitted during this
+# request automatically includes it via JsonFormatter.
+# Echoes X-Request-ID on the response so clients can correlate their own logs.
+@app.middleware("http")
+async def _request_id_middleware(request: Request, call_next):
+    rid = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+    token = request_id_var.set(rid)
+    try:
+        response = await call_next(request)
+    finally:
+        # Always reset — prevents ContextVar leakage across requests in the
+        # same event-loop iteration (e.g. keep-alive connections).
+        request_id_var.reset(token)
+    response.headers["X-Request-ID"] = rid
+    return response
+
+
 # ── Diagnostic: log every unhandled exception ────────────────────────────────
 # Without this, FastAPI's default 500 handler swallows tracebacks on Vercel
 # (the runtime doesn't capture starlette's internal logger). This surfaces
 # them through our `tandempay.*` logger which IS captured.
-import traceback
-from fastapi import Request
-from fastapi.responses import JSONResponse
-
+# exc_info=True causes JsonFormatter to serialise the full traceback into the
+# structured `exc_info` field rather than embedding it as unescaped text.
 @app.exception_handler(Exception)
 async def _log_unhandled_exception(request: Request, exc: Exception):
     logger.error(
-        "UNHANDLED %s on %s %s: %s\n%s",
+        "Unhandled %s on %s %s",
         type(exc).__name__,
         request.method,
         request.url.path,
-        exc,
-        traceback.format_exc(),
+        exc_info=True,
     )
     # Explicitly forward to Sentry — the FastAPI exception handler converts
     # the exception into a JSONResponse, which means Sentry's ASGI middleware
@@ -189,6 +275,7 @@ app.include_router(users.router)
 app.include_router(reminders.router)
 app.include_router(payments.router)
 app.include_router(reconciliation_router)
+app.include_router(audit_log.router)
 
 @app.get("/")
 async def root():
