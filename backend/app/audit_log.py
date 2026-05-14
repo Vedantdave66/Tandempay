@@ -86,7 +86,9 @@ class AuditLog(Base):
     #   or any field that matches the Sentry forbidden-terms list in main.py.
     # Safe fields: amount (Decimal/float), description (expense title),
     #   method (payment method string), split_type, participant_count.
-    metadata: Mapped[Optional[dict]] = mapped_column(JSONB, nullable=True)
+    # Column name is "metadata" in the DB; Python attr renamed to avoid
+    # shadowing SQLAlchemy's BaseModel.metadata class attribute.
+    action_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
 
     # ── When ──────────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(

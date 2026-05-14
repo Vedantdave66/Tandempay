@@ -1,14 +1,14 @@
 """
 Audit logging service for TandemPay financial actions.
 
-PRIVACY CONTRACT — the `metadata` dict passed to log_action MUST NOT contain:
+PRIVACY CONTRACT — the `action_metadata` dict passed to log_action MUST NOT contain:
     - email, interac_email, interac_handle
     - stripe_payment_intent, stripe_account_id
     - hashed_password, access_token
     - phone, name (user display name)
     - Any field matching the Sentry forbidden-terms list in app/main.py
 
-Safe fields for metadata: amount (numeric), description (expense title),
+Safe fields for action_metadata: amount (numeric), description (expense title),
 method (payment method string e.g. "etransfer"), split_type,
 participant_count, status_from, status_to.
 
@@ -34,7 +34,7 @@ async def log_action(
     entity_type: str,
     entity_id: str | UUID,
     group_id: str | UUID | None = None,
-    metadata: dict[str, Any] | None = None,
+    action_metadata: dict[str, Any] | None = None,
 ) -> None:
     """
     Insert one AuditLog row in the current session.
@@ -44,13 +44,13 @@ async def log_action(
     (no silent audit loss, no orphaned primary write).
 
     Args:
-        db:          The active AsyncSession for the current request.
-        actor_id:    ID of the user performing the action.
-        action:      One of the AuditActions constants (e.g. AuditActions.EXPENSE_CREATED).
-        entity_type: Short noun for the affected entity ("expense", "settlement").
-        entity_id:   PK of the affected row.
-        group_id:    Group context; None for user-scoped actions without a group.
-        metadata:    Optional structured context dict.  See PRIVACY CONTRACT above.
+        db:              The active AsyncSession for the current request.
+        actor_id:        ID of the user performing the action.
+        action:          One of the AuditActions constants (e.g. AuditActions.EXPENSE_CREATED).
+        entity_type:     Short noun for the affected entity ("expense", "settlement").
+        entity_id:       PK of the affected row.
+        group_id:        Group context; None for user-scoped actions without a group.
+        action_metadata: Optional structured context dict.  See PRIVACY CONTRACT above.
     """
     entry = AuditLog(
         actor_id=str(actor_id),
@@ -58,7 +58,7 @@ async def log_action(
         entity_type=entity_type,
         entity_id=str(entity_id),
         group_id=str(group_id) if group_id is not None else None,
-        metadata=metadata,
+        action_metadata=action_metadata,
     )
     db.add(entry)
     # Flush so the row is visible within the transaction (e.g. for tests that
