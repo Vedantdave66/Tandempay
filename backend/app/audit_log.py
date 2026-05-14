@@ -15,8 +15,7 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import String, DateTime, Index, func, text, desc
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import String, DateTime, Index, JSON, func, text, desc
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -88,7 +87,7 @@ class AuditLog(Base):
     #   method (payment method string), split_type, participant_count.
     # Column name is "metadata" in the DB; Python attr renamed to avoid
     # shadowing SQLAlchemy's BaseModel.metadata class attribute.
-    action_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSONB, nullable=True)
+    action_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
 
     # ── When ──────────────────────────────────────────────────────────────────
     created_at: Mapped[datetime] = mapped_column(
