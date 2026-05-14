@@ -12,10 +12,10 @@ Design constraints:
 """
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from sqlalchemy import String, DateTime, Index, JSON, func, text, desc
+from sqlalchemy import String, DateTime, Index, JSON
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -50,12 +50,13 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     # ── Primary key ───────────────────────────────────────────────────────────
-    # server_default uses gen_random_uuid() so the DB assigns the ID even if
-    # the application layer forgets to set one.
+    # Python default generates the UUID so this works in both SQLite (tests)
+    # and PostgreSQL (prod). The Alembic migration already set gen_random_uuid()
+    # as the server_default on prod — removing it from the model only affects
+    # how SQLAlchemy generates the schema during test setup.
     id: Mapped[str] = mapped_column(
         String,
         primary_key=True,
-        server_default=text("gen_random_uuid()::text"),
         default=lambda: str(uuid.uuid4()),
     )
 
@@ -90,9 +91,11 @@ class AuditLog(Base):
     action_metadata: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
 
     # ── When ──────────────────────────────────────────────────────────────────
+    # Python default so SQLite test setup doesn't need func.now() (PG-only).
+    # Prod DB already has server_default=NOW() set via Alembic migration.
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
-        server_default=func.now(),
+        default=lambda: datetime.now(timezone.utc),
         nullable=False,
         index=True,
     )
