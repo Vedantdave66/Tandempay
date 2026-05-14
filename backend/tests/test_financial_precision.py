@@ -21,11 +21,14 @@ from sqlalchemy import select
 import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_precision.db"
 
+import app.audit_log  # noqa: F401 — must come before 'from app.main import app';
+                      # 'import app.X' binds name 'app' to the package, so
+                      # the subsequent 'from app.main import app' overwrites
+                      # it with the FastAPI instance (the correct binding).
 from app.main import app
 from app.database import Base, get_db
 from app.models import User, WalletTransaction, Group, GroupMember, Expense, ExpenseParticipant
 from app.ledger import compute_wallet_balance
-import app.audit_log  # noqa: F401 — ensures AuditLog is registered with Base before create_all
 
 # ─── Test Database Setup ───
 
