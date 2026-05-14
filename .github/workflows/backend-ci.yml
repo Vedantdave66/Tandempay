@@ -54,7 +54,7 @@ jobs:
       - name: Run tests
         working-directory: backend
         run: |
-          pytest tests/ -v --tb=short \
+          pytest -m pytests/ -v --tb=short \
             --ignore=tests/test_pg_concurrency.py \
             --ignore=tests/test_pg_failure_injection.py \
             --ignore=tests/test_stripe_idempotency.py
