@@ -15,19 +15,25 @@ _db_url = settings.DATABASE_URL
 _scheme = _db_url.split("://", 1)[0] if "://" in _db_url else "<missing>"
 logger.info("Initializing async engine with scheme=%s", _scheme)
 
+# asyncpg-specific connect_args (PgBouncer + Supabase requirements).
+# Skipped entirely for SQLite (used in tests) — aiosqlite does not
+# accept these kwargs and will raise on connection.
+_is_postgres = _db_url.startswith("postgresql")
+_connect_args = (
+    {
+        "statement_cache_size": 0,
+        "prepared_statement_cache_size": 0,
+        "ssl": "require",
+    }
+    if _is_postgres
+    else {}
+)
+
 engine = create_async_engine(
     _db_url,
     echo=False,
     poolclass=NullPool,
-    # asyncpg + Supabase Transaction Pooler (PgBouncer) requires:
-    #   - prepared-statement caches disabled (PgBouncer recycles connections,
-    #     so cached statements break across them)
-    #   - SSL required (Supabase rejects plaintext)
-    connect_args={
-        "statement_cache_size": 0,
-        "prepared_statement_cache_size": 0,
-        "ssl": "require",
-    },
+    connect_args=_connect_args,
 )
 async_session = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
 
