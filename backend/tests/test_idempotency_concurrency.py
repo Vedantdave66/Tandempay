@@ -33,6 +33,7 @@ import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_idempotency.db"
 
 from app import audit_log as _audit_log  # noqa: F401 — registers AuditLog with Base before create_all
+from app import models as _models        # noqa: F401 — ensures all app models are registered with Base before create_all
 from app.main import app
 from app.database import Base, get_db
 from app.models import User, WalletTransaction
