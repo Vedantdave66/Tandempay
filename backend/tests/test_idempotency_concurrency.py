@@ -36,6 +36,7 @@ from app.main import app
 from app.database import Base, get_db
 from app.models import User, WalletTransaction
 from app.idempotency import IdempotencyKey
+import app.audit_log  # noqa: F401 — ensures AuditLog is registered with Base before create_all
 
 # ─── Test Database Setup ───
 

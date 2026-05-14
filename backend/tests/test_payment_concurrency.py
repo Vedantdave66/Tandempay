@@ -27,6 +27,7 @@ os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_payment_toctou.db"
 from app.main import app
 from app.database import Base, get_db
 from app.models import User, WalletTransaction, Group, GroupMember, PaymentRequest
+import app.audit_log  # noqa: F401 — ensures AuditLog is registered with Base before create_all
 
 # ─── Test Database Setup ───
 
