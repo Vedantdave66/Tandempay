@@ -163,6 +163,18 @@ Pro tier — $3.99/mo or $29.99/yr:
 | 6 | CI/CD pipeline | ✅ DONE — GitHub Actions SQLite job green (commits `bc60c8f`–`a57c5bb`); PG job TODO (needs service container) |
 | 7 | Refund endpoint | Optional — depends on whether Stripe Connect stays as backup |
 
+## Pre-Launch Checklist (Before/During Phase 4)
+
+These are non-code requirements that must be addressed before TandemPay handles real money at scale. Work these in parallel with Phase 4 development.
+
+1. **Register Canadian business entity** — sole proprietorship or corporation. Required before opening a business bank account and before Stripe Connect approval.
+2. **Add Privacy Policy and Terms of Service pages to the app** — required by Stripe, Apple App Store, and Google Play. Must be live URLs, not placeholders.
+3. **Determine if MSB (Money Services Business) registration with FINTRAC is required** — any platform that facilitates money transfers in Canada may need to register. Consult a Canadian fintech lawyer before launching to real users.
+4. **Start Stripe Connect application once core payment flows are working (mid-Phase 4)** — Stripe reviews Connect applications manually; allow 2–4 weeks. Do not wait until launch week.
+5. **Stripe Connect will need:** business registration documents, KYC/onboarding flow description, dispute/refund policy, and expected transaction volumes (monthly).
+
+---
+
 ## After Phase 3 — product revamp (the new direction)
 
 | # | Prompt | Notes |
