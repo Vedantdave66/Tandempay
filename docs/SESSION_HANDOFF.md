@@ -158,7 +158,7 @@ Pro tier — $3.99/mo or $29.99/yr:
 | 1 | Security headers (vercel.json, both projects) | ✅ DONE — A grade on securityheaders.com |
 | 2 | Sentry error monitoring (backend + frontend + mobile) | ✅ DONE on backend + frontend; mobile pending EAS build verification |
 | 3 | Audit log for financial actions | ✅ DONE — AuditLog wired in wallet.py (deposit/withdraw) and payments.py (4 locations); commit `a07769f`, merged PR #1 |
-| 4 | Structured JSON logging (slimmed — rename portion already done) | **NEXT** |
+| 4 | Structured JSON logging (slimmed — rename portion already done) | ✅ DONE — moved inline loggers to module level in stripe_routes.py and plaid_routes.py; commit `47de988`, merged PR #2 |
 | 5 | Input validation hardening | After structured logging |
 | 6 | CI/CD pipeline | ✅ DONE — GitHub Actions SQLite job green (commits `bc60c8f`–`a57c5bb`); PG job TODO (needs service container) |
 | 7 | Refund endpoint | Optional — depends on whether Stripe Connect stays as backup |
