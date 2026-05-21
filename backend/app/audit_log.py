@@ -39,6 +39,15 @@ class AuditActions:
     SETTLEMENT_CONFIRMED = "settlement.confirmed"
     SETTLEMENT_REJECTED = "settlement.rejected"
 
+    # Wallet lifecycle
+    WALLET_DEPOSITED = "wallet.deposited"
+    WALLET_WITHDRAWN = "wallet.withdrawn"
+
+    # Payment lifecycle
+    PAYMENT_INITIATED = "payment.initiated"
+    PAYMENT_PENDING_CLAIM = "payment.pending_claim"
+    PAYMENT_STALE_EXPIRED = "payment.stale_expired"
+
 
 class AuditLog(Base):
     """

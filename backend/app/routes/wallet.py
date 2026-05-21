@@ -19,6 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from pydantic import BaseModel, condecimal
 
+from app.audit_log import AuditLog, AuditActions
 from app.database import get_db
 from app.models import User, Notification, WalletTransaction
 from app.routes.auth import get_current_user
@@ -74,6 +75,14 @@ async def add_funds(
     # 3. Post-mutation integrity check
     await validate_balance_integrity(user, db)
 
+    db.add(AuditLog(
+        actor_id=user.id,
+        action=AuditActions.WALLET_DEPOSITED,
+        entity_type="wallet_transaction",
+        entity_id=txn.id,
+        action_metadata={"amount": str(data.amount), "balance_after": str(user.wallet_balance)},
+    ))
+
     await db.commit()
     await verify_post_commit(user.id, user.wallet_balance, db)
 
@@ -111,6 +120,14 @@ async def withdraw_funds(
     
     # 3. Post-mutation integrity check
     await validate_balance_integrity(user, db)
+
+    db.add(AuditLog(
+        actor_id=user.id,
+        action=AuditActions.WALLET_WITHDRAWN,
+        entity_type="wallet_transaction",
+        entity_id=txn.id,
+        action_metadata={"amount": str(data.amount), "balance_after": str(user.wallet_balance)},
+    ))
 
     await db.commit()
     await verify_post_commit(user.id, user.wallet_balance, db)

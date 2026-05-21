@@ -6,6 +6,7 @@ from sqlalchemy import select
 from pydantic import BaseModel
 from typing import Optional
 
+from app.audit_log import AuditLog, AuditActions
 from app.database import get_db
 from app.models import User, Payment
 from app.routes.auth import get_current_user
@@ -80,6 +81,13 @@ async def create_payment(
                     else:
                         # Payee now has an account! Expire the old pending_claim and let it create a new real payment below.
                         existing_payment.status = "expired"
+                        db.add(AuditLog(
+                            actor_id=current_user.id,
+                            action=AuditActions.PAYMENT_STALE_EXPIRED,
+                            entity_type="payment",
+                            entity_id=existing_payment.id,
+                            action_metadata={"amount_cents": existing_payment.amount, "reason": "pending_claim_upgraded"},
+                        ))
                         await db.flush()
             else:
                 # Fetch absolute status from Stripe source of truth
@@ -120,6 +128,13 @@ async def create_payment(
                                 logger.warning(f"[{correlation_id}] Could not cancel PI {existing_payment.stripe_payment_intent_id}: {str(cancel_err)}")
                         
                         existing_payment.status = "expired"
+                        db.add(AuditLog(
+                            actor_id=current_user.id,
+                            action=AuditActions.PAYMENT_STALE_EXPIRED,
+                            entity_type="payment",
+                            entity_id=existing_payment.id,
+                            action_metadata={"amount_cents": existing_payment.amount, "reason": "stale_pi_reset"},
+                        ))
                         await db.flush()
                 except Exception as e:
                     logger.error(f"[{correlation_id}] Error auditing existing PI: {str(e)}")
@@ -152,6 +167,13 @@ async def create_payment(
             group_id=None
         )
         db.add(notif)
+        db.add(AuditLog(
+            actor_id=current_user.id,
+            action=AuditActions.PAYMENT_PENDING_CLAIM,
+            entity_type="payment",
+            entity_id=new_payment.id,
+            action_metadata={"amount_cents": data.amount, "payee_id": data.payee_id},
+        ))
         await db.commit()
         logger.info(f"[{correlation_id}] Pending claim created, payee notified.")
         return {"status": "pending_claim", "payment_id": new_payment.id, "client_secret": None}
@@ -178,9 +200,17 @@ async def create_payment(
         logger.info(f"[{correlation_id}] Fresh Stripe PaymentIntent created: id={intent.id} status={intent.status} client_secret={intent.client_secret[:20]}...")
 
         new_payment.stripe_payment_intent_id = intent.id
-        # Keep status as 'pending' — it transitions to 'processing' only when 
+        # Keep status as 'pending' — it transitions to 'processing' only when
         # Stripe actually starts processing (after user submits payment method)
-        
+
+        db.add(AuditLog(
+            actor_id=current_user.id,
+            action=AuditActions.PAYMENT_INITIATED,
+            entity_type="payment",
+            entity_id=new_payment.id,
+            action_metadata={"amount_cents": data.amount, "payee_id": data.payee_id, "method": "stripe"},
+        ))
+
         await db.commit()
         
         response = {
