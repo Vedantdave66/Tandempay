@@ -1,3 +1,5 @@
+import logging
+
 import plaid
 from plaid.api import plaid_api
 from plaid.model.link_token_create_request import LinkTokenCreateRequest
@@ -19,7 +21,7 @@ from app.config import get_settings
 
 router = APIRouter(prefix="/api/plaid", tags=["Plaid"])
 settings = get_settings()
-logger = __import__("logging").getLogger("tandempay.plaid")
+logger = logging.getLogger("tandempay.plaid")
 
 configuration = plaid.Configuration(
     host=plaid.Environment.Sandbox if settings.PLAID_ENV == 'sandbox' else plaid.Environment.Production,
