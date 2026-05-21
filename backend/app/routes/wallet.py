@@ -17,13 +17,13 @@ from decimal import Decimal
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel, condecimal
+from pydantic import BaseModel
 
 from app.audit_log import AuditLog, AuditActions
 from app.database import get_db
 from app.models import User, Notification, WalletTransaction
 from app.routes.auth import get_current_user
-from app.schemas import UserOut, WalletTransactionOut
+from app.schemas import UserOut, WalletTransactionOut, CadAmount
 from app.idempotency import idempotent
 from app.ledger import (
     lock_user_for_update,
@@ -40,10 +40,10 @@ router = APIRouter(prefix="/api/wallet", tags=["wallet"])
 
 
 class AddFundsRequest(BaseModel):
-    amount: condecimal(ge=Decimal("0.01"), decimal_places=2)
+    amount: CadAmount
 
 class WithdrawRequest(BaseModel):
-    amount: condecimal(ge=Decimal("0.01"), decimal_places=2)
+    amount: CadAmount
 
 @router.post("/add-funds")
 @idempotent

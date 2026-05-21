@@ -22,6 +22,10 @@ security = HTTPBearer()
 settings = get_settings()
 logger = logging.getLogger("tandempay.auth")
 
+# In-memory rate-limit store for expired-token auto-resend (keyed by email).
+# Prevents hammering Resend if a user repeatedly submits the same expired token.
+recent_reset_requests: dict[str, datetime] = {}
+
 from app.limiter import limiter
 
 AVATAR_COLORS = ["#3ECF8E", "#6366F1", "#F59E0B", "#EF4444", "#EC4899", "#8B5CF6", "#14B8A6", "#F97316"]
