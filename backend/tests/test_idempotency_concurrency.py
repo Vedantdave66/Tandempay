@@ -30,7 +30,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from httpx import AsyncClient, ASGITransport
 from jose import jwt as _jwt
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, or_
 
 import os
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///./test_idempotency.db"
@@ -176,7 +176,12 @@ async def count_deposit_transactions(user_id: str) -> int:
                 WalletTransaction.user_id == user_id,
                 WalletTransaction.type == "deposit",
                 WalletTransaction.status == "completed",
-                WalletTransaction.reference_id != "initial_test_funding",
+                # NULL != 'x' evaluates to NULL in SQL, not TRUE — use OR IS NULL
+                # to correctly include rows where reference_id was never set.
+                or_(
+                    WalletTransaction.reference_id.is_(None),
+                    WalletTransaction.reference_id != "initial_test_funding",
+                ),
             )
         )
         return len(result.scalars().all())
