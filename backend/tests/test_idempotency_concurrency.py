@@ -56,14 +56,12 @@ async def override_get_db():
             raise
 
 
-app.dependency_overrides[get_db] = override_get_db
-
-
 # ─── Fixtures ───
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_database():
     """Create tables before each test, drop after."""
+    app.dependency_overrides[get_db] = override_get_db
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -73,6 +71,7 @@ async def setup_database():
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
+    app.dependency_overrides.pop(get_db, None)
     if os.path.exists("test_idempotency.db"):
         try:
             os.remove("test_idempotency.db")
