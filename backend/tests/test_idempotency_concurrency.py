@@ -25,7 +25,10 @@ import logging
 
 import pytest
 import pytest_asyncio
+from fastapi import Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from httpx import AsyncClient, ASGITransport
+from jose import jwt as _jwt
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select
 
@@ -38,12 +41,17 @@ from app.main import app
 from app.database import Base, get_db
 from app.models import User, WalletTransaction
 from app.idempotency import IdempotencyKey
+from app.routes.auth import get_current_user
+from app.config import get_settings as _get_settings
 
 # ─── Test Database Setup ───
 
 TEST_DB_URL = "sqlite+aiosqlite:///./test_idempotency.db"
 test_engine = create_async_engine(TEST_DB_URL, echo=False)
 TestSessionLocal = async_sessionmaker(test_engine, class_=AsyncSession, expire_on_commit=False)
+
+_security = HTTPBearer()
+_settings = _get_settings()
 
 
 async def override_get_db():
@@ -56,12 +64,28 @@ async def override_get_db():
             raise
 
 
+async def override_get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(_security),
+) -> User:
+    """Decode the test JWT and return the User ORM object from the test DB."""
+    payload = _jwt.decode(
+        credentials.credentials,
+        _settings.SECRET_KEY,
+        algorithms=[_settings.ALGORITHM],
+    )
+    user_id: str = payload["sub"]
+    async with TestSessionLocal() as db:
+        result = await db.execute(select(User).where(User.id == user_id))
+        return result.scalar_one()
+
+
 # ─── Fixtures ───
 
 @pytest_asyncio.fixture(autouse=True)
 async def setup_database():
     """Create tables before each test, drop after."""
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_current_user] = override_get_current_user
     async with test_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield
@@ -72,6 +96,7 @@ async def setup_database():
         await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
     app.dependency_overrides.pop(get_db, None)
+    app.dependency_overrides.pop(get_current_user, None)
     if os.path.exists("test_idempotency.db"):
         try:
             os.remove("test_idempotency.db")

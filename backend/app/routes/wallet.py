@@ -72,11 +72,11 @@ async def add_funds(
     user.wallet_balance += data.amount
     
     # 3. Post-mutation integrity check
-    await validate_balance_integrity(user.id, user.wallet_balance, db)
-    
+    await validate_balance_integrity(user, db)
+
     await db.commit()
     await verify_post_commit(user.id, user.wallet_balance, db)
-    
+
     return {"status": "success", "new_balance": user.wallet_balance}
 
 @router.post("/withdraw")
@@ -110,11 +110,11 @@ async def withdraw_funds(
     user.wallet_balance -= data.amount
     
     # 3. Post-mutation integrity check
-    await validate_balance_integrity(user.id, user.wallet_balance, db)
-    
+    await validate_balance_integrity(user, db)
+
     await db.commit()
     await verify_post_commit(user.id, user.wallet_balance, db)
-    
+
     return {"status": "success", "new_balance": user.wallet_balance}
 
 @router.get("/balance", response_model=UserOut)
