@@ -1,6 +1,8 @@
 import asyncio
 import logging
 import stripe
+
+logger = logging.getLogger("tandempay.stripe")
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from decimal import Decimal
@@ -97,9 +99,7 @@ async def get_onboarding_status(
             
             if pending_claims:
                 from app.models import Notification
-                import logging
-                logger = logging.getLogger("tandempay.onboarding")
-                
+
                 for p in pending_claims:
                     # Mark it so we don't double-notify
                     p.status = "pending_claim_ready"
@@ -141,9 +141,7 @@ async def get_onboarding_status(
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     import traceback
-    import logging
-    logger = logging.getLogger("tandempay.webhooks")
-    
+
     try:
         payload = await request.body()
         sig_header = request.headers.get("Stripe-Signature", "")
@@ -355,7 +353,6 @@ async def reconcile_payment(
 
     try:
         intent = stripe.PaymentIntent.retrieve(payment.stripe_payment_intent_id)
-        logger = logging.getLogger("tandempay.reconciliation")
         logger.info(f"Reconciling {payment_id}: Stripe status={intent.status}")
         
         if intent.status == "succeeded":
