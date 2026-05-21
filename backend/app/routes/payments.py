@@ -3,7 +3,7 @@ import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 from app.audit_log import AuditLog, AuditActions
@@ -24,9 +24,9 @@ router = APIRouter(prefix="/api/payments", tags=["Payments"])
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 class PaymentCreateRequest(BaseModel):
-    payee_id: str
-    amount: int  # in cents
-    settlement_id: Optional[str] = None
+    payee_id: str = Field(min_length=1, max_length=64)
+    amount: int = Field(gt=0, le=1_000_000, description="Amount in cents (max $10,000 CAD)")
+    settlement_id: Optional[str] = Field(default=None, max_length=64)
 
 @router.post("/create")
 @idempotent
@@ -58,6 +58,9 @@ async def create_payment(
     if not payee:
         logger.error(f"[{correlation_id}] Payment failed: Payee {data.payee_id} not found")
         raise HTTPException(status_code=404, detail="Payee not found")
+
+    if data.payee_id == current_user.id:
+        raise HTTPException(status_code=400, detail="Cannot initiate a payment to yourself")
 
     is_pending_claim = not getattr(payee, 'stripe_account_id', None)
 
