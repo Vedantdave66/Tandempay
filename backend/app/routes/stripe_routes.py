@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 from app.database import get_db
-from app.models import User, ProviderAccount, WalletTransaction, SettlementRecord, Payment, StripeEvent
+from app.models import User, ProviderAccount, WalletTransaction, SettlementRecord, Payment, StripeEvent, SubscriptionTier
 from app.routes.auth import get_current_user
 from app.config import get_settings
 from app.idempotency import idempotent
@@ -288,6 +288,70 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                     f"charge={charge_id} amount=${dispute_amount:.2f} "
                     f"— could not find matching Payment record"
                 )
+
+        elif event.type in (
+            'customer.subscription.created',
+            'customer.subscription.updated',
+        ):
+            subscription = event.data.object
+            customer_id = subscription.get("customer")
+            sub_status = subscription.get("status", "")
+            if customer_id:
+                result = await db.execute(
+                    select(User).where(User.stripe_customer_id == customer_id)
+                )
+                affected_user = result.scalars().first()
+                if affected_user:
+                    if sub_status in ("active", "trialing"):
+                        affected_user.subscription_tier = SubscriptionTier.pro
+                        logger.info(
+                            f"Subscription {event.type}: user {affected_user.id} upgraded to pro "
+                            f"(status={sub_status})"
+                        )
+                    else:
+                        logger.info(
+                            f"Subscription {event.type}: ignoring status={sub_status} for user {affected_user.id}"
+                        )
+                else:
+                    logger.warning(
+                        f"Subscription {event.type}: no user found for customer {customer_id}"
+                    )
+
+        elif event.type == 'customer.subscription.deleted':
+            subscription = event.data.object
+            customer_id = subscription.get("customer")
+            if customer_id:
+                result = await db.execute(
+                    select(User).where(User.stripe_customer_id == customer_id)
+                )
+                affected_user = result.scalars().first()
+                if affected_user:
+                    affected_user.subscription_tier = SubscriptionTier.free
+                    logger.info(
+                        f"Subscription deleted: user {affected_user.id} downgraded to free"
+                    )
+                else:
+                    logger.warning(
+                        f"Subscription deleted: no user found for customer {customer_id}"
+                    )
+
+        elif event.type == 'invoice.payment_failed':
+            invoice = event.data.object
+            customer_id = invoice.get("customer")
+            if customer_id:
+                result = await db.execute(
+                    select(User).where(User.stripe_customer_id == customer_id)
+                )
+                affected_user = result.scalars().first()
+                if affected_user:
+                    affected_user.subscription_tier = SubscriptionTier.free
+                    logger.warning(
+                        f"invoice.payment_failed: user {affected_user.id} downgraded to free"
+                    )
+                else:
+                    logger.warning(
+                        f"invoice.payment_failed: no user found for customer {customer_id}"
+                    )
 
         elif event.type == 'account.updated':
             # Stripe Connect: a connected account's status changed.

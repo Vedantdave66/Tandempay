@@ -28,6 +28,7 @@ class Settings(BaseSettings):
     STRIPE_SECRET_KEY: str = ""
     STRIPE_PUBLISHABLE_KEY: str = ""
     STRIPE_WEBHOOK_SECRET: str = ""
+    STRIPE_PRO_PRICE_ID: str = ""
 
     # Sentry — leave empty to disable monitoring entirely (safe for local dev)
     SENTRY_DSN: str = ""
