@@ -1,11 +1,17 @@
+import enum
 import uuid
 import secrets
 from datetime import datetime
 from typing import Optional
-from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index
+from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from decimal import Decimal
 from app.database import Base
+
+
+class SubscriptionTier(str, enum.Enum):
+    free = "free"
+    pro = "pro"
 
 
 class User(Base):
@@ -19,7 +25,14 @@ class User(Base):
     wallet_balance: Mapped[Decimal] = mapped_column(Numeric(12, 2, asdecimal=True), default=Decimal('0.00'))
     interac_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     stripe_account_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    stripe_customer_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     has_completed_payment: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    subscription_tier: Mapped[SubscriptionTier] = mapped_column(
+        SAEnum(SubscriptionTier, name="subscriptiontier", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+        default=SubscriptionTier.free,
+        server_default=SubscriptionTier.free.value,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     groups: Mapped[list["GroupMember"]] = relationship(back_populates="user")
