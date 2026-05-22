@@ -62,6 +62,7 @@ export interface User {
     stripe_account_id: string | null;
     interac_email: string | null;
     has_completed_payment: boolean;
+    subscription_tier: 'free' | 'pro';
     created_at: string;
 }
 
@@ -441,4 +442,54 @@ export const remindersApi = {
         request<void>(`/groups/${groupId}/expenses/${expenseId}/reminder`, {
             method: 'DELETE',
         }),
+};
+
+// --- Recurring Expenses (Pro) ---
+export type RecurrenceFrequency = 'weekly' | 'biweekly' | 'monthly' | 'yearly';
+
+export interface RecurringExpense {
+    id: string;
+    group_id: string | null;
+    created_by_id: string;
+    description: string;
+    amount: string;
+    currency: string;
+    frequency: RecurrenceFrequency;
+    next_run_date: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export interface RecurringExpenseCreate {
+    description: string;
+    amount: string;
+    currency?: string;
+    frequency: RecurrenceFrequency;
+    next_run_date: string;
+    group_id?: string | null;
+}
+
+export interface RecurringExpenseUpdate {
+    description?: string;
+    amount?: string;
+    frequency?: RecurrenceFrequency;
+    next_run_date?: string;
+    is_active?: boolean;
+}
+
+export const recurringApi = {
+    list: () => request<RecurringExpense[]>('/recurring'),
+    create: (data: RecurringExpenseCreate) =>
+        request<RecurringExpense>('/recurring', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+    update: (id: string, data: RecurringExpenseUpdate) =>
+        request<RecurringExpense>(`/recurring/${id}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
+    delete: (id: string) =>
+        request<void>(`/recurring/${id}`, { method: 'DELETE' }),
 };

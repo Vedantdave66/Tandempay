@@ -25,6 +25,7 @@ from app.routes import auth, groups, expenses, settlements, notifications, me, f
 from app.routes import reminders
 from app.routes import audit_log
 from app.routes import subscription_routes
+from app.routes import recurring_routes
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
 from app.services.reminder_scheduler import process_due_reminders
@@ -157,6 +158,7 @@ async def lifespan(app: FastAPI):
         # APScheduler only works in long-running servers, not serverless
         if not is_serverless:
             from app.services.payment_reconciliation import run_payment_reconciliation
+            from app.scheduler import process_due_recurring_expenses
             scheduler = AsyncIOScheduler()
             scheduler.add_job(
                 process_due_reminders,
@@ -172,8 +174,15 @@ async def lifespan(app: FastAPI):
                 name="Automated payment reconciliation",
                 replace_existing=True,
             )
+            scheduler.add_job(
+                process_due_recurring_expenses,
+                trigger=IntervalTrigger(hours=24),
+                id="recurring_expense_tick",
+                name="Process due recurring expenses",
+                replace_existing=True,
+            )
             scheduler.start()
-            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m).")
+            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m, Recurring 24h).")
     except Exception as e:
         logger.error(f"Lifespan startup error (non-fatal): {e}")
 
@@ -306,6 +315,7 @@ app.include_router(payments.router)
 app.include_router(reconciliation_router)
 app.include_router(audit_log.router)
 app.include_router(subscription_routes.router)
+app.include_router(recurring_routes.router)
 
 @app.get("/")
 async def root():
