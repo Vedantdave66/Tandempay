@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { BASE_URL } from '../services/api';
 import { Download, FileText, Sheet, Crown, Lock, Loader2 } from 'lucide-react';
+import UpgradeButton from '../components/UpgradeButton';
 
 async function downloadExport(format: 'csv' | 'pdf'): Promise<void> {
     const token = localStorage.getItem('token');
@@ -86,12 +87,7 @@ export default function ExportPage() {
                         <p className="text-xs text-secondary mt-0.5">
                             Pro members can download their full expense history as CSV or PDF at any time.
                         </p>
-                        <a
-                            href="/settings"
-                            className="inline-block mt-2 text-xs font-bold text-accent hover:underline"
-                        >
-                            Upgrade now &rarr;
-                        </a>
+                        <UpgradeButton />
                     </div>
                 </div>
             ) : (
