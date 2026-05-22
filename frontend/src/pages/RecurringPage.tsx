@@ -6,6 +6,7 @@ import {
     RecurrenceFrequency,
 } from '../services/api';
 import { RefreshCw, Plus, Pencil, Trash2, X, Loader2, Crown, Lock } from 'lucide-react';
+import UpgradeButton from '../components/UpgradeButton';
 
 const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
     weekly: 'Weekly',
@@ -176,12 +177,7 @@ export default function RecurringPage() {
                         <p className="text-xs text-secondary mt-0.5">
                             Pro members can set up automatic splits for rent, subscriptions, and more.
                         </p>
-                        <a
-                            href="/settings"
-                            className="inline-block mt-2 text-xs font-bold text-accent hover:underline"
-                        >
-                            Upgrade now &rarr;
-                        </a>
+                        <UpgradeButton />
                     </div>
                 </div>
             )}
