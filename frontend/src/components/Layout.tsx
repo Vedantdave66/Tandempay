@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2 } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -172,6 +172,19 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     >
                         <Activity className="w-5 h-5" />
                         Activity
+                    </button>
+                    <button
+                        onClick={() => {
+                            navigate('/recurring');
+                            setIsMobileMenuOpen(false);
+                        }}
+                        className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-200 cursor-pointer ${location.pathname === '/recurring'
+                            ? 'bg-accent/10 text-accent font-bold'
+                            : 'text-secondary hover:text-primary hover:bg-surface-hover'
+                            }`}
+                    >
+                        <RefreshCw className="w-5 h-5" />
+                        Recurring
                     </button>
                 </nav>
 

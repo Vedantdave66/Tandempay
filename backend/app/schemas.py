@@ -14,7 +14,7 @@ not untrusted input coming in.  No strip_whitespace on output fields.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
 from typing import Annotated, Optional
@@ -116,6 +116,7 @@ class UserOut(BaseModel):
     interac_email: Optional[str] = None
     stripe_account_id: Optional[str] = None
     has_completed_payment: bool = False
+    subscription_tier: str = "free"
     created_at: datetime
 
 
@@ -384,3 +385,45 @@ class ReminderOut(BaseModel):
     expense_id: str
     created_by: str
     interval_days: int
+
+
+# ── Recurring Expenses (Pro) ──────────────────────────────────────────────────
+
+class RecurrenceFrequency(str, Enum):
+    weekly = "weekly"
+    biweekly = "biweekly"
+    monthly = "monthly"
+    yearly = "yearly"
+
+
+class RecurringExpenseCreate(BaseModel):
+    description: Annotated[str, StringConstraints(min_length=1, max_length=255, strip_whitespace=True)]
+    amount: CadAmount
+    currency: str = Field(default="CAD", max_length=3)
+    frequency: RecurrenceFrequency
+    next_run_date: date
+    group_id: Optional[str] = Field(default=None, max_length=64)
+
+
+class RecurringExpenseUpdate(BaseModel):
+    description: Optional[Annotated[str, StringConstraints(min_length=1, max_length=255, strip_whitespace=True)]] = None
+    amount: Optional[CadAmount] = None
+    frequency: Optional[RecurrenceFrequency] = None
+    next_run_date: Optional[date] = None
+    is_active: Optional[bool] = None
+
+
+class RecurringExpenseOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: str
+    group_id: Optional[str] = None
+    created_by_id: str
+    description: str
+    amount: Decimal
+    currency: str
+    frequency: str
+    next_run_date: date
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime

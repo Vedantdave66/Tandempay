@@ -1,9 +1,9 @@
 import enum
 import uuid
 import secrets
-from datetime import datetime
+from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum
+from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum, Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from decimal import Decimal
 from app.database import Base
@@ -277,3 +277,35 @@ class StripeEvent(Base):
     id: Mapped[str] = mapped_column(String, primary_key=True)  # This will be the actual Stripe event ID
     type: Mapped[str] = mapped_column(String(100), nullable=False)
     processed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+# --- Recurring Expenses (Pro feature) ---
+
+class RecurrenceFrequency(str, enum.Enum):
+    weekly = "weekly"
+    biweekly = "biweekly"
+    monthly = "monthly"
+    yearly = "yearly"
+
+
+class RecurringExpense(Base):
+    """Template for an expense that auto-fires on a recurring schedule (Pro only)."""
+    __tablename__ = "recurring_expenses"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    group_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("groups.id", ondelete="CASCADE"), nullable=True)
+    created_by_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
+    description: Mapped[str] = mapped_column(String(255), nullable=False)
+    amount: Mapped[Decimal] = mapped_column(Numeric(10, 2, asdecimal=True), nullable=False)
+    currency: Mapped[str] = mapped_column(String(3), default="CAD")
+    frequency: Mapped[RecurrenceFrequency] = mapped_column(
+        SAEnum(RecurrenceFrequency, name="recurrencefrequency", values_callable=lambda x: [e.value for e in x]),
+        nullable=False,
+    )
+    next_run_date: Mapped[date] = mapped_column(Date, nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    group: Mapped[Optional["Group"]] = relationship()
+    created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])

@@ -11,6 +11,7 @@ import GroupPage from './pages/GroupPage';
 import InvitePage from './pages/InvitePage';
 import PaymentsPage from './pages/PaymentsPage';
 import FriendsPage from './pages/FriendsPage';
+import RecurringPage from './pages/RecurringPage';
 import LandingPage from './pages/LandingPage';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
@@ -76,6 +77,7 @@ export default function App() {
                             <Route path="/dashboard" element={<ProtectedRoute><Layout><DashboardPage /></Layout></ProtectedRoute>} />
                             <Route path="/payments" element={<ProtectedRoute><Layout><PaymentsPage /></Layout></ProtectedRoute>} />
                             <Route path="/friends" element={<ProtectedRoute><Layout><FriendsPage /></Layout></ProtectedRoute>} />
+                            <Route path="/recurring" element={<ProtectedRoute><Layout><RecurringPage /></Layout></ProtectedRoute>} />
                             <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
                             <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
                             <Route path="*" element={<Navigate to="/dashboard" />} />
