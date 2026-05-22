@@ -26,6 +26,7 @@ from app.routes import reminders
 from app.routes import audit_log
 from app.routes import subscription_routes
 from app.routes import recurring_routes
+from app.routes import export_routes
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
 from app.services.reminder_scheduler import process_due_reminders
@@ -316,6 +317,7 @@ app.include_router(reconciliation_router)
 app.include_router(audit_log.router)
 app.include_router(subscription_routes.router)
 app.include_router(recurring_routes.router)
+app.include_router(export_routes.router)
 
 @app.get("/")
 async def root():
