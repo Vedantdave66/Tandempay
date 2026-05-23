@@ -105,3 +105,4 @@ If you add new fields to your models in `app/models.py` (e.g., adding `phone_num
 - **Prod URL Structure:** `postgresql+asyncpg://user:password@host/dbname`
 - **ORM:** SQLAlchemy 2.0 (Async)
 - **Migrations:** Alembic
+
