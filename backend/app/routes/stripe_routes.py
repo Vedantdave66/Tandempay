@@ -165,23 +165,23 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
         if event.type == 'payment_intent.succeeded':
             intent = event.data.object
-            metadata = intent.get('metadata', {})
+            metadata = intent.metadata or {}
             payment_id = metadata.get("payment_id")
-            
+
             if not payment_id:
                 logger.warning(f"No payment_id found in metadata for {event_logger}")
             else:
                 result = await db.execute(select(Payment).where(Payment.id == payment_id))
                 payment = result.scalars().first()
-                
+
                 if payment:
                     if payment.status != "succeeded":
                         # STRICT TRANSFER VALIDATION
                         try:
-                            latest_charge_id = intent.get("latest_charge")
+                            latest_charge_id = intent.latest_charge
                             if latest_charge_id:
                                 charge = stripe.Charge.retrieve(latest_charge_id)
-                                transfer_id = charge.get("transfer")
+                                transfer_id = charge.transfer
                                 if transfer_id:
                                     transfer = stripe.Transfer.retrieve(transfer_id)
                                     if transfer.status != "succeeded":
@@ -214,7 +214,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
         
         elif event.type == 'payment_intent.payment_failed':
             intent = event.data.object
-            metadata = intent.get('metadata', {})
+            metadata = intent.metadata or {}
             payment_id = metadata.get("payment_id")
             
             result = await db.execute(select(Payment).where(Payment.id == payment_id))
@@ -225,7 +225,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
         elif event.type == 'payment_intent.canceled':
             intent = event.data.object
-            metadata = intent.get('metadata', {})
+            metadata = intent.metadata or {}
             payment_id = metadata.get("payment_id")
             
             result = await db.execute(select(Payment).where(Payment.id == payment_id))
@@ -238,7 +238,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             # 3DS challenge pending — the user must complete authentication.
             # We mark the DB so the scheduled cleanup can expire it later if they abandon.
             intent = event.data.object
-            metadata = intent.get('metadata', {})
+            metadata = intent.metadata or {}
             payment_id = metadata.get("payment_id")
 
             if not payment_id:
@@ -248,14 +248,14 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                 payment = result.scalars().first()
                 if payment and payment.status not in ("succeeded", "failed", "expired"):
                     payment.status = "requires_action"
-                    logger.info(f"Payment {payment_id} requires 3DS action (intent={intent.get('id')})")
+                    logger.info(f"Payment {payment_id} requires 3DS action (intent={intent.id})")
 
         elif event.type == 'charge.dispute.created':
             # A chargeback has been opened — mark the payment disputed and alert ops.
             dispute = event.data.object
-            charge_id = dispute.get("charge")
-            dispute_id = dispute.get("id")
-            dispute_amount = dispute.get("amount", 0) / 100  # Stripe amounts are in cents
+            charge_id = dispute.charge
+            dispute_id = dispute.id
+            dispute_amount = (dispute.amount or 0) / 100  # Stripe amounts are in cents
 
             # Look up the Payment by charge ID via the PaymentIntent
             payment = None
@@ -265,7 +265,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                     charge = await _asyncio.to_thread(
                         lambda: stripe.Charge.retrieve(charge_id)
                     )
-                    pi_id = charge.get("payment_intent")
+                    pi_id = charge.payment_intent
                     if pi_id:
                         result = await db.execute(
                             select(Payment).where(Payment.stripe_payment_intent_id == pi_id)
@@ -294,8 +294,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             'customer.subscription.updated',
         ):
             subscription = event.data.object
-            customer_id = subscription.get("customer")
-            sub_status = subscription.get("status", "")
+            customer_id = subscription.customer
+            sub_status = subscription.status or ""
             if customer_id:
                 result = await db.execute(
                     select(User).where(User.stripe_customer_id == customer_id)
@@ -319,7 +319,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
         elif event.type == 'customer.subscription.deleted':
             subscription = event.data.object
-            customer_id = subscription.get("customer")
+            customer_id = subscription.customer
             if customer_id:
                 result = await db.execute(
                     select(User).where(User.stripe_customer_id == customer_id)
@@ -337,7 +337,7 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
 
         elif event.type == 'invoice.payment_failed':
             invoice = event.data.object
-            customer_id = invoice.get("customer")
+            customer_id = invoice.customer
             if customer_id:
                 result = await db.execute(
                     select(User).where(User.stripe_customer_id == customer_id)
@@ -358,8 +358,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
             # If charges_enabled goes False, payouts are suspended — alert ops immediately.
             import asyncio as _asyncio
             account = event.data.object
-            account_id = account.get("id")
-            charges_enabled = account.get("charges_enabled", True)
+            account_id = account.id
+            charges_enabled = account.charges_enabled
 
             if not charges_enabled:
                 # Identify whose account this is for log context
