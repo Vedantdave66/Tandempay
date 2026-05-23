@@ -83,6 +83,11 @@
   --color-gold-base: #D4A853;
 }
 
+html,
+body {
+  background-color: #09090B;
+}
+
 * {
   box-sizing: border-box;
 }
