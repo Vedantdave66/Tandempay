@@ -23,8 +23,7 @@ export default function DashboardPage() {
         try {
             const data = await groupsApi.list();
             setGroups(data);
-        } catch (err) {
-            console.error(err);
+        } catch {
         } finally {
             setLoading(false);
         }
@@ -42,8 +41,7 @@ export default function DashboardPage() {
             setNewGroupName('');
             setShowCreate(false);
             await loadGroups();
-        } catch (err) {
-            console.error(err);
+        } catch {
         } finally {
             setCreating(false);
         }
@@ -58,7 +56,6 @@ export default function DashboardPage() {
             <div className="fixed top-0 left-0 w-[600px] h-[600px] bg-accent/10 rounded-full blur-[120px] pointer-events-none -z-10 translate-x-[-20%] translate-y-[-20%]" />
             <div className="fixed top-0 right-0 w-[600px] h-[600px] bg-indigo/10 rounded-full blur-[120px] pointer-events-none -z-10 translate-x-[20%] translate-y-[-10%]" />
 
-            {/* Subtle Noise Texture Overlay (Optional, using CSS or SVG) */}
             <div className="fixed inset-0 opacity-[0.015] pointer-events-none -z-10" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
             {/* Hero Header */}
@@ -77,7 +74,6 @@ export default function DashboardPage() {
                             Manage your shared financial spaces, track group balances, and pay balances effortlessly.
                         </p>
                     </div>
-                    {/* Optional Abstract Decoration */}
                     <div className="hidden md:flex items-center justify-center w-32 h-32 relative">
                         <div className="absolute inset-0 border-2 border-dashed border-border/80 rounded-full animate-[spin_60s_linear_infinite]" />
                         <div className="w-24 h-24 bg-gradient-to-tr from-accent/20 to-indigo/20 rounded-full blur-xl" />

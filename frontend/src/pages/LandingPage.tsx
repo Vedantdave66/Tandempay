@@ -46,6 +46,9 @@ export default function LandingPage() {
                             <PlayCircle className="w-4 h-4" />
                             How it works
                         </Link>
+                        <Link to="/pricing" className="hidden md:flex items-center gap-2 text-sm font-medium text-secondary hover:text-primary transition-colors">
+                            Pricing
+                        </Link>
                         <Link to="/login" className="px-5 py-2.5 text-sm font-medium text-secondary hover:text-primary transition-colors">
                             Log in
                         </Link>
@@ -290,6 +293,7 @@ export default function LandingPage() {
                             <ul className="space-y-2 text-sm text-secondary">
                                 <li><Link to="/register" className="hover:text-accent transition-colors">Sign Up</Link></li>
                                 <li><Link to="/login" className="hover:text-accent transition-colors">Log In</Link></li>
+                                <li><Link to="/pricing" className="hover:text-accent transition-colors">Pricing</Link></li>
                                 <li><Link to="/tutorial" className="hover:text-accent transition-colors text-primary font-medium">How it works</Link></li>
                             </ul>
                          </div>
