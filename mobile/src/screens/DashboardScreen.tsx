@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Activ
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { groupsApi, GroupListItem } from '../services/api';
-import { LogOut, Plus, Users, ArrowRight, HelpCircle, Crown } from 'lucide-react-native';
+import { LogOut, Plus, Users, ArrowRight } from 'lucide-react-native';
 import ThemeToggle from '../components/ThemeToggle';
 
 export default function DashboardScreen({ navigation }: any) {
@@ -97,18 +97,14 @@ export default function DashboardScreen({ navigation }: any) {
                     <View style={styles.greetingRow}>
                         <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.name.split(' ')[0]}</Text>
                         {user?.subscription_tier === 'pro' && (
-                            <Text style={styles.crownBadge}>👑</Text>
+                            <View style={styles.proBadge}>
+                                <Text style={styles.proBadgeText}>PRO</Text>
+                            </View>
                         )}
                     </View>
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Here is your summary</Text>
                 </View>
                 <View style={styles.headerActions}>
-                    <TouchableOpacity onPress={() => navigation.navigate('Tutorial')} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <HelpCircle color={colors.secondaryText} size={20} />
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => navigation.navigate('ProUpgrade')} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Crown color={user?.subscription_tier === 'pro' ? colors.accent : colors.secondaryText} size={20} />
-                    </TouchableOpacity>
                     <ThemeToggle />
                     <TouchableOpacity onPress={logout} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <LogOut color={colors.danger} size={20} />
@@ -221,9 +217,19 @@ const styles = StyleSheet.create({
         letterSpacing: -0.3,
         marginBottom: 3,
     },
-    crownBadge: {
-        fontSize: 20,
-        lineHeight: 28,
+    proBadge: {
+        backgroundColor: '#16a34a',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        alignSelf: 'center',
+        marginBottom: 3,
+    },
+    proBadgeText: {
+        color: '#ffffff',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     subtitle: {
         fontSize: 14,
