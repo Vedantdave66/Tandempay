@@ -4,7 +4,7 @@ import DashboardScreen from '../screens/DashboardScreen';
 import PaymentsScreen from '../screens/PaymentsScreen';
 import GroupsScreen from '../screens/GroupsScreen';
 import FriendsScreen from '../screens/FriendsScreen';
-import ActivityScreen from '../screens/ActivityScreen';
+import ProHubScreen from '../screens/ProHubScreen';
 import CustomTabBar from '../components/CustomTabBar';
 
 const Tab = createBottomTabNavigator();
@@ -22,7 +22,7 @@ export default function MainTabNavigator() {
             <Tab.Screen name="Groups" component={GroupsScreen} />
             <Tab.Screen name="Payments" component={PaymentsScreen} />
             <Tab.Screen name="Friends" component={FriendsScreen} />
-            <Tab.Screen name="Activity" component={ActivityScreen} />
+            <Tab.Screen name="Pro" component={ProHubScreen} />
         </Tab.Navigator>
     );
 }

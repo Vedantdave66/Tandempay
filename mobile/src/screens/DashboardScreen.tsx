@@ -3,12 +3,14 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Activ
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { groupsApi, GroupListItem } from '../services/api';
-import { LogOut, Plus, Users, ArrowRight } from 'lucide-react-native';
+import { LogOut, Plus, Users, ArrowRight, Bell } from 'lucide-react-native';
 import ThemeToggle from '../components/ThemeToggle';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function DashboardScreen({ navigation }: any) {
     const { user, logout } = useAuth();
     const { colors, isDark } = useTheme();
+    const { unreadCount } = useNotifications();
     const [groups, setGroups] = useState<GroupListItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -105,6 +107,19 @@ export default function DashboardScreen({ navigation }: any) {
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Here is your summary</Text>
                 </View>
                 <View style={styles.headerActions}>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('Notifications')}
+                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                        <Bell color={colors.secondaryText} size={20} />
+                        {unreadCount > 0 && (
+                            <View style={styles.bellBadge}>
+                                <Text style={styles.bellBadgeText}>
+                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                </Text>
+                            </View>
+                        )}
+                    </TouchableOpacity>
                     <ThemeToggle />
                     <TouchableOpacity onPress={logout} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <LogOut color={colors.danger} size={20} />
@@ -247,6 +262,23 @@ const styles = StyleSheet.create({
         shadowOpacity: 0.04,
         shadowRadius: 8,
         elevation: 2,
+    },
+    bellBadge: {
+        position: 'absolute',
+        top: 6,
+        right: 6,
+        minWidth: 14,
+        height: 14,
+        borderRadius: 7,
+        backgroundColor: '#E05252',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 2,
+    },
+    bellBadgeText: {
+        color: '#fff',
+        fontSize: 8,
+        fontWeight: '800',
     },
     statsContainer: {
         paddingHorizontal: 24,
