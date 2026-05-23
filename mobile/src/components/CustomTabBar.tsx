@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Home, Send, Users, Bell, LayoutGrid } from 'lucide-react-native';
+import { Home, Send, Users, Crown, LayoutGrid } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 
@@ -17,7 +17,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
             case 'Groups':   return <LayoutGrid size={size} color={color} strokeWidth={sw} />;
             case 'Payments': return <Send size={size} color={color} strokeWidth={sw} />;
             case 'Friends':  return <Users size={size} color={color} strokeWidth={sw} />;
-            case 'Activity': return <Bell size={size} color={color} strokeWidth={sw} />;
+            case 'Pro':      return <Crown size={size} color={color} strokeWidth={sw} />;
             default:         return <Home size={size} color={color} strokeWidth={sw} />;
         }
     };
@@ -45,7 +45,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
                     };
 
                     const iconColor = isFocused ? '#1A1A1A' : colors.tabIconDefault;
-                    const showBadge = route.name === 'Activity' && unreadCount > 0;
+                    const showBadge = false; // notification badge moved to DashboardScreen header
 
                     return (
                         <TouchableOpacity

@@ -15,6 +15,9 @@ import AddFriendScreen from '../screens/AddFriendScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import TutorialScreen from '../screens/TutorialScreen';
 import ProUpgradeScreen from '../screens/ProUpgradeScreen';
+import RecurringScreen from '../screens/RecurringScreen';
+import ExportScreen from '../screens/ExportScreen';
+import NotificationsScreen from '../screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -91,6 +94,21 @@ export default function RootNavigator() {
                         <Stack.Screen
                             name="ProUpgrade"
                             component={ProUpgradeScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="Recurring"
+                            component={RecurringScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="Export"
+                            component={ExportScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="Notifications"
+                            component={NotificationsScreen}
                             options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>
