@@ -47,7 +47,7 @@ async def create_checkout_session(
             customer=customer_id,
             mode="subscription",
             line_items=[{"price": settings.STRIPE_PRO_PRICE_ID, "quantity": 1}],
-            success_url=f"{settings.FRONTEND_URL}/settings?subscription=success",
+            success_url=f"{settings.FRONTEND_URL}/pro-success",
             cancel_url=f"{settings.FRONTEND_URL}/settings?subscription=cancelled",
             metadata={"user_id": current_user.id},
         )

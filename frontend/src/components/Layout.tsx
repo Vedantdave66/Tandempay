@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag, Crown } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -236,7 +236,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     >
                         {user && <Avatar name={user.name} color={user.avatar_color} size="sm" />}
                         <div className="flex-1 min-w-0 text-left">
-                            <p className="text-sm font-medium text-primary truncate">{user?.name}</p>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <span className="text-sm font-medium text-primary truncate">{user?.name}</span>
+                                {user?.subscription_tier === 'pro' && (
+                                    <Crown className="w-4 h-4 text-amber-400 shrink-0" />
+                                )}
+                            </div>
                             <p className="text-xs text-secondary truncate">{user?.email}</p>
                         </div>
                         <Pencil className="w-3.5 h-3.5 text-secondary opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
