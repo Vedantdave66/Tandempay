@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag, Lock } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag, Lock, Crown } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
