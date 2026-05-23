@@ -3,6 +3,7 @@ import { formatCurrency } from '../utils/currency';
 import { Plus, TrendingUp, Receipt, Users, ArrowRight } from 'lucide-react';
 import { groupsApi, GroupListItem } from '../services/api';
 import GroupCard from '../components/GroupCard';
+import ProUpsellBanner from '../components/ProUpsellBanner';
 import { useAuth } from '../context/AuthContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
@@ -144,6 +145,8 @@ export default function DashboardPage() {
                     </div>
                 </div>
             </div>
+
+            <ProUpsellBanner />
 
             {/* Groups Section Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
