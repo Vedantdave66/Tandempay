@@ -95,6 +95,15 @@ _configure_logging()
 
 logger = logging.getLogger("tandempay.main")
 
+# Debug: verify webhook secret is loaded correctly on every cold start.
+# Remove once the Vercel env var is confirmed correct.
+_wh_secret = get_settings().STRIPE_WEBHOOK_SECRET.strip()
+logger.info(
+    "STRIPE_WEBHOOK_SECRET check: first_10=%r len=%d",
+    _wh_secret[:10],
+    len(_wh_secret),
+)
+
 # ── Sentry — module-level init ───────────────────────────────────────────────
 # Must be at module level so it runs on every serverless cold start.
 # Mangum (Vercel) imports this module directly; lifespan() is not always

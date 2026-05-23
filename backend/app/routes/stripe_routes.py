@@ -145,8 +145,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
     try:
         payload = await request.body()
         sig_header = request.headers.get("Stripe-Signature", "")
-        endpoint_secret = settings.STRIPE_WEBHOOK_SECRET
-        
+        endpoint_secret = settings.STRIPE_WEBHOOK_SECRET.strip()
+
         try:
             event = stripe.Webhook.construct_event(payload, sig_header, endpoint_secret)
         except ValueError:
