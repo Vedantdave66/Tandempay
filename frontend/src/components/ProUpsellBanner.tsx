@@ -13,10 +13,17 @@ const FEATURES = [
 
 export default function ProUpsellBanner() {
     const { user } = useAuth();
-    const [dismissed, setDismissed] = useState(false);
+    const [dismissed, setDismissed] = useState(
+        () => localStorage.getItem('proUpsellDismissed') === 'true'
+    );
     const [loading, setLoading] = useState(false);
 
     if (user?.subscription_tier === 'pro' || dismissed) return null;
+
+    const dismiss = () => {
+        localStorage.setItem('proUpsellDismissed', 'true');
+        setDismissed(true);
+    };
 
     const startCheckout = async () => {
         setLoading(true);
@@ -39,38 +46,30 @@ export default function ProUpsellBanner() {
     };
 
     return (
-        <div className="relative mb-10 rounded-[2rem] border border-accent/25 bg-surface/50 backdrop-blur-xl shadow-xl shadow-black/30 overflow-hidden">
-            {/* Accent top bar */}
-            <div className="absolute top-0 left-0 w-full h-0.5 bg-gradient-to-r from-accent via-[#22C55E] to-accent/20" />
-
-            {/* Background glow */}
-            <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-indigo/5 pointer-events-none" />
-
-            <div className="relative z-10 p-6 sm:p-8">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3 mb-4">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-accent/20 to-transparent border border-accent/20 flex items-center justify-center shadow-inner shrink-0">
-                            <Crown className="w-5 h-5 text-accent" />
-                        </div>
+        <div className="relative mb-8 rounded-2xl border border-border bg-surface/60 overflow-hidden">
+            <div className="p-5 sm:p-6">
+                <div className="flex items-start justify-between gap-4 mb-4">
+                    <div className="flex items-center gap-2.5">
+                        <Crown className="w-4 h-4 text-accent shrink-0" />
                         <div>
-                            <h3 className="text-lg font-black text-primary tracking-tight">Unlock TandemPay Pro</h3>
-                            <p className="text-xs text-secondary font-medium">From $4.99/month</p>
+                            <h3 className="text-sm font-semibold text-primary">When you're ready to go further</h3>
+                            <p className="text-xs text-secondary">From $4.99/month</p>
                         </div>
                     </div>
                     <button
-                        onClick={() => setDismissed(true)}
-                        className="p-1.5 text-secondary hover:text-primary hover:bg-surface-light rounded-lg transition-colors shrink-0 cursor-pointer"
+                        onClick={dismiss}
+                        className="p-1.5 text-secondary hover:text-primary hover:bg-surface-hover rounded-lg transition-colors shrink-0 cursor-pointer"
                         aria-label="Dismiss"
                     >
                         <X className="w-4 h-4" />
                     </button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 mb-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 mb-4">
                     {FEATURES.map(({ icon: Icon, label, description }) => (
-                        <div key={label} className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl bg-bg/40 border border-border/50">
-                            <Icon className="w-4 h-4 text-accent shrink-0" />
-                            <span className="text-sm text-primary font-semibold leading-tight">
+                        <div key={label} className="flex items-center gap-2 px-2.5 py-2 rounded-lg bg-bg/50">
+                            <Icon className="w-3.5 h-3.5 text-accent shrink-0" />
+                            <span className="text-xs text-primary font-medium leading-tight">
                                 {label}
                                 <span className="text-secondary font-normal"> — {description}</span>
                             </span>
@@ -81,9 +80,9 @@ export default function ProUpsellBanner() {
                 <button
                     onClick={startCheckout}
                     disabled={loading}
-                    className="inline-flex items-center gap-2 bg-gradient-to-br from-[#4ADE80] to-[#22C55E] hover:from-[#22C55E] hover:to-[#16a34a] text-[#064E3B] text-sm font-bold px-6 py-3 rounded-2xl transition-all duration-300 shadow-[0_0_20px_rgba(74,222,128,0.3)] hover:shadow-[0_0_25px_rgba(74,222,128,0.5)] hover:-translate-y-0.5 disabled:opacity-60 cursor-pointer"
+                    className="inline-flex items-center gap-2 bg-accent hover:bg-accent/90 text-white text-xs font-semibold px-4 py-2 rounded-xl transition-colors disabled:opacity-60 cursor-pointer"
                 >
-                    {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ArrowRight className="w-4 h-4" />}
+                    {loading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <ArrowRight className="w-3.5 h-3.5" />}
                     Upgrade to Pro →
                 </button>
             </div>

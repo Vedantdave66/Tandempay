@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag } from 'lucide-react';
+import { LayoutDashboard, LogOut, Wallet, Menu, X, Users, Activity, Pencil, Loader2, CheckCircle2, RefreshCw, Download, Tag, Lock } from 'lucide-react';
 import Avatar from './Avatar';
 import NotificationBell from './NotificationBell';
 import ThemeToggle from './ThemeToggle';
@@ -184,7 +184,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             }`}
                     >
                         <RefreshCw className="w-5 h-5" />
-                        Recurring
+                        <span className="flex-1 text-left">Recurring</span>
+                        {user?.subscription_tier !== 'pro' && <Lock className="w-3 h-3 text-secondary/40" />}
                     </button>
                     <button
                         onClick={() => {
@@ -197,7 +198,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                             }`}
                     >
                         <Download className="w-5 h-5" />
-                        Export
+                        <span className="flex-1 text-left">Export</span>
+                        {user?.subscription_tier !== 'pro' && <Lock className="w-3 h-3 text-secondary/40" />}
                     </button>
                     <button
                         onClick={() => {

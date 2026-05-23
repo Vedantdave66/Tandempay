@@ -6,7 +6,12 @@ import {
     RecurrenceFrequency,
 } from '../services/api';
 import { RefreshCw, Plus, Pencil, Trash2, X, Loader2, Crown, Lock } from 'lucide-react';
-import UpgradeButton from '../components/UpgradeButton';
+
+const SAMPLE_ROWS = [
+    { description: 'Rent', frequency: 'Monthly', amount: '800.00', next_run: 'Jun 1, 2026' },
+    { description: 'Netflix', frequency: 'Monthly', amount: '18.00', next_run: 'Jun 1, 2026' },
+    { description: 'Hydro bill', frequency: 'Monthly', amount: '95.00', next_run: 'Jun 5, 2026' },
+];
 
 const FREQUENCY_LABELS: Record<RecurrenceFrequency, string> = {
     weekly: 'Weekly',
@@ -170,16 +175,23 @@ export default function RecurringPage() {
             </div>
 
             {!isPro && (
-                <div className="mb-6 p-4 bg-accent/5 border border-accent/20 rounded-2xl flex items-start gap-3">
-                    <Crown className="w-5 h-5 text-accent mt-0.5 shrink-0" />
-                    <div>
-                        <p className="text-sm font-semibold text-primary">Upgrade to Pro to create recurring expenses</p>
-                        <p className="text-xs text-secondary mt-0.5">
-                            Pro members can set up automatic splits for rent, subscriptions, and more.
-                        </p>
-                        <UpgradeButton />
+                <>
+                    <div className="space-y-3 opacity-40 pointer-events-none select-none mb-4">
+                        {SAMPLE_ROWS.map(row => (
+                            <div key={row.description} className="p-4 bg-surface border border-border rounded-2xl flex items-center gap-4">
+                                <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-primary">{row.description}</p>
+                                    <p className="text-sm text-secondary mt-0.5">{row.frequency} · CAD ${row.amount}</p>
+                                    <p className="text-xs text-secondary/70 mt-0.5">Next run: {row.next_run}</p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
-                </div>
+                    <p className="text-sm text-secondary text-center mb-6">
+                        Automate your recurring bills with Pro.{' '}
+                        <a href="/pricing" className="text-accent hover:underline">Learn more →</a>
+                    </p>
+                </>
             )}
 
             {error && (

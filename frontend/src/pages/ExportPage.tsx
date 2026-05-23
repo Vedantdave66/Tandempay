@@ -1,8 +1,7 @@
 import { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { BASE_URL } from '../services/api';
-import { Download, FileText, Sheet, Crown, Lock, Loader2 } from 'lucide-react';
-import UpgradeButton from '../components/UpgradeButton';
+import { Download, FileText, Sheet, Crown, Loader2 } from 'lucide-react';
 
 async function downloadExport(format: 'csv' | 'pdf'): Promise<void> {
     const token = localStorage.getItem('token');
@@ -79,94 +78,74 @@ export default function ExportPage() {
                 </p>
             </div>
 
-            {!isPro ? (
-                <div className="p-5 bg-accent/5 border border-accent/20 rounded-2xl flex items-start gap-3">
-                    <Crown className="w-5 h-5 text-accent mt-0.5 shrink-0" />
-                    <div>
-                        <p className="text-sm font-semibold text-primary">Upgrade to Pro to export your expenses</p>
+            <div className="space-y-4">
+                {isPro && error && (
+                    <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-sm text-danger">
+                        {error}
+                    </div>
+                )}
+
+                {/* CSV card */}
+                <div className={`p-5 bg-surface border border-border rounded-2xl flex items-center gap-4 ${!isPro ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                    <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center shrink-0">
+                        <Sheet className="w-6 h-6 text-accent" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-primary">CSV Spreadsheet</p>
                         <p className="text-xs text-secondary mt-0.5">
-                            Pro members can download their full expense history as CSV or PDF at any time.
+                            Open in Excel, Google Sheets, or Numbers
                         </p>
-                        <UpgradeButton />
                     </div>
+                    <button
+                        onClick={handleCsv}
+                        disabled={csvLoading || pdfLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent/90 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                    >
+                        {csvLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
+                        Download CSV
+                    </button>
                 </div>
-            ) : (
-                <div className="space-y-4">
-                    {error && (
-                        <div className="p-3 bg-danger/10 border border-danger/20 rounded-xl text-sm text-danger">
-                            {error}
-                        </div>
-                    )}
 
-                    {/* CSV card */}
-                    <div className="p-5 bg-surface border border-border rounded-2xl flex items-center gap-4">
-                        <div className="w-12 h-12 bg-accent/10 rounded-xl flex items-center justify-center shrink-0">
-                            <Sheet className="w-6 h-6 text-accent" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-primary">CSV Spreadsheet</p>
-                            <p className="text-xs text-secondary mt-0.5">
-                                Open in Excel, Google Sheets, or Numbers
-                            </p>
-                        </div>
-                        <button
-                            onClick={handleCsv}
-                            disabled={csvLoading || pdfLoading}
-                            className="flex items-center gap-2 px-4 py-2 bg-accent text-white text-sm font-semibold rounded-xl hover:bg-accent/90 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
-                        >
-                            {csvLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Download className="w-4 h-4" />
-                            )}
-                            Download CSV
-                        </button>
+                {/* PDF card */}
+                <div className={`p-5 bg-surface border border-border rounded-2xl flex items-center gap-4 ${!isPro ? 'opacity-40 pointer-events-none select-none' : ''}`}>
+                    <div className="w-12 h-12 bg-indigo/10 rounded-xl flex items-center justify-center shrink-0">
+                        <FileText className="w-6 h-6 text-indigo" />
                     </div>
-
-                    {/* PDF card */}
-                    <div className="p-5 bg-surface border border-border rounded-2xl flex items-center gap-4">
-                        <div className="w-12 h-12 bg-indigo/10 rounded-xl flex items-center justify-center shrink-0">
-                            <FileText className="w-6 h-6 text-indigo" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-primary">PDF Report</p>
-                            <p className="text-xs text-secondary mt-0.5">
-                                Formatted table with header — ready to print or share
-                            </p>
-                        </div>
-                        <button
-                            onClick={handlePdf}
-                            disabled={csvLoading || pdfLoading}
-                            className="flex items-center gap-2 px-4 py-2 bg-indigo text-white text-sm font-semibold rounded-xl hover:bg-indigo/90 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
-                        >
-                            {pdfLoading ? (
-                                <Loader2 className="w-4 h-4 animate-spin" />
-                            ) : (
-                                <Download className="w-4 h-4" />
-                            )}
-                            Download PDF
-                        </button>
+                    <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-primary">PDF Report</p>
+                        <p className="text-xs text-secondary mt-0.5">
+                            Formatted table with header — ready to print or share
+                        </p>
                     </div>
+                    <button
+                        onClick={handlePdf}
+                        disabled={csvLoading || pdfLoading}
+                        className="flex items-center gap-2 px-4 py-2 bg-indigo text-white text-sm font-semibold rounded-xl hover:bg-indigo/90 transition-colors cursor-pointer disabled:opacity-60 shrink-0"
+                    >
+                        {pdfLoading ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                            <Download className="w-4 h-4" />
+                        )}
+                        Download PDF
+                    </button>
+                </div>
 
+                {isPro ? (
                     <p className="text-xs text-secondary text-center pt-1">
                         Exports include all expenses where you are a participant, sorted newest first.
                     </p>
-                </div>
-            )}
-
-            {!isPro && (
-                <div className="mt-6 p-5 bg-surface border border-border rounded-2xl opacity-40 pointer-events-none select-none">
-                    <div className="flex items-center gap-4">
-                        <div className="w-12 h-12 bg-border rounded-xl flex items-center justify-center shrink-0">
-                            <Lock className="w-6 h-6 text-secondary" />
-                        </div>
-                        <div className="flex-1">
-                            <p className="font-semibold text-primary">CSV &amp; PDF downloads</p>
-                            <p className="text-xs text-secondary mt-0.5">Available with Pro</p>
-                        </div>
-                    </div>
-                </div>
-            )}
+                ) : (
+                    <p className="text-sm text-secondary text-center pt-1">
+                        Export your full history with Pro.{' '}
+                        <a href="/pricing" className="text-accent hover:underline">Learn more →</a>
+                    </p>
+                )}
+            </div>
         </div>
     );
 }
