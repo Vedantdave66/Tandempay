@@ -36,7 +36,7 @@ const PRO_FEATURES = [
     },
     {
         title: 'Receipt OCR',
-        desc: 'Snap a photo — we'll extract and split the items',
+        desc: 'Snap a photo — we\'ll extract and split the items',
         screen: null,
     },
 ];
