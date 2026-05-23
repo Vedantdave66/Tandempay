@@ -1,4 +1,3 @@
-import asyncio
 import logging
 import stripe
 
@@ -62,8 +61,7 @@ async def onboard_user(
             await db.commit()
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
-            
-    # Create an onboarding link
+
     try:
         clean_path = return_path.lstrip("/")
         account_link = stripe.AccountLink.create(
