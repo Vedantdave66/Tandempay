@@ -14,6 +14,7 @@ import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
 import ForgotPasswordScreen from '../screens/ForgotPasswordScreen';
 import TutorialScreen from '../screens/TutorialScreen';
+import ProUpgradeScreen from '../screens/ProUpgradeScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -86,6 +87,11 @@ export default function RootNavigator() {
                             name="Tutorial"
                             component={TutorialScreen}
                             options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="ProUpgrade"
+                            component={ProUpgradeScreen}
+                            options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>
                 )}

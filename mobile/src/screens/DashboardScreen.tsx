@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, Activ
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { groupsApi, GroupListItem } from '../services/api';
-import { LogOut, Plus, Users, ArrowRight, HelpCircle } from 'lucide-react-native';
+import { LogOut, Plus, Users, ArrowRight } from 'lucide-react-native';
 import ThemeToggle from '../components/ThemeToggle';
 
 export default function DashboardScreen({ navigation }: any) {
@@ -94,13 +94,17 @@ export default function DashboardScreen({ navigation }: any) {
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
                 <View>
-                    <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.name.split(' ')[0]}</Text>
+                    <View style={styles.greetingRow}>
+                        <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.name.split(' ')[0]}</Text>
+                        {user?.subscription_tier === 'pro' && (
+                            <View style={styles.proBadge}>
+                                <Text style={styles.proBadgeText}>PRO</Text>
+                            </View>
+                        )}
+                    </View>
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Here is your summary</Text>
                 </View>
                 <View style={styles.headerActions}>
-                    <TouchableOpacity onPress={() => navigation.navigate('Tutorial')} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <HelpCircle color={colors.secondaryText} size={20} />
-                    </TouchableOpacity>
                     <ThemeToggle />
                     <TouchableOpacity onPress={logout} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <LogOut color={colors.danger} size={20} />
@@ -127,15 +131,37 @@ export default function DashboardScreen({ navigation }: any) {
                 </View>
             </View>
 
-            <View style={styles.listHeader}>
-                <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
-            </View>
-
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id}
                 renderItem={renderGroup}
                 contentContainerStyle={styles.listContent}
+                ListHeaderComponent={
+                    <View>
+                        {user?.subscription_tier !== 'pro' && (
+                            <TouchableOpacity
+                                style={[styles.upsellBanner, {
+                                    backgroundColor: isDark ? 'rgba(74,222,128,0.08)' : 'rgba(22,163,74,0.06)',
+                                    borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.2)',
+                                }]}
+                                onPress={() => navigation.navigate('ProUpgrade')}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={styles.upsellEmoji}>👑</Text>
+                                <View style={styles.upsellTextBlock}>
+                                    <Text style={[styles.upsellTitle, { color: colors.text }]}>Unlock Pro features</Text>
+                                    <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
+                                        Recurring splits, CSV export & more — from $4.99/mo
+                                    </Text>
+                                </View>
+                                <ArrowRight color={colors.accent} size={18} />
+                            </TouchableOpacity>
+                        )}
+                        <View style={styles.listHeader}>
+                            <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
+                        </View>
+                    </View>
+                }
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
@@ -180,11 +206,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 8,
     },
+    greetingRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+    },
     greeting: {
         fontSize: 26,
         fontWeight: '700',
         letterSpacing: -0.3,
         marginBottom: 3,
+    },
+    proBadge: {
+        backgroundColor: '#16a34a',
+        borderRadius: 4,
+        paddingHorizontal: 5,
+        paddingVertical: 2,
+        alignSelf: 'center',
+        marginBottom: 3,
+    },
+    proBadgeText: {
+        color: '#ffffff',
+        fontSize: 10,
+        fontWeight: '700',
+        letterSpacing: 0.5,
     },
     subtitle: {
         fontSize: 14,
@@ -253,8 +298,31 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: '700',
     },
+    upsellBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 16,
+        borderWidth: 1,
+        padding: 14,
+        marginBottom: 16,
+    },
+    upsellEmoji: {
+        fontSize: 24,
+        marginRight: 12,
+    },
+    upsellTextBlock: {
+        flex: 1,
+    },
+    upsellTitle: {
+        fontSize: 14,
+        fontWeight: '700',
+        marginBottom: 2,
+    },
+    upsellSub: {
+        fontSize: 12,
+        lineHeight: 17,
+    },
     listHeader: {
-        paddingHorizontal: 24,
         marginBottom: 14,
     },
     listTitle: {

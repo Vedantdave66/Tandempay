@@ -56,6 +56,7 @@ export interface User {
     avatar_color: string;
     created_at: string;
     wallet_balance: number;
+    subscription_tier: 'free' | 'pro' | null;
 }
 
 export interface Token {

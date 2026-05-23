@@ -15,6 +15,7 @@ import RecurringPage from './pages/RecurringPage';
 import ExportPage from './pages/ExportPage';
 import LandingPage from './pages/LandingPage';
 import PricingPage from './pages/PricingPage';
+import ProSuccessPage from './pages/ProSuccessPage';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 
@@ -84,6 +85,7 @@ export default function App() {
                             <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
                             <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
                             <Route path="/pricing" element={<PricingPage />} />
+                            <Route path="/pro-success" element={<ProtectedRoute><ProSuccessPage /></ProtectedRoute>} />
                             <Route path="*" element={<Navigate to="/dashboard" />} />
                         </Routes>
                     </AuthListener>
