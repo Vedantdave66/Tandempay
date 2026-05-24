@@ -1,5 +1,6 @@
 import json
 # fix payment retry constraint + idempotency key
+# fix forgot password user enumeration
 # forgot password split layout
 # register page split layout + pill size
 # landing page nav + card sizing
