@@ -1,4 +1,5 @@
 import json
+# extend dot grid to full page background
 # unify login page background
 # login page left panel dot grid
 # login grid full-screen fix (build trigger)
