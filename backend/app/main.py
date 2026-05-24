@@ -1,5 +1,5 @@
 import json
-# ProHubScreen smart quote fix (build trigger)
+# landing page polish + deAI (build trigger)
 import logging
 import os
 import uuid
