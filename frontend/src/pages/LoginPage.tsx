@@ -174,19 +174,19 @@ export default function LoginPage() {
   return (
     <div className="relative min-h-screen grid lg:grid-cols-2 bg-bg">
       <div
-        className="absolute inset-0 pointer-events-none z-0 opacity-[0.06]"
-        style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "20px 20px" }}
-      />
-
-      {/* Left panel — characters */}
-      <div className="relative hidden lg:flex flex-col justify-between p-12">
-        <div
           className="absolute inset-0 z-0 pointer-events-none"
           style={{
             backgroundImage: 'radial-gradient(circle, rgba(150,150,150,0.18) 1px, transparent 1px)',
             backgroundSize: '24px 24px',
           }}
         />
+      <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.06]"
+        style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+      />
+
+      {/* Left panel — characters */}
+      <div className="relative hidden lg:flex flex-col justify-between p-12">
         {/* Branding */}
         <div className="relative z-20 flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
