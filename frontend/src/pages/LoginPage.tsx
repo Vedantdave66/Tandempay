@@ -172,14 +172,14 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="relative min-h-screen grid lg:grid-cols-2">
+    <div className="relative min-h-screen grid lg:grid-cols-2 bg-bg">
       <div
         className="absolute inset-0 pointer-events-none z-0 opacity-[0.06]"
         style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "20px 20px" }}
       />
 
       {/* Left panel — characters */}
-      <div className="relative hidden lg:flex flex-col justify-between bg-surface p-12">
+      <div className="relative hidden lg:flex flex-col justify-between p-12">
         <div
           className="absolute inset-0 z-0 pointer-events-none"
           style={{
@@ -312,7 +312,7 @@ export default function LoginPage() {
       </div>
 
       {/* Right panel — form */}
-      <div className="flex items-center justify-center p-8 bg-bg">
+      <div className="flex items-center justify-center p-8">
         <div className="w-full max-w-[420px]">
 
           {/* Mobile logo */}
