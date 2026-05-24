@@ -173,8 +173,10 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen grid lg:grid-cols-2">
-      {/* Full-screen dot grid */}
-      <div className="absolute inset-0 bg-[size:20px_20px] opacity-[0.06] pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)" }} />
+      <div
+        className="absolute inset-0 pointer-events-none z-0 opacity-[0.06]"
+        style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "20px 20px" }}
+      />
 
       {/* Left panel — characters */}
       <div className="relative hidden lg:flex flex-col justify-between bg-surface p-12">
