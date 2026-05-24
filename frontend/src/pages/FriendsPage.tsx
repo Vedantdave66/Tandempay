@@ -204,7 +204,7 @@ export default function FriendsPage() {
             </div>
 
             {/* Polished Tabs */}
-            <div className="flex overflow-x-auto hide-scrollbar gap-1.5 p-1.5 bg-surface border border-border rounded-2xl mb-8 shadow-sm">
+            <div className="flex overflow-x-auto hide-scrollbar gap-2 p-1.5 bg-surface border border-border rounded-2xl mb-8 shadow-sm">
                 <TabButton active={activeTab === 'activity'} onClick={() => handleTabChange('activity')} icon={<Bell />} label="Activity" />
                 <TabButton active={activeTab === 'my-friends'} onClick={() => handleTabChange('my-friends')} icon={<Users />} label="My Friends" />
                 <TabButton active={activeTab === 'pending'} onClick={() => handleTabChange('pending')} icon={<Clock />} label="Pending" />
@@ -471,7 +471,7 @@ function TabButton({ active, onClick, icon, label }: { active: boolean, onClick:
     return (
         <button
             onClick={onClick}
-            className={`relative flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap focus:outline-none flex-1 justify-center sm:flex-none sm:justify-start ${
+            className={`relative flex items-center gap-2.5 px-3 sm:px-5 py-2.5 rounded-xl text-sm font-bold transition-all duration-200 cursor-pointer whitespace-nowrap focus:outline-none flex-1 justify-center sm:flex-none sm:justify-start ${
                 active
                     ? 'bg-gradient-to-br from-indigo-500/20 to-indigo-600/10 text-indigo-400 border border-indigo-500/30 shadow-sm shadow-indigo-500/10'
                     : 'text-secondary hover:text-primary hover:bg-primary/5 border border-transparent'
