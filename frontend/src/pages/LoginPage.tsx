@@ -172,15 +172,18 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen grid lg:grid-cols-2">
+    <div className="relative min-h-screen grid lg:grid-cols-2">
+      {/* Full-screen dot grid */}
+      <div className="absolute inset-0 bg-[size:20px_20px] opacity-[0.06] pointer-events-none" style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)" }} />
+
       {/* Left panel — characters */}
-      <div className="relative hidden lg:flex flex-col justify-between bg-zinc-950 p-12 text-white">
+      <div className="relative hidden lg:flex flex-col justify-between bg-surface p-12">
         {/* Branding */}
         <div className="relative z-20 flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
             <Wallet className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight">TandemPay</span>
+          <span className="text-xl font-bold tracking-tight text-primary">TandemPay</span>
         </div>
 
         {/* Characters */}
@@ -290,12 +293,11 @@ export default function LoginPage() {
         </div>
 
         {/* Footer */}
-        <div className="relative z-20 text-sm text-zinc-500">
+        <div className="relative z-20 text-sm text-secondary">
           Free forever · Built in Canada 🍁
         </div>
 
         {/* Decorative */}
-        <div className="absolute inset-0 bg-[size:20px_20px] opacity-5" style={{ backgroundImage: "radial-gradient(circle, #fff 1px, transparent 1px)" }} />
         <div className="absolute top-1/4 right-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-amber-500/5 rounded-full blur-3xl" />
       </div>
