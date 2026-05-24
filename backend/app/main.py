@@ -1,4 +1,5 @@
 import json
+# wire auth error event + fix phrases cleanup
 import logging
 import os
 import uuid
