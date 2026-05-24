@@ -81,7 +81,7 @@ export default function LandingPage() {
                 <section className="relative max-w-7xl mx-auto px-6 pt-16 pb-32 flex flex-col lg:flex-row items-center gap-16">
                     <div className="flex-1 text-center lg:text-left z-10">
                         <Reveal>
-                            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-semibold mb-8 backdrop-blur-md">
+                            <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-accent/10 border border-accent/20 text-accent text-sm font-semibold mb-8 backdrop-blur-md">
                                 <span
                                     style={{
                                         transition: 'opacity 0.3s ease, transform 0.3s ease',

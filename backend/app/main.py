@@ -1,4 +1,6 @@
 import json
+# forgot password split layout
+# register page split layout + pill size
 # landing page nav + card sizing
 # friends page tab spacing fix
 # rotating hero pill
