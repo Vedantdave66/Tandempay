@@ -66,7 +66,7 @@ export default function LandingPage() {
                         <Link to="/pricing" className="hidden md:flex items-center gap-2 text-sm font-medium text-secondary hover:text-primary transition-colors">
                             Pricing
                         </Link>
-                        <Link to="/login" className="px-5 py-2.5 text-sm font-medium text-secondary hover:text-primary transition-colors">
+                        <Link to="/login" className="whitespace-nowrap text-sm font-medium text-secondary hover:text-primary transition-colors">
                             Log in
                         </Link>
                         <Link to="/register" className="px-5 py-2.5 rounded-xl bg-primary text-bg text-sm font-bold hover:opacity-90 transition-transform transform hover:scale-[1.02] active:scale-[0.98] shadow-lg">
@@ -164,7 +164,7 @@ export default function LandingPage() {
                     <div className="max-w-7xl mx-auto px-6 grid md:grid-cols-2 gap-16 items-center">
                         <Reveal>
                             <div className="relative">
-                                <div className="relative bg-surface border border-border rounded-3xl p-8 shadow-2xl">
+                                <div className="relative bg-surface border border-border rounded-3xl p-10 shadow-2xl">
                                     <div className="flex items-center gap-4 mb-6 pb-6 border-b border-border">
                                         <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center">
                                             <Zap className="w-6 h-6 text-yellow-600" />
@@ -175,11 +175,11 @@ export default function LandingPage() {
                                         </div>
                                     </div>
                                     <div className="space-y-4">
-                                        <div className="flex justify-between items-center p-4 bg-primary/5 rounded-xl border border-border">
+                                        <div className="flex justify-between items-center p-5 bg-primary/5 rounded-xl border border-border">
                                             <span className="text-primary font-medium">Uber to Concert</span>
                                             <span className="text-primary font-bold">$34.50</span>
                                         </div>
-                                        <div className="flex justify-between items-center p-4 bg-primary/5 rounded-xl border border-border">
+                                        <div className="flex justify-between items-center p-5 bg-primary/5 rounded-xl border border-border">
                                             <span className="text-primary font-medium">Drinks</span>
                                             <span className="text-primary font-bold">$82.00</span>
                                         </div>
@@ -219,16 +219,16 @@ export default function LandingPage() {
                         </Reveal>
                         <Reveal className="order-1 md:order-2">
                              <div className="relative">
-                                <div className="relative bg-surface border border-border rounded-3xl p-8 shadow-2xl flex flex-col gap-4">
+                                <div className="relative bg-surface border border-border rounded-3xl p-10 shadow-2xl flex flex-col gap-4">
                                      <div className="flex items-center gap-4 text-secondary font-medium text-sm mb-2">
                                          <TrendingUp className="w-4 h-4 text-accent" />
                                          Balances simplified
                                      </div>
-                                     <div className="flex items-center justify-between p-4 bg-primary/5 rounded-xl border border-border">
+                                     <div className="flex items-center justify-between p-5 bg-primary/5 rounded-xl border border-border">
                                          <div className="flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center font-bold text-xs">AL</div>
+                                            <div className="w-10 h-10 rounded-full bg-blue-500/20 text-blue-600 flex items-center justify-center font-bold text-xs">AL</div>
                                             <ArrowRight className="w-4 h-4 text-secondary/50" />
-                                            <div className="w-8 h-8 rounded-full bg-purple-500/20 text-purple-600 flex items-center justify-center font-bold text-xs">CH</div>
+                                            <div className="w-10 h-10 rounded-full bg-purple-500/20 text-purple-600 flex items-center justify-center font-bold text-xs">CH</div>
                                          </div>
                                          <span className="text-primary font-bold tracking-tight">$120.00</span>
                                      </div>
@@ -251,7 +251,7 @@ export default function LandingPage() {
 
                     <div className="max-w-4xl mx-auto px-6">
                         <Reveal delay={200}>
-                            <div className="bg-surface border border-border rounded-3xl p-8 md:p-12 shadow-2xl relative overflow-hidden">
+                            <div className="bg-surface border border-border rounded-3xl p-10 md:p-12 shadow-2xl relative overflow-hidden">
                                 <div className="grid md:grid-cols-2 gap-12 items-center relative z-10">
                                     <div className="space-y-8">
                                         <div className="flex gap-4">
