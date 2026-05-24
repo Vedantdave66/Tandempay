@@ -180,6 +180,13 @@ export default function LoginPage() {
 
       {/* Left panel — characters */}
       <div className="relative hidden lg:flex flex-col justify-between bg-surface p-12">
+        <div
+          className="absolute inset-0 z-0 pointer-events-none"
+          style={{
+            backgroundImage: 'radial-gradient(circle, rgba(150,150,150,0.18) 1px, transparent 1px)',
+            backgroundSize: '24px 24px',
+          }}
+        />
         {/* Branding */}
         <div className="relative z-20 flex items-center gap-3">
           <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
