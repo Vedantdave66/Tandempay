@@ -1,4 +1,5 @@
 import json
+# landing page nav + card sizing
 # friends page tab spacing fix
 # rotating hero pill
 # pricing page auth-aware nav + scroll fix
