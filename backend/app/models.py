@@ -3,7 +3,7 @@ import uuid
 import secrets
 from datetime import datetime, date
 from typing import Optional
-from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum, Date
+from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum, Date, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from decimal import Decimal
 from app.database import Base
@@ -251,7 +251,8 @@ class Payment(Base):
     """Core transaction tracker representing a real Stripe PaymentIntent."""
     __tablename__ = "payments"
     __table_args__ = (
-        UniqueConstraint("settlement_id", "payer_id", name="uq_payment_settlement_payer"),
+        Index("uq_active_payment_settlement_payer", "settlement_id", "payer_id", unique=True,
+              postgresql_where=text("status NOT IN ('expired', 'failed', 'canceled')")),
     )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
