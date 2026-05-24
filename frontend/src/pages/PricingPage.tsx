@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Check, Crown, Loader2, Wallet } from 'lucide-react';
 import { BASE_URL } from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
+import { useAuth } from '../context/AuthContext';
 
 const FREE_FEATURES = [
     'Unlimited friends',
@@ -31,6 +32,7 @@ const PRO_FEATURES = [
 ];
 
 export default function PricingPage() {
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
 
     const startCheckout = async () => {
@@ -64,7 +66,7 @@ export default function PricingPage() {
             <div className="fixed bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-indigo-500/10 rounded-full blur-[150px] pointer-events-none" />
 
             {/* Nav */}
-            <nav className="border-b border-border bg-bg/80 backdrop-blur-xl sticky top-0 z-10">
+            <nav className="border-b border-border bg-bg/80 backdrop-blur-xl sticky top-0 z-30">
                 <div className="max-w-5xl mx-auto px-6 py-4 flex items-center justify-between">
                     <Link to="/" className="flex items-center gap-2.5">
                         <div className="w-8 h-8 bg-gradient-to-br from-accent to-emerald-500 rounded-lg flex items-center justify-center shadow-sm shadow-accent/20">
@@ -74,12 +76,20 @@ export default function PricingPage() {
                     </Link>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />
-                        <Link to="/login" className="text-sm font-medium text-secondary hover:text-primary transition-colors px-4 py-2">
-                            Log in
-                        </Link>
-                        <Link to="/register" className="text-sm font-bold px-4 py-2 rounded-xl bg-primary text-bg hover:opacity-90 transition-opacity">
-                            Get started
-                        </Link>
+                        {user ? (
+                            <Link to="/dashboard" className="text-sm font-bold px-4 py-2 rounded-xl bg-primary text-bg hover:opacity-90 transition-opacity">
+                                Go to dashboard
+                            </Link>
+                        ) : (
+                            <>
+                                <Link to="/login" className="text-sm font-medium text-secondary hover:text-primary transition-colors px-4 py-2 whitespace-nowrap">
+                                    Log in
+                                </Link>
+                                <Link to="/register" className="text-sm font-bold px-4 py-2 rounded-xl bg-primary text-bg hover:opacity-90 transition-opacity">
+                                    Get started
+                                </Link>
+                            </>
+                        )}
                     </div>
                 </div>
             </nav>
