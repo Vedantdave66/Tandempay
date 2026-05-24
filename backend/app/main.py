@@ -1,4 +1,5 @@
 import json
+# friends page tab spacing fix
 # rotating hero pill
 # pricing page auth-aware nav + scroll fix
 # extend dot grid to full page background
