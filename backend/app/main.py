@@ -1,4 +1,5 @@
 import json
+# rotating hero pill
 # pricing page auth-aware nav + scroll fix
 # extend dot grid to full page background
 # unify login page background
