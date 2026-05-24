@@ -24,6 +24,27 @@ export default function LandingPage() {
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 
+    const phrases = [
+        'Built for Canadian roommates 🍁',
+        'Interac e-Transfer friendly',
+        'Split rent, groceries & more',
+        'The new standard for group expenses',
+        'Free forever. No hidden fees.',
+    ];
+    const [phraseIndex, setPhraseIndex] = useState(0);
+    const [pillVisible, setPillVisible] = useState(true);
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            setPillVisible(false);
+            setTimeout(() => {
+                setPhraseIndex(i => (i + 1) % phrases.length);
+                setPillVisible(true);
+            }, 300);
+        }, 3000);
+        return () => clearInterval(interval);
+    }, []);
+
     return (
         <div className="min-h-screen bg-bg text-primary selection:bg-accent/30 selection:text-white overflow-hidden transition-colors duration-500">
             {/* Navigation */}
@@ -61,7 +82,16 @@ export default function LandingPage() {
                     <div className="flex-1 text-center lg:text-left z-10">
                         <Reveal>
                             <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent/10 border border-accent/20 text-accent text-xs font-semibold mb-8 backdrop-blur-md">
-                                🍁 Built for Canadian roommates
+                                <span
+                                    style={{
+                                        transition: 'opacity 0.3s ease, transform 0.3s ease',
+                                        opacity: pillVisible ? 1 : 0,
+                                        transform: pillVisible ? 'translateY(0)' : 'translateY(-6px)',
+                                        display: 'inline-block',
+                                    }}
+                                >
+                                    {phrases[phraseIndex]}
+                                </span>
                             </div>
                         </Reveal>
 
