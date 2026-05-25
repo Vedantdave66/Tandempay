@@ -16,15 +16,15 @@ Production-grade financial safety for pay_request_with_wallet:
 import datetime
 import logging
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 
 from app.database import get_db
 from app.models import PaymentRequest, User, GroupMember, Notification, WalletTransaction
 from app.routes.auth import get_current_user
-from app.schemas import PaymentRequestCreate, PaymentRequestOut
+from app.schemas import PaymentRequestCreate, PaymentRequestOut, PaginatedResponse
 from app.idempotency import idempotent
 from app.ledger import (
     lock_users_sorted,
@@ -107,27 +107,43 @@ async def create_payment_request(
     return _build_payment_request_out(reloaded)
 
 
-@router.get("/groups/{group_id}/requests", response_model=list[PaymentRequestOut])
+@router.get("/groups/{group_id}/requests", response_model=PaginatedResponse[PaymentRequestOut])
 async def get_group_requests(
     group_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
     """Retrieves all requests in a group for the current user."""
+    user_filter = (
+        (PaymentRequest.requester_id == current_user.id)
+        | (PaymentRequest.payer_id == current_user.id)
+    )
+    where_clause = (PaymentRequest.group_id == group_id) & user_filter
+
+    total_q = await db.execute(
+        select(func.count(PaymentRequest.id)).where(where_clause)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(PaymentRequest)
         .options(
             selectinload(PaymentRequest.requester),
             selectinload(PaymentRequest.payer),
         )
-        .filter(
-            PaymentRequest.group_id == group_id,
-            (PaymentRequest.requester_id == current_user.id)
-            | (PaymentRequest.payer_id == current_user.id),
-        )
+        .where(where_clause)
         .order_by(PaymentRequest.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
-    return [_build_payment_request_out(r) for r in result.scalars().all()]
+    return PaginatedResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[_build_payment_request_out(r) for r in result.scalars().all()],
+    )
 
 
 

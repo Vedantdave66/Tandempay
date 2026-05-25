@@ -1,12 +1,12 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from decimal import Decimal, ROUND_DOWN
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
-from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut
+from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut, PaginatedResponse
 from app.routes.auth import get_current_user
 from app.services.audit import log_action
 from app.audit_log import AuditActions
@@ -150,34 +150,45 @@ async def create_expense(
     )
 
 
-@router.get("", response_model=list[ExpenseOut])
+@router.get("", response_model=PaginatedResponse[ExpenseOut])
 async def list_expenses(
     group_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     await _verify_membership(group_id, current_user.id, db)
 
+    total_q = await db.execute(
+        select(func.count(Expense.id)).where(Expense.group_id == group_id)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(Expense)
         .where(Expense.group_id == group_id)
-        .options(selectinload(Expense.participants))
-        .options(selectinload(Expense.payer))
+        .options(
+            selectinload(Expense.participants).selectinload(ExpenseParticipant.user),
+            selectinload(Expense.payer),
+        )
         .order_by(Expense.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     expenses = result.scalars().all()
 
     out = []
     for e in expenses:
-        # Get participant names
-        participant_outs = []
-        for p in e.participants:
-            user_result = await db.execute(select(User).where(User.id == p.user_id))
-            u = user_result.scalar_one()
-            participant_outs.append(ExpenseParticipantOut(
-                user_id=u.id, name=u.name, share_amount=p.share_amount, avatar_color=u.avatar_color
-            ))
-
+        participant_outs = [
+            ExpenseParticipantOut(
+                user_id=p.user.id,
+                name=p.user.name,
+                share_amount=p.share_amount,
+                avatar_color=p.user.avatar_color,
+            )
+            for p in e.participants
+        ]
         out.append(ExpenseOut(
             id=e.id,
             title=e.title,
@@ -189,7 +200,8 @@ async def list_expenses(
             created_at=e.created_at,
             participants=participant_outs,
         ))
-    return out
+
+    return PaginatedResponse(total=total, limit=limit, offset=offset, items=out)
 
 
 @router.put("/{expense_id}", response_model=ExpenseOut)

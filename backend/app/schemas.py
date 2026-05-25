@@ -17,7 +17,7 @@ from __future__ import annotations
 from datetime import datetime, date
 from decimal import Decimal
 from enum import Enum
-from typing import Annotated, Optional
+from typing import Annotated, Generic, Optional, TypeVar
 
 from pydantic import (
     BaseModel,
@@ -27,6 +27,19 @@ from pydantic import (
     StringConstraints,
     field_validator,
 )
+
+
+# ── Pagination ────────────────────────────────────────────────────────────────
+
+T = TypeVar("T")
+
+
+class PaginatedResponse(BaseModel, Generic[T]):
+    """Generic paginated envelope returned by all list endpoints."""
+    total: int
+    limit: int
+    offset: int
+    items: list[T]
 
 
 # ── Shared annotated types ────────────────────────────────────────────────────

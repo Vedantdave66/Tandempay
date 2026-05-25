@@ -14,16 +14,16 @@ Production-grade financial safety guarantees:
 import datetime
 import logging
 from decimal import Decimal
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from pydantic import BaseModel
 
 from app.audit_log import AuditLog, AuditActions
 from app.database import get_db
 from app.models import User, Notification, WalletTransaction
 from app.routes.auth import get_current_user
-from app.schemas import UserOut, WalletTransactionOut, CadAmount
+from app.schemas import UserOut, WalletTransactionOut, CadAmount, PaginatedResponse
 from app.idempotency import idempotent
 from app.ledger import (
     lock_user_for_update,
@@ -160,16 +160,30 @@ async def get_balance(
     return current_user
 
 
-@router.get("/transactions", response_model=list[WalletTransactionOut])
+@router.get("/transactions", response_model=PaginatedResponse[WalletTransactionOut])
 async def get_transactions(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Return the ledger feed for this user."""
+    """Return the paginated ledger feed for this user."""
+    total_q = await db.execute(
+        select(func.count(WalletTransaction.id))
+        .where(WalletTransaction.user_id == current_user.id)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(WalletTransaction)
-        .filter(WalletTransaction.user_id == current_user.id)
+        .where(WalletTransaction.user_id == current_user.id)
         .order_by(WalletTransaction.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
-    transactions = result.scalars().all()
-    return transactions
+    return PaginatedResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=result.scalars().all(),
+    )
