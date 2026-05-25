@@ -79,7 +79,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         setLoading(true);
         try {
             const records = await settlementRecordsApi.list(groupId);
-            const latest = records.find(r =>
+            const latest = records.items.find(r =>
                 r.payer_id === settlement.from_user_id &&
                 r.payee_id === settlement.to_user_id &&
                 r.status === 'pending'
