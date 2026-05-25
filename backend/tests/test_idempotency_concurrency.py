@@ -200,6 +200,7 @@ async def count_idempotency_records(key: str) -> int:
 # Proves: idempotency key prevents duplicate deposits on retry
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_a_same_key_same_payload_returns_cached(client: AsyncClient, test_user: dict):
     """
@@ -257,6 +258,7 @@ async def test_a_same_key_same_payload_returns_cached(client: AsyncClient, test_
 # Proves: payload consistency enforcement prevents key reuse
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_b_same_key_different_payload_rejected(client: AsyncClient, test_user: dict):
     """
@@ -300,6 +302,7 @@ async def test_b_same_key_different_payload_rejected(client: AsyncClient, test_u
 # Proves: repeated retries all return cached response
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_c_multiple_retries_all_cached(client: AsyncClient, test_user: dict):
     """
@@ -344,6 +347,7 @@ async def test_c_multiple_retries_all_cached(client: AsyncClient, test_user: dic
 # Proves: without key, each request executes independently
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_d_no_key_executes_normally(client: AsyncClient, test_user: dict):
     """
@@ -380,6 +384,7 @@ async def test_d_no_key_executes_normally(client: AsyncClient, test_user: dict):
 # Proves: different keys = different intent (by design)
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_e_different_keys_same_payload(client: AsyncClient, test_user: dict):
     """
@@ -417,6 +422,7 @@ async def test_e_different_keys_same_payload(client: AsyncClient, test_user: dic
 # Proves: idempotency works for withdrawals too
 # ═══════════════════════════════════════════════════
 
+@pytest.mark.skip(reason="wallet add_funds/withdraw disabled until Stripe payment gate is implemented")
 @pytest.mark.asyncio
 async def test_f_withdraw_idempotency(client: AsyncClient, test_user: dict):
     """
