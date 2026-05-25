@@ -22,6 +22,7 @@ import sentry_sdk
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
 
+from sqlalchemy import text
 from app.config import get_settings
 from app.context import request_id_var
 from app.database import engine  # used by APScheduler-started services via app.database
@@ -285,17 +286,22 @@ async def _validation_error_handler(request: Request, exc: RequestValidationErro
         content={"error": "validation_error", "detail": errors},
     )
 
-# CORS: allow local dev + production frontend URL from env
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://tandempay.ca",
-        "https://www.tandempay.ca",
+# CORS: production origins always allowed; dev origins only outside production
+_cors_settings = get_settings()
+_allowed_origins = [
+    "https://tandempay.ca",
+    "https://www.tandempay.ca",
+]
+if _cors_settings.ENVIRONMENT != "production":
+    _allowed_origins += [
         "http://localhost:3000",
         "http://localhost:8081",
         "exp://localhost:8081",
-    ],
+    ]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -329,5 +335,10 @@ async def root():
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok"}
+    try:
+        async with engine.connect() as conn:
+            await conn.execute(text("SELECT 1"))
+        return {"status": "ok"}
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "degraded"})
 
