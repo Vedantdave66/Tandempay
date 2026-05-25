@@ -60,7 +60,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
             const record = await settlementRecordsApi.create(groupId, {
                 payee_id: settlement.to_user_id,
                 amount: settlement.amount,
-                method: 'stripe',
+                method: 'in_app',
             });
             setActiveRecordId(record.id);
             setShowStripeModal(true);
