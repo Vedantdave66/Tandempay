@@ -347,3 +347,22 @@ class RecurringExpense(Base):
 
     group: Mapped[Optional["Group"]] = relationship()
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
+
+
+class PasswordResetToken(Base):
+    """Single-use, time-limited password reset token stored as a SHA-256 hash.
+
+    The raw token travels only in the reset URL and is never persisted.
+    Lookup is by token_hash; used_at is set on first successful consumption
+    so replayed links are rejected even if they arrive before expires_at.
+    """
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    user_id: Mapped[str] = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    token_hash: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    used_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    user: Mapped["User"] = relationship()
