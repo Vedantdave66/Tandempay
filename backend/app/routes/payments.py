@@ -197,7 +197,7 @@ async def create_payment(
                 "payee_id": data.payee_id,
                 "settlement_id": data.settlement_id or "none",
             },
-            idempotency_key=f"pi_{data.settlement_id or 'none'}_{current_user.id}"
+            idempotency_key=f"pi_{new_payment.id}"
         )
         
         logger.info(f"[{correlation_id}] Fresh Stripe PaymentIntent created: id={intent.id} status={intent.status} client_secret={intent.client_secret[:20]}...")

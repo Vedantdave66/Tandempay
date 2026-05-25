@@ -252,17 +252,14 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
         if not result["success"]:
             logger.warning(f"forgot_password: email dispatch failed — {result['error']}")
             raise HTTPException(
-                status_code=500, 
+                status_code=500,
                 detail=f"Email delivery service failure: {result['error']}"
             )
-            
-        return {"message": "Password reset link sent"}
+
     else:
         logger.info("forgot_password: reset requested for unregistered email (not disclosed to caller)")
-        raise HTTPException(
-            status_code=404,
-            detail="No account found with that email address"
-        )
+
+    return {"message": "If an account with that email exists, a reset link has been sent."}
 
 
 @router.post("/reset-password")

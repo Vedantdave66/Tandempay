@@ -1,17 +1,6 @@
 import json
-# forgot password split layout
-# register page split layout + pill size
-# landing page nav + card sizing
-# friends page tab spacing fix
-# rotating hero pill
-# pricing page auth-aware nav + scroll fix
-# extend dot grid to full page background
-# unify login page background
-# login page left panel dot grid
-# login grid full-screen fix (build trigger)
-# login page grid + light mode fix (build trigger)
-# animated login page TandemPay (build trigger)
-# landing page polish + deAI (build trigger)
+# wire auth error event + fix phrases cleanup
+# db check constraints + status enums
 import logging
 import os
 import uuid
@@ -27,7 +16,6 @@ from fastapi.responses import JSONResponse
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
-# nav restructure + mobile pro screens (build trigger)
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 import sentry_sdk
@@ -110,15 +98,6 @@ def _configure_logging() -> None:
 _configure_logging()
 
 logger = logging.getLogger("tandempay.main")
-
-# Debug: verify webhook secret is loaded correctly on every cold start.
-# Remove once the Vercel env var is confirmed correct.
-_wh_secret = get_settings().STRIPE_WEBHOOK_SECRET.strip()
-logger.info(
-    "STRIPE_WEBHOOK_SECRET check: first_10=%r len=%d",
-    _wh_secret[:10],
-    len(_wh_secret),
-)
 
 # ── Sentry — module-level init ───────────────────────────────────────────────
 # Must be at module level so it runs on every serverless cold start.

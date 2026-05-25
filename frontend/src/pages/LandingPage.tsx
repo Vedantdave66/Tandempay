@@ -15,6 +15,14 @@ function Reveal({ children, className = '', delay = 0, fadeOnly = false }: { chi
     );
 }
 
+const phrases = [
+    'Built for Canadian roommates 🍁',
+    'Interac e-Transfer friendly',
+    'Split rent, groceries & more',
+    'The new standard for group expenses',
+    'Free forever. No hidden fees.',
+];
+
 export default function LandingPage() {
     const [scrolled, setScrolled] = useState(false);
 
@@ -23,26 +31,22 @@ export default function LandingPage() {
         window.addEventListener('scroll', handleScroll);
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
-
-    const phrases = [
-        'Built for Canadian roommates 🍁',
-        'Interac e-Transfer friendly',
-        'Split rent, groceries & more',
-        'The new standard for group expenses',
-        'Free forever. No hidden fees.',
-    ];
     const [phraseIndex, setPhraseIndex] = useState(0);
     const [pillVisible, setPillVisible] = useState(true);
 
     useEffect(() => {
+        let timeoutId: ReturnType<typeof setTimeout>;
         const interval = setInterval(() => {
             setPillVisible(false);
-            setTimeout(() => {
+            timeoutId = setTimeout(() => {
                 setPhraseIndex(i => (i + 1) % phrases.length);
                 setPillVisible(true);
             }, 300);
         }, 3000);
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            clearTimeout(timeoutId);
+        };
     }, []);
 
     return (
