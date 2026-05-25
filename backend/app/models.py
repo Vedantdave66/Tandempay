@@ -14,6 +14,34 @@ class SubscriptionTier(str, enum.Enum):
     pro = "pro"
 
 
+class SettlementStatus(str, enum.Enum):
+    pending = "pending"
+    sent = "sent"
+    settled = "settled"
+    declined = "declined"
+
+
+class SettlementMethod(str, enum.Enum):
+    in_app = "in_app"
+    interac = "interac"
+    cash = "cash"
+    other = "other"
+    etransfer = "etransfer"
+
+
+class PaymentStatus(str, enum.Enum):
+    pending = "pending"
+    pending_claim = "pending_claim"
+    pending_claim_ready = "pending_claim_ready"
+    processing = "processing"
+    succeeded = "succeeded"
+    expired = "expired"
+    failed = "failed"
+    canceled = "canceled"
+    requires_action = "requires_action"
+    disputed = "disputed"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -109,8 +137,14 @@ class SettlementRecord(Base):
     payer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2, asdecimal=True), nullable=False)
-    method: Mapped[str] = mapped_column(String(20), default="etransfer")  # in_app | etransfer
-    status: Mapped[str] = mapped_column(String(20), default="pending")    # pending | sent | settled | declined
+    method: Mapped[SettlementMethod] = mapped_column(
+        SAEnum(SettlementMethod, name="settlementmethod", values_callable=lambda x: [e.value for e in x]),
+        default=SettlementMethod.etransfer,
+    )
+    status: Mapped[SettlementStatus] = mapped_column(
+        SAEnum(SettlementStatus, name="settlementstatus", values_callable=lambda x: [e.value for e in x]),
+        default=SettlementStatus.pending,
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -260,7 +294,10 @@ class Payment(Base):
     payer_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False) # cents
-    status: Mapped[str] = mapped_column(String(50), default="pending")  # pending, pending_claim, processing, succeeded, failed, expired
+    status: Mapped[PaymentStatus] = mapped_column(
+        SAEnum(PaymentStatus, name="paymentstatus", values_callable=lambda x: [e.value for e in x]),
+        default=PaymentStatus.pending,
+    )
     payout_arrival_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     settlement_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("settlement_records.id", ondelete="CASCADE"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
