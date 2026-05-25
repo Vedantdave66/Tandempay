@@ -16,7 +16,7 @@ from decimal import Decimal, ROUND_DOWN
 from sqlalchemy import select
 
 from app.database import async_session
-from app.models import RecurringExpense, RecurrenceFrequency, Expense, ExpenseParticipant, GroupMember
+from app.models import RecurringExpense, RecurrenceFrequency, Expense, ExpenseParticipant, GroupMember, User, SubscriptionTier
 
 logger = logging.getLogger("tandempay.recurring")
 
@@ -60,6 +60,15 @@ async def process_due_recurring_expenses():
 
             for rec in due:
                 try:
+                    creator_result = await db.execute(select(User).where(User.id == rec.created_by_id))
+                    creator = creator_result.scalar_one_or_none()
+                    if not creator or creator.subscription_tier != SubscriptionTier.pro:
+                        logger.info(
+                            "[recurring_tick] Skipping recurring expense %s — creator is not Pro.",
+                            rec.id,
+                        )
+                        continue
+
                     await _fire_recurring(rec, db)
                     rec.next_run_date = _advance_date(rec.next_run_date, rec.frequency)
                     await db.commit()
