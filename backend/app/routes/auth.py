@@ -275,7 +275,8 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
 
 
 @router.post("/reset-password")
-async def reset_password(data: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
+@limiter.limit("10/minute", error_message="Too many reset attempts. Please try again later.")
+async def reset_password(request: Request, data: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
     bad_token = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Invalid or expired reset token"
@@ -345,32 +346,49 @@ async def admin_reset_all_passwords(
     sent = 0
     failed = 0
     failures = []
-    
+
     for user in users:
         try:
-            # Generate a longer-lived reset token (24 hours) for mass reset
-            expire = datetime.now(timezone.utc) + timedelta(hours=24)
-            to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
-            reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-            
-            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-            # Never log reset_link — contains a live credential
+            now = datetime.now(timezone.utc)
+
+            # Invalidate any unused tokens for this user before issuing a new one
+            await db.execute(
+                update(PasswordResetToken)
+                .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+                .values(used_at=now)
+            )
+
+            # Raw token goes in the URL; only the SHA-256 hash is persisted
+            raw_token = secrets.token_urlsafe(32)
+            token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+            db_token = PasswordResetToken(
+                user_id=user.id,
+                token_hash=token_hash,
+                expires_at=now + timedelta(hours=24),
+            )
+            db.add(db_token)
+            await db.flush()
+
+            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
             logger.info(f"[MASS RESET] dispatching to user_id={user.id}")
-            
+
             email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
-            
+
             if email_result["success"]:
+                await db.commit()
                 sent += 1
                 logger.info(f"[MASS RESET] sent ok — user_id={user.id}")
             else:
+                await db.rollback()
                 failed += 1
                 failures.append({"email": user.email, "error": email_result["error"]})
                 logger.warning(f"[MASS RESET] failed for user_id={user.id}: {email_result['error']}")
-            
+
             # Rate limit: small delay between sends to avoid hitting Resend limits
             await asyncio.sleep(0.5)
-            
+
         except Exception as e:
+            await db.rollback()
             failed += 1
             failures.append({"email": user.email, "error": str(e)})
             logger.error(f"[MASS RESET] exception for user_id={user.id}: {type(e).__name__}")
