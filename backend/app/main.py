@@ -1,5 +1,6 @@
 import json
 # wire auth error event + fix phrases cleanup
+# db check constraints + status enums
 import logging
 import os
 import uuid
