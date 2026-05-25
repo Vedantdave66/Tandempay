@@ -193,8 +193,8 @@ def send_reset_email_sync(to_email: str, reset_link: str) -> dict:
     """
 
     import os
-    FROM_NAME = "Tandem"
-    FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "noreply@tandempay.ca")
+    FROM_NAME = "TandemPay"
+    FROM_EMAIL = os.getenv("RESEND_FROM_EMAIL", "noreply@send.tandempay.ca")
     
     try:
         logger.info(f"send_reset_email_sync: dispatching to={to_email} from={FROM_EMAIL}")
