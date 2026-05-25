@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, text, func
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, SettlementRecord, Expense, ExpenseParticipant
@@ -13,6 +13,8 @@ router = APIRouter(prefix="/api/me", tags=["me"])
 @router.get("/payments", response_model=list[SettlementRecordOut])
 async def get_my_payments(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     """Get all settlement records where the user is either the payer or the payee."""
+    # BEFORE: 1 query for records + 1 bulk IN query for all unique user IDs = 2 queries
+    # AFTER:  1 JOIN query loads payer and payee in a single round trip = 1 query
     result = await db.execute(
         select(SettlementRecord)
         .where(
@@ -22,40 +24,32 @@ async def get_my_payments(current_user: User = Depends(get_current_user), db: As
             )
         )
         .order_by(SettlementRecord.created_at.desc())
+        .options(joinedload(SettlementRecord.payer), joinedload(SettlementRecord.payee))
     )
-    records = result.scalars().all()
-    
-    # We need to look up Names and Avatar colors for payer/payee
-    # It's usually better to do a join, but we can just fetch all users involved for simplicity
-    user_ids = set()
-    for r in records:
-        user_ids.add(r.payer_id)
-        user_ids.add(r.payee_id)
-        
-    user_result = await db.execute(select(User).where(User.id.in_(user_ids)))
-    users_by_id = {u.id: u for u in user_result.scalars().all()}
-    
+    records = result.unique().scalars().all()
+
     out = []
     for r in records:
-        payer = users_by_id.get(r.payer_id)
-        payee = users_by_id.get(r.payee_id)
-        
+        payer = r.payer
+        payee = r.payee
         out.append(SettlementRecordOut(
             id=r.id,
             group_id=r.group_id,
-            payer_id=r.payer_id,
-            payer_name=payer.name if payer else "Unknown User",
-            payer_avatar_color=payer.avatar_color if payer else "#ccc",
-            payee_id=r.payee_id,
-            payee_name=payee.name if payee else "Unknown User",
-            payee_avatar_color=payee.avatar_color if payee else "#ccc",
+            payer_id=payer.id,
+            payer_name=payer.name,
+            payer_email=payer.interac_email or payer.email,
+            payer_avatar_color=payer.avatar_color,
+            payee_id=payee.id,
+            payee_name=payee.name,
+            payee_email=payee.interac_email or payee.email,
+            payee_avatar_color=payee.avatar_color,
             amount=r.amount,
             status=r.status,
             method=r.method,
             created_at=r.created_at,
-            updated_at=r.updated_at
+            updated_at=r.updated_at,
         ))
-        
+
     return out
 
 

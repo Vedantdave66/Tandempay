@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, SettlementRecord, Notification
@@ -135,22 +135,17 @@ async def list_settlements(
     """List all settlement records for a group."""
     await _verify_membership(group_id, current_user.id, db)
 
+    # BEFORE: 1 query for records + 2 queries per record (payer, payee) = 2N+1 total
+    # AFTER:  1 JOIN query loads payer and payee in the same round trip
     result = await db.execute(
         select(SettlementRecord)
         .where(SettlementRecord.group_id == group_id)
         .order_by(SettlementRecord.created_at.desc())
+        .options(joinedload(SettlementRecord.payer), joinedload(SettlementRecord.payee))
     )
-    records = result.scalars().all()
+    records = result.unique().scalars().all()
 
-    out = []
-    for r in records:
-        payer_q = await db.execute(select(User).where(User.id == r.payer_id))
-        payee_q = await db.execute(select(User).where(User.id == r.payee_id))
-        payer = payer_q.scalar_one()
-        payee = payee_q.scalar_one()
-        out.append(_build_settlement_out(r, payer, payee))
-
-    return out
+    return [_build_settlement_out(r, r.payer, r.payee) for r in records]
 
 
 @router.put("/{settlement_id}/status", response_model=SettlementRecordOut)
@@ -170,15 +165,22 @@ async def update_settlement_status(
     """
     await _verify_membership(group_id, current_user.id, db)
 
+    # BEFORE: bare select then 2 separate User queries after the status update
+    # AFTER:  single JOIN loads payer + payee; captured in locals before flush expires them
     result = await db.execute(
-        select(SettlementRecord).where(
+        select(SettlementRecord)
+        .where(
             SettlementRecord.id == settlement_id,
             SettlementRecord.group_id == group_id,
         )
+        .options(joinedload(SettlementRecord.payer), joinedload(SettlementRecord.payee))
     )
-    record = result.scalar_one_or_none()
+    record = result.unique().scalar_one_or_none()
     if not record:
         raise HTTPException(status_code=404, detail="Settlement not found")
+
+    payer = record.payer
+    payee = record.payee
 
     # Authorization checks
     valid_transitions = {
@@ -199,12 +201,6 @@ async def update_settlement_status(
     record.status = data.status
     await db.flush()
     await db.refresh(record)
-
-    # Get both users for output
-    payer_q = await db.execute(select(User).where(User.id == record.payer_id))
-    payee_q = await db.execute(select(User).where(User.id == record.payee_id))
-    payer = payer_q.scalar_one()
-    payee = payee_q.scalar_one()
 
     # Send notification based on transition
     if data.status == "sent":
