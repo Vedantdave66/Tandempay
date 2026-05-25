@@ -53,40 +53,10 @@ async def add_funds(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Add funds to the user's wallet. 
-    Strict ledger validation applied.
-    """
-    user = await lock_user_for_update(current_user.id, db)
-    await pre_validate_balance(user, db)
-
-    # 1. Create transaction
-    txn = WalletTransaction(
-        user_id=user.id,
-        type="deposit",
-        amount=data.amount,
-        status="completed" # for simulation, immediately complete
+    raise HTTPException(
+        status_code=503,
+        detail="Direct wallet funding is not available. Please use the payment flow.",
     )
-    db.add(txn)
-    
-    # 2. Update cached balance
-    user.wallet_balance += data.amount
-    
-    # 3. Post-mutation integrity check
-    await validate_balance_integrity(user, db)
-
-    db.add(AuditLog(
-        actor_id=user.id,
-        action=AuditActions.WALLET_DEPOSITED,
-        entity_type="wallet_transaction",
-        entity_id=txn.id,
-        action_metadata={"amount": str(data.amount), "balance_after": str(user.wallet_balance)},
-    ))
-
-    await db.commit()
-    await verify_post_commit(user.id, user.wallet_balance, db)
-
-    return {"status": "success", "new_balance": user.wallet_balance}
 
 @router.post("/withdraw")
 @idempotent
@@ -96,43 +66,10 @@ async def withdraw_funds(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Withdraw funds from the user's wallet.
-    Strict ledger validation applied.
-    """
-    user = await lock_user_for_update(current_user.id, db)
-    await pre_validate_balance(user, db)
-
-    if user.wallet_balance < data.amount:
-        raise HTTPException(status_code=400, detail="Insufficient funds")
-
-    # 1. Create transaction
-    txn = WalletTransaction(
-        user_id=user.id,
-        type="withdrawal",
-        amount=-data.amount,
-        status="completed" # for simulation, immediately complete
+    raise HTTPException(
+        status_code=503,
+        detail="Direct wallet funding is not available. Please use the payment flow.",
     )
-    db.add(txn)
-    
-    # 2. Update cached balance
-    user.wallet_balance -= data.amount
-    
-    # 3. Post-mutation integrity check
-    await validate_balance_integrity(user, db)
-
-    db.add(AuditLog(
-        actor_id=user.id,
-        action=AuditActions.WALLET_WITHDRAWN,
-        entity_type="wallet_transaction",
-        entity_id=txn.id,
-        action_metadata={"amount": str(data.amount), "balance_after": str(user.wallet_balance)},
-    ))
-
-    await db.commit()
-    await verify_post_commit(user.id, user.wallet_balance, db)
-
-    return {"status": "success", "new_balance": user.wallet_balance}
 
 @router.get("/balance", response_model=UserOut)
 async def get_balance(

@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { groupsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Wallet } from 'lucide-react';
 
 export default function InvitePage() {
     const { groupId } = useParams<{ groupId: string }>();
+    const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const { user, loading: authLoading } = useAuth();
     const [error, setError] = useState('');
@@ -21,9 +22,15 @@ export default function InvitePage() {
                 return;
             }
 
+            const inviteToken = searchParams.get('token');
+            if (!inviteToken) {
+                setError('Invalid invite link — missing token');
+                return;
+            }
+
             try {
                 // Call the join endpoint
-                await groupsApi.join(groupId);
+                await groupsApi.join(groupId, inviteToken);
                 // Success! Redirect directly into the group
                 navigate(`/groups/${groupId}`);
             } catch (err: any) {
@@ -32,7 +39,7 @@ export default function InvitePage() {
         }
 
         joinGroup();
-    }, [groupId, user, authLoading, navigate]);
+    }, [groupId, searchParams, user, authLoading, navigate]);
 
     return (
         <div className="min-h-screen bg-bg flex items-center justify-center p-4">

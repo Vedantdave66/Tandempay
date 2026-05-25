@@ -261,10 +261,10 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
         email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
 
         if not email_result["success"]:
-            logger.warning(f"forgot_password: email dispatch failed — {email_result['error']}")
+            logger.error(f"forgot_password: email dispatch failed — {email_result['error']}")
             raise HTTPException(
-                status_code=500,
-                detail=f"Email delivery service failure: {email_result['error']}"
+                status_code=503,
+                detail="Email service temporarily unavailable. Please try again later."
             )
 
         await db.commit()
@@ -421,7 +421,7 @@ async def admin_diagnose_hashes(
     for user in users:
         h = user.hashed_password
         entry = {
-            "email": user.email,
+            "user_id": user.id,
             "hash_length": len(h) if h else 0,
             "starts_with_$2": h.startswith("$2") if h else False,
             "looks_valid": bool(h and h.startswith("$2") and len(h) >= 59),

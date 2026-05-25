@@ -143,9 +143,10 @@ export const groupsApi = {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
-    join: (groupId: string) =>
+    join: (groupId: string, inviteToken: string) =>
         request<GroupMember>(`/groups/${groupId}/join`, {
             method: 'POST',
+            body: JSON.stringify({ invite_token: inviteToken }),
         }),
     deleteGroup: (groupId: string) =>
         request<void>(`/groups/${groupId}`, { method: 'DELETE' }),
