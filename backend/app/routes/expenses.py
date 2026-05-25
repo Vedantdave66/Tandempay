@@ -129,7 +129,7 @@ async def create_expense(
         entity_type="expense",
         entity_id=expense.id,
         group_id=group_id,
-        metadata={
+        action_metadata={
             "amount": float(data.amount),
             "description": data.title,
             "split_type": data.split_type,
@@ -282,7 +282,7 @@ async def update_expense(
         entity_type="expense",
         entity_id=expense.id,
         group_id=group_id,
-        metadata={
+        action_metadata={
             "amount": float(data.amount),
             "description": data.title,
             "split_type": data.split_type,
@@ -354,7 +354,7 @@ async def delete_expense(
         entity_type="expense",
         entity_id=deleted_expense_id,
         group_id=group_id,
-        metadata={
+        action_metadata={
             "amount": deleted_amount,
             "description": deleted_title,
         },

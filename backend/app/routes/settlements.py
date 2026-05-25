@@ -117,7 +117,7 @@ async def create_settlement(
         entity_type="settlement",
         entity_id=record.id,
         group_id=group_id,
-        metadata={
+        action_metadata={
             "amount": float(data.amount),
             "method": data.method,
         },
@@ -265,7 +265,7 @@ async def update_settlement_status(
             entity_type="settlement",
             entity_id=record.id,
             group_id=group_id,
-            metadata={
+            action_metadata={
                 "amount": float(record.amount),
                 "method": record.method,
                 "status_from": transition[0],

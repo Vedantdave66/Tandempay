@@ -62,6 +62,9 @@ async def onboard_user(
         except Exception as e:
             raise HTTPException(status_code=400, detail=str(e))
 
+    if not return_path.startswith("/") or "://" in return_path:
+        raise HTTPException(status_code=400, detail="Invalid return_path")
+
     try:
         clean_path = return_path.lstrip("/")
         account_link = stripe.AccountLink.create(
@@ -194,8 +197,8 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                         payment.status = "succeeded"
                         
                         # Calculate +2 business days for payout arrival
-                        from datetime import datetime, timedelta
-                        now = datetime.now()
+                        from datetime import datetime, timedelta, timezone
+                        now = datetime.now(timezone.utc)
                         days_to_add = 2
                         while days_to_add > 0:
                             now += timedelta(days=1)
@@ -421,8 +424,8 @@ async def reconcile_payment(
             payment.status = "succeeded"
             
             # Calculate +2 business days for payout arrival
-            from datetime import datetime, timedelta
-            now = datetime.now()
+            from datetime import datetime, timedelta, timezone
+            now = datetime.now(timezone.utc)
             days_to_add = 2
             while days_to_add > 0:
                 now += timedelta(days=1)
@@ -470,8 +473,8 @@ async def cleanup_payments(
     """
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
-    from datetime import datetime, timedelta
-    twenty_four_hours_ago = datetime.now() - timedelta(hours=24)
+    from datetime import datetime, timedelta, timezone
+    twenty_four_hours_ago = datetime.now(timezone.utc) - timedelta(hours=24)
     
     result = await db.execute(
         select(Payment).where(

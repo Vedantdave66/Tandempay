@@ -12,7 +12,7 @@ from app.models import User, Payment
 from app.routes.auth import get_current_user
 from app.idempotency import idempotent
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from app.config import get_settings
 
 logger = logging.getLogger("tandempay.payments")
@@ -40,7 +40,7 @@ async def create_payment(
     logger.info(f"[{correlation_id}] Initiating payment creation: user={current_user.id} amount={data.amount} payee={data.payee_id} settlement={data.settlement_id}")
 
     # 1. Rate Limiting: Max 5 attempts per minute
-    one_minute_ago = datetime.now() - timedelta(minutes=1)
+    one_minute_ago = datetime.now(timezone.utc) - timedelta(minutes=1)
     rate_limit_check = await db.execute(
         select(Payment).where(
             Payment.payer_id == current_user.id,
