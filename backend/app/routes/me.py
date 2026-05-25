@@ -1,38 +1,48 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, text, func
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, SettlementRecord, Expense, ExpenseParticipant
-from app.schemas import SettlementRecordOut, UserOut
+from app.schemas import SettlementRecordOut, UserOut, PaginatedResponse
 from app.routes.auth import get_current_user
 
 router = APIRouter(prefix="/api/me", tags=["me"])
 
-@router.get("/payments", response_model=list[SettlementRecordOut])
-async def get_my_payments(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.get("/payments", response_model=PaginatedResponse[SettlementRecordOut])
+async def get_my_payments(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Get all settlement records where the user is either the payer or the payee."""
-    # BEFORE: 1 query for records + 1 bulk IN query for all unique user IDs = 2 queries
-    # AFTER:  1 JOIN query loads payer and payee in a single round trip = 1 query
+    where_clause = or_(
+        SettlementRecord.payer_id == current_user.id,
+        SettlementRecord.payee_id == current_user.id,
+    )
+
+    total_q = await db.execute(
+        select(func.count(SettlementRecord.id)).where(where_clause)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(SettlementRecord)
-        .where(
-            or_(
-                SettlementRecord.payer_id == current_user.id,
-                SettlementRecord.payee_id == current_user.id
-            )
-        )
+        .where(where_clause)
         .order_by(SettlementRecord.created_at.desc())
         .options(joinedload(SettlementRecord.payer), joinedload(SettlementRecord.payee))
+        .limit(limit)
+        .offset(offset)
     )
     records = result.unique().scalars().all()
 
-    out = []
+    items = []
     for r in records:
         payer = r.payer
         payee = r.payee
-        out.append(SettlementRecordOut(
+        items.append(SettlementRecordOut(
             id=r.id,
             group_id=r.group_id,
             payer_id=payer.id,
@@ -50,11 +60,16 @@ async def get_my_payments(current_user: User = Depends(get_current_user), db: As
             updated_at=r.updated_at,
         ))
 
-    return out
+    return PaginatedResponse(total=total, limit=limit, offset=offset, items=items)
 
 
-@router.get("/friends", response_model=list[dict])
-async def get_my_friends(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+@router.get("/friends", response_model=dict)
+async def get_my_friends(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     """Get all users the current user shares a group with OR has an accepted friend request with."""
     from app.models import FriendRequest
     
@@ -96,15 +111,16 @@ async def get_my_friends(current_user: User = Depends(get_current_user), db: Asy
     for f in received_friends_result.scalars().all():
         friends_dict[f.id] = f
 
-    # Format output
-    out = []
-    for f_id, f in friends_dict.items():
-        out.append({
+    all_friends = [
+        {
             "id": f.id,
             "name": f.name,
             "email": f.email,
             "avatar_color": f.avatar_color,
-            "shared_groups_count": 0  # To be calculated if needed
-        })
-        
-    return out
+            "shared_groups_count": 0,
+        }
+        for f in friends_dict.values()
+    ]
+    total = len(all_friends)
+    items = all_friends[offset: offset + limit]
+    return {"total": total, "limit": limit, "offset": offset, "items": items}

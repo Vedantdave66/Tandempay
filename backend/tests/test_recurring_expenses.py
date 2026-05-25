@@ -153,7 +153,7 @@ async def test_list_recurring_expenses(client: AsyncClient, pro_user: User):
     resp = await client.get("/api/recurring")
     assert resp.status_code == 200
     data = resp.json()
-    assert len(data) == 2
+    assert len(data["items"]) == 2
 
 
 @pytest.mark.asyncio
@@ -196,7 +196,7 @@ async def test_delete_recurring_expense_deactivates(client: AsyncClient, pro_use
     # List should still return it (is_active=False), endpoint returns all owned records
     list_resp = await client.get("/api/recurring")
     data = list_resp.json()
-    match = next((r for r in data if r["id"] == rec_id), None)
+    match = next((r for r in data["items"] if r["id"] == rec_id), None)
     assert match is not None
     assert match["is_active"] is False
 

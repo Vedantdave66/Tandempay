@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func
 from sqlalchemy.orm import selectinload
@@ -7,7 +7,7 @@ import logging
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense
-from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, JoinGroup, GroupMemberOut
+from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, JoinGroup, GroupMemberOut, PaginatedResponse
 from app.routes.auth import get_current_user
 from app.services.balance_service import _compute_balances
 
@@ -43,31 +43,43 @@ async def create_group(data: GroupCreate, current_user: User = Depends(get_curre
     )
 
 
-@router.get("", response_model=list[GroupListOut])
-async def list_groups(current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    # Get all group IDs the user is a member of
+@router.get("", response_model=PaginatedResponse[GroupListOut])
+async def list_groups(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
     member_q = select(GroupMember.group_id).where(GroupMember.user_id == current_user.id)
+
+    total_q = await db.execute(
+        select(sa_func.count(Group.id)).where(Group.id.in_(member_q))
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(Group)
         .where(Group.id.in_(member_q))
         .options(selectinload(Group.members))
         .options(selectinload(Group.expenses))
         .order_by(Group.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
     groups = result.scalars().all()
 
     out = []
     for g in groups:
-        total = sum(e.amount for e in g.expenses)
+        total_exp = sum(e.amount for e in g.expenses)
         out.append(GroupListOut(
             id=g.id,
             name=g.name,
             created_by=g.created_by,
             created_at=g.created_at,
             member_count=len(g.members),
-            total_expenses=total,
+            total_expenses=total_exp,
         ))
-    return out
+    return PaginatedResponse(total=total, limit=limit, offset=offset, items=out)
 
 
 @router.get("/{group_id}", response_model=GroupOut)

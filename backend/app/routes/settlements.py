@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload, joinedload
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, SettlementRecord, Notification
-from app.schemas import SettlementRecordCreate, SettlementRecordOut, SettlementStatusUpdate
+from app.schemas import SettlementRecordCreate, SettlementRecordOut, SettlementStatusUpdate, PaginatedResponse
 from app.routes.auth import get_current_user
 from app.idempotency import idempotent
 from app.services.audit import log_action
@@ -126,26 +126,39 @@ async def create_settlement(
     return _build_settlement_out(record, current_user, payee)
 
 
-@router.get("", response_model=list[SettlementRecordOut])
+@router.get("", response_model=PaginatedResponse[SettlementRecordOut])
 async def list_settlements(
     group_id: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """List all settlement records for a group."""
+    """List settlement records for a group, newest first."""
     await _verify_membership(group_id, current_user.id, db)
 
-    # BEFORE: 1 query for records + 2 queries per record (payer, payee) = 2N+1 total
-    # AFTER:  1 JOIN query loads payer and payee in the same round trip
+    total_q = await db.execute(
+        select(func.count(SettlementRecord.id))
+        .where(SettlementRecord.group_id == group_id)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(SettlementRecord)
         .where(SettlementRecord.group_id == group_id)
         .order_by(SettlementRecord.created_at.desc())
         .options(joinedload(SettlementRecord.payer), joinedload(SettlementRecord.payee))
+        .limit(limit)
+        .offset(offset)
     )
     records = result.unique().scalars().all()
 
-    return [_build_settlement_out(r, r.payer, r.payee) for r in records]
+    return PaginatedResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=[_build_settlement_out(r, r.payer, r.payee) for r in records],
+    )
 
 
 @router.put("/{settlement_id}/status", response_model=SettlementRecordOut)

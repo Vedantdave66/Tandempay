@@ -1,12 +1,12 @@
 import logging
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 
 from app.database import get_db
 from app.models import RecurringExpense, User
-from app.schemas import RecurringExpenseCreate, RecurringExpenseUpdate, RecurringExpenseOut
+from app.schemas import RecurringExpenseCreate, RecurringExpenseUpdate, RecurringExpenseOut, PaginatedResponse
 from app.routes.auth import get_current_user
 from app.dependencies.subscription import require_pro
 
@@ -36,17 +36,32 @@ async def create_recurring_expense(
     return rec
 
 
-@router.get("", response_model=list[RecurringExpenseOut])
+@router.get("", response_model=PaginatedResponse[RecurringExpenseOut])
 async def list_recurring_expenses(
+    limit: int = Query(default=50, ge=1, le=200),
+    offset: int = Query(default=0, ge=0),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
+    total_q = await db.execute(
+        select(func.count(RecurringExpense.id))
+        .where(RecurringExpense.created_by_id == current_user.id)
+    )
+    total = total_q.scalar_one()
+
     result = await db.execute(
         select(RecurringExpense)
         .where(RecurringExpense.created_by_id == current_user.id)
         .order_by(RecurringExpense.created_at.desc())
+        .limit(limit)
+        .offset(offset)
     )
-    return result.scalars().all()
+    return PaginatedResponse(
+        total=total,
+        limit=limit,
+        offset=offset,
+        items=result.scalars().all(),
+    )
 
 
 @router.patch("/{recurring_id}", response_model=RecurringExpenseOut)
