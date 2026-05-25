@@ -55,6 +55,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setUser(null);
     };
 
+    useEffect(() => {
+        const handler = () => logout();
+        window.addEventListener('auth_error', handler);
+        return () => window.removeEventListener('auth_error', handler);
+    }, [logout]);
+
     const refetchUser = async () => {
         if (token) {
             const me = await authApi.me();
