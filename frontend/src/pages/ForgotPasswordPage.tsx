@@ -100,21 +100,6 @@ const TAIL_FILL: React.CSSProperties = {
   borderTop: '6px solid var(--bg-secondary)',
 };
 
-const NAME_TAG: React.CSSProperties = {
-  position: 'absolute',
-  bottom: '-12px',
-  left: '50%',
-  transform: 'translateX(-50%)',
-  borderRadius: '999px',
-  padding: '2px 10px',
-  fontSize: '10px',
-  fontWeight: 600,
-  color: 'var(--text-primary)',
-  whiteSpace: 'nowrap',
-  zIndex: 10,
-  pointerEvents: 'none',
-  letterSpacing: '0.03em',
-};
 
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
@@ -295,8 +280,7 @@ export default function ForgotPasswordPage() {
                                 <EyeBall size={18} pupilSize={7} maxDistance={5} eyeColor="white" pupilColor="#1A1A1A" isBlinking={isGreenBlinking} />
                                 <EyeBall size={18} pupilSize={7} maxDistance={5} eyeColor="white" pupilColor="#1A1A1A" isBlinking={isGreenBlinking} />
                             </div>
-                            {/* Max name tag */}
-                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(52,211,153,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Max</div>
+
                         </div>
 
                         {/* Amber semi-circle — front left (Rue) */}
@@ -316,8 +300,7 @@ export default function ForgotPasswordPage() {
                                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" />
                                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" />
                             </div>
-                            {/* Rue name tag */}
-                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.5)' }}>Rue</div>
+
                         </div>
 
                         {/* Light emerald rounded rectangle — front right (Kai) */}
@@ -342,8 +325,7 @@ export default function ForgotPasswordPage() {
                                     left: `${40 + (lightPos.faceX || 0)}px`,
                                     top: `${88 + (lightPos.faceY || 0)}px`,
                                 }} />
-                            {/* Kai name tag */}
-                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(110,231,183,0.25)', border: '1px solid rgba(110,231,183,0.5)' }}>Kai</div>
+
                         </div>
 
                         {/* ── Speech bubbles — one visible at a time ── */}
