@@ -77,6 +77,56 @@ const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, eyeColor = "whit
   );
 };
 
+const LOGIN_MAX_PHRASES = ["Welcome back! 🎉", "Ready to split?", "Let's get it!", "Your squad awaits!"];
+const LOGIN_RUE_PHRASES = ["Oh, you're back.", "Remembered your password this time?", "Finally.", "Sure, come on in."];
+const LOGIN_KAI_PHRASES = ["So happy to see you! 🥰", "We missed you!", "Yay you're here!", "Come on in 💚"];
+const LOGIN_ZO_PHRASES  = ["hey.", "sup.", "cool.", "...hi."];
+
+const BUBBLE_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  transform: 'translateX(-50%)',
+  transition: 'opacity 300ms ease',
+  backgroundColor: 'var(--bg-secondary)',
+  border: '1px solid var(--border-color)',
+  borderRadius: '10px',
+  padding: '5px 10px',
+  fontSize: '11px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  maxWidth: '190px',
+  textAlign: 'center',
+  pointerEvents: 'none',
+  zIndex: 30,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  lineHeight: '1.4',
+};
+
+const TAIL_BORDER: React.CSSProperties = {
+  position: 'absolute', bottom: '-7px', left: '50%', transform: 'translateX(-50%)',
+  width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent',
+  borderTop: '7px solid var(--border-color)',
+};
+const TAIL_FILL: React.CSSProperties = {
+  position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
+  width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent',
+  borderTop: '6px solid var(--bg-secondary)',
+};
+
+const NAME_TAG_BASE: React.CSSProperties = {
+  position: 'absolute',
+  bottom: '-26px',
+  transform: 'translateX(-50%)',
+  borderRadius: '999px',
+  padding: '2px 10px',
+  fontSize: '10px',
+  fontWeight: 600,
+  color: 'var(--text-primary)',
+  whiteSpace: 'nowrap',
+  zIndex: 10,
+  pointerEvents: 'none',
+  letterSpacing: '0.03em',
+};
+
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
@@ -90,6 +140,20 @@ export default function LoginPage() {
   const [isTyping, setIsTyping] = useState(false);
   const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false);
   const [isGreenPeeking, setIsGreenPeeking] = useState(false);
+
+  // Speech bubble state
+  const [maxIdx, setMaxIdx] = useState(0);
+  const [rueIdx, setRueIdx] = useState(0);
+  const [kaiIdx, setKaiIdx] = useState(0);
+  const [zoIdx,  setZoIdx]  = useState(0);
+  const [maxVisible, setMaxVisible] = useState(true);
+  const [rueVisible, setRueVisible] = useState(true);
+  const [kaiVisible, setKaiVisible] = useState(true);
+  const [zoVisible,  setZoVisible]  = useState(true);
+  const [maxOverride, setMaxOverride] = useState<string | null>(null);
+  const [kaiOverride, setKaiOverride] = useState<string | null>(null);
+  const [zoOverride,  setZoOverride]  = useState<string | null>(null);
+  const [isHoveringSubmit, setIsHoveringSubmit] = useState(false);
 
   const greenRef = useRef<HTMLDivElement>(null);
   const darkRef = useRef<HTMLDivElement>(null);
@@ -140,6 +204,25 @@ export default function LoginPage() {
     }
   }, [password, showPassword, isGreenPeeking]);
 
+  // Phrase cycling
+  useEffect(() => {
+    const cycle = (setVis: (v: boolean) => void, setI: (fn: (i: number) => number) => void, len: number) => {
+      return setInterval(() => {
+        setVis(false);
+        setTimeout(() => { setI(i => (i + 1) % len); setVis(true); }, 300);
+      }, 4000);
+    };
+    const t1 = cycle(setMaxVisible, setMaxIdx, LOGIN_MAX_PHRASES.length);
+    const t2 = cycle(setRueVisible, setRueIdx, LOGIN_RUE_PHRASES.length);
+    const t3 = cycle(setKaiVisible, setKaiIdx, LOGIN_KAI_PHRASES.length);
+    const t4 = cycle(setZoVisible,  setZoIdx,  LOGIN_ZO_PHRASES.length);
+    return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); clearInterval(t4); };
+  }, []);
+
+  useEffect(() => { setKaiOverride(isTyping ? "Ooh they're typing! 👀" : null); }, [isTyping]);
+  useEffect(() => { setMaxOverride(isHoveringSubmit ? "DO IT! DO IT! DO IT!" : null); }, [isHoveringSubmit]);
+  useEffect(() => { setZoOverride(isLoading ? "...processing." : null); }, [isLoading]);
+
   const calculatePosition = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (!ref.current) return { faceX: 0, faceY: 0, bodySkew: 0 };
     const rect = ref.current.getBoundingClientRect();
@@ -156,6 +239,12 @@ export default function LoginPage() {
   const darkPos = calculatePosition(darkRef);
   const amberPos = calculatePosition(amberRef);
   const lightPos = calculatePosition(lightRef);
+
+  // Displayed phrases
+  const maxPhrase = maxOverride ?? LOGIN_MAX_PHRASES[maxIdx];
+  const ruePhrase = LOGIN_RUE_PHRASES[rueIdx];
+  const kaiPhrase = kaiOverride ?? LOGIN_KAI_PHRASES[kaiIdx];
+  const zoPhrase  = zoOverride  ?? LOGIN_ZO_PHRASES[zoIdx];
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -298,6 +387,38 @@ export default function LoginPage() {
                   top: (password.length > 0 && showPassword) ? "88px" : `${88 + (lightPos.faceY || 0)}px`,
                 }} />
             </div>
+
+            {/* ── Speech bubbles ── */}
+            {/* Max (green) — left:70, width:180, center:160, char height:400 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '414px', left: '160px', opacity: maxOverride !== null || maxVisible ? 1 : 0 }}>
+              {maxPhrase}
+              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            </div>
+
+            {/* Zo (dark) — left:240, width:120, center:300, char height:310 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '324px', left: '300px', opacity: zoOverride !== null || zoVisible ? 1 : 0 }}>
+              {zoPhrase}
+              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            </div>
+
+            {/* Rue (amber) — left:0, width:240, center:120, char height:200 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: rueVisible ? 1 : 0 }}>
+              {ruePhrase}
+              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            </div>
+
+            {/* Kai (light) — left:310, width:140, center:380, char height:230 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '380px', opacity: kaiOverride !== null || kaiVisible ? 1 : 0 }}>
+              {kaiPhrase}
+              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            </div>
+
+            {/* ── Name tags ── */}
+            <div style={{ ...NAME_TAG_BASE, left: '160px', backgroundColor: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.3)' }}>Max</div>
+            <div style={{ ...NAME_TAG_BASE, left: '300px', backgroundColor: 'rgba(39,39,42,0.13)', border: '1px solid rgba(39,39,42,0.35)' }}>Zo</div>
+            <div style={{ ...NAME_TAG_BASE, left: '120px', backgroundColor: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.3)' }}>Rue</div>
+            <div style={{ ...NAME_TAG_BASE, left: '380px', backgroundColor: 'rgba(110,231,183,0.13)', border: '1px solid rgba(110,231,183,0.3)' }}>Kai</div>
+
           </div>
         </div>
 
@@ -366,6 +487,8 @@ export default function LoginPage() {
             )}
 
             <button type="submit" disabled={isLoading}
+              onMouseEnter={() => setIsHoveringSubmit(true)}
+              onMouseLeave={() => setIsHoveringSubmit(false)}
               className="w-full h-12 rounded-xl bg-gradient-to-r from-accent to-emerald-500 hover:from-accent hover:to-emerald-600 text-white font-bold text-base transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed">
               {isLoading ? "Signing in..." : "Log in"}
             </button>

@@ -64,15 +64,76 @@ const EyeBall = ({ size = 48, pupilSize = 16, maxDistance = 10, eyeColor = "whit
   );
 };
 
+const FORGOT_MAX_PHRASES = ["We got you! 💪", "Back in no time!", "You've got this!", "Reset and conquer!"];
+const FORGOT_RUE_PHRASES = ["Forgot it again huh.", "It happens to the best of us.", "Classic.", "No judgment. Much judgment."];
+const FORGOT_KAI_PHRASES = ["Don't worry at all! 🌸", "We'll fix this together!", "It's totally okay!", "You're doing great! 💚"];
+
+const BUBBLE_STYLE: React.CSSProperties = {
+  position: 'absolute',
+  transform: 'translateX(-50%)',
+  transition: 'opacity 300ms ease',
+  backgroundColor: 'var(--bg-secondary)',
+  border: '1px solid var(--border-color)',
+  borderRadius: '10px',
+  padding: '5px 10px',
+  fontSize: '11px',
+  fontWeight: 500,
+  color: 'var(--text-primary)',
+  maxWidth: '190px',
+  textAlign: 'center',
+  pointerEvents: 'none',
+  zIndex: 30,
+  boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+  lineHeight: '1.4',
+};
+
+const TAIL_BORDER: React.CSSProperties = {
+  position: 'absolute', bottom: '-7px', left: '50%', transform: 'translateX(-50%)',
+  width: 0, height: 0, borderLeft: '7px solid transparent', borderRight: '7px solid transparent',
+  borderTop: '7px solid var(--border-color)',
+};
+const TAIL_FILL: React.CSSProperties = {
+  position: 'absolute', bottom: '-5px', left: '50%', transform: 'translateX(-50%)',
+  width: 0, height: 0, borderLeft: '6px solid transparent', borderRight: '6px solid transparent',
+  borderTop: '6px solid var(--bg-secondary)',
+};
+
+const NAME_TAG_BASE: React.CSSProperties = {
+  position: 'absolute',
+  bottom: '-26px',
+  transform: 'translateX(-50%)',
+  borderRadius: '999px',
+  padding: '2px 10px',
+  fontSize: '10px',
+  fontWeight: 600,
+  color: 'var(--text-primary)',
+  whiteSpace: 'nowrap',
+  zIndex: 10,
+  pointerEvents: 'none',
+  letterSpacing: '0.03em',
+};
+
 export default function ForgotPasswordPage() {
     const [email, setEmail] = useState('');
     const [loading, setLoading] = useState(false);
     const [submitted, setSubmitted] = useState(false);
     const [error, setError] = useState('');
+    const [isTyping, setIsTyping] = useState(false);
 
     const [mouseX, setMouseX] = useState<number>(0);
     const [mouseY, setMouseY] = useState<number>(0);
     const [isGreenBlinking, setIsGreenBlinking] = useState(false);
+
+    // Speech bubble state
+    const [maxIdx, setMaxIdx] = useState(0);
+    const [rueIdx, setRueIdx] = useState(0);
+    const [kaiIdx, setKaiIdx] = useState(0);
+    const [maxVisible, setMaxVisible] = useState(true);
+    const [rueVisible, setRueVisible] = useState(true);
+    const [kaiVisible, setKaiVisible] = useState(true);
+    const [maxOverride, setMaxOverride] = useState<string | null>(null);
+    const [kaiOverride, setKaiOverride] = useState<string | null>(null);
+    const [isHoveringSubmit, setIsHoveringSubmit] = useState(false);
 
     const greenRef = useRef<HTMLDivElement>(null);
     const amberRef = useRef<HTMLDivElement>(null);
@@ -96,6 +157,24 @@ export default function ForgotPasswordPage() {
         return () => { clearTimeout(t1); };
     }, []);
 
+    // Phrase cycling
+    useEffect(() => {
+        const cycle = (setVis: (v: boolean) => void, setI: (fn: (i: number) => number) => void, len: number) => {
+            return setInterval(() => {
+                setVis(false);
+                setTimeout(() => { setI(i => (i + 1) % len); setVis(true); }, 300);
+            }, 4000);
+        };
+        const t1 = cycle(setMaxVisible, setMaxIdx, FORGOT_MAX_PHRASES.length);
+        const t2 = cycle(setRueVisible, setRueIdx, FORGOT_RUE_PHRASES.length);
+        const t3 = cycle(setKaiVisible, setKaiIdx, FORGOT_KAI_PHRASES.length);
+        return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
+    }, []);
+
+    useEffect(() => { setKaiOverride(isTyping ? "Ooh they're typing! 👀" : null); }, [isTyping]);
+    useEffect(() => { setMaxOverride(isHoveringSubmit ? "DO IT! DO IT! DO IT!" : null); }, [isHoveringSubmit]);
+    useEffect(() => { if (submitted) setKaiOverride("Check your inbox! We sent it! 🎉"); }, [submitted]);
+
     const calculatePosition = (ref: React.RefObject<HTMLDivElement | null>) => {
         if (!ref.current) return { faceX: 0, faceY: 0, bodySkew: 0 };
         const rect = ref.current.getBoundingClientRect();
@@ -111,6 +190,11 @@ export default function ForgotPasswordPage() {
     const greenPos = calculatePosition(greenRef);
     const amberPos = calculatePosition(amberRef);
     const lightPos = calculatePosition(lightRef);
+
+    // Displayed phrases
+    const maxPhrase = maxOverride ?? FORGOT_MAX_PHRASES[maxIdx];
+    const ruePhrase = FORGOT_RUE_PHRASES[rueIdx];
+    const kaiPhrase = kaiOverride ?? FORGOT_KAI_PHRASES[kaiIdx];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -217,6 +301,31 @@ export default function ForgotPasswordPage() {
                                     top: `${88 + (lightPos.faceY || 0)}px`,
                                 }} />
                         </div>
+
+                        {/* ── Speech bubbles ── */}
+                        {/* Max (green) — left:80, width:180, center:170, char height:400 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '414px', left: '170px', opacity: maxOverride !== null || maxVisible ? 1 : 0 }}>
+                            {maxPhrase}
+                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        </div>
+
+                        {/* Rue (amber) — left:0, width:240, center:120, char height:200 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: rueVisible ? 1 : 0 }}>
+                            {ruePhrase}
+                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        </div>
+
+                        {/* Kai (light) — left:320, width:140, center:390, char height:230 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '390px', opacity: kaiOverride !== null || kaiVisible ? 1 : 0 }}>
+                            {kaiPhrase}
+                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        </div>
+
+                        {/* ── Name tags ── */}
+                        <div style={{ ...NAME_TAG_BASE, left: '170px', backgroundColor: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.3)' }}>Max</div>
+                        <div style={{ ...NAME_TAG_BASE, left: '120px', backgroundColor: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.3)' }}>Rue</div>
+                        <div style={{ ...NAME_TAG_BASE, left: '390px', backgroundColor: 'rgba(110,231,183,0.13)', border: '1px solid rgba(110,231,183,0.3)' }}>Kai</div>
+
                     </div>
                 </div>
 
@@ -267,6 +376,8 @@ export default function ForgotPasswordPage() {
                                             type="email"
                                             value={email}
                                             onChange={(e) => setEmail(e.target.value)}
+                                            onFocus={() => setIsTyping(true)}
+                                            onBlur={() => setIsTyping(false)}
                                             placeholder="you@example.com"
                                             required
                                             className="flex h-12 w-full rounded-xl border border-border bg-surface pl-11 pr-4 py-2 text-sm text-primary placeholder:text-secondary focus:outline-none focus:ring-2 focus:ring-accent focus:border-transparent transition-colors"
@@ -276,6 +387,8 @@ export default function ForgotPasswordPage() {
                                 <button
                                     type="submit"
                                     disabled={loading || !email}
+                                    onMouseEnter={() => setIsHoveringSubmit(true)}
+                                    onMouseLeave={() => setIsHoveringSubmit(false)}
                                     className="w-full h-12 rounded-xl bg-gradient-to-r from-accent to-emerald-500 hover:from-accent hover:to-emerald-600 text-white font-bold text-base transition-all shadow-lg disabled:opacity-60 disabled:cursor-not-allowed mt-2"
                                 >
                                     {loading ? (
