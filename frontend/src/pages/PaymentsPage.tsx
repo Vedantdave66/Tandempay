@@ -31,8 +31,8 @@ export default function PaymentsPage() {
                 walletApi.getTransactions(),
                 stripeApi.getStatus()
             ]);
-            setPayments(payData);
-            setTransactions(transData);
+            setPayments(payData.items);
+            setTransactions(transData.items);
             setStripeStatus(stripeData);
         } catch (err) {
             console.error(err);

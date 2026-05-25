@@ -61,7 +61,7 @@ export default function RecurringPage() {
         setError('');
         try {
             const data = await recurringApi.list();
-            setItems(data);
+            setItems(data.items);
         } catch (e: any) {
             setError(e.message || 'Failed to load recurring expenses');
         } finally {

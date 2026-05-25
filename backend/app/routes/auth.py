@@ -1,15 +1,17 @@
+import hashlib
 import random
+import secrets
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, update
 from jose import jwt, JWTError, ExpiredSignatureError
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.database import get_db
 from app.config import get_settings
-from app.models import User
+from app.models import User, PasswordResetToken
 from app.schemas import UserRegister, UserLogin, Token, UserOut, UserUpdate, PasswordResetRequest, PasswordResetConfirm
 import smtplib
 from email.mime.text import MIMEText
@@ -21,10 +23,6 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 security = HTTPBearer()
 settings = get_settings()
 logger = logging.getLogger("tandempay.auth")
-
-# In-memory rate-limit store for expired-token auto-resend (keyed by email).
-# Prevents hammering Resend if a user repeatedly submits the same expired token.
-recent_reset_requests: dict[str, datetime] = {}
 
 from app.limiter import limiter
 
@@ -235,27 +233,41 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
 
     result = await db.execute(select(User).where(User.email == email_lower))
     user = result.scalar_one_or_none()
-    
+
     if user:
-        # Generate a short-lived token for password reset (30 minutes)
-        expire = datetime.now(timezone.utc) + timedelta(minutes=30)
-        to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
-        reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-        
-        # Build the reset link — never log this value
-        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        now = datetime.now(timezone.utc)
+
+        # Invalidate any unused tokens for this user before issuing a new one
+        await db.execute(
+            update(PasswordResetToken)
+            .where(PasswordResetToken.user_id == user.id, PasswordResetToken.used_at.is_(None))
+            .values(used_at=now)
+        )
+
+        # Raw token goes in the URL; only the SHA-256 hash is persisted
+        raw_token = secrets.token_urlsafe(32)
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+        db_token = PasswordResetToken(
+            user_id=user.id,
+            token_hash=token_hash,
+            expires_at=now + timedelta(minutes=15),
+        )
+        db.add(db_token)
+        await db.flush()
+
+        reset_link = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
         logger.info(f"forgot_password: reset link generated for user_id={user.id}")
-        
-        # Dispatch the email
-        result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
-        
-        if not result["success"]:
-            logger.warning(f"forgot_password: email dispatch failed — {result['error']}")
+
+        email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
+
+        if not email_result["success"]:
+            logger.warning(f"forgot_password: email dispatch failed — {email_result['error']}")
             raise HTTPException(
                 status_code=500,
-                detail=f"Email delivery service failure: {result['error']}"
+                detail=f"Email delivery service failure: {email_result['error']}"
             )
 
+        await db.commit()
     else:
         logger.info("forgot_password: reset requested for unregistered email (not disclosed to caller)")
 
@@ -264,75 +276,44 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
 
 @router.post("/reset-password")
 async def reset_password(data: PasswordResetConfirm, db: AsyncSession = Depends(get_db)):
-    credentials_exception = HTTPException(
+    bad_token = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
         detail="Invalid or expired reset token"
     )
-    try:
-        payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        user_id: str = payload.get("sub")
-        token_type: str = payload.get("type")
-        
-        if user_id is None or token_type != "password_reset":
-            logger.warning("reset_password: invalid token payload — missing sub or wrong type")
-            raise credentials_exception
-    except ExpiredSignatureError:
-        logger.info("reset_password: token expired — attempting auto-resend")
-        try:
-            unverified_payload = jwt.decode(data.token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM], options={"verify_exp": False})
-            user_id = unverified_payload.get("sub")
-            if not user_id:
-                raise credentials_exception
-                
-            result = await db.execute(select(User).where(User.id == user_id))
-            user = result.scalar_one_or_none()
-            if not user:
-                raise credentials_exception
-                
-            # Rate limit auto-resend
-            now = datetime.now(timezone.utc)
-            if user.email in recent_reset_requests:
-                last_request = recent_reset_requests[user.email]
-                if (now - last_request) < timedelta(minutes=2):
-                    raise HTTPException(
-                        status_code=400,
-                        detail="Your reset link expired. A fresh link was sent recently, please check your email."
-                    )
-            recent_reset_requests[user.email] = now
-            
-            # Send a new email
-            expire = datetime.now(timezone.utc) + timedelta(minutes=30)
-            to_encode = {"sub": user.id, "type": "password_reset", "exp": expire}
-            reset_token = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
-            reset_link = f"{settings.FRONTEND_URL}/reset-password?token={reset_token}"
-            
-            email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
-            if email_result["success"]:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Your reset link expired. We have automatically sent a fresh link to your email!"
-                )
-            else:
-                raise HTTPException(
-                    status_code=400,
-                    detail="Your reset link expired, and we failed to send a new one. Please request a new link manually."
-                )
-        except JWTError:
-            raise credentials_exception
-    except JWTError as e:
-        logger.warning(f"reset_password: JWT decode error — {type(e).__name__}")
-        raise credentials_exception
 
-    result = await db.execute(select(User).where(User.id == user_id))
+    token_hash = hashlib.sha256(data.token.encode()).hexdigest()
+    result = await db.execute(
+        select(PasswordResetToken).where(PasswordResetToken.token_hash == token_hash)
+    )
+    db_token = result.scalar_one_or_none()
+
+    if db_token is None:
+        logger.warning("reset_password: token hash not found in DB")
+        raise bad_token
+
+    if db_token.used_at is not None:
+        logger.warning(f"reset_password: token already consumed — user_id={db_token.user_id}")
+        raise bad_token
+
+    now = datetime.now(timezone.utc)
+    expires = db_token.expires_at
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    if expires < now:
+        logger.info(f"reset_password: token expired — user_id={db_token.user_id}")
+        raise bad_token
+
+    result = await db.execute(select(User).where(User.id == db_token.user_id))
     user = result.scalar_one_or_none()
     if user is None:
-        raise credentials_exception
+        logger.warning("reset_password: user not found for valid token")
+        raise bad_token
 
-    # Hash the new password and save it
+    db_token.used_at = now
     user.hashed_password = hash_password(data.new_password)
-    db.add(user)
     await db.commit()
-    
+
+    logger.info(f"reset_password: success — user_id={user.id}")
     return {"message": "Password successfully reset"}
 
 
