@@ -34,10 +34,10 @@ export default function FriendsPage() {
         try {
             if (activeTab === 'my-friends') {
                 const data = await meApi.getFriends();
-                setFriends(data);
+                setFriends(data.items);
             } else if (activeTab === 'activity') {
                 const data = await notificationsApi.list();
-                setNotifications(data);
+                setNotifications(data.items);
             } else if (activeTab === 'pending') {
                 const data = await friendRequestsApi.getPending();
                 setPendingRequests(data);

@@ -102,9 +102,9 @@ export default function GroupPage() {
                 requestsApi.list(groupId)
             ]);
             setGroup(g);
-            setExpenses(e);
-            setPaymentRecords(pr);
-            setPaymentRequests(reqs.filter(r => r.status === 'pending'));
+            setExpenses(e.items);
+            setPaymentRecords(pr.items);
+            setPaymentRequests(reqs.items.filter(r => r.status === 'pending'));
         } catch (err) {
             console.error(err);
         } finally {
@@ -193,7 +193,7 @@ export default function GroupPage() {
         setFriendsLoading(true);
         try {
             const f = await meApi.getFriends();
-            setFriends(f);
+            setFriends(f.items);
         } catch {
             // Silently fail
         } finally {

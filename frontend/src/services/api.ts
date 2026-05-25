@@ -3,6 +3,13 @@ export const BASE_URL = import.meta.env.PROD
     ? "https://api.tandempay.ca/api"
     : "http://localhost:8000/api";
 
+export interface PaginatedResponse<T> {
+    total: number;
+    limit: number;
+    offset: number;
+    items: T[];
+}
+
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = localStorage.getItem('token');
     const headers: Record<string, string> = {
@@ -129,7 +136,7 @@ export interface GroupListItem {
 export const groupsApi = {
     create: (name: string) =>
         request<Group>('/groups', { method: 'POST', body: JSON.stringify({ name }) }),
-    list: () => request<GroupListItem[]>('/groups'),
+    list: () => request<PaginatedResponse<GroupListItem>>('/groups'),
     get: (id: string) => request<Group>(`/groups/${id}`),
     addMember: (groupId: string, email: string) =>
         request<GroupMember>(`/groups/${groupId}/members`, {
@@ -172,7 +179,7 @@ export const expensesApi = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    list: (groupId: string) => request<Expense[]>(`/groups/${groupId}/expenses`),
+    list: (groupId: string) => request<PaginatedResponse<Expense>>(`/groups/${groupId}/expenses`),
     update: (groupId: string, expenseId: string, data: { title: string; amount: number; paid_by: string; participant_ids: string[] }) =>
         request<Expense>(`/groups/${groupId}/expenses/${expenseId}`, {
             method: 'PUT',
@@ -236,7 +243,7 @@ export const settlementRecordsApi = {
             method: 'POST',
             body: JSON.stringify(data),
         }),
-    list: (groupId: string) => request<SettlementRecord[]>(`/groups/${groupId}/settlement-records`),
+    list: (groupId: string) => request<PaginatedResponse<SettlementRecord>>(`/groups/${groupId}/settlement-records`),
     updateStatus: (groupId: string, settlementId: string, status: string) =>
         request<SettlementRecord>(`/groups/${groupId}/settlement-records/${settlementId}/status`, {
             method: 'PUT',
@@ -258,7 +265,7 @@ export interface AppNotification {
 }
 
 export const notificationsApi = {
-    list: () => request<AppNotification[]>('/notifications'),
+    list: () => request<PaginatedResponse<AppNotification>>('/notifications'),
     unreadCount: () => request<{ count: number }>('/notifications/unread-count'),
     markRead: (id: string) => request<AppNotification>(`/notifications/${id}/read`, { method: 'PUT' }),
     markAllRead: () => request<{ status: string }>('/notifications/read-all', { method: 'PUT' }),
@@ -274,8 +281,8 @@ export interface Friend {
 }
 
 export const meApi = {
-    getPayments: () => request<SettlementRecord[]>('/me/payments'),
-    getFriends: () => request<Friend[]>('/me/friends'),
+    getPayments: () => request<PaginatedResponse<SettlementRecord>>('/me/payments'),
+    getFriends: () => request<PaginatedResponse<Friend>>('/me/friends'),
 };
 
 // --- Users (Search) ---
@@ -372,7 +379,7 @@ export interface WalletTransaction {
 
 export const walletApi = {
     getBalance: () => request<User>('/wallet/balance'),
-    getTransactions: () => request<WalletTransaction[]>('/wallet/transactions'),
+    getTransactions: () => request<PaginatedResponse<WalletTransaction>>('/wallet/transactions'),
 };
 
 export interface PaymentRequestData {
@@ -399,7 +406,7 @@ export const requestsApi = {
             method: 'POST',
             body: JSON.stringify(data)
         }),
-    list: (groupId: string) => request<PaymentRequestData[]>(`/groups/${groupId}/requests`),
+    list: (groupId: string) => request<PaginatedResponse<PaymentRequestData>>(`/groups/${groupId}/requests`),
 };
 
 // --- Strict Stripe Payments ---
@@ -479,7 +486,7 @@ export interface RecurringExpenseUpdate {
 }
 
 export const recurringApi = {
-    list: () => request<RecurringExpense[]>('/recurring'),
+    list: () => request<PaginatedResponse<RecurringExpense>>('/recurring'),
     create: (data: RecurringExpenseCreate) =>
         request<RecurringExpense>('/recurring', {
             method: 'POST',

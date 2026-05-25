@@ -22,7 +22,7 @@ export default function DashboardPage() {
     const loadGroups = useCallback(async () => {
         try {
             const data = await groupsApi.list();
-            setGroups(data);
+            setGroups(data.items);
         } catch {
         } finally {
             setLoading(false);
