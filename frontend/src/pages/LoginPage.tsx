@@ -82,6 +82,8 @@ const LOGIN_RUE_PHRASES = ["Oh, you're back.", "Remembered your password this ti
 const LOGIN_KAI_PHRASES = ["So happy to see you! 🥰", "We missed you!", "Yay you're here!", "Come on in 💚"];
 const LOGIN_ZO_PHRASES  = ["hey.", "sup.", "cool.", "...hi."];
 
+type Speaker = 'max' | 'zo' | 'rue' | 'kai';
+
 const BUBBLE_STYLE: React.CSSProperties = {
   position: 'absolute',
   transform: 'translateX(-50%)',
@@ -112,9 +114,10 @@ const TAIL_FILL: React.CSSProperties = {
   borderTop: '6px solid var(--bg-secondary)',
 };
 
-const NAME_TAG_BASE: React.CSSProperties = {
+const NAME_TAG: React.CSSProperties = {
   position: 'absolute',
-  bottom: '-26px',
+  bottom: '-12px',
+  left: '50%',
   transform: 'translateX(-50%)',
   borderRadius: '999px',
   padding: '2px 10px',
@@ -141,19 +144,19 @@ export default function LoginPage() {
   const [isLookingAtEachOther, setIsLookingAtEachOther] = useState(false);
   const [isGreenPeeking, setIsGreenPeeking] = useState(false);
 
-  // Speech bubble state
-  const [maxIdx, setMaxIdx] = useState(0);
-  const [rueIdx, setRueIdx] = useState(0);
-  const [kaiIdx, setKaiIdx] = useState(0);
-  const [zoIdx,  setZoIdx]  = useState(0);
-  const [maxVisible, setMaxVisible] = useState(true);
-  const [rueVisible, setRueVisible] = useState(true);
-  const [kaiVisible, setKaiVisible] = useState(true);
-  const [zoVisible,  setZoVisible]  = useState(true);
-  const [maxOverride, setMaxOverride] = useState<string | null>(null);
-  const [kaiOverride, setKaiOverride] = useState<string | null>(null);
-  const [zoOverride,  setZoOverride]  = useState<string | null>(null);
+  // ── Shared bubble state (one speaker at a time) ──
+  const [activeSpeaker, setActiveSpeaker] = useState<Speaker>('max');
+  const [currentPhrase, setCurrentPhrase] = useState(LOGIN_MAX_PHRASES[0]);
+  const [bubbleVisible, setBubbleVisible] = useState(true);
   const [isHoveringSubmit, setIsHoveringSubmit] = useState(false);
+
+  // Stable refs — mutations don't trigger re-renders
+  const speakerRef = useRef<Speaker>('max');
+  const phraseIdxRef = useRef<Record<Speaker, number>>({ max: 0, zo: 0, rue: 0, kai: 0 });
+  const cycleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const resumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const triggerActiveRef = useRef(false);
+  const fireTriggerRef = useRef<(s: Speaker, p: string) => void>(() => {});
 
   const greenRef = useRef<HTMLDivElement>(null);
   const darkRef = useRef<HTMLDivElement>(null);
@@ -204,24 +207,60 @@ export default function LoginPage() {
     }
   }, [password, showPassword, isGreenPeeking]);
 
-  // Phrase cycling
+  // ── Bubble cycling system ──
   useEffect(() => {
-    const cycle = (setVis: (v: boolean) => void, setI: (fn: (i: number) => number) => void, len: number) => {
-      return setInterval(() => {
-        setVis(false);
-        setTimeout(() => { setI(i => (i + 1) % len); setVis(true); }, 300);
+    const phrases: Record<Speaker, string[]> = {
+      max: LOGIN_MAX_PHRASES, zo: LOGIN_ZO_PHRASES,
+      rue: LOGIN_RUE_PHRASES, kai: LOGIN_KAI_PHRASES,
+    };
+    const all: Speaker[] = ['max', 'zo', 'rue', 'kai'];
+
+    const transition = (next: Speaker, phrase: string) => {
+      setBubbleVisible(false);
+      setTimeout(() => {
+        speakerRef.current = next;
+        setActiveSpeaker(next);
+        setCurrentPhrase(phrase);
+        setBubbleVisible(true);
+      }, 300);
+    };
+
+    const startCycle = () => {
+      if (cycleRef.current) clearTimeout(cycleRef.current);
+      cycleRef.current = setTimeout(() => {
+        if (triggerActiveRef.current) { startCycle(); return; }
+        const others = all.filter(s => s !== speakerRef.current);
+        const next = others[Math.floor(Math.random() * others.length)];
+        phraseIdxRef.current[next] = (phraseIdxRef.current[next] + 1) % phrases[next].length;
+        transition(next, phrases[next][phraseIdxRef.current[next]]);
+        setTimeout(startCycle, 300);
       }, 4000);
     };
-    const t1 = cycle(setMaxVisible, setMaxIdx, LOGIN_MAX_PHRASES.length);
-    const t2 = cycle(setRueVisible, setRueIdx, LOGIN_RUE_PHRASES.length);
-    const t3 = cycle(setKaiVisible, setKaiIdx, LOGIN_KAI_PHRASES.length);
-    const t4 = cycle(setZoVisible,  setZoIdx,  LOGIN_ZO_PHRASES.length);
-    return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); clearInterval(t4); };
+
+    const fireTrigger = (speaker: Speaker, phrase: string) => {
+      triggerActiveRef.current = true;
+      if (cycleRef.current) clearTimeout(cycleRef.current);
+      if (resumeRef.current) clearTimeout(resumeRef.current);
+      transition(speaker, phrase);
+      resumeRef.current = setTimeout(() => {
+        triggerActiveRef.current = false;
+        startCycle();
+      }, 3300);
+    };
+
+    fireTriggerRef.current = fireTrigger;
+    startCycle();
+
+    return () => {
+      if (cycleRef.current) clearTimeout(cycleRef.current);
+      if (resumeRef.current) clearTimeout(resumeRef.current);
+    };
   }, []);
 
-  useEffect(() => { setKaiOverride(isTyping ? "Ooh they're typing! 👀" : null); }, [isTyping]);
-  useEffect(() => { setMaxOverride(isHoveringSubmit ? "DO IT! DO IT! DO IT!" : null); }, [isHoveringSubmit]);
-  useEffect(() => { setZoOverride(isLoading ? "...processing." : null); }, [isLoading]);
+  // Trigger hooks
+  useEffect(() => { if (isTyping) fireTriggerRef.current('kai', "Ooh they're typing! 👀"); }, [isTyping]);
+  useEffect(() => { if (isHoveringSubmit) fireTriggerRef.current('max', "DO IT! DO IT! DO IT!"); }, [isHoveringSubmit]);
+  useEffect(() => { if (isLoading) fireTriggerRef.current('zo', "...processing."); }, [isLoading]);
 
   const calculatePosition = (ref: React.RefObject<HTMLDivElement | null>) => {
     if (!ref.current) return { faceX: 0, faceY: 0, bodySkew: 0 };
@@ -240,12 +279,6 @@ export default function LoginPage() {
   const amberPos = calculatePosition(amberRef);
   const lightPos = calculatePosition(lightRef);
 
-  // Displayed phrases
-  const maxPhrase = maxOverride ?? LOGIN_MAX_PHRASES[maxIdx];
-  const ruePhrase = LOGIN_RUE_PHRASES[rueIdx];
-  const kaiPhrase = kaiOverride ?? LOGIN_KAI_PHRASES[kaiIdx];
-  const zoPhrase  = zoOverride  ?? LOGIN_ZO_PHRASES[zoIdx];
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -259,6 +292,8 @@ export default function LoginPage() {
       setIsLoading(false);
     }
   };
+
+  const maxGrowth = isTyping || (password.length > 0 && !showPassword);
 
   return (
     <div className="relative min-h-screen grid lg:grid-cols-2 bg-bg">
@@ -288,16 +323,16 @@ export default function LoginPage() {
         <div className="relative z-20 flex items-end justify-center h-[500px]">
           <div className="relative" style={{ width: "550px", height: "400px" }}>
 
-            {/* Green tall rectangle — back layer */}
+            {/* Green tall rectangle — back layer (Max) */}
             <div ref={greenRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
                 left: "70px", width: "180px",
-                height: (isTyping || (password.length > 0 && !showPassword)) ? "440px" : "400px",
+                height: maxGrowth ? "440px" : "400px",
                 backgroundColor: "#34D399",
                 borderRadius: "10px 10px 0 0", zIndex: 1,
                 transform: (password.length > 0 && showPassword)
                   ? "skewX(0deg)"
-                  : (isTyping || (password.length > 0 && !showPassword))
+                  : maxGrowth
                     ? `skewX(${(greenPos.bodySkew || 0) - 12}deg) translateX(40px)`
                     : `skewX(${greenPos.bodySkew || 0}deg)`,
                 transformOrigin: "bottom center",
@@ -314,9 +349,11 @@ export default function LoginPage() {
                   forceLookX={(password.length > 0 && showPassword) ? (isGreenPeeking ? 4 : -4) : isLookingAtEachOther ? 3 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? (isGreenPeeking ? 5 : -4) : isLookingAtEachOther ? 4 : undefined} />
               </div>
+              {/* Max name tag — straddling bottom edge */}
+              <div style={{ ...NAME_TAG, backgroundColor: 'rgba(52,211,153,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Max</div>
             </div>
 
-            {/* Dark zinc rectangle — middle layer */}
+            {/* Dark zinc rectangle — middle layer (Zo) */}
             <div ref={darkRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
                 left: "240px", width: "120px", height: "310px",
@@ -326,7 +363,7 @@ export default function LoginPage() {
                   ? "skewX(0deg)"
                   : isLookingAtEachOther
                     ? `skewX(${(darkPos.bodySkew || 0) * 1.5 + 10}deg) translateX(20px)`
-                    : (isTyping || (password.length > 0 && !showPassword))
+                    : maxGrowth
                       ? `skewX(${(darkPos.bodySkew || 0) * 1.5}deg)`
                       : `skewX(${darkPos.bodySkew || 0}deg)`,
                 transformOrigin: "bottom center",
@@ -343,9 +380,11 @@ export default function LoginPage() {
                   forceLookX={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? 0 : undefined}
                   forceLookY={(password.length > 0 && showPassword) ? -4 : isLookingAtEachOther ? -4 : undefined} />
               </div>
+              {/* Zo name tag */}
+              <div style={{ ...NAME_TAG, backgroundColor: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.2)' }}>Zo</div>
             </div>
 
-            {/* Amber semi-circle — front left */}
+            {/* Amber semi-circle — front left (Rue) */}
             <div ref={amberRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
                 left: "0px", width: "240px", height: "200px", zIndex: 3,
@@ -362,9 +401,11 @@ export default function LoginPage() {
                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" forceLookX={(password.length > 0 && showPassword) ? -5 : undefined} forceLookY={(password.length > 0 && showPassword) ? -4 : undefined} />
               </div>
+              {/* Rue name tag */}
+              <div style={{ ...NAME_TAG, backgroundColor: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.5)' }}>Rue</div>
             </div>
 
-            {/* Light emerald rounded rectangle — front right */}
+            {/* Light emerald rounded rectangle — front right (Kai) */}
             <div ref={lightRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
               style={{
                 left: "310px", width: "140px", height: "230px",
@@ -386,38 +427,30 @@ export default function LoginPage() {
                   left: (password.length > 0 && showPassword) ? "10px" : `${40 + (lightPos.faceX || 0)}px`,
                   top: (password.length > 0 && showPassword) ? "88px" : `${88 + (lightPos.faceY || 0)}px`,
                 }} />
+              {/* Kai name tag */}
+              <div style={{ ...NAME_TAG, backgroundColor: 'rgba(110,231,183,0.25)', border: '1px solid rgba(110,231,183,0.5)' }}>Kai</div>
             </div>
 
-            {/* ── Speech bubbles ── */}
-            {/* Max (green) — left:70, width:180, center:160, char height:400 */}
-            <div style={{ ...BUBBLE_STYLE, bottom: '414px', left: '160px', opacity: maxOverride !== null || maxVisible ? 1 : 0 }}>
-              {maxPhrase}
-              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            {/* ── Speech bubbles — one visible at a time ── */}
+            {/* Max — green, center x=160, above base height 400 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: maxGrowth ? '454px' : '414px', left: '160px', opacity: activeSpeaker === 'max' && bubbleVisible ? 1 : 0 }}>
+              {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
             </div>
 
-            {/* Zo (dark) — left:240, width:120, center:300, char height:310 */}
-            <div style={{ ...BUBBLE_STYLE, bottom: '324px', left: '300px', opacity: zoOverride !== null || zoVisible ? 1 : 0 }}>
-              {zoPhrase}
-              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            {/* Zo — dark, center x=300, above height 310 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '324px', left: '300px', opacity: activeSpeaker === 'zo' && bubbleVisible ? 1 : 0 }}>
+              {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
             </div>
 
-            {/* Rue (amber) — left:0, width:240, center:120, char height:200 */}
-            <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: rueVisible ? 1 : 0 }}>
-              {ruePhrase}
-              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            {/* Rue — amber, center x=120, above height 200 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: activeSpeaker === 'rue' && bubbleVisible ? 1 : 0 }}>
+              {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
             </div>
 
-            {/* Kai (light) — left:310, width:140, center:380, char height:230 */}
-            <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '380px', opacity: kaiOverride !== null || kaiVisible ? 1 : 0 }}>
-              {kaiPhrase}
-              <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+            {/* Kai — light, center x=380, above height 230 */}
+            <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '380px', opacity: activeSpeaker === 'kai' && bubbleVisible ? 1 : 0 }}>
+              {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
             </div>
-
-            {/* ── Name tags ── */}
-            <div style={{ ...NAME_TAG_BASE, left: '160px', backgroundColor: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.3)' }}>Max</div>
-            <div style={{ ...NAME_TAG_BASE, left: '300px', backgroundColor: 'rgba(39,39,42,0.13)', border: '1px solid rgba(39,39,42,0.35)' }}>Zo</div>
-            <div style={{ ...NAME_TAG_BASE, left: '120px', backgroundColor: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.3)' }}>Rue</div>
-            <div style={{ ...NAME_TAG_BASE, left: '380px', backgroundColor: 'rgba(110,231,183,0.13)', border: '1px solid rgba(110,231,183,0.3)' }}>Kai</div>
 
           </div>
         </div>

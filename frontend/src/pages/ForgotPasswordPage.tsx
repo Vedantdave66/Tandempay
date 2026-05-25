@@ -68,6 +68,8 @@ const FORGOT_MAX_PHRASES = ["We got you! 💪", "Back in no time!", "You've got 
 const FORGOT_RUE_PHRASES = ["Forgot it again huh.", "It happens to the best of us.", "Classic.", "No judgment. Much judgment."];
 const FORGOT_KAI_PHRASES = ["Don't worry at all! 🌸", "We'll fix this together!", "It's totally okay!", "You're doing great! 💚"];
 
+type Speaker = 'max' | 'rue' | 'kai';
+
 const BUBBLE_STYLE: React.CSSProperties = {
   position: 'absolute',
   transform: 'translateX(-50%)',
@@ -98,9 +100,10 @@ const TAIL_FILL: React.CSSProperties = {
   borderTop: '6px solid var(--bg-secondary)',
 };
 
-const NAME_TAG_BASE: React.CSSProperties = {
+const NAME_TAG: React.CSSProperties = {
   position: 'absolute',
-  bottom: '-26px',
+  bottom: '-12px',
+  left: '50%',
   transform: 'translateX(-50%)',
   borderRadius: '999px',
   padding: '2px 10px',
@@ -124,16 +127,18 @@ export default function ForgotPasswordPage() {
     const [mouseY, setMouseY] = useState<number>(0);
     const [isGreenBlinking, setIsGreenBlinking] = useState(false);
 
-    // Speech bubble state
-    const [maxIdx, setMaxIdx] = useState(0);
-    const [rueIdx, setRueIdx] = useState(0);
-    const [kaiIdx, setKaiIdx] = useState(0);
-    const [maxVisible, setMaxVisible] = useState(true);
-    const [rueVisible, setRueVisible] = useState(true);
-    const [kaiVisible, setKaiVisible] = useState(true);
-    const [maxOverride, setMaxOverride] = useState<string | null>(null);
-    const [kaiOverride, setKaiOverride] = useState<string | null>(null);
+    // ── Shared bubble state (one speaker at a time) ──
+    const [activeSpeaker, setActiveSpeaker] = useState<Speaker>('max');
+    const [currentPhrase, setCurrentPhrase] = useState(FORGOT_MAX_PHRASES[0]);
+    const [bubbleVisible, setBubbleVisible] = useState(true);
     const [isHoveringSubmit, setIsHoveringSubmit] = useState(false);
+
+    const speakerRef = useRef<Speaker>('max');
+    const phraseIdxRef = useRef<Record<Speaker, number>>({ max: 0, rue: 0, kai: 0 });
+    const cycleRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const resumeRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const triggerActiveRef = useRef(false);
+    const fireTriggerRef = useRef<(s: Speaker, p: string, permanent?: boolean) => void>(() => {});
 
     const greenRef = useRef<HTMLDivElement>(null);
     const amberRef = useRef<HTMLDivElement>(null);
@@ -157,23 +162,61 @@ export default function ForgotPasswordPage() {
         return () => { clearTimeout(t1); };
     }, []);
 
-    // Phrase cycling
+    // ── Bubble cycling system ──
     useEffect(() => {
-        const cycle = (setVis: (v: boolean) => void, setI: (fn: (i: number) => number) => void, len: number) => {
-            return setInterval(() => {
-                setVis(false);
-                setTimeout(() => { setI(i => (i + 1) % len); setVis(true); }, 300);
+        const phrases: Record<Speaker, string[]> = {
+            max: FORGOT_MAX_PHRASES, rue: FORGOT_RUE_PHRASES, kai: FORGOT_KAI_PHRASES,
+        };
+        const all: Speaker[] = ['max', 'rue', 'kai'];
+
+        const transition = (next: Speaker, phrase: string) => {
+            setBubbleVisible(false);
+            setTimeout(() => {
+                speakerRef.current = next;
+                setActiveSpeaker(next);
+                setCurrentPhrase(phrase);
+                setBubbleVisible(true);
+            }, 300);
+        };
+
+        const startCycle = () => {
+            if (cycleRef.current) clearTimeout(cycleRef.current);
+            cycleRef.current = setTimeout(() => {
+                if (triggerActiveRef.current) { startCycle(); return; }
+                const others = all.filter(s => s !== speakerRef.current);
+                const next = others[Math.floor(Math.random() * others.length)];
+                phraseIdxRef.current[next] = (phraseIdxRef.current[next] + 1) % phrases[next].length;
+                transition(next, phrases[next][phraseIdxRef.current[next]]);
+                setTimeout(startCycle, 300);
             }, 4000);
         };
-        const t1 = cycle(setMaxVisible, setMaxIdx, FORGOT_MAX_PHRASES.length);
-        const t2 = cycle(setRueVisible, setRueIdx, FORGOT_RUE_PHRASES.length);
-        const t3 = cycle(setKaiVisible, setKaiIdx, FORGOT_KAI_PHRASES.length);
-        return () => { clearInterval(t1); clearInterval(t2); clearInterval(t3); };
+
+        const fireTrigger = (speaker: Speaker, phrase: string, permanent = false) => {
+            triggerActiveRef.current = true;
+            if (cycleRef.current) clearTimeout(cycleRef.current);
+            if (resumeRef.current) clearTimeout(resumeRef.current);
+            transition(speaker, phrase);
+            if (!permanent) {
+                resumeRef.current = setTimeout(() => {
+                    triggerActiveRef.current = false;
+                    startCycle();
+                }, 3300);
+            }
+        };
+
+        fireTriggerRef.current = fireTrigger;
+        startCycle();
+
+        return () => {
+            if (cycleRef.current) clearTimeout(cycleRef.current);
+            if (resumeRef.current) clearTimeout(resumeRef.current);
+        };
     }, []);
 
-    useEffect(() => { setKaiOverride(isTyping ? "Ooh they're typing! 👀" : null); }, [isTyping]);
-    useEffect(() => { setMaxOverride(isHoveringSubmit ? "DO IT! DO IT! DO IT!" : null); }, [isHoveringSubmit]);
-    useEffect(() => { if (submitted) setKaiOverride("Check your inbox! We sent it! 🎉"); }, [submitted]);
+    // Trigger hooks
+    useEffect(() => { if (isTyping) fireTriggerRef.current('kai', "Ooh they're typing! 👀"); }, [isTyping]);
+    useEffect(() => { if (isHoveringSubmit) fireTriggerRef.current('max', "DO IT! DO IT! DO IT!"); }, [isHoveringSubmit]);
+    useEffect(() => { if (submitted) fireTriggerRef.current('kai', "Check your inbox! We sent it! 🎉", true); }, [submitted]);
 
     const calculatePosition = (ref: React.RefObject<HTMLDivElement | null>) => {
         if (!ref.current) return { faceX: 0, faceY: 0, bodySkew: 0 };
@@ -190,11 +233,6 @@ export default function ForgotPasswordPage() {
     const greenPos = calculatePosition(greenRef);
     const amberPos = calculatePosition(amberRef);
     const lightPos = calculatePosition(lightRef);
-
-    // Displayed phrases
-    const maxPhrase = maxOverride ?? FORGOT_MAX_PHRASES[maxIdx];
-    const ruePhrase = FORGOT_RUE_PHRASES[rueIdx];
-    const kaiPhrase = kaiOverride ?? FORGOT_KAI_PHRASES[kaiIdx];
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -236,11 +274,11 @@ export default function ForgotPasswordPage() {
                     <span className="text-xl font-bold tracking-tight text-primary">TandemPay</span>
                 </div>
 
-                {/* Characters — green, amber, light emerald */}
+                {/* Characters — green (Max), amber (Rue), light (Kai) */}
                 <div className="relative z-20 flex items-end justify-center h-[500px]">
                     <div className="relative" style={{ width: "550px", height: "400px" }}>
 
-                        {/* Green tall rectangle — back layer */}
+                        {/* Green tall rectangle — back layer (Max) */}
                         <div ref={greenRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
                             style={{
                                 left: "80px", width: "180px", height: "400px",
@@ -257,9 +295,11 @@ export default function ForgotPasswordPage() {
                                 <EyeBall size={18} pupilSize={7} maxDistance={5} eyeColor="white" pupilColor="#1A1A1A" isBlinking={isGreenBlinking} />
                                 <EyeBall size={18} pupilSize={7} maxDistance={5} eyeColor="white" pupilColor="#1A1A1A" isBlinking={isGreenBlinking} />
                             </div>
+                            {/* Max name tag */}
+                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(52,211,153,0.25)', border: '1px solid rgba(52,211,153,0.5)' }}>Max</div>
                         </div>
 
-                        {/* Amber semi-circle — front left */}
+                        {/* Amber semi-circle — front left (Rue) */}
                         <div ref={amberRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
                             style={{
                                 left: "0px", width: "240px", height: "200px", zIndex: 3,
@@ -276,9 +316,11 @@ export default function ForgotPasswordPage() {
                                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" />
                                 <Pupil size={12} maxDistance={5} pupilColor="#1A1A1A" />
                             </div>
+                            {/* Rue name tag */}
+                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(245,158,11,0.25)', border: '1px solid rgba(245,158,11,0.5)' }}>Rue</div>
                         </div>
 
-                        {/* Light emerald rounded rectangle — front right */}
+                        {/* Light emerald rounded rectangle — front right (Kai) */}
                         <div ref={lightRef} className="absolute bottom-0 transition-all duration-700 ease-in-out"
                             style={{
                                 left: "320px", width: "140px", height: "230px",
@@ -300,31 +342,25 @@ export default function ForgotPasswordPage() {
                                     left: `${40 + (lightPos.faceX || 0)}px`,
                                     top: `${88 + (lightPos.faceY || 0)}px`,
                                 }} />
+                            {/* Kai name tag */}
+                            <div style={{ ...NAME_TAG, backgroundColor: 'rgba(110,231,183,0.25)', border: '1px solid rgba(110,231,183,0.5)' }}>Kai</div>
                         </div>
 
-                        {/* ── Speech bubbles ── */}
-                        {/* Max (green) — left:80, width:180, center:170, char height:400 */}
-                        <div style={{ ...BUBBLE_STYLE, bottom: '414px', left: '170px', opacity: maxOverride !== null || maxVisible ? 1 : 0 }}>
-                            {maxPhrase}
-                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        {/* ── Speech bubbles — one visible at a time ── */}
+                        {/* Max — green, center x=170, above height 400 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '414px', left: '170px', opacity: activeSpeaker === 'max' && bubbleVisible ? 1 : 0 }}>
+                            {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
                         </div>
 
-                        {/* Rue (amber) — left:0, width:240, center:120, char height:200 */}
-                        <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: rueVisible ? 1 : 0 }}>
-                            {ruePhrase}
-                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        {/* Rue — amber, center x=120, above height 200 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '214px', left: '120px', opacity: activeSpeaker === 'rue' && bubbleVisible ? 1 : 0 }}>
+                            {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
                         </div>
 
-                        {/* Kai (light) — left:320, width:140, center:390, char height:230 */}
-                        <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '390px', opacity: kaiOverride !== null || kaiVisible ? 1 : 0 }}>
-                            {kaiPhrase}
-                            <div style={TAIL_BORDER} /><div style={TAIL_FILL} />
+                        {/* Kai — light, center x=390, above height 230 */}
+                        <div style={{ ...BUBBLE_STYLE, bottom: '244px', left: '390px', opacity: activeSpeaker === 'kai' && bubbleVisible ? 1 : 0 }}>
+                            {currentPhrase}<div style={TAIL_BORDER} /><div style={TAIL_FILL} />
                         </div>
-
-                        {/* ── Name tags ── */}
-                        <div style={{ ...NAME_TAG_BASE, left: '170px', backgroundColor: 'rgba(52,211,153,0.13)', border: '1px solid rgba(52,211,153,0.3)' }}>Max</div>
-                        <div style={{ ...NAME_TAG_BASE, left: '120px', backgroundColor: 'rgba(245,158,11,0.13)', border: '1px solid rgba(245,158,11,0.3)' }}>Rue</div>
-                        <div style={{ ...NAME_TAG_BASE, left: '390px', backgroundColor: 'rgba(110,231,183,0.13)', border: '1px solid rgba(110,231,183,0.3)' }}>Kai</div>
 
                     </div>
                 </div>
