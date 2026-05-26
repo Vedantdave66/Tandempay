@@ -273,4 +273,5 @@ async def update_settlement_status(
             },
         )
 
+    await db.commit()
     return _build_settlement_out(record, payer, payee)

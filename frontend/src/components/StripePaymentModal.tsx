@@ -54,8 +54,6 @@ function CheckoutForm({
         };
     }, []);
 
-    console.log(`[StripePayment] CheckoutForm mounted. stripe=${!!stripe} elements=${!!elements} clientSecret=${clientSecret?.slice(0, 20)}...`);
-
     const startPolling = useCallback((pid: string) => {
         setState('verifying');
         const startTime = Date.now();
