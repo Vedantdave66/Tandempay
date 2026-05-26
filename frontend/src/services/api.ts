@@ -122,6 +122,7 @@ export interface Group {
     created_at: string;
     members: GroupMember[];
     total_expenses: number;
+    invite_token?: string;
 }
 
 export interface GroupListItem {
@@ -358,12 +359,7 @@ export const stripeApi = {
     onboard: (returnPath: string = '/dashboard') =>
         request<{ url: string }>(`/stripe/onboard?return_path=${encodeURIComponent(returnPath)}`, { method: 'POST' }),
     getStatus: () => request<{ onboarded: boolean; account_id: string | null; email: string | null; payouts_enabled: boolean; dashboard_url: string | null }>('/stripe/status'),
-    createPaymentIntent: (data: { amount: number; payee_id: string; provider_account_id: string }) =>
-        request<{ client_secret: string; status: string }>('/stripe/create-payment-intent', {
-            method: 'POST',
-            body: JSON.stringify(data)
-        }),
-    reconcile: (paymentId: string) => 
+    reconcile: (paymentId: string) =>
         request<{ status: string; resolved: boolean }>(`/stripe/reconcile/${paymentId}`, { method: 'POST' }),
     cleanup: () => request<{ status: string; expired_count: number }>('/stripe/cleanup', { method: 'POST' }),
 };
@@ -371,10 +367,10 @@ export const stripeApi = {
 export interface WalletTransaction {
     id: string;
     user_id: string;
-    tx_type: string;
+    type: string;
     amount: number;
     status: string;
-    related_request_id: string | null;
+    reference_id: string | null;
     created_at: string;
 }
 

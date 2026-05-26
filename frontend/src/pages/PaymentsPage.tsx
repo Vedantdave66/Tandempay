@@ -205,25 +205,25 @@ export default function PaymentsPage() {
                                     <div key={t.id} className="flex items-center justify-between p-4 bg-surface border border-border rounded-2xl flex-wrap gap-4">
                                         <div className="flex items-center gap-4">
                                             <div className={`w-12 h-12 rounded-full flex items-center justify-center border-2 shrink-0
-                                                ${t.tx_type === 'deposit' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
-                                                    t.tx_type === 'withdrawal' ? 'bg-indigo/10 border-indigo/20 text-indigo' :
+                                                ${t.type === 'deposit' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' :
+                                                    t.type === 'withdrawal' ? 'bg-indigo/10 border-indigo/20 text-indigo' :
                                                         'bg-accent/10 border-accent/20 text-accent'}
                                             `}>
-                                                {t.tx_type === 'deposit' ? <ArrowDownRight className="w-5 h-5" /> :
-                                                    t.tx_type === 'withdrawal' ? <ArrowUpRight className="w-5 h-5" /> :
+                                                {t.type === 'deposit' ? <ArrowDownRight className="w-5 h-5" /> :
+                                                    t.type === 'withdrawal' ? <ArrowUpRight className="w-5 h-5" /> :
                                                         <ArrowRightLeft className="w-5 h-5" />}
                                             </div>
                                             <div>
-                                                <p className="font-bold text-primary capitalize">{t.tx_type}</p>
+                                                <p className="font-bold text-primary capitalize">{t.type}</p>
                                                 <p className="text-xs text-secondary mt-0.5">
                                                     {new Date(t.created_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
-                                                    {t.related_request_id && " • Payment Request"}
+                                                    {t.reference_id && " • Payment Request"}
                                                 </p>
                                             </div>
                                         </div>
                                         <div className="text-right">
-                                            <p className={`font-black text-lg ${t.tx_type === 'deposit' || t.tx_type === 'transfer_in' ? 'text-emerald-500' : 'text-primary'}`}>
-                                                {t.tx_type === 'deposit' || t.tx_type === 'transfer_in' ? '+' : '-'}${formatCurrency(t?.amount)}
+                                            <p className={`font-black text-lg ${t.type === 'deposit' || t.type === 'transfer_in' ? 'text-emerald-500' : 'text-primary'}`}>
+                                                {t.type === 'deposit' || t.type === 'transfer_in' ? '+' : '-'}${formatCurrency(t?.amount)}
                                             </p>
                                             <span className={`text-[10px] font-bold uppercase tracking-widest mt-1 block
                                                 ${t.status === 'completed' || t.status === 'settled' ? 'text-emerald-500/80' :

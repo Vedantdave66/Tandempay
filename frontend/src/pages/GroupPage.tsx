@@ -226,7 +226,7 @@ export default function GroupPage() {
 
     const handleCopyLink = () => {
         if (!group) return;
-        const url = `${window.location.origin}/invite/${group.id}`;
+        const url = `${window.location.origin}/invite/${group.id}?token=${group.invite_token}`;
         navigator.clipboard.writeText(url);
         setCopied(true);
         setTimeout(() => setCopied(false), 2000);

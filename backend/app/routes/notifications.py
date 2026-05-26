@@ -74,6 +74,7 @@ async def mark_read(
 
     notif.read = True
     await db.flush()
+    await db.commit()
     await db.refresh(notif)
     return notif
 
@@ -90,4 +91,5 @@ async def mark_all_read(
         .values(read=True)
     )
     await db.flush()
+    await db.commit()
     return {"status": "ok"}
