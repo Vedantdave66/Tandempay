@@ -14,25 +14,13 @@ from app.routes.auth import get_current_user
 from app.config import get_settings
 from app.idempotency import idempotent
 
-import plaid
-from plaid.api import plaid_api
-from plaid.model.processor_stripe_bank_account_token_create_request import ProcessorStripeBankAccountTokenCreateRequest
-
 router = APIRouter(prefix="/api/stripe", tags=["Stripe"])
 settings = get_settings()
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
-# Setup Plaid client for processor token exchange
-configuration = plaid.Configuration(
-    host=plaid.Environment.Sandbox if settings.PLAID_ENV == 'sandbox' else plaid.Environment.Production,
-    api_key={
-        'clientId': settings.PLAID_CLIENT_ID,
-        'secret': settings.PLAID_SECRET,
-    }
-)
-api_client = plaid.ApiClient(configuration)
-plaid_client = plaid_api.PlaidApi(api_client)
+# Plaid processor-token → Stripe flow removed. If re-implementing, see
+# docs/adversarial_audit.md TC-2 for the safe variable naming pattern.
 
 class PaymentIntentRequest(BaseModel):
     amount: Decimal
