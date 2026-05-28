@@ -131,6 +131,9 @@ class UserOut(BaseModel):
     has_completed_payment: bool = False
     subscription_tier: str = "free"
     created_at: datetime
+    character_shape: Optional[str] = 'rect'
+    character_color: Optional[str] = '#34D399'
+    character_nickname: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
