@@ -5,6 +5,9 @@ Production-grade financial safety for pay_request_with_wallet:
   1. Idempotency check (request body hashed)
   2. Load + validate request state
   3. Lock users (deterministic sorted order — prevents deadlocks)
+  3b. RE-LOAD PaymentRequest inside the lock using SELECT ... WITH FOR UPDATE.
+      Do NOT use the pr object from the initial fetch — it is stale. If pr is
+      None or pr.status != 'pending' after the re-load, raise 400 immediately.
   4. Pre-validate: both users' cached balances == ledger
   5. Create PENDING double-entry ledger transactions
   6. Compute new balances (in memory)
@@ -146,4 +149,6 @@ async def get_group_requests(
     )
 
 
-
+# TODO: Implement pay_request_with_wallet
+# SAFETY REQUIREMENT: Must use SELECT ... with_for_update() re-load after
+# lock_users_sorted() — see docstring Step 3b. See docs/adversarial_audit.md TC-6.
