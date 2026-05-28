@@ -71,6 +71,9 @@ export interface User {
     has_completed_payment: boolean;
     subscription_tier: 'free' | 'pro';
     created_at: string;
+    character_shape: string | null;
+    character_color: string | null;
+    character_nickname: string | null;
 }
 
 export interface Token {
@@ -297,6 +300,11 @@ export interface UserSearchResult {
 
 export const usersApi = {
     search: (query: string) => request<UserSearchResult[]>(`/users/search?query=${encodeURIComponent(query)}`),
+    patchCharacter: (data: { shape?: string; color?: string; nickname?: string }) =>
+        request<User>('/users/me/character', {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
 };
 
 // --- Friend Requests ---
