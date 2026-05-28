@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
+import { Link } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
-import { Plus, TrendingUp, Receipt, Users, ArrowRight } from 'lucide-react';
+import { Plus, TrendingUp, Receipt, Users, ArrowRight, Palette } from 'lucide-react';
 import { groupsApi, GroupListItem } from '../services/api';
 import GroupCard from '../components/GroupCard';
 import ProUpsellBanner from '../components/ProUpsellBanner';
@@ -143,6 +144,21 @@ export default function DashboardPage() {
             </div>
 
             <ProUpsellBanner />
+
+            {/* Character customiser quick-link */}
+            <Link
+                to="/settings/character"
+                className="flex items-center gap-4 p-4 mb-8 bg-surface/50 border border-border/60 rounded-2xl hover:border-accent/30 hover:bg-surface transition-all group"
+            >
+                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
+                    <Palette className="w-5 h-5 text-accent" />
+                </div>
+                <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-primary">Customise your character</p>
+                    <p className="text-xs text-secondary">Pick your colour, shape, and nickname</p>
+                </div>
+                <ArrowRight className="w-4 h-4 text-secondary group-hover:text-accent transition-colors shrink-0" />
+            </Link>
 
             {/* Groups Section Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
