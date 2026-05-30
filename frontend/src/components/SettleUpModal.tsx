@@ -36,33 +36,48 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         setTimeout(() => setCopied(false), 2000);
     };
 
-    const handleSelectEtransfer = async () => {
-        setLoading(true);
-        setError('');
+    // Returns the ID of the existing pending record for this payer→payee pair, or null.
+    const findExistingPending = async (): Promise<string | null> => {
+        const records = await settlementRecordsApi.list(groupId);
+        const found = records.items.find(r =>
+            r.payer_id === currentUserId &&
+            r.payee_id === settlement.to_user_id &&
+            r.status === 'pending'
+        );
+        return found?.id ?? null;
+    };
+
+    // Create a settlement record, reusing an existing pending one on 409.
+    const createOrReuse = async (method: string): Promise<string> => {
         try {
-            await settlementRecordsApi.create(groupId, {
+            const record = await settlementRecordsApi.create(groupId, {
                 payee_id: settlement.to_user_id,
                 amount: settlement.amount,
-                method: 'etransfer',
+                method,
             });
-            setStep('etransfer');
+            return record.id;
         } catch (err: any) {
-            setError(err.message || 'Failed to initiate settlement');
-        } finally {
-            setLoading(false);
+            if (err.message?.includes('already exists')) {
+                const existingId = await findExistingPending();
+                if (existingId) return existingId;
+            }
+            throw err;
         }
+    };
+
+    // Interac button: just navigate — record is created on confirm to avoid
+    // a premature POST that conflicts if the user switches to card.
+    const handleSelectEtransfer = () => {
+        setError('');
+        setStep('etransfer');
     };
 
     const handleSelectStripe = async () => {
         setLoading(true);
         setError('');
         try {
-            const record = await settlementRecordsApi.create(groupId, {
-                payee_id: settlement.to_user_id,
-                amount: settlement.amount,
-                method: 'in_app',
-            });
-            setActiveRecordId(record.id);
+            const recordId = await createOrReuse('in_app');
+            setActiveRecordId(recordId);
             setShowStripeModal(true);
         } catch (err: any) {
             let msg = err.message || 'Failed to initiate settlement';
@@ -77,16 +92,10 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
 
     const handleMarkSent = async () => {
         setLoading(true);
+        setError('');
         try {
-            const records = await settlementRecordsApi.list(groupId);
-            const latest = records.items.find(r =>
-                r.payer_id === settlement.from_user_id &&
-                r.payee_id === settlement.to_user_id &&
-                r.status === 'pending'
-            );
-            if (latest) {
-                await settlementRecordsApi.updateStatus(groupId, latest.id, 'sent');
-            }
+            const recordId = await createOrReuse('etransfer');
+            await settlementRecordsApi.updateStatus(groupId, recordId, 'sent');
             setStep('sent_confirmation');
         } catch (err: any) {
             setError(err.message || 'Failed to mark as sent');
