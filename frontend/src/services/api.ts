@@ -202,6 +202,8 @@ export interface UserBalance {
     user_id: string;
     name: string;
     avatar_color: string;
+    character_shape: string | null;
+    character_color: string | null;
     total_paid: number;
     total_owed: number;
     net_balance: number;

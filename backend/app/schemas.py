@@ -247,6 +247,8 @@ class UserBalance(BaseModel):
     user_id: str
     name: str
     avatar_color: str
+    character_shape: Optional[str] = None
+    character_color: Optional[str] = None
     total_paid: Decimal
     total_owed: Decimal
     net_balance: Decimal

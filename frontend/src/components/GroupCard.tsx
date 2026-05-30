@@ -1,17 +1,23 @@
-import { GroupListItem } from '../services/api';
+import { GroupListItem, UserBalance } from '../services/api';
 import { formatCurrency } from '../utils/currency';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import CharacterShape from './CharacterShape';
 
 interface GroupCardProps {
     group: GroupListItem;
+    members?: UserBalance[];
+    myNetBalance?: number;
 }
 
-export default function GroupCard({ group }: GroupCardProps) {
-    const navigate = useNavigate();
+const SETTLED_THRESHOLD = 0.01;
 
-    // Get the first initial of the group name for the avatar
+export default function GroupCard({ group, members = [], myNetBalance = 0 }: GroupCardProps) {
+    const navigate = useNavigate();
     const initial = group.name ? group.name.charAt(0).toUpperCase() : '?';
+    const visibleMembers = members.slice(0, 3);
+    const extraCount = members.length > 3 ? members.length - 3 : 0;
+    const balanceLoaded = members.length > 0;
 
     return (
         <button
@@ -22,17 +28,31 @@ export default function GroupCard({ group }: GroupCardProps) {
             <div className="absolute inset-0 bg-gradient-to-br from-accent/0 to-accent/0 group-hover:from-accent/5 group-hover:to-transparent transition-colors duration-500 pointer-events-none" />
 
             <div className="relative z-10 flex items-start gap-5 mb-6">
-                {/* Group Avatar / Initial Container */}
-                <div className="relative shrink-0">
-                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-surface to-bg flex items-center justify-center shadow-inner border border-border/80 group-hover:border-accent/40 transition-colors duration-500 relative z-10">
-                        <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary group-hover:from-accent group-hover:to-emerald-500 transition-all duration-500">
-                            {initial}
-                        </span>
-                    </div>
-                    {/* Simulated member stacking */}
-                    {group.member_count > 1 && (
-                        <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-indigo border-2 border-surface-light flex items-center justify-center z-20 shadow-sm shadow-black/50">
-                            <span className="text-[9px] font-bold text-white leading-none">+{group.member_count - 1}</span>
+                {/* Character cluster — up to 3 members, or letter avatar while loading */}
+                <div className="relative shrink-0 flex items-end" style={{ minWidth: 40, height: 48 }}>
+                    {balanceLoaded ? (
+                        <>
+                            <div className="flex items-end gap-1">
+                                {visibleMembers.map(m => (
+                                    <CharacterShape
+                                        key={m.user_id}
+                                        shape={m.character_shape ?? 'rect'}
+                                        color={m.character_color ?? '#6B7280'}
+                                        variant="cluster"
+                                    />
+                                ))}
+                            </div>
+                            {extraCount > 0 && (
+                                <div className="absolute -bottom-1 -right-3 w-5 h-5 rounded-full bg-indigo border-2 border-surface-light flex items-center justify-center z-20 shadow-sm shadow-black/50">
+                                    <span className="text-[8px] font-bold text-white leading-none">+{extraCount}</span>
+                                </div>
+                            )}
+                        </>
+                    ) : (
+                        <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-surface to-bg flex items-center justify-center shadow-inner border border-border/80 group-hover:border-accent/40 transition-colors duration-500">
+                            <span className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-br from-primary to-secondary group-hover:from-accent group-hover:to-emerald-500 transition-all duration-500">
+                                {initial}
+                            </span>
                         </div>
                     )}
                 </div>
@@ -41,8 +61,29 @@ export default function GroupCard({ group }: GroupCardProps) {
                     <h3 className="text-[1.15rem] font-black text-primary truncate mb-1.5 group-hover:text-transparent group-hover:bg-clip-text group-hover:bg-gradient-to-r group-hover:from-primary group-hover:to-accent transition-all duration-300">
                         {group.name}
                     </h3>
-                    <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg/60 border border-border/40">
-                        <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">{group.member_count} Member{group.member_count !== 1 ? 's' : ''}</span>
+                    <div className="flex items-center gap-2 flex-wrap">
+                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-bg/60 border border-border/40">
+                            <span className="text-[10px] font-bold text-secondary uppercase tracking-widest">
+                                {group.member_count} Member{group.member_count !== 1 ? 's' : ''}
+                            </span>
+                        </div>
+                        {balanceLoaded && (
+                            Math.abs(myNetBalance) > SETTLED_THRESHOLD ? (
+                                myNetBalance > 0 ? (
+                                    <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg border border-emerald-500/20 leading-none">
+                                        ↑ ${formatCurrency(myNetBalance)}
+                                    </span>
+                                ) : (
+                                    <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-2 py-1 rounded-lg border border-amber-500/20 leading-none">
+                                        ↓ ${formatCurrency(Math.abs(myNetBalance))}
+                                    </span>
+                                )
+                            ) : (
+                                <span className="text-[10px] font-medium text-secondary/60 px-2 py-1 leading-none">
+                                    ✓ Settled
+                                </span>
+                            )
+                        )}
                     </div>
                 </div>
             </div>
