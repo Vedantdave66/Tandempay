@@ -48,6 +48,7 @@ import StripePaymentModal from '../components/StripePaymentModal';
 import StripeOnboardingModal from '../components/StripeOnboardingModal';
 import { computeUserBalances, deriveSuggestedSettlements, isAllSettled } from '../utils/balances';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
+import CharacterShape from '../components/CharacterShape';
 
 type Tab = 'expenses' | 'balances' | 'settlements' | 'payments';
 
@@ -71,6 +72,7 @@ export default function GroupPage() {
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [copied, setCopied] = useState(false);
     const [loading, setLoading] = useState(true);
+    const [apiBalances, setApiBalances] = useState<UserBalance[]>([]);
     const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
@@ -96,16 +98,18 @@ export default function GroupPage() {
         if (!groupId) return;
         setLoading(prev => prev); // preserve loading state on background refresh
         try {
-            const [g, e, pr, reqs] = await Promise.all([
+            const [g, e, pr, reqs, bal] = await Promise.all([
                 groupsApi.get(groupId),
                 expensesApi.list(groupId),
                 settlementRecordsApi.list(groupId),
-                requestsApi.list(groupId)
+                requestsApi.list(groupId),
+                balancesApi.getBalances(groupId).catch(() => [] as UserBalance[]),
             ]);
             setGroup(g);
             setExpenses(e.items);
             setPaymentRecords(pr.items);
             setPaymentRequests(reqs.items.filter(r => r.status === 'pending'));
+            setApiBalances(bal);
         } catch (err) {
             console.error(err);
         } finally {
@@ -248,6 +252,11 @@ export default function GroupPage() {
     const allSettled = isAllSettled(computedBalances);
     const currentUserBalance = computedBalances.find(b => b.user_id === user?.id);
 
+    // Lookup map: user_id → { shape, color } from the API balance response
+    const characterLookup = new Map(
+        apiBalances.map(b => [b.user_id, { shape: b.character_shape ?? 'rect', color: b.character_color ?? '#6B7280' }])
+    );
+
     // Find settlements where the current user owes money
     const mySettlements = effectiveSettlements.filter(s => s.from_user_id === user?.id);
 
@@ -313,21 +322,36 @@ export default function GroupPage() {
 
             <div className="bg-surface border border-border rounded-2xl p-6 mb-6">
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-5">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-2xl font-bold text-primary">{group.name}</h1>
-                            <button
-                                onClick={handleDeleteGroup}
-                                disabled={actionLoadingId === groupId}
-                                className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50"
-                                title="Delete Group"
-                            >
-                                <Trash2 className="w-4 h-4" />
-                            </button>
+                    <div className="flex items-end gap-4">
+                        {/* Character cluster */}
+                        {apiBalances.length > 0 && (
+                            <div className="flex items-end gap-1 shrink-0 pb-0.5">
+                                {apiBalances.slice(0, 3).map(b => (
+                                    <CharacterShape
+                                        key={b.user_id}
+                                        shape={b.character_shape ?? 'rect'}
+                                        color={b.character_color ?? '#6B7280'}
+                                        variant="cluster"
+                                    />
+                                ))}
+                            </div>
+                        )}
+                        <div>
+                            <div className="flex items-center gap-3 mb-1">
+                                <h1 className="text-2xl font-bold text-primary">{group.name}</h1>
+                                <button
+                                    onClick={handleDeleteGroup}
+                                    disabled={actionLoadingId === groupId}
+                                    className="p-1.5 rounded-lg text-secondary hover:text-danger hover:bg-danger/10 transition-colors cursor-pointer disabled:opacity-50"
+                                    title="Delete Group"
+                                >
+                                    <Trash2 className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <p className="text-sm text-secondary">
+                                {(group.members || []).length} member{(group.members || []).length !== 1 ? 's' : ''} · ${formatCurrency(totalSpent)} total
+                            </p>
                         </div>
-                        <p className="text-sm text-secondary">
-                            {(group.members || []).length} member{(group.members || []).length !== 1 ? 's' : ''} · ${formatCurrency(totalSpent)} total
-                        </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2 mt-4 sm:mt-0">
                         <button
@@ -373,24 +397,44 @@ export default function GroupPage() {
                     </div>
                 </div>
 
-                {/* Members */}
-                <div className="flex items-center gap-2">
-                    <div className="flex flex-wrap gap-2">
-                        {(group.members || []).map((m) => (
-                            <div key={m.user_id} className="flex items-center gap-1.5 bg-bg border border-border/50 rounded-full pl-1 pr-2 py-1">
-                                <Avatar name={m.name} color={m.avatar_color} size="sm" />
-                                <span className="text-xs font-medium text-secondary">{m.name.split(' ')[0]}</span>
+                {/* Members — character cards with inline balance */}
+                <div className="flex flex-wrap gap-3">
+                    {(group.members || []).map((m) => {
+                        const charData = characterLookup.get(m.user_id);
+                        const memberBalance = computedBalances.find(b => b.user_id === m.user_id);
+                        const net = Number(memberBalance?.net_balance ?? 0);
+                        const isOwed = net > 0.01;
+                        const isOwing = net < -0.01;
+                        return (
+                            <div key={m.user_id} className="relative flex flex-col items-center gap-1 bg-bg border border-border/50 rounded-2xl px-3 py-2" style={{ minWidth: 56 }}>
+                                <CharacterShape
+                                    shape={charData?.shape ?? 'rect'}
+                                    color={charData?.color ?? '#6B7280'}
+                                    variant="mini"
+                                />
+                                <span className="text-[10px] font-semibold text-secondary leading-none">
+                                    {m.name.split(' ')[0]}
+                                </span>
+                                {isOwed ? (
+                                    <span className="text-[9px] font-bold text-emerald-400 leading-none">↑ ${formatCurrency(net)}</span>
+                                ) : isOwing ? (
+                                    <span className="text-[9px] font-bold text-amber-400 leading-none">↓ ${formatCurrency(Math.abs(net))}</span>
+                                ) : (
+                                    <span className="text-[9px] text-secondary/50 leading-none">✓</span>
+                                )}
                                 <button
                                     onClick={() => handleRemoveMember(m.user_id, m.name)}
                                     disabled={actionLoadingId === m.user_id}
-                                    className="w-4 h-4 rounded-full flex items-center justify-center hover:bg-danger/10 text-secondary hover:text-danger transition-colors cursor-pointer ml-1 disabled:opacity-50"
+                                    className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-surface-light border border-border/80 flex items-center justify-center hover:bg-danger/10 text-secondary hover:text-danger transition-colors cursor-pointer disabled:opacity-50 shadow-sm"
                                     title={`Remove ${m.name}`}
                                 >
-                                    {actionLoadingId === m.user_id ? <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" /> : <XIcon className="w-3 h-3" />}
+                                    {actionLoadingId === m.user_id
+                                        ? <div className="w-2 h-2 border border-current border-t-transparent rounded-full animate-spin" />
+                                        : <XIcon className="w-2.5 h-2.5" />}
                                 </button>
                             </div>
-                        ))}
-                    </div>
+                        );
+                    })}
                 </div>
 
                 {/* Quick Pay Balance Banner — High Contrast Rebuild */}
