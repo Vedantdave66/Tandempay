@@ -2,45 +2,12 @@ import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
 import { Plus, Users, ArrowRight, Palette, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
-import { groupsApi, balancesApi, GroupListItem } from '../services/api';
+import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
 import GroupCard from '../components/GroupCard';
+import CharacterShape from '../components/CharacterShape';
 import ProUpsellBanner from '../components/ProUpsellBanner';
 import { useAuth } from '../context/AuthContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
-
-// ── Character mini component ──────────────────────────────────────────────────
-
-const MINI_CONFIGS = {
-    mini: {
-        rect:  { w: 32, h: 52,  radius: '6px 6px 0 0',   eyeTop: 10, eyeLeft: 8,  eyeSize: 5, eyeGap: 6 },
-        tall:  { w: 22, h: 64,  radius: '4px 4px 0 0',   eyeTop: 12, eyeLeft: 4,  eyeSize: 5, eyeGap: 4 },
-        semi:  { w: 56, h: 30,  radius: '28px 28px 0 0', eyeTop: 8,  eyeLeft: 19, eyeSize: 5, eyeGap: 8 },
-        round: { w: 40, h: 52,  radius: '20px 20px 0 0', eyeTop: 12, eyeLeft: 12, eyeSize: 5, eyeGap: 6 },
-    },
-    hero: {
-        rect:  { w: 56, h: 96,  radius: '8px 8px 0 0',   eyeTop: 18, eyeLeft: 14, eyeSize: 9, eyeGap: 10 },
-        tall:  { w: 40, h: 116, radius: '6px 6px 0 0',   eyeTop: 22, eyeLeft: 7,  eyeSize: 9, eyeGap: 8  },
-        semi:  { w: 100, h: 54, radius: '50px 50px 0 0', eyeTop: 14, eyeLeft: 34, eyeSize: 9, eyeGap: 14 },
-        round: { w: 72, h: 96,  radius: '36px 36px 0 0', eyeTop: 22, eyeLeft: 22, eyeSize: 9, eyeGap: 10 },
-    },
-} as const;
-
-type MiniVariant = keyof typeof MINI_CONFIGS;
-
-function CharacterMini({ shape, color, variant = 'mini' }: { shape: string; color: string; variant?: MiniVariant }) {
-    const table = MINI_CONFIGS[variant];
-    const cfg = (table as Record<string, typeof table[keyof typeof table]>)[shape] ?? table.rect;
-    return (
-        <div style={{ width: cfg.w, height: cfg.h, backgroundColor: color, borderRadius: cfg.radius, position: 'relative', flexShrink: 0 }}>
-            <div style={{ position: 'absolute', top: cfg.eyeTop, left: cfg.eyeLeft, display: 'flex', gap: cfg.eyeGap }}>
-                <div style={{ width: cfg.eyeSize, height: cfg.eyeSize, backgroundColor: '#1A1A1A', borderRadius: '50%', opacity: 0.7 }} />
-                <div style={{ width: cfg.eyeSize, height: cfg.eyeSize, backgroundColor: '#1A1A1A', borderRadius: '50%', opacity: 0.7 }} />
-            </div>
-        </div>
-    );
-}
-
-// ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
     const { user } = useAuth();
@@ -51,6 +18,7 @@ export default function DashboardPage() {
     const [creating, setCreating] = useState(false);
     const [owedToMe, setOwedToMe] = useState(0);
     const [iOwe, setIOwe] = useState(0);
+    const [groupBalances, setGroupBalances] = useState<Record<string, UserBalance[]>>({});
 
     useEffect(() => {
         loadGroups();
@@ -66,18 +34,21 @@ export default function DashboardPage() {
         }
     }, []);
 
-    // Aggregate cross-group balances whenever the group list settles
+    // Fetch per-group balances in parallel; derive both the group map and hero aggregates
     useEffect(() => {
         if (loading || !user?.id || groups.length === 0) return;
-        Promise.all(groups.map(g => balancesApi.getBalances(g.id)))
-            .then(allBalances => {
+        Promise.all(groups.map(g => balancesApi.getBalances(g.id).then(bs => ({ id: g.id, bs }))))
+            .then(results => {
+                const byGroup: Record<string, UserBalance[]> = {};
                 let owed = 0, owing = 0;
-                for (const groupBalances of allBalances) {
-                    const me = groupBalances.find(b => b.user_id === user.id);
+                for (const { id, bs } of results) {
+                    byGroup[id] = bs;
+                    const me = bs.find(b => b.user_id === user.id);
                     if (!me) continue;
-                    if (me.net_balance > 0) owed += me.net_balance;
-                    else if (me.net_balance < 0) owing += Math.abs(me.net_balance);
+                    if (me.net_balance > 0) owed += Number(me.net_balance);
+                    else if (me.net_balance < 0) owing += Math.abs(Number(me.net_balance));
                 }
+                setGroupBalances(byGroup);
                 setOwedToMe(owed);
                 setIOwe(owing);
             })
@@ -125,7 +96,7 @@ export default function DashboardPage() {
                 <div className="relative z-10 flex items-end gap-6 sm:gap-8">
                     {/* Character — hero size, standing at left edge */}
                     {user?.character_shape && user?.character_color && (
-                        <CharacterMini shape={user.character_shape} color={user.character_color} variant="hero" />
+                        <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
                     )}
                     {/* Greeting */}
                     <div className="flex-1 pb-8 sm:pb-10">
@@ -284,7 +255,12 @@ export default function DashboardPage() {
             ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     {groups.map((group) => (
-                        <GroupCard key={group.id} group={group} />
+                        <GroupCard
+                                key={group.id}
+                                group={group}
+                                members={groupBalances[group.id] ?? []}
+                                myNetBalance={Number(groupBalances[group.id]?.find(b => b.user_id === user?.id)?.net_balance ?? 0)}
+                            />
                     ))}
                 </div>
             )}
