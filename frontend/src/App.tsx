@@ -19,16 +19,11 @@ import ProSuccessPage from './pages/ProSuccessPage';
 import CharacterCustomizerPage from './pages/CharacterCustomizerPage';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
+import LoadingScreen from './components/LoadingScreen';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-bg">
-                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
+    if (loading) return <LoadingScreen />;
 
     // If not logged in, redirect to register but remember where they wanted to go
     const location = window.location;
@@ -39,13 +34,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
-    if (loading) {
-        return (
-            <div className="flex items-center justify-center min-h-screen bg-bg">
-                <div className="w-8 h-8 border-2 border-accent border-t-transparent rounded-full animate-spin" />
-            </div>
-        );
-    }
+    if (loading) return <LoadingScreen />;
     return user ? <Navigate to="/dashboard" /> : <>{children}</>;
 }
 
