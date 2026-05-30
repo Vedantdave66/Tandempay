@@ -3,6 +3,8 @@ import { Expense, SettlementRecord, GroupMember, UserBalance, Settlement } from 
 export interface ComputedBalance {
     user_id: string;
     name: string;
+    email: string;
+    interac_email: string | null;
     avatar_color: string;
     spent: number;
     owed: number;
@@ -27,6 +29,8 @@ export function computeUserBalances(
         balanceMap[member.user_id] = {
             user_id: member.user_id,
             name: member.name,
+            email: member.email,
+            interac_email: member.interac_email,
             avatar_color: member.avatar_color,
             spent: 0,
             owed: 0,
@@ -107,13 +111,14 @@ export function deriveSuggestedSettlements(balances: ComputedBalance[]): Settlem
         suggestions.push({
             from_user_id: debtor.user_id,
             from_user_name: debtor.name,
-            from_user_email: '', // Not strictly needed for UI display if name is available
+            from_user_email: debtor.interac_email || debtor.email,
             from_avatar_color: debtor.avatar_color,
             to_user_id: creditor.user_id,
             to_user_name: creditor.name,
-            to_user_email: '',
+            to_user_email: creditor.interac_email || creditor.email,
+            to_interac_email: creditor.interac_email || null,
             to_avatar_color: creditor.avatar_color,
-            amount: amount
+            amount: Math.round(amount * 100) / 100,
         });
 
         debtor.amount -= amount;

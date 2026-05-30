@@ -115,6 +115,7 @@ export interface GroupMember {
     user_id: string;
     name: string;
     email: string;
+    interac_email: string | null;
     avatar_color: string;
 }
 
@@ -214,6 +215,7 @@ export interface Settlement {
     to_user_id: string;
     to_user_name: string;
     to_user_email: string;
+    to_interac_email: string | null;
     to_avatar_color: string;
     amount: number;
 }
