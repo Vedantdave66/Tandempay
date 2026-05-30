@@ -8,6 +8,25 @@ import ProUpsellBanner from '../components/ProUpsellBanner';
 import { useAuth } from '../context/AuthContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
+const MINI_CONFIG: Record<string, { w: number; h: number; radius: string; eyeTop: number; eyeLeft: number; eyeSize: number; eyeGap: number }> = {
+    rect:  { w: 32, h: 52, radius: '6px 6px 0 0',   eyeTop: 10, eyeLeft: 8,  eyeSize: 5, eyeGap: 6 },
+    tall:  { w: 22, h: 64, radius: '4px 4px 0 0',   eyeTop: 12, eyeLeft: 4,  eyeSize: 5, eyeGap: 4 },
+    semi:  { w: 56, h: 30, radius: '28px 28px 0 0', eyeTop: 8,  eyeLeft: 19, eyeSize: 5, eyeGap: 8 },
+    round: { w: 40, h: 52, radius: '20px 20px 0 0', eyeTop: 12, eyeLeft: 12, eyeSize: 5, eyeGap: 6 },
+};
+
+function CharacterMini({ shape, color }: { shape: string; color: string }) {
+    const cfg = MINI_CONFIG[shape] ?? MINI_CONFIG.rect;
+    return (
+        <div style={{ width: cfg.w, height: cfg.h, backgroundColor: color, borderRadius: cfg.radius, position: 'relative', flexShrink: 0 }}>
+            <div style={{ position: 'absolute', top: cfg.eyeTop, left: cfg.eyeLeft, display: 'flex', gap: cfg.eyeGap }}>
+                <div style={{ width: cfg.eyeSize, height: cfg.eyeSize, backgroundColor: '#1A1A1A', borderRadius: '50%', opacity: 0.7 }} />
+                <div style={{ width: cfg.eyeSize, height: cfg.eyeSize, backgroundColor: '#1A1A1A', borderRadius: '50%', opacity: 0.7 }} />
+            </div>
+        </div>
+    );
+}
+
 export default function DashboardPage() {
     const { user } = useAuth();
     const [groups, setGroups] = useState<GroupListItem[]>([]);
@@ -68,9 +87,14 @@ export default function DashboardPage() {
                             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
                             <span className="text-xs font-semibold text-accent uppercase tracking-wider">Dashboard Overview</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary mb-4 drop-shadow-sm tracking-tight">
-                            Welcome back, {user?.name?.split(' ')[0]}
-                        </h1>
+                        <div className="flex items-end gap-4 mb-4">
+                            <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary drop-shadow-sm tracking-tight">
+                                Welcome back, {user?.name?.split(' ')[0]}
+                            </h1>
+                            {user?.character_shape && user?.character_color && (
+                                <CharacterMini shape={user.character_shape} color={user.character_color} />
+                            )}
+                        </div>
                         <p className="text-secondary tracking-wide text-base leading-relaxed">
                             Manage your shared financial spaces, track group balances, and pay balances effortlessly.
                         </p>

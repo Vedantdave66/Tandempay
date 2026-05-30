@@ -44,7 +44,7 @@ export default function CharacterCustomizerPage() {
             });
             await refetchUser();
             setSaved(true);
-            setTimeout(() => setSaved(false), 2500);
+            setTimeout(() => navigate('/dashboard'), 1200);
         } catch (err: any) {
             setError(err.message || 'Save failed');
         } finally {
