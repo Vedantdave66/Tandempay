@@ -99,6 +99,7 @@ async def create_settlement(
     try:
         await db.flush()
     except IntegrityError:
+        await db.rollback()
         logger.warning(
             "Duplicate active settlement blocked: group=%s payer=%s payee=%s",
             group_id, current_user.id, data.payee_id,
