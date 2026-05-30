@@ -44,7 +44,7 @@ export default function CharacterCustomizerPage() {
             });
             await refetchUser();
             setSaved(true);
-            setTimeout(() => setSaved(false), 2500);
+            setTimeout(() => navigate('/dashboard'), 1200);
         } catch (err: any) {
             setError(err.message || 'Save failed');
         } finally {
@@ -78,7 +78,7 @@ export default function CharacterCustomizerPage() {
                     <p className="text-xs font-semibold text-secondary uppercase tracking-widest mb-6">Preview</p>
                     <div className="relative flex items-end justify-center h-[500px]">
                         <div className="relative" style={{ width: '550px', height: '400px' }}>
-                            <Characters />
+                            <Characters single={{ shape, color }} />
                         </div>
                     </div>
                 </div>

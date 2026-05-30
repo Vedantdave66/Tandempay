@@ -104,12 +104,25 @@ const TAIL_FILL: CSSProperties = {
   borderTop: '6px solid var(--bg-secondary)',
 };
 
+const SINGLE_SHAPE_CONFIG: Record<string, {
+  width: number; height: number; borderRadius: string;
+  eyeLeft: number; eyeTop: number; eyeType: 'ball' | 'pupil';
+  eyeSize: number; eyePupilSize: number; eyeMaxDist: number; eyeGap: number;
+  mouthLeft?: number; mouthTop?: number;
+}> = {
+  rect:  { width: 110, height: 250, borderRadius: '8px 8px 0 0',     eyeLeft: 30, eyeTop: 40, eyeType: 'ball',  eyeSize: 16, eyePupilSize: 6, eyeMaxDist: 4, eyeGap: 18 },
+  tall:  { width: 140, height: 330, borderRadius: '8px 8px 0 0',     eyeLeft: 43, eyeTop: 55, eyeType: 'ball',  eyeSize: 18, eyePupilSize: 7, eyeMaxDist: 5, eyeGap: 18 },
+  semi:  { width: 230, height: 160, borderRadius: '115px 115px 0 0', eyeLeft: 93, eyeTop: 60, eyeType: 'pupil', eyeSize: 12, eyePupilSize: 0, eyeMaxDist: 5, eyeGap: 20 },
+  round: { width: 130, height: 230, borderRadius: '65px 65px 0 0',   eyeLeft: 45, eyeTop: 45, eyeType: 'pupil', eyeSize: 12, eyePupilSize: 0, eyeMaxDist: 5, eyeGap: 16, mouthLeft: 25, mouthTop: 90 },
+};
+
 interface CharactersProps {
   isTyping?: boolean;
   isHoveringSubmit?: boolean;
   password?: string;
   showPassword?: boolean;
   isLoading?: boolean;
+  single?: { shape: string; color: string };
 }
 
 export default function Characters({
@@ -118,6 +131,7 @@ export default function Characters({
   password = "",
   showPassword = false,
   isLoading = false,
+  single,
 }: CharactersProps = {}) {
 
   const [mouseX, setMouseX] = useState<number>(0);
@@ -142,6 +156,7 @@ export default function Characters({
   const darkRef = useRef<HTMLDivElement>(null);
   const amberRef = useRef<HTMLDivElement>(null);
   const lightRef = useRef<HTMLDivElement>(null);
+  const singleRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => { setMouseX(e.clientX); setMouseY(e.clientY); };
@@ -253,8 +268,58 @@ export default function Characters({
   const darkPos = calculatePosition(darkRef);
   const amberPos = calculatePosition(amberRef);
   const lightPos = calculatePosition(lightRef);
+  const singlePos = calculatePosition(singleRef);
 
   const maxGrowth = isTyping || (password.length > 0 && !showPassword);
+
+  if (single) {
+    const cfg = SINGLE_SHAPE_CONFIG[single.shape] ?? SINGLE_SHAPE_CONFIG.rect;
+    return (
+      <div
+        ref={singleRef}
+        className="absolute bottom-0 transition-all duration-500 ease-in-out"
+        style={{
+          left: '50%',
+          width: cfg.width,
+          height: cfg.height,
+          backgroundColor: single.color,
+          borderRadius: cfg.borderRadius,
+          transform: `translateX(-50%) skewX(${singlePos.bodySkew}deg)`,
+          transformOrigin: 'bottom center',
+        }}
+      >
+        <div
+          className="absolute flex transition-all duration-200 ease-out"
+          style={{
+            left: `${cfg.eyeLeft + singlePos.faceX}px`,
+            top: `${cfg.eyeTop + singlePos.faceY}px`,
+            gap: `${cfg.eyeGap}px`,
+          }}
+        >
+          {cfg.eyeType === 'ball' ? (
+            <>
+              <EyeBall size={cfg.eyeSize} pupilSize={cfg.eyePupilSize} maxDistance={cfg.eyeMaxDist} eyeColor="white" pupilColor="#1A1A1A" />
+              <EyeBall size={cfg.eyeSize} pupilSize={cfg.eyePupilSize} maxDistance={cfg.eyeMaxDist} eyeColor="white" pupilColor="#1A1A1A" />
+            </>
+          ) : (
+            <>
+              <Pupil size={cfg.eyeSize} maxDistance={cfg.eyeMaxDist} pupilColor="#1A1A1A" />
+              <Pupil size={cfg.eyeSize} maxDistance={cfg.eyeMaxDist} pupilColor="#1A1A1A" />
+            </>
+          )}
+        </div>
+        {cfg.mouthLeft !== undefined && cfg.mouthTop !== undefined && (
+          <div
+            className="absolute w-20 h-[4px] bg-[#1A1A1A] rounded-full transition-all duration-200 ease-out"
+            style={{
+              left: `${cfg.mouthLeft + singlePos.faceX}px`,
+              top: `${cfg.mouthTop + singlePos.faceY}px`,
+            }}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <>
