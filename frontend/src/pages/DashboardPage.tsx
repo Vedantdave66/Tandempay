@@ -1,22 +1,35 @@
 import { useState, useEffect, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
-import { Plus, TrendingUp, Receipt, Users, ArrowRight, Palette } from 'lucide-react';
-import { groupsApi, GroupListItem } from '../services/api';
+import { Plus, Users, ArrowRight, Palette, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { groupsApi, balancesApi, GroupListItem } from '../services/api';
 import GroupCard from '../components/GroupCard';
 import ProUpsellBanner from '../components/ProUpsellBanner';
 import { useAuth } from '../context/AuthContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
-const MINI_CONFIG: Record<string, { w: number; h: number; radius: string; eyeTop: number; eyeLeft: number; eyeSize: number; eyeGap: number }> = {
-    rect:  { w: 32, h: 52, radius: '6px 6px 0 0',   eyeTop: 10, eyeLeft: 8,  eyeSize: 5, eyeGap: 6 },
-    tall:  { w: 22, h: 64, radius: '4px 4px 0 0',   eyeTop: 12, eyeLeft: 4,  eyeSize: 5, eyeGap: 4 },
-    semi:  { w: 56, h: 30, radius: '28px 28px 0 0', eyeTop: 8,  eyeLeft: 19, eyeSize: 5, eyeGap: 8 },
-    round: { w: 40, h: 52, radius: '20px 20px 0 0', eyeTop: 12, eyeLeft: 12, eyeSize: 5, eyeGap: 6 },
-};
+// ── Character mini component ──────────────────────────────────────────────────
 
-function CharacterMini({ shape, color }: { shape: string; color: string }) {
-    const cfg = MINI_CONFIG[shape] ?? MINI_CONFIG.rect;
+const MINI_CONFIGS = {
+    mini: {
+        rect:  { w: 32, h: 52,  radius: '6px 6px 0 0',   eyeTop: 10, eyeLeft: 8,  eyeSize: 5, eyeGap: 6 },
+        tall:  { w: 22, h: 64,  radius: '4px 4px 0 0',   eyeTop: 12, eyeLeft: 4,  eyeSize: 5, eyeGap: 4 },
+        semi:  { w: 56, h: 30,  radius: '28px 28px 0 0', eyeTop: 8,  eyeLeft: 19, eyeSize: 5, eyeGap: 8 },
+        round: { w: 40, h: 52,  radius: '20px 20px 0 0', eyeTop: 12, eyeLeft: 12, eyeSize: 5, eyeGap: 6 },
+    },
+    hero: {
+        rect:  { w: 56, h: 96,  radius: '8px 8px 0 0',   eyeTop: 18, eyeLeft: 14, eyeSize: 9, eyeGap: 10 },
+        tall:  { w: 40, h: 116, radius: '6px 6px 0 0',   eyeTop: 22, eyeLeft: 7,  eyeSize: 9, eyeGap: 8  },
+        semi:  { w: 100, h: 54, radius: '50px 50px 0 0', eyeTop: 14, eyeLeft: 34, eyeSize: 9, eyeGap: 14 },
+        round: { w: 72, h: 96,  radius: '36px 36px 0 0', eyeTop: 22, eyeLeft: 22, eyeSize: 9, eyeGap: 10 },
+    },
+} as const;
+
+type MiniVariant = keyof typeof MINI_CONFIGS;
+
+function CharacterMini({ shape, color, variant = 'mini' }: { shape: string; color: string; variant?: MiniVariant }) {
+    const table = MINI_CONFIGS[variant];
+    const cfg = (table as Record<string, typeof table[keyof typeof table]>)[shape] ?? table.rect;
     return (
         <div style={{ width: cfg.w, height: cfg.h, backgroundColor: color, borderRadius: cfg.radius, position: 'relative', flexShrink: 0 }}>
             <div style={{ position: 'absolute', top: cfg.eyeTop, left: cfg.eyeLeft, display: 'flex', gap: cfg.eyeGap }}>
@@ -27,6 +40,8 @@ function CharacterMini({ shape, color }: { shape: string; color: string }) {
     );
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function DashboardPage() {
     const { user } = useAuth();
     const [groups, setGroups] = useState<GroupListItem[]>([]);
@@ -34,6 +49,8 @@ export default function DashboardPage() {
     const [showCreate, setShowCreate] = useState(false);
     const [newGroupName, setNewGroupName] = useState('');
     const [creating, setCreating] = useState(false);
+    const [owedToMe, setOwedToMe] = useState(0);
+    const [iOwe, setIOwe] = useState(0);
 
     useEffect(() => {
         loadGroups();
@@ -48,6 +65,24 @@ export default function DashboardPage() {
             setLoading(false);
         }
     }, []);
+
+    // Aggregate cross-group balances whenever the group list settles
+    useEffect(() => {
+        if (loading || !user?.id || groups.length === 0) return;
+        Promise.all(groups.map(g => balancesApi.getBalances(g.id)))
+            .then(allBalances => {
+                let owed = 0, owing = 0;
+                for (const groupBalances of allBalances) {
+                    const me = groupBalances.find(b => b.user_id === user.id);
+                    if (!me) continue;
+                    if (me.net_balance > 0) owed += me.net_balance;
+                    else if (me.net_balance < 0) owing += Math.abs(me.net_balance);
+                }
+                setOwedToMe(owed);
+                setIOwe(owing);
+            })
+            .catch(() => {});
+    }, [groups, loading, user?.id]);
 
     // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
     useAutoRefresh(loadGroups, 30000, !loading);
@@ -67,7 +102,6 @@ export default function DashboardPage() {
         }
     };
 
-    const totalSpending = groups.reduce((sum, g) => sum + Number(g.total_expenses || 0), 0);
     const totalGroups = groups.length;
 
     return (
@@ -79,90 +113,69 @@ export default function DashboardPage() {
             <div className="fixed inset-0 opacity-[0.015] pointer-events-none -z-10" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
             {/* Hero Header */}
-            <div className="relative mb-12 p-8 sm:p-10 rounded-[2rem] overflow-hidden border border-border/60 bg-surface/40 backdrop-blur-xl shadow-2xl shadow-black/40">
+            <div className="relative mb-8 px-8 pt-8 pb-0 sm:px-10 sm:pt-10 rounded-[2rem] overflow-hidden border border-border/60 bg-surface/40 backdrop-blur-xl shadow-2xl shadow-black/40">
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-indigo/5 opacity-60" />
-                <div className="relative z-10 flex flex-col md:flex-row md:items-end justify-between gap-6">
-                    <div className="max-w-xl">
-                        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 mb-6">
-                            <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                            <span className="text-xs font-semibold text-accent uppercase tracking-wider">Dashboard Overview</span>
-                        </div>
-                        <div className="flex items-end gap-4 mb-4">
-                            <h1 className="text-4xl sm:text-5xl font-black text-transparent bg-clip-text bg-gradient-to-r from-primary to-secondary drop-shadow-sm tracking-tight">
-                                Welcome back, {user?.name?.split(' ')[0]}
-                            </h1>
-                            {user?.character_shape && user?.character_color && (
-                                <CharacterMini shape={user.character_shape} color={user.character_color} />
-                            )}
-                        </div>
-                        <p className="text-secondary tracking-wide text-base leading-relaxed">
-                            Manage your shared financial spaces, track group balances, and pay balances effortlessly.
+                {/* Personalised ambient glow behind character */}
+                {user?.character_color && (
+                    <div
+                        className="absolute left-4 bottom-0 w-48 h-48 rounded-full blur-3xl opacity-25 pointer-events-none transition-colors duration-700"
+                        style={{ backgroundColor: user.character_color }}
+                    />
+                )}
+                <div className="relative z-10 flex items-end gap-6 sm:gap-8">
+                    {/* Character — hero size, standing at left edge */}
+                    {user?.character_shape && user?.character_color && (
+                        <CharacterMini shape={user.character_shape} color={user.character_color} variant="hero" />
+                    )}
+                    {/* Greeting */}
+                    <div className="flex-1 pb-8 sm:pb-10">
+                        <h1 className="text-4xl sm:text-5xl font-black text-primary tracking-tight mb-2">
+                            Hey, {user?.name?.split(' ')[0]} 👋
+                        </h1>
+                        <p className="text-secondary text-base leading-relaxed">
+                            Here's where things stand with your squads.
                         </p>
-                    </div>
-                    <div className="hidden md:flex items-center justify-center w-32 h-32 relative">
-                        <div className="absolute inset-0 border-2 border-dashed border-border/80 rounded-full animate-[spin_60s_linear_infinite]" />
-                        <div className="w-24 h-24 bg-gradient-to-tr from-accent/20 to-indigo/20 rounded-full blur-xl" />
-                        <TrendingUp className="w-10 h-10 text-primary absolute drop-shadow-lg" />
                     </div>
                 </div>
             </div>
 
-            {/* Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-12">
-                {/* Total Spending Stat */}
-                <div className="relative overflow-hidden bg-surface-light/50 border border-border/60 rounded-3xl p-7 group hover:border-accent/30 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-accent/10 transition-colors duration-500" />
-                    <div className="relative z-10 flex flex-col h-full">
+            {/* Balance Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-10">
+                {/* You're owed */}
+                <div className="relative overflow-hidden bg-surface-light/50 border border-emerald-500/20 rounded-3xl p-7 group hover:border-emerald-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-colors duration-500" />
+                    <div className="relative z-10">
                         <div className="flex justify-between items-start mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-accent/20 to-transparent flex items-center justify-center border border-accent/20 shadow-inner">
-                                <TrendingUp className="w-6 h-6 text-accent drop-shadow" />
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/15 flex items-center justify-center border border-emerald-500/20 shadow-inner">
+                                <ArrowDownLeft className="w-6 h-6 text-emerald-400 drop-shadow" />
                             </div>
-                            <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] bg-bg/50 px-2.5 py-1 rounded-lg border border-border/50">Total</span>
+                            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-[0.2em] bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                                Incoming
+                            </span>
                         </div>
-                        <div className="mt-auto">
-                            <p className="text-sm font-medium text-secondary mb-1">Total Spending</p>
-                            <p className="text-[2rem] font-black text-primary tracking-tight leading-none">
-                                ${formatCurrency(totalSpending)}
-                            </p>
-                        </div>
+                        <p className="text-sm font-medium text-secondary mb-1">You're owed</p>
+                        <p className="text-[2rem] font-black text-emerald-400 tracking-tight leading-none">
+                            ${formatCurrency(owedToMe)}
+                        </p>
                     </div>
                 </div>
 
-                {/* Groups Stat */}
-                <div className="relative overflow-hidden bg-surface-light/50 border border-border/60 rounded-3xl p-7 group hover:border-indigo/30 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-indigo/10 transition-colors duration-500" />
-                    <div className="relative z-10 flex flex-col h-full">
+                {/* You owe */}
+                <div className="relative overflow-hidden bg-surface-light/50 border border-amber-500/20 rounded-3xl p-7 group hover:border-amber-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-amber-500/10 transition-colors duration-500" />
+                    <div className="relative z-10">
                         <div className="flex justify-between items-start mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo/20 to-transparent flex items-center justify-center border border-indigo/20 shadow-inner">
-                                <Users className="w-6 h-6 text-indigo drop-shadow" />
+                            <div className="w-12 h-12 rounded-2xl bg-amber-500/15 flex items-center justify-center border border-amber-500/20 shadow-inner">
+                                <ArrowUpRight className="w-6 h-6 text-amber-400 drop-shadow" />
                             </div>
-                            <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] bg-bg/50 px-2.5 py-1 rounded-lg border border-border/50">Active</span>
+                            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-[0.2em] bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                                Outgoing
+                            </span>
                         </div>
-                        <div className="mt-auto">
-                            <p className="text-sm font-medium text-secondary mb-1">Total Groups</p>
-                            <p className="text-[2rem] font-black text-primary tracking-tight leading-none">{totalGroups}</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Avg per Group Stat */}
-                <div className="relative overflow-hidden bg-surface-light/50 border border-border/60 rounded-3xl p-7 group hover:border-warning/30 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
-                    <div className="absolute top-0 right-0 w-32 h-32 bg-warning/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-warning/10 transition-colors duration-500" />
-                    <div className="relative z-10 flex flex-col h-full">
-                        <div className="flex justify-between items-start mb-6">
-                            <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-warning/20 to-transparent flex items-center justify-center border border-warning/20 shadow-inner">
-                                <Receipt className="w-6 h-6 text-warning drop-shadow" />
-                            </div>
-                            <span className="text-[10px] font-bold text-secondary uppercase tracking-[0.2em] bg-bg/50 px-2.5 py-1 rounded-lg border border-border/50">Average</span>
-                        </div>
-                        <div className="mt-auto">
-                            <p className="text-sm font-medium text-secondary mb-1">Avg. Per Group</p>
-                            <p className="text-[2rem] font-black text-primary tracking-tight leading-none">
-                                ${totalGroups > 0
-                                    ? formatCurrency(totalSpending / totalGroups)
-                                    : '0.00'}
-                            </p>
-                        </div>
+                        <p className="text-sm font-medium text-secondary mb-1">You owe</p>
+                        <p className="text-[2rem] font-black text-amber-400 tracking-tight leading-none">
+                            ${formatCurrency(iOwe)}
+                        </p>
                     </div>
                 </div>
             </div>
