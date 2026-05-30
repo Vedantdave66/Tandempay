@@ -1,7 +1,12 @@
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import selectinload, joinedload
+
+logger = logging.getLogger("tandempay.settlements")
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, SettlementRecord, Notification
@@ -91,7 +96,17 @@ async def create_settlement(
         status="pending",
     )
     db.add(record)
-    await db.flush()
+    try:
+        await db.flush()
+    except IntegrityError:
+        logger.warning(
+            "Duplicate active settlement blocked: group=%s payer=%s payee=%s",
+            group_id, current_user.id, data.payee_id,
+        )
+        raise HTTPException(
+            status_code=409,
+            detail="An active settlement already exists for this pair. Resolve it before creating another.",
+        )
     await db.refresh(record)
 
     # Get payee user for notification + output
