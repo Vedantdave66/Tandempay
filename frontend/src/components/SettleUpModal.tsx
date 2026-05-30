@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { formatCurrency } from '../utils/currency';
-import { X, Send, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, Sparkles } from 'lucide-react';
+import { X, Send, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, Sparkles, AlertCircle } from 'lucide-react';
 import { Settlement, settlementRecordsApi } from '../services/api';
 import Avatar from './Avatar';
 import StripePaymentModal from './StripePaymentModal';
@@ -27,6 +27,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
     const recipientName = isPayer ? settlement.to_user_name : settlement.from_user_name;
     const recipientEmail = isPayer ? settlement.to_user_email : settlement.from_user_email;
     const recipientColor = isPayer ? settlement.to_avatar_color : settlement.from_avatar_color;
+    const hasInteracEmail = isPayer ? !!settlement.to_interac_email : true;
 
     const stripeFee = (settlement.amount * 0.029 + 0.30).toFixed(2);
 
@@ -52,7 +53,7 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         try {
             const record = await settlementRecordsApi.create(groupId, {
                 payee_id: settlement.to_user_id,
-                amount: settlement.amount,
+                amount: Math.round(settlement.amount * 100) / 100,
                 method,
             });
             return record.id;
@@ -199,9 +200,20 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                 </div>
 
                                 <div className="space-y-3">
+                                    {!hasInteracEmail && (
+                                        <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3">
+                                            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                            <p className="text-xs text-amber-300 leading-snug">
+                                                <span className="font-semibold">{recipientName}</span> hasn't added their Interac email yet.
+                                                Ask them to add it in their profile, or send to their account email instead.
+                                            </p>
+                                        </div>
+                                    )}
                                     <div className="flex items-center justify-between bg-bg rounded-xl px-4 py-3 border border-border">
                                         <div>
-                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">Email</p>
+                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">
+                                                {hasInteracEmail ? 'Interac Email' : 'Account Email'}
+                                            </p>
                                             <p className="text-sm font-bold text-primary">{recipientEmail}</p>
                                         </div>
                                         <button

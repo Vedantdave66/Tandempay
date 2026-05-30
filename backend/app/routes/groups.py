@@ -28,7 +28,7 @@ async def create_group(data: GroupCreate, current_user: User = Depends(get_curre
     await db.refresh(group, attribute_names=["members"])
 
     members_out = [
-        GroupMemberOut(user_id=current_user.id, name=current_user.name, email=current_user.email, avatar_color=current_user.avatar_color)
+        GroupMemberOut(user_id=current_user.id, name=current_user.name, email=current_user.email, interac_email=current_user.interac_email, avatar_color=current_user.avatar_color)
     ]
 
     return GroupOut(
@@ -100,7 +100,7 @@ async def get_group(group_id: str, current_user: User = Depends(get_current_user
         raise HTTPException(status_code=403, detail="Not a member of this group")
 
     members_out = [
-        GroupMemberOut(user_id=m.user.id, name=m.user.name, email=m.user.email, avatar_color=m.user.avatar_color)
+        GroupMemberOut(user_id=m.user.id, name=m.user.name, email=m.user.email, interac_email=m.user.interac_email, avatar_color=m.user.avatar_color)
         for m in group.members
     ]
     total = sum(e.amount for e in group.expenses)
@@ -151,6 +151,7 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
         user_id=user_to_add.id,
         name=user_to_add.name,
         email=user_to_add.email,
+        interac_email=user_to_add.interac_email,
         avatar_color=user_to_add.avatar_color,
     )
 
@@ -190,6 +191,7 @@ async def join_group(
             user_id=current_user.id,
             name=current_user.name,
             email=current_user.email,
+            interac_email=current_user.interac_email,
             avatar_color=current_user.avatar_color,
         )
 
@@ -201,6 +203,7 @@ async def join_group(
         user_id=current_user.id,
         name=current_user.name,
         email=current_user.email,
+        interac_email=current_user.interac_email,
         avatar_color=current_user.avatar_color,
     )
 
