@@ -75,10 +75,13 @@ export default function GroupPage() {
     const [apiBalances, setApiBalances] = useState<UserBalance[]>([]);
     const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
 
-    // New-group onboarding state
+    // New-group onboarding state (step 1: add friends)
     const [onboardingDismissed, setOnboardingDismissed] = useState(false);
     const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
     const [onboardingAdding, setOnboardingAdding] = useState(false);
+
+    // Squad-ready overlay state (step 2: first action prompt)
+    const [squadReadyDismissed, setSquadReadyDismissed] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
     // Edit expense state
@@ -262,8 +265,13 @@ export default function GroupPage() {
         apiBalances.map(b => [b.user_id, { shape: b.character_shape ?? 'rect', color: b.character_color ?? '#6B7280' }])
     );
 
-    // Onboarding modal: shown for groups with only the creator, until dismissed or a member is added
+    // Step 1 overlay: group has only the creator
     const showOnboarding = !onboardingDismissed && !loading && !!group && (group.members || []).length <= 1;
+
+    // Step 2 overlay: group has members but no expenses yet
+    const showSquadReady = !squadReadyDismissed && !loading && !showOnboarding && !!group
+        && (group.members || []).length > 1
+        && expenses.length === 0;
     const memberIds = new Set((group?.members || []).map(m => m.user_id));
     const onboardingFriends = friends.filter(f => !memberIds.has(f.id));
 
@@ -905,6 +913,68 @@ export default function GroupPage() {
                     onClose={handleDismissOnboarding}
                     returnPath={`/group/${groupId}`}
                 />
+            )}
+
+            {/* ── Squad-ready overlay (step 2) ─────────────────────────── */}
+            {showSquadReady && group && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="w-full max-w-md bg-surface rounded-3xl shadow-2xl overflow-hidden border border-border/60">
+                        <div className="px-6 pt-8 pb-6 flex flex-col items-center text-center">
+                            {/* Character cluster */}
+                            {apiBalances.length > 0 && (
+                                <div className="flex items-end justify-center gap-2 mb-6">
+                                    {apiBalances.slice(0, 3).map(b => (
+                                        <CharacterShape
+                                            key={b.user_id}
+                                            shape={b.character_shape ?? 'rect'}
+                                            color={b.character_color ?? '#6B7280'}
+                                            variant="cluster"
+                                        />
+                                    ))}
+                                </div>
+                            )}
+
+                            <h2 className="text-2xl font-black text-primary mb-2">Your squad's ready 🎉</h2>
+                            <p className="text-sm text-secondary mb-8">
+                                Start tracking expenses or request money from your group.
+                            </p>
+
+                            <div className="w-full space-y-3">
+                                <button
+                                    onClick={() => {
+                                        setSquadReadyDismissed(true);
+                                        setExpenseToEdit(undefined);
+                                        setShowAddExpense(true);
+                                    }}
+                                    className="w-full h-12 rounded-2xl bg-gradient-to-r from-accent to-emerald-500 hover:from-accent hover:to-emerald-600 text-white font-bold text-sm transition-all shadow-lg shadow-accent/20 flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    <Plus className="w-4 h-4" />
+                                    Add an expense
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        setSquadReadyDismissed(true);
+                                        if (user && !user.stripe_account_id) {
+                                            setShowStripeOnboarding(true);
+                                        } else {
+                                            setShowRequestMoney(true);
+                                        }
+                                    }}
+                                    className="w-full h-12 rounded-2xl bg-surface-light hover:bg-border border border-border text-primary font-bold text-sm transition-all flex items-center justify-center gap-2 cursor-pointer"
+                                >
+                                    <Handshake className="w-4 h-4" />
+                                    Request money
+                                </button>
+                                <button
+                                    onClick={() => setSquadReadyDismissed(true)}
+                                    className="w-full text-xs text-secondary/60 hover:text-secondary transition-colors py-1 cursor-pointer"
+                                >
+                                    I'll do this later
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             )}
 
             {/* ── New-group onboarding overlay ─────────────────────────── */}
