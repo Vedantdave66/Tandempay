@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { formatCurrency } from '../utils/currency';
-import { X } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { X, ArrowRight } from 'lucide-react';
 import { GroupMember, expensesApi, Expense } from '../services/api';
 
 interface AddExpenseModalProps {
@@ -21,61 +21,68 @@ export default function AddExpenseModal({
     onUpdated
 }: AddExpenseModalProps) {
     const isEditMode = !!expense;
+    const navigate = useNavigate();
 
     const [title, setTitle] = useState(expense?.title || '');
     const [amount, setAmount] = useState(expense ? expense.amount.toString() : '');
     const [paidBy, setPaidBy] = useState(expense?.paid_by || members[0]?.user_id || '');
+    // Only used in edit mode — participant selection is handled by SplitCanvas for new expenses
     const [selectedParticipants, setSelectedParticipants] = useState<string[]>(
-        expense
-            ? expense.participants.map(p => p.user_id)
-            : members.map((m) => m.user_id)
+        expense ? expense.participants.map(p => p.user_id) : members.map(m => m.user_id)
     );
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
     const toggleParticipant = (userId: string) => {
-        setSelectedParticipants((prev) =>
-            prev.includes(userId) ? prev.filter((id) => id !== userId) : [...prev, userId]
+        setSelectedParticipants(prev =>
+            prev.includes(userId) ? prev.filter(id => id !== userId) : [...prev, userId]
         );
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!title || !amount || !paidBy || selectedParticipants.length === 0) {
-            setError('Please fill all fields and select at least one participant');
+        const parsedAmount = parseFloat(amount);
+
+        if (!title.trim() || !parsedAmount || parsedAmount <= 0 || !paidBy) {
+            setError('Please fill in a description, amount, and who paid');
             return;
         }
 
-        setLoading(true);
-        setError('');
-
-        try {
-            if (isEditMode && expense && onUpdated) {
+        // Edit mode — submit directly with participant selection
+        if (isEditMode && expense && onUpdated) {
+            if (selectedParticipants.length === 0) {
+                setError('Select at least one participant');
+                return;
+            }
+            setLoading(true);
+            setError('');
+            try {
                 const updatedExpense = await expensesApi.update(groupId, expense.id, {
-                    title,
-                    amount: parseFloat(amount),
+                    title: title.trim(),
+                    amount: parsedAmount,
                     paid_by: paidBy,
                     participant_ids: selectedParticipants,
                 });
                 onUpdated(updatedExpense);
-            } else if (onCreated) {
-                const newExpense = await expensesApi.create(groupId, {
-                    title,
-                    amount: parseFloat(amount),
-                    paid_by: paidBy,
-                    participant_ids: selectedParticipants,
-                });
-                onCreated(newExpense);
+            } catch (err: any) {
+                setError(err.message || 'Failed to save expense');
+                setLoading(false);
             }
-        } catch (err: any) {
-            setError(err.message || 'Failed to save expense');
-        } finally {
-            setLoading(false);
+            return;
         }
+
+        // Create mode — hand off to SplitCanvas for participant selection
+        const params = new URLSearchParams({
+            name: title.trim(),
+            amount: parsedAmount.toString(),
+            paidBy,
+        });
+        onClose();
+        navigate(`/groups/${groupId}/split?${params.toString()}`);
     };
 
     const splitAmount = selectedParticipants.length > 0
-        ? formatCurrency(parseFloat(amount || '0') / (selectedParticipants.length || 1))
+        ? (parseFloat(amount || '0') / selectedParticipants.length).toFixed(2)
         : '0.00';
 
     return (
@@ -146,56 +153,68 @@ export default function AddExpenseModal({
                         </select>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-secondary mb-2">Split between</label>
-                        <div className="space-y-2">
-                            {members.map((m) => (
-                                <label
-                                    key={m.user_id}
-                                    className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200 ${selectedParticipants.includes(m.user_id)
-                                        ? 'bg-accent/5 border-accent/30'
-                                        : 'bg-bg border-border hover:border-border'
-                                        }`}
-                                >
-                                    <input
-                                        type="checkbox"
-                                        checked={selectedParticipants.includes(m.user_id)}
-                                        onChange={() => toggleParticipant(m.user_id)}
-                                        className="sr-only"
-                                    />
-                                    <div
-                                        className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${selectedParticipants.includes(m.user_id)
-                                            ? 'bg-accent border-accent'
-                                            : 'border-border'
-                                            }`}
-                                    >
-                                        {selectedParticipants.includes(m.user_id) && (
-                                            <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                                                <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                                            </svg>
-                                        )}
-                                    </div>
-                                    <span className="text-sm font-medium text-primary flex-1">{m.name}</span>
-                                </label>
-                            ))}
-                        </div>
-                    </div>
+                    {/* Participant selection — edit mode only; SplitCanvas handles this for new expenses */}
+                    {isEditMode && (
+                        <>
+                            <div>
+                                <label className="block text-sm font-medium text-secondary mb-2">Split between</label>
+                                <div className="space-y-2">
+                                    {members.map((m) => (
+                                        <label
+                                            key={m.user_id}
+                                            className={`flex items-center gap-3 px-4 py-3 rounded-xl border cursor-pointer transition-all duration-200 ${selectedParticipants.includes(m.user_id)
+                                                ? 'bg-accent/5 border-accent/30'
+                                                : 'bg-bg border-border hover:border-border'
+                                                }`}
+                                        >
+                                            <input
+                                                type="checkbox"
+                                                checked={selectedParticipants.includes(m.user_id)}
+                                                onChange={() => toggleParticipant(m.user_id)}
+                                                className="sr-only"
+                                            />
+                                            <div
+                                                className={`w-5 h-5 rounded-md border-2 flex items-center justify-center transition-colors ${selectedParticipants.includes(m.user_id)
+                                                    ? 'bg-accent border-accent'
+                                                    : 'border-border'
+                                                    }`}
+                                            >
+                                                {selectedParticipants.includes(m.user_id) && (
+                                                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                                                    </svg>
+                                                )}
+                                            </div>
+                                            <span className="text-sm font-medium text-primary flex-1">{m.name}</span>
+                                        </label>
+                                    ))}
+                                </div>
+                            </div>
 
-                    {/* Split preview */}
-                    {parseFloat(amount || '0') > 0 && selectedParticipants.length > 0 && (
-                        <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
-                            <p className="text-sm text-secondary">
-                                Each person pays <span className="text-accent font-bold">${splitAmount}</span>
-                            </p>
-                        </div>
+                            {parseFloat(amount || '0') > 0 && selectedParticipants.length > 0 && (
+                                <div className="bg-accent/5 border border-accent/20 rounded-xl p-4">
+                                    <p className="text-sm text-secondary">
+                                        Each person pays <span className="text-accent font-bold">${splitAmount}</span>
+                                    </p>
+                                </div>
+                            )}
+                        </>
+                    )}
+
+                    {!isEditMode && (
+                        <p className="text-xs text-secondary/60 text-center -mt-1">
+                            You'll choose who's splitting on the next screen
+                        </p>
                     )}
 
                     <button
                         type="submit"
                         disabled={loading}
-                        className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 cursor-pointer"
+                        className="w-full bg-accent hover:bg-accent-hover text-white font-semibold py-3 rounded-xl transition-all duration-200 disabled:opacity-50 cursor-pointer flex items-center justify-center gap-2"
                     >
-                        {loading ? 'Saving...' : isEditMode ? 'Save Changes' : 'Add Expense'}
+                        {loading ? 'Saving...' : isEditMode ? 'Save Changes' : (
+                            <>Choose who's splitting <ArrowRight className="w-4 h-4" /></>
+                        )}
                     </button>
                 </form>
             </div>

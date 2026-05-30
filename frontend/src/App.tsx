@@ -17,6 +17,7 @@ import LandingPage from './pages/LandingPage';
 import PricingPage from './pages/PricingPage';
 import ProSuccessPage from './pages/ProSuccessPage';
 import CharacterCustomizerPage from './pages/CharacterCustomizerPage';
+import SplitCanvas from './pages/SplitCanvas';
 import Layout from './components/Layout';
 import ErrorBoundary from './components/ErrorBoundary';
 import LoadingScreen from './components/LoadingScreen';
@@ -73,6 +74,7 @@ export default function App() {
                             <Route path="/recurring" element={<ProtectedRoute><Layout><RecurringPage /></Layout></ProtectedRoute>} />
                             <Route path="/export" element={<ProtectedRoute><Layout><ExportPage /></Layout></ProtectedRoute>} />
                             <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
+                            <Route path="/groups/:groupId/split" element={<ProtectedRoute><SplitCanvas /></ProtectedRoute>} />
                             <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
                             <Route path="/pricing" element={<PricingPage />} />
                             <Route path="/pro-success" element={<ProtectedRoute><ProSuccessPage /></ProtectedRoute>} />

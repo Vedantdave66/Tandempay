@@ -1031,18 +1031,18 @@ export default function GroupPage() {
                                 })
                             )}
 
-                            {/* Invite someone new */}
+                            {/* Invite someone new — copies the group invite link */}
                             <button
                                 onClick={() => {
                                     setOnboardingDismissed(true);
-                                    setShowInvite(true);
+                                    handleCopyLink();
                                 }}
                                 className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-dashed border-border/60 hover:border-accent/40 hover:bg-surface-light transition-all duration-150 cursor-pointer"
                             >
                                 <div className="w-9 h-9 rounded-full border-2 border-dashed border-border/60 flex items-center justify-center shrink-0">
-                                    <Plus className="w-4 h-4 text-secondary" />
+                                    <LinkIcon className="w-4 h-4 text-secondary" />
                                 </div>
-                                <span className="text-sm font-medium text-secondary">Invite someone new</span>
+                                <span className="text-sm font-medium text-secondary">Share invite link</span>
                             </button>
                         </div>
 
