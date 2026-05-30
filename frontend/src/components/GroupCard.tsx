@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { GroupListItem, UserBalance } from '../services/api';
 import { formatCurrency } from '../utils/currency';
 import { ArrowRight } from 'lucide-react';
@@ -15,6 +16,10 @@ const SETTLED_THRESHOLD = 0.01;
 export default function GroupCard({ group, members = [], myNetBalance = 0 }: GroupCardProps) {
     const navigate = useNavigate();
     const initial = group.name ? group.name.charAt(0).toUpperCase() : '?';
+
+    useEffect(() => {
+        console.log('[GroupCard] members for', group.name, members);
+    }, [members]);
     const visibleMembers = members.slice(0, 3);
     const extraCount = members.length > 3 ? members.length - 3 : 0;
     const balanceLoaded = members.length > 0;

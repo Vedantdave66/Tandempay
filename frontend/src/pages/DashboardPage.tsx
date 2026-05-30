@@ -36,9 +36,11 @@ export default function DashboardPage() {
 
     // Fetch per-group balances in parallel; derive both the group map and hero aggregates
     useEffect(() => {
+        console.log('[Dashboard] balance effect — loading:', loading, 'userId:', user?.id, 'groups:', groups.length);
         if (loading || !user?.id || groups.length === 0) return;
         Promise.all(groups.map(g => balancesApi.getBalances(g.id).then(bs => ({ id: g.id, bs }))))
             .then(results => {
+                console.log('[Dashboard] raw balance results:', results);
                 const byGroup: Record<string, UserBalance[]> = {};
                 let owed = 0, owing = 0;
                 for (const { id, bs } of results) {
@@ -52,7 +54,7 @@ export default function DashboardPage() {
                 setOwedToMe(owed);
                 setIOwe(owing);
             })
-            .catch(() => {});
+            .catch(err => { console.error('[Dashboard] balance fetch failed:', err); });
     }, [groups, loading, user?.id]);
 
     // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
