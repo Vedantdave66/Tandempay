@@ -70,10 +70,11 @@ export function computeUserBalances(
 
     // 3. Final Computation
     // net = spent - owed
-    // final_balance = net + (received - sent)
+    // final_balance = net + (sent - received)
+    // sent reduces debtor's outstanding debt; received reduces creditor's outstanding credit
     return Object.values(balanceMap).map(b => {
         const net = b.spent - b.owed;
-        const final_balance = net + (b.received - b.sent);
+        const final_balance = net + (b.sent - b.received);
         
         return {
             ...b,
