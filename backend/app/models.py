@@ -141,11 +141,11 @@ class SettlementRecord(Base):
     payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2, asdecimal=True), nullable=False)
     method: Mapped[SettlementMethod] = mapped_column(
-        SAEnum(SettlementMethod, name="settlementmethod", values_callable=lambda x: [e.value for e in x]),
+        SAEnum(SettlementMethod, name="settlementmethod", values_callable=lambda x: [e.value for e in x], native_enum=False),
         default=SettlementMethod.etransfer,
     )
     status: Mapped[SettlementStatus] = mapped_column(
-        SAEnum(SettlementStatus, name="settlementstatus", values_callable=lambda x: [e.value for e in x]),
+        SAEnum(SettlementStatus, name="settlementstatus", values_callable=lambda x: [e.value for e in x], native_enum=False),
         default=SettlementStatus.pending,
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
@@ -298,7 +298,7 @@ class Payment(Base):
     payee_id: Mapped[str] = mapped_column(String, ForeignKey("users.id"), nullable=False)
     amount: Mapped[int] = mapped_column(Integer, nullable=False) # cents
     status: Mapped[PaymentStatus] = mapped_column(
-        SAEnum(PaymentStatus, name="paymentstatus", values_callable=lambda x: [e.value for e in x]),
+        SAEnum(PaymentStatus, name="paymentstatus", values_callable=lambda x: [e.value for e in x], native_enum=False),
         default=PaymentStatus.pending,
     )
     payout_arrival_date: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
