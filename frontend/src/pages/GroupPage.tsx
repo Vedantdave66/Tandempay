@@ -74,6 +74,11 @@ export default function GroupPage() {
     const [loading, setLoading] = useState(true);
     const [apiBalances, setApiBalances] = useState<UserBalance[]>([]);
     const [payingRequestId, setPayingRequestId] = useState<string | null>(null);
+
+    // New-group onboarding state
+    const [onboardingDismissed, setOnboardingDismissed] = useState(false);
+    const [selectedFriendIds, setSelectedFriendIds] = useState<Set<string>>(new Set());
+    const [onboardingAdding, setOnboardingAdding] = useState(false);
     const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
     // Edit expense state
@@ -257,8 +262,41 @@ export default function GroupPage() {
         apiBalances.map(b => [b.user_id, { shape: b.character_shape ?? 'rect', color: b.character_color ?? '#6B7280' }])
     );
 
+    // Onboarding modal: shown for groups with only the creator, until dismissed or a member is added
+    const showOnboarding = !onboardingDismissed && !loading && !!group && (group.members || []).length <= 1;
+    const memberIds = new Set((group?.members || []).map(m => m.user_id));
+    const onboardingFriends = friends.filter(f => !memberIds.has(f.id));
+
+    const toggleFriend = (id: string) => {
+        setSelectedFriendIds(prev => {
+            const next = new Set(prev);
+            if (next.has(id)) next.delete(id); else next.add(id);
+            return next;
+        });
+    };
+
+    const handleOnboardingAdd = async () => {
+        if (!groupId || selectedFriendIds.size === 0) return;
+        setOnboardingAdding(true);
+        const toAdd = friends.filter(f => selectedFriendIds.has(f.id));
+        try {
+            await Promise.all(toAdd.map(f => groupsApi.addMember(groupId, f.email)));
+            setSelectedFriendIds(new Set());
+        } catch {
+            // partial adds may have succeeded — reload regardless
+        } finally {
+            setOnboardingAdding(false);
+            await loadAll(); // refreshes members; if length > 1, modal auto-closes
+        }
+    };
+
     // Find settlements where the current user owes money
     const mySettlements = effectiveSettlements.filter(s => s.from_user_id === user?.id);
+
+    // Load friends as soon as the onboarding modal becomes visible
+    useEffect(() => {
+        if (showOnboarding) loadFriends();
+    }, [showOnboarding]);
 
     // Auto-trigger onboarding if owed money
     useEffect(() => {
@@ -863,10 +901,97 @@ export default function GroupPage() {
             )}
             
             {showStripeOnboarding && groupId && (
-                <StripeOnboardingModal 
+                <StripeOnboardingModal
                     onClose={handleDismissOnboarding}
-                    returnPath={`/group/${groupId}`} 
+                    returnPath={`/group/${groupId}`}
                 />
+            )}
+
+            {/* ── New-group onboarding overlay ─────────────────────────── */}
+            {showOnboarding && group && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+                    <div className="w-full max-w-md bg-surface rounded-3xl shadow-2xl overflow-hidden border border-border/60">
+                        {/* Header */}
+                        <div className="px-6 pt-6 pb-4 border-b border-border/40">
+                            <div className="flex items-start justify-between mb-1">
+                                <p className="text-xs font-semibold text-accent uppercase tracking-wider truncate pr-4">
+                                    {group.name}
+                                </p>
+                                <button
+                                    onClick={() => setOnboardingDismissed(true)}
+                                    className="p-1 rounded-lg text-secondary hover:text-primary transition-colors cursor-pointer shrink-0"
+                                >
+                                    <XIcon className="w-4 h-4" />
+                                </button>
+                            </div>
+                            <h2 className="text-xl font-black text-primary">Who's splitting with you?</h2>
+                        </div>
+
+                        {/* Friends list */}
+                        <div className="px-6 py-4 max-h-72 overflow-y-auto space-y-2">
+                            {friendsLoading ? (
+                                <div className="flex items-center justify-center py-8">
+                                    <Loader2 className="w-5 h-5 text-accent animate-spin" />
+                                </div>
+                            ) : onboardingFriends.length === 0 && !friendsLoading ? (
+                                <p className="text-sm text-secondary text-center py-6">
+                                    No friends yet — invite someone below.
+                                </p>
+                            ) : (
+                                onboardingFriends.map(f => {
+                                    const selected = selectedFriendIds.has(f.id);
+                                    return (
+                                        <button
+                                            key={f.id}
+                                            onClick={() => toggleFriend(f.id)}
+                                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-2xl border transition-all duration-150 cursor-pointer text-left ${
+                                                selected
+                                                    ? 'border-accent bg-accent/5'
+                                                    : 'border-border/60 bg-bg hover:border-border hover:bg-surface-light'
+                                            }`}
+                                        >
+                                            <Avatar name={f.name} color={f.avatar_color} size="md" />
+                                            <div className="flex-1 min-w-0">
+                                                <p className="text-sm font-semibold text-primary truncate">{f.name}</p>
+                                                <p className="text-xs text-secondary truncate">{f.email}</p>
+                                            </div>
+                                            {selected && <CheckCircle2 className="w-5 h-5 text-accent shrink-0" />}
+                                        </button>
+                                    );
+                                })
+                            )}
+
+                            {/* Invite someone new */}
+                            <button
+                                onClick={() => {
+                                    setOnboardingDismissed(true);
+                                    setShowInvite(true);
+                                }}
+                                className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl border border-dashed border-border/60 hover:border-accent/40 hover:bg-surface-light transition-all duration-150 cursor-pointer"
+                            >
+                                <div className="w-9 h-9 rounded-full border-2 border-dashed border-border/60 flex items-center justify-center shrink-0">
+                                    <Plus className="w-4 h-4 text-secondary" />
+                                </div>
+                                <span className="text-sm font-medium text-secondary">Invite someone new</span>
+                            </button>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="px-6 pb-6 pt-2">
+                            <button
+                                onClick={handleOnboardingAdd}
+                                disabled={selectedFriendIds.size === 0 || onboardingAdding}
+                                className="w-full h-12 rounded-2xl bg-gradient-to-r from-accent to-emerald-500 hover:from-accent hover:to-emerald-600 text-white font-bold text-sm transition-all shadow-lg shadow-accent/20 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 cursor-pointer"
+                            >
+                                {onboardingAdding ? (
+                                    <><Loader2 className="w-4 h-4 animate-spin" /> Adding...</>
+                                ) : (
+                                    <>Add to group{selectedFriendIds.size > 0 ? ` (${selectedFriendIds.size})` : ''}</>
+                                )}
+                            </button>
+                        </div>
+                    </div>
+                </div>
             )}
         </div>
     );
