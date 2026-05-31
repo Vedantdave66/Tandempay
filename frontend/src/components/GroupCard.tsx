@@ -22,22 +22,21 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
     const isSettled = !isOwe && !isOwed;
 
     return (
-        // aspect-[5/8] = width:height 5:8 → height is 1.6× width (portrait)
         <div
             onClick={() => navigate(`/groups/${group.id}`)}
-            className="relative overflow-hidden bg-surface-light rounded-2xl cursor-pointer select-none flex flex-col aspect-[5/8]"
+            className="relative overflow-hidden bg-surface-light rounded-2xl cursor-pointer select-none flex flex-col"
         >
             {/* Radial green glow — same intensity in light + dark */}
             <div
                 className="absolute inset-x-0 top-0 h-56 pointer-events-none"
                 style={{
                     background:
-                        'radial-gradient(ellipse 90% 60% at 50% 0%, rgba(34,197,94,0.30) 0%, transparent 70%)',
+                        'radial-gradient(ellipse at top, #22c55e30 0%, transparent 60%)',
                 }}
             />
 
             {/* ── Characters row — evenly spread across full card width ── */}
-            <div className="relative z-10 flex justify-evenly items-end pt-8 px-4">
+            <div className="relative z-10 flex justify-evenly items-end pt-5 px-4">
                 {balanceLoaded ? (
                     visibleMembers.map((m) => {
                         const firstName = m.name.split(' ')[0];
@@ -66,29 +65,26 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
             </div>
 
             {/* ── Group name pill ─────────────────────────────────────── */}
-            <div className="relative z-10 flex justify-center mt-4 px-4">
-                <div className="bg-black rounded-full px-6 py-3 max-w-full">
+            <div className="relative z-10 flex justify-center mt-3 px-4">
+                <div className="w-fit bg-black rounded-full px-6 py-2.5 max-w-full">
                     <h3 className="text-2xl font-bold text-white truncate">{group.name}</h3>
                 </div>
             </div>
 
             {/* +N others pill */}
             {extraCount > 0 && (
-                <div className="relative z-10 flex justify-center mt-2">
+                <div className="relative z-10 flex justify-center mt-1.5">
                     <div className="bg-surface border border-border/40 rounded-full px-3 py-1">
                         <span className="text-xs text-secondary font-medium">+{extraCount} others</span>
                     </div>
                 </div>
             )}
 
-            {/* Flex spacer — pushes stats to the lower third of the portrait card */}
-            <div className="flex-1" />
-
             {/* ── Stats — centered ────────────────────────────────────── */}
-            <div className="relative z-10 px-5 pb-6 flex flex-col items-center gap-3">
+            <div className="relative z-10 px-5 pt-3 pb-5 flex flex-col items-center gap-2">
 
                 {/* Total expenses */}
-                <div className="flex flex-col items-center gap-1.5">
+                <div className="flex flex-col items-center gap-1">
                     <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">
                         Total Expenses
                     </span>
@@ -101,7 +97,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
 
                 {/* Balance row */}
                 {balanceLoaded && (
-                    <div className="flex flex-col items-center gap-1.5">
+                    <div className="flex flex-col items-center gap-1">
                         <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">
                             {isOwed ? "You're Owed" : isOwe ? 'You Owe' : 'Status'}
                         </span>
