@@ -366,10 +366,10 @@ export default function GroupPage() {
     // ── Tabbed layout ──────────────────────────────────────────────────────────
     return (
         <>
-            <div className="min-h-screen bg-bg">
+            <div className="max-w-5xl mx-auto">
 
                 {/* HEADER */}
-                <div className="bg-surface border-b border-border px-4 pt-4 pb-0">
+                <div className="bg-surface border border-border/60 rounded-2xl px-6 pt-5 pb-0 mb-4">
                     <div className="flex items-start justify-between mb-3">
                         <div className="flex items-center gap-2 min-w-0">
                             <button onClick={() => navigate('/dashboard')} className="shrink-0 p-1 rounded-lg text-secondary hover:text-primary transition-colors cursor-pointer">
@@ -455,7 +455,7 @@ export default function GroupPage() {
                 </div>
 
                 {/* TAB CONTENT */}
-                <div className="p-4">
+                <div className="py-4">
 
                     {/* EXPENSES */}
                     {activeTab === 'expenses' && (
