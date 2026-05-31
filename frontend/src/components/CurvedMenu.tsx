@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
     LayoutDashboard, LogOut, Wallet, Users, Activity, Pencil,
-    Loader2, CheckCircle2, RefreshCw, Download, Tag, Lock, Crown, Palette, Menu,
+    Loader2, CheckCircle2, RefreshCw, Download, Tag, Lock, Crown, Palette,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import Avatar from './Avatar';
@@ -67,7 +67,7 @@ function Curve() {
     return (
         <svg
             className="absolute top-0 -right-[99px] w-[100px] h-full stroke-none pointer-events-none"
-            style={{ fill: 'var(--bg-secondary)' }}
+            style={{ fill: '#111318' }}
         >
             <motion.path variants={variants} initial="initial" animate="enter" exit="exit" />
         </svg>
@@ -199,18 +199,19 @@ export default function CurvedMenu() {
 
     return (
         <>
-            {/* Hamburger — fixed top-left, always on top */}
-            <button
+            {/* Logo trigger — fixed top-left, always on top */}
+            <motion.button
                 onClick={() => setIsOpen(v => !v)}
                 aria-label={isOpen ? 'Close menu' : 'Open menu'}
-                className="fixed left-0 top-0 m-4 z-[60] w-11 h-11 flex items-center justify-center rounded-xl bg-surface border border-border cursor-pointer hover:bg-surface-hover transition-colors shadow-sm"
+                animate={{ scale: isOpen ? 0.88 : 1 }}
+                whileTap={{ scale: 0.82 }}
+                transition={{ duration: 0.2, ease: 'easeOut' }}
+                className="fixed left-0 top-0 m-4 z-[60] cursor-pointer"
             >
-                <div className="w-5 h-4 flex flex-col justify-between">
-                    <span className={`block h-0.5 rounded-full bg-primary transition-all duration-300 origin-left ${isOpen ? 'rotate-[38deg] translate-y-px' : ''}`} />
-                    <span className={`block h-0.5 rounded-full bg-primary transition-all duration-300 ${isOpen ? 'opacity-0 scale-x-50' : ''}`} />
-                    <span className={`block h-0.5 rounded-full bg-primary transition-all duration-300 origin-left ${isOpen ? '-rotate-[38deg] -translate-y-px' : ''}`} />
+                <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
+                    <Wallet className="w-5 h-5 text-white" />
                 </div>
-            </button>
+            </motion.button>
 
             <AnimatePresence mode="wait">
                 {isOpen && (
@@ -233,22 +234,21 @@ export default function CurvedMenu() {
                             initial="initial"
                             animate="enter"
                             exit="exit"
-                            className="fixed left-0 top-0 z-50 h-[100dvh] w-80 flex flex-col bg-surface"
+                            className="fixed left-0 top-0 z-50 h-[100dvh] w-80 flex flex-col bg-[#111318]"
                         >
                             {/* Brand header */}
                             <div className="flex items-center gap-3 px-6 pt-6 pb-5 border-b border-white/10 shrink-0">
                                 <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                                     <Wallet className="w-4 h-4 text-white" />
                                 </div>
-                                <span className="text-base font-bold" style={{ color: 'var(--text-primary)' }}>
+                                <span className="text-base font-bold text-white">
                                     TandemPay
                                 </span>
                             </div>
 
                             {/* Nav items */}
                             <nav className="flex-1 overflow-y-auto px-6 pt-5 pb-2">
-                                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] mb-4"
-                                    style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>
+                                <p className="text-[10px] font-semibold uppercase tracking-[0.15em] mb-4 text-white/40">
                                     Navigation
                                 </p>
                                 {NAV_ITEMS.map((item, i) => (
@@ -270,7 +270,7 @@ export default function CurvedMenu() {
                             >
                                 {/* Theme + notifications row */}
                                 <div className="flex items-center justify-between px-1 pb-2">
-                                    <span className="text-xs" style={{ color: 'var(--text-secondary)', opacity: 0.5 }}>
+                                    <span className="text-xs text-white/40">
                                         Appearance
                                     </span>
                                     <div className="flex items-center gap-3">
@@ -287,46 +287,41 @@ export default function CurvedMenu() {
                                     {user && <Avatar name={user.name} color={user.avatar_color} size="sm" />}
                                     <div className="flex-1 min-w-0 text-left">
                                         <div className="flex items-center gap-1.5">
-                                            <span className="text-sm font-medium truncate" style={{ color: 'var(--text-primary)' }}>
+                                            <span className="text-sm font-medium truncate text-white">
                                                 {user?.name}
                                             </span>
                                             {isPro && <Crown className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
                                         </div>
-                                        <p className="text-xs truncate" style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
+                                        <p className="text-xs truncate text-white/50">
                                             {user?.email}
                                         </p>
                                     </div>
-                                    <Pencil className="w-3.5 h-3.5 opacity-0 group-hover:opacity-40 transition-opacity shrink-0"
-                                        style={{ color: 'var(--text-secondary)' }} />
+                                    <Pencil className="w-3.5 h-3.5 text-white/30 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
                                 </button>
 
                                 {/* Inline profile edit */}
                                 {showProfile && (
                                     <div className="rounded-2xl border border-white/10 bg-white/5 p-4 space-y-3">
                                         <div>
-                                            <label className="block text-xs font-semibold mb-1"
-                                                style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
+                                            <label className="block text-xs font-semibold mb-1 text-white/50">
                                                 Display name
                                             </label>
                                             <input
                                                 value={profileName}
                                                 onChange={e => setProfileName(e.target.value)}
-                                                className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-xl placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
-                                                style={{ color: 'var(--text-primary)' }}
+                                                className="w-full px-3 py-2 text-sm text-white bg-white/5 border border-white/10 rounded-xl placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
                                                 placeholder="Your name"
                                             />
                                         </div>
                                         <div>
-                                            <label className="block text-xs font-semibold mb-1"
-                                                style={{ color: 'var(--text-secondary)', opacity: 0.6 }}>
+                                            <label className="block text-xs font-semibold mb-1 text-white/50">
                                                 Interac e-Transfer email
                                             </label>
                                             <input
                                                 value={profileInterac}
                                                 onChange={e => setProfileInterac(e.target.value)}
                                                 type="email"
-                                                className="w-full px-3 py-2 text-sm bg-white/5 border border-white/10 rounded-xl placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
-                                                style={{ color: 'var(--text-primary)' }}
+                                                className="w-full px-3 py-2 text-sm text-white bg-white/5 border border-white/10 rounded-xl placeholder-white/20 focus:outline-none focus:border-accent transition-colors"
                                                 placeholder="Optional"
                                             />
                                         </div>
@@ -336,8 +331,7 @@ export default function CurvedMenu() {
                                         <div className="flex gap-2">
                                             <button
                                                 onClick={() => setShowProfile(false)}
-                                                className="flex-1 py-2 text-xs rounded-xl transition-colors cursor-pointer hover:bg-white/10 bg-white/5"
-                                                style={{ color: 'var(--text-secondary)' }}
+                                                className="flex-1 py-2 text-xs text-white/60 rounded-xl transition-colors cursor-pointer hover:bg-white/10 bg-white/5"
                                             >
                                                 Cancel
                                             </button>
@@ -359,8 +353,7 @@ export default function CurvedMenu() {
                                 {/* Sign out */}
                                 <button
                                     onClick={handleLogout}
-                                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm transition-colors cursor-pointer hover:bg-danger/10 hover:text-danger"
-                                    style={{ color: 'var(--text-secondary)', opacity: 0.7 }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm text-white/50 transition-colors cursor-pointer hover:bg-danger/10 hover:text-danger"
                                 >
                                     <LogOut className="w-4 h-4" />
                                     Sign out
