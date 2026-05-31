@@ -42,6 +42,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [inviteEmail, setInviteEmail] = useState('');
     const [inviteLoading, setInviteLoading] = useState(false);
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
+    const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
     const loadData = useCallback(async () => {
         try {
@@ -100,6 +101,39 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         } finally {
             setAddingFriendId(null);
         }
+    };
+
+    const handleRemoveMember = (memberId: string, memberName: string) => {
+        if (!group) return;
+        const isSelf = memberId === user?.id;
+        const isCreatorLeaving = isSelf && user?.id === group.created_by;
+        const otherMembers = group.members.filter(m => m.user_id !== memberId);
+        const title = isCreatorLeaving ? 'Leave group?' : `Remove ${memberName}?`;
+        const message = isCreatorLeaving
+            ? `You're the creator. Removing yourself will ${otherMembers.length > 0 ? 'transfer ownership to another member' : 'delete the group as you\'re the last member'}. Are you sure?`
+            : `Remove ${memberName} from this group?`;
+        Alert.alert(title, message, [
+            { text: 'Cancel', style: 'cancel' },
+            {
+                text: isCreatorLeaving ? 'Leave' : 'Remove',
+                style: 'destructive',
+                onPress: async () => {
+                    setRemovingMemberId(memberId);
+                    try {
+                        await groupsApi.removeMember(groupId, memberId);
+                        if (isCreatorLeaving) {
+                            navigation.replace('Groups');
+                        } else {
+                            loadData();
+                        }
+                    } catch (err: any) {
+                        Alert.alert('Error', err.message || 'Failed to remove member.');
+                    } finally {
+                        setRemovingMemberId(null);
+                    }
+                },
+            },
+        ]);
     };
 
     const handleInviteByEmail = async () => {
@@ -334,6 +368,42 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             <TouchableOpacity onPress={() => setMembersModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
                                 <X size={20} color={colors.text} />
                             </TouchableOpacity>
+                        </View>
+
+                        {/* Current members with remove buttons */}
+                        <View style={{ marginBottom: 16 }}>
+                            <Text style={{ color: colors.secondaryText, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+                                Current Members
+                            </Text>
+                            {(group?.members || []).map(m => {
+                                const isCreator = m.user_id === group?.created_by;
+                                const canRemove = user?.id === group?.created_by || m.user_id === user?.id;
+                                return (
+                                    <View key={m.user_id} style={[styles.friendRow, { borderColor: colors.border }]}>
+                                        <View style={[styles.friendAvatar, { backgroundColor: m.avatar_color || colors.accent }]}>
+                                            <Text style={styles.friendAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
+                                        </View>
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>
+                                                {m.name}{isCreator ? ' 👑' : ''}
+                                            </Text>
+                                            <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{m.email}</Text>
+                                        </View>
+                                        {canRemove && (
+                                            <TouchableOpacity
+                                                style={[styles.addBtn, { backgroundColor: 'rgba(239,68,68,0.12)' }]}
+                                                onPress={() => handleRemoveMember(m.user_id, m.name)}
+                                                disabled={removingMemberId === m.user_id}
+                                            >
+                                                {removingMemberId === m.user_id
+                                                    ? <ActivityIndicator size="small" color="#EF4444" />
+                                                    : <X size={16} color="#EF4444" />
+                                                }
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+                                );
+                            })}
                         </View>
 
                         {/* Tab switcher */}

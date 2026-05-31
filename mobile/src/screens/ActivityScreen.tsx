@@ -64,7 +64,7 @@ function groupNotifications(list: NotificationOut[]): Array<{ type: 'header'; la
 // ─── Screen ───────────────────────────────────────────────────────────────────
 export default function ActivityScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
-    const { refreshNotifications } = useNotifications();
+    const { refreshNotifications, clearUnread } = useNotifications();
 
     const [notifications, setNotifications] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
@@ -96,7 +96,7 @@ export default function ActivityScreen({ navigation }: any) {
     const handleMarkAllRead = async () => {
         await notificationsApi.markAllRead();
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
-        refreshNotifications();
+        clearUnread();
     };
 
     const handleTap = async (n: NotificationOut) => {

@@ -4,10 +4,12 @@ import { Users, Search, UserPlus, Bell, Clock, Send, Check, X, ShieldAlert, Chec
 import { meApi, Friend, notificationsApi, AppNotification, friendRequestsApi, FriendRequest, usersApi } from '../services/api';
 import Avatar from '../components/Avatar';
 import { useAuth } from '../context/AuthContext';
+import { useNotifications } from '../context/NotificationContext';
 import { useAutoRefresh } from '../hooks/useAutoRefresh';
 
 export default function FriendsPage() {
     const { user } = useAuth();
+    const { clearUnread } = useNotifications();
     const [searchParams, setSearchParams] = useSearchParams();
     const activeTab = searchParams.get('tab') || 'my-friends';
     const navigate = useNavigate();
@@ -61,6 +63,7 @@ export default function FriendsPage() {
     const handleMarkAllRead = async () => {
         await notificationsApi.markAllRead();
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        clearUnread();
     };
 
     const handleNotificationClick = async (notif: AppNotification) => {

@@ -25,12 +25,14 @@ interface NotificationContextType {
     unreadCount: number;
     notifications: NotificationOut[];
     refreshNotifications: () => Promise<void>;
+    clearUnread: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType>({
     unreadCount: 0,
     notifications: [],
     refreshNotifications: async () => {},
+    clearUnread: () => {},
 });
 
 export function useNotifications() {
@@ -120,6 +122,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
         }
     }, [user]);
 
+    const clearUnread = useCallback(() => {
+        setUnreadCount(0);
+        setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+    }, []);
+
     // Initial load + 30-second polling
     useEffect(() => {
         if (!user) return;
@@ -129,7 +136,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }, [user, refreshNotifications]);
 
     return (
-        <NotificationContext.Provider value={{ unreadCount, notifications, refreshNotifications }}>
+        <NotificationContext.Provider value={{ unreadCount, notifications, refreshNotifications, clearUnread }}>
             {children}
             <ToastBanner message={toastMessage} visible={toastVisible} colors={colors} />
         </NotificationContext.Provider>
