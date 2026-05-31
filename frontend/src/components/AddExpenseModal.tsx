@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { X, ArrowRight } from 'lucide-react';
 import { GroupMember, expensesApi, Expense } from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
 interface AddExpenseModalProps {
     groupId: string;
@@ -22,6 +23,7 @@ export default function AddExpenseModal({
 }: AddExpenseModalProps) {
     const isEditMode = !!expense;
     const navigate = useNavigate();
+    const { user } = useAuth();
 
     const [title, setTitle] = useState(expense?.title || '');
     const [amount, setAmount] = useState(expense ? expense.amount.toString() : '');
@@ -50,6 +52,10 @@ export default function AddExpenseModal({
 
         // Edit mode — submit directly with participant selection
         if (isEditMode && expense && onUpdated) {
+            if (expense.paid_by !== user?.id) {
+                setError('You can only edit expenses you created');
+                return;
+            }
             if (selectedParticipants.length === 0) {
                 setError('Select at least one participant');
                 return;

@@ -155,6 +155,27 @@ export default function GroupPage() {
         loadAll();
     };
 
+    const handleRemoveMember = async (memberId: string, memberName: string) => {
+        if (!groupId || !group) return;
+        const isSelf = memberId === user?.id;
+        const isCreatorLeaving = isSelf && user?.id === group.created_by;
+        const otherMembers = (group.members || []).filter(m => m.user_id !== memberId);
+        const message = isCreatorLeaving
+            ? `You're the creator. Removing yourself will ${otherMembers.length > 0 ? 'transfer ownership to another member' : 'delete the group as you\'re the last member'}. Are you sure?`
+            : `Remove ${memberName} from this group?`;
+        if (!window.confirm(message)) return;
+        setActionLoadingId(memberId);
+        try {
+            await groupsApi.removeMember(groupId, memberId);
+            if (isCreatorLeaving) navigate('/dashboard');
+            else await loadAll();
+        } catch (err: any) {
+            alert(err.message || 'Failed to remove member.');
+        } finally {
+            setActionLoadingId(null);
+        }
+    };
+
     const handleDeleteGroup = async () => {
         if (!groupId || !group) return;
         if (!window.confirm(`Delete "${group.name}"? This cannot be undone.`)) return;
@@ -452,20 +473,32 @@ export default function GroupPage() {
                 >
                     {(group.members || []).map(m => {
                         const cd = characterLookup.get(m.user_id) ?? { shape: 'rect', color: '#6B7280' };
+                        const canRemove = user?.id === group.created_by || m.user_id === user?.id;
                         return (
-                            <div
-                                key={m.user_id}
-                                className="flex flex-col items-center gap-1 shrink-0 select-none cursor-grab active:cursor-grabbing"
-                                style={{ touchAction: 'none' }}
-                                onPointerDown={e => handleMemberPointerDown(e, m.user_id, cd.shape, cd.color)}
-                            >
-                                <CharacterShape shape={cd.shape} color={cd.color} variant="mini" />
+                            <div key={m.user_id} className="flex flex-col items-center gap-1 shrink-0 select-none">
+                                <div
+                                    className="cursor-grab active:cursor-grabbing"
+                                    style={{ touchAction: 'none' }}
+                                    onPointerDown={e => handleMemberPointerDown(e, m.user_id, cd.shape, cd.color)}
+                                >
+                                    <CharacterShape shape={cd.shape} color={cd.color} variant="mini" />
+                                </div>
                                 <span
                                     className="text-[9px] font-semibold"
                                     style={{ color: 'rgba(255,255,255,0.35)' }}
                                 >
                                     {m.name.split(' ')[0]}
                                 </span>
+                                {canRemove && (
+                                    <button
+                                        onClick={() => handleRemoveMember(m.user_id, m.name)}
+                                        disabled={actionLoadingId === m.user_id}
+                                        className="text-[8px] font-bold cursor-pointer leading-none disabled:opacity-30 transition-opacity hover:opacity-100"
+                                        style={{ color: 'rgba(239,68,68,0.5)' }}
+                                    >
+                                        {actionLoadingId === m.user_id ? '…' : '×'}
+                                    </button>
+                                )}
                             </div>
                         );
                     })}
@@ -634,21 +667,23 @@ export default function GroupPage() {
 
                         {/* Edit / delete actions */}
                         <div className="flex gap-3 pt-1">
-                            <button
-                                onClick={() => {
-                                    setExpenseToEdit(selectedExpense);
-                                    setSelectedExpense(null);
-                                    setShowAddExpense(true);
-                                }}
-                                className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer transition-colors"
-                                style={{
-                                    background: 'rgba(255,255,255,0.06)',
-                                    color: 'rgba(255,255,255,0.65)',
-                                    border: '1px solid rgba(255,255,255,0.08)',
-                                }}
-                            >
-                                Edit
-                            </button>
+                            {selectedExpense.paid_by === user?.id && (
+                                <button
+                                    onClick={() => {
+                                        setExpenseToEdit(selectedExpense);
+                                        setSelectedExpense(null);
+                                        setShowAddExpense(true);
+                                    }}
+                                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer transition-colors"
+                                    style={{
+                                        background: 'rgba(255,255,255,0.06)',
+                                        color: 'rgba(255,255,255,0.65)',
+                                        border: '1px solid rgba(255,255,255,0.08)',
+                                    }}
+                                >
+                                    Edit
+                                </button>
+                            )}
                             <button
                                 onClick={() => handleDeleteExpense(selectedExpense)}
                                 disabled={actionLoadingId === selectedExpense.id}

@@ -10,11 +10,13 @@ import {
     RefreshControl
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
+import { useNotifications } from '../context/NotificationContext';
 import { Bell, Receipt, Send, CheckCircle2, XCircle, Clock, CheckCheck } from 'lucide-react-native';
 import { notificationsApi, NotificationOut } from '../services/api';
 
 export default function NotificationsScreen() {
     const { colors, isDark } = useTheme();
+    const { clearUnread } = useNotifications();
     
     const [notifications, setNotifications] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
@@ -52,8 +54,8 @@ export default function NotificationsScreen() {
     };
 
     const handleMarkAllRead = async () => {
-        // Optimistic update
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
+        clearUnread();
         try {
             await notificationsApi.markAllRead();
             loadData();

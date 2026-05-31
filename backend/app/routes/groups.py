@@ -257,10 +257,17 @@ async def remove_member(group_id: str, user_id: str, current_user: User = Depend
     
     if not member_record:
         raise HTTPException(status_code=404, detail="Member not found in this group")
-        
-    # Prevent removing the creator
+
+    # Creator self-removal: transfer ownership or delete the group if last member.
     if user_id == group.created_by:
-        raise HTTPException(status_code=400, detail="Cannot remove the group creator")
+        remaining = [m for m in group.members if m.user_id != user_id]
+        if not remaining:
+            # Creator is the last member — delete the whole group.
+            await db.delete(group)
+            await db.flush()
+            return None
+        # Transfer ownership to the next oldest member before proceeding.
+        group.created_by = remaining[0].user_id
 
     # PRIMARY GUARD: block removal if the member has any unsettled balance.
     # We pass the current active member set explicitly so _compute_balances
