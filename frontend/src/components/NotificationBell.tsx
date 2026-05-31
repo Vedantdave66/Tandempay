@@ -1,25 +1,10 @@
-import { useState, useEffect } from 'react';
 import { Bell } from 'lucide-react';
-import { notificationsApi } from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { useNotifications } from '../context/NotificationContext';
 
 export default function NotificationBell() {
-    const [unreadCount, setUnreadCount] = useState(0);
+    const { unreadCount } = useNotifications();
     const navigate = useNavigate();
-
-    // Fetch unread count on mount and every 30 seconds
-    useEffect(() => {
-        fetchUnreadCount();
-        const interval = setInterval(fetchUnreadCount, 30000);
-        return () => clearInterval(interval);
-    }, []);
-
-    const fetchUnreadCount = async () => {
-        try {
-            const data = await notificationsApi.unreadCount();
-            setUnreadCount(data.count);
-        } catch { /* silent */ }
-    };
 
     const handleClick = () => {
         navigate('/friends?tab=activity');

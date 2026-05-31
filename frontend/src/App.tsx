@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ForgotPasswordPage from './pages/ForgotPasswordPage';
@@ -60,6 +61,7 @@ export default function App() {
         <ErrorBoundary>
             <BrowserRouter>
                 <AuthProvider>
+                    <NotificationProvider>
                     <AuthListener>
                         <Routes>
                             <Route path="/" element={<PublicRoute><LandingPage /></PublicRoute>} />
@@ -82,6 +84,7 @@ export default function App() {
                             <Route path="*" element={<Navigate to="/dashboard" />} />
                         </Routes>
                     </AuthListener>
+                    </NotificationProvider>
                 </AuthProvider>
             </BrowserRouter>
         </ErrorBoundary>
