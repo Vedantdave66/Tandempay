@@ -23,63 +23,7 @@ import CharacterShape from '../components/CharacterShape';
 import Avatar from '../components/Avatar';
 import ExpenseCard from '../components/ExpenseCard';
 
-// ── Canvas helpers ─────────────────────────────────────────────────────────────
-
-function hashId(id: string): number {
-    let h = 0;
-    for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-    return Math.abs(h);
-}
-
-// Reuses blobDrift keyframe from index.css (translate only — no border-radius change)
-function driftStyle(id: string): React.CSSProperties {
-    const h = hashId(id);
-    const tx = ((h >> 4) % 21) - 10;
-    const ty = ((h >> 8) % 21) - 10;
-    const dur = 5 + ((h >> 12) % 5);
-    const delay = -(((h >> 16) % (dur * 10)) / 10);
-    return {
-        ['--blob-tx' as string]: `${tx}px`,
-        ['--blob-ty' as string]: `${ty}px`,
-        animationName: 'blobDrift',
-        animationDuration: `${dur}s`,
-        animationDelay: `${delay}s`,
-        animationDirection: 'alternate',
-        animationIterationCount: 'infinite',
-        animationTimingFunction: 'ease-in-out',
-    };
-}
-
-// Seeded scatter — 8–83% on each axis so blobs never hug the edge
-function expBlobPos(id: string): { left: string; top: string } {
-    const h = hashId(id);
-    return { left: `${8 + (h % 76)}%`, top: `${8 + ((h >> 8) % 76)}%` };
-}
-
-// Seeded diameter 108–131px
-function expBlobSize(id: string): number {
-    return 108 + (hashId(id) % 24);
-}
-
-// 5-colour palette — all classes listed verbatim so Tailwind includes them
-const BLOB_PALETTE = [
-    'bg-emerald-500/15 border-emerald-500/25',
-    'bg-amber-500/15 border-amber-500/25',
-    'bg-sky-500/15 border-sky-500/25',
-    'bg-violet-500/15 border-violet-500/25',
-    'bg-rose-500/15 border-rose-500/25',
-] as const;
-
-// ── Types ──────────────────────────────────────────────────────────────────────
-
-interface DragState {
-    memberId: string; shape: string; color: string;
-    startX: number; startY: number; x: number; y: number;
-}
-
 type ActiveTab = 'expenses' | 'balances' | 'settleup';
-
-// ── Component ──────────────────────────────────────────────────────────────────
 
 export default function GroupPage() {
     const { groupId } = useParams<{ groupId: string }>();
@@ -112,13 +56,7 @@ export default function GroupPage() {
     const [onboardingAdding, setOnboardingAdding] = useState(false);
     const [squadReadyDismissed, setSquadReadyDismissed] = useState(false);
 
-    // Canvas state
-    const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
-    const [drag, setDrag] = useState<DragState | null>(null);
-
-    // Tab / canvas view — default: expenses tab
     const [activeTab, setActiveTab] = useState<ActiveTab>('expenses');
-    const [showCanvas, setShowCanvas] = useState(false);
     const [reminderToast, setReminderToast] = useState(false);
 
     useEffect(() => { if (groupId) loadAll(); }, [groupId]);
@@ -191,7 +129,6 @@ export default function GroupPage() {
         setActionLoadingId(expense.id);
         try {
             await expensesApi.delete(groupId, expense.id);
-            setSelectedExpense(null);
             await loadAll();
         } catch (err: any) {
             alert(err.message || 'Failed to delete expense');
@@ -221,7 +158,6 @@ export default function GroupPage() {
     const totalSpent = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const computedBalances = computeUserBalances(expenses, paymentRecords, group?.members || []);
     const effectiveSettlements = deriveSuggestedSettlements(computedBalances);
-    const mySettlements = effectiveSettlements.filter(s => s.from_user_id === user?.id);
 
     const characterLookup = useMemo(() => new Map(
         apiBalances.map(b => [b.user_id, { shape: b.character_shape ?? 'rect', color: b.character_color ?? '#6B7280' }])
@@ -280,21 +216,6 @@ export default function GroupPage() {
     const handleRemind = () => {
         setReminderToast(true);
         setTimeout(() => setReminderToast(false), 3000);
-    };
-
-    // Unused drag handlers kept for state compatibility
-    const handleMemberPointerDown = (e: React.PointerEvent, memberId: string, shape: string, color: string) => {
-        e.currentTarget.setPointerCapture(e.pointerId);
-        setDrag({ memberId, shape, color, startX: e.clientX, startY: e.clientY, x: e.clientX, y: e.clientY });
-    };
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!drag) return;
-        setDrag(prev => prev ? { ...prev, x: e.clientX, y: e.clientY } : null);
-    };
-    const handlePointerUp = () => {
-        if (!drag) return;
-        if (drag.startY - drag.y > 40) { setExpenseToEdit(undefined); setShowAddExpense(true); }
-        setDrag(null);
     };
 
     if (loading) return <LoadingScreen />;
@@ -442,249 +363,6 @@ export default function GroupPage() {
         </>
     );
 
-    // ── Canvas full-screen takeover ────────────────────────────────────────────
-    if (showCanvas) {
-        const groupIsSettled = effectiveSettlements.length === 0 && expenses.length > 0;
-
-        return (
-            <>
-                <div className="fixed inset-0 z-[100] flex flex-col bg-bg">
-
-                    {/* Top bar */}
-                    <div className="shrink-0 flex items-center justify-between px-5 py-3 bg-surface/80 backdrop-blur-sm border-b border-border">
-                        <button
-                            onClick={() => { setShowCanvas(false); setActiveTab('expenses'); }}
-                            className="flex items-center gap-2 text-secondary hover:text-primary transition-colors cursor-pointer"
-                        >
-                            <ArrowLeft className="w-4 h-4" />
-                            <span className="text-sm font-semibold hidden sm:inline">{group.name}</span>
-                        </button>
-                        <span className="text-sm font-bold text-primary sm:hidden truncate mx-4 flex-1 text-center">{group.name}</span>
-                        <button
-                            onClick={() => { setExpenseToEdit(undefined); setShowAddExpense(true); }}
-                            className="flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-xl bg-accent text-white hover:bg-accent-hover transition-colors cursor-pointer shrink-0"
-                        >
-                            <Plus className="w-3.5 h-3.5" />
-                            <span className="hidden sm:inline">Expense</span>
-                            <span className="sm:hidden">+</span>
-                        </button>
-                    </div>
-
-                    {/* Scrollable canvas */}
-                    <div className="flex-1 overflow-auto">
-                        <div className="relative min-h-[700px] w-full">
-
-                            {/* Center group blob */}
-                            <div
-                                className="absolute z-20"
-                                style={{ left: '50%', top: '42%', width: 164, height: 164, marginLeft: -82, marginTop: -82 }}
-                            >
-                                <div className="w-full h-full rounded-full bg-surface border-2 border-border shadow-xl flex flex-col items-center justify-center text-center px-4 gap-0.5">
-                                    <p className="text-xs font-black text-primary leading-tight line-clamp-2 w-full">{group.name}</p>
-                                    <p className="text-[10px] text-secondary mt-0.5">{group.members.length} member{group.members.length !== 1 ? 's' : ''}</p>
-                                    <p className="text-sm font-black text-primary">${formatCurrency(totalSpent)}</p>
-                                    {Math.abs(myNet) > 0.01 && (
-                                        <span className={`text-[10px] font-bold mt-1 px-2 py-0.5 rounded-full ${myNet > 0 ? 'bg-emerald-500/15 text-emerald-600' : 'bg-amber-500/15 text-amber-700'}`}>
-                                            {myNet > 0 ? '↑' : '↓'} ${formatCurrency(Math.abs(myNet))}
-                                        </span>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* All-settled badge */}
-                            {groupIsSettled && (
-                                <div className="absolute z-30 flex justify-center" style={{ left: '50%', top: '20%', transform: 'translateX(-50%)' }}>
-                                    <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-accent/15 border border-accent/25">
-                                        <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
-                                        <span className="text-xs font-bold text-accent">All settled</span>
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Empty state */}
-                            {expenses.length === 0 && (
-                                <div className="absolute z-10" style={{ left: '50%', top: '70%', transform: 'translateX(-50%)' }}>
-                                    <button
-                                        onClick={() => { setExpenseToEdit(undefined); setShowAddExpense(true); }}
-                                        className="flex flex-col items-center gap-2 cursor-pointer group"
-                                    >
-                                        <div className="w-14 h-14 rounded-full border-2 border-dashed border-border group-hover:border-accent/60 flex items-center justify-center bg-surface/60 transition-colors">
-                                            <Plus className="w-5 h-5 text-secondary group-hover:text-accent transition-colors" />
-                                        </div>
-                                        <p className="text-xs text-secondary group-hover:text-primary transition-colors whitespace-nowrap">Add first expense</p>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Expense blobs */}
-                            {expenses.map(exp => {
-                                const pos = expBlobPos(exp.id);
-                                const size = expBlobSize(exp.id);
-                                const colorClass = groupIsSettled
-                                    ? 'bg-emerald-500/10 border-emerald-500/20'
-                                    : BLOB_PALETTE[hashId(exp.id) % BLOB_PALETTE.length];
-
-                                return (
-                                    <div
-                                        key={exp.id}
-                                        className="absolute z-10"
-                                        style={{
-                                            left: pos.left,
-                                            top: pos.top,
-                                            width: size,
-                                            height: size,
-                                            marginLeft: -size / 2,
-                                            marginTop: -size / 2,
-                                        }}
-                                    >
-                                        <button
-                                            onClick={() => setSelectedExpense(exp)}
-                                            className={`w-full h-full rounded-full border flex flex-col items-center justify-center gap-1 cursor-pointer hover:scale-105 active:scale-95 transition-transform shadow-lg ${colorClass}`}
-                                            style={driftStyle(exp.id)}
-                                        >
-                                            {groupIsSettled && (
-                                                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
-                                            )}
-                                            <p className="text-[11px] font-bold text-primary text-center leading-tight px-2 line-clamp-2">
-                                                {exp.title}
-                                            </p>
-                                            <p className="text-xs font-black text-primary">
-                                                ${formatCurrency(exp.amount)}
-                                            </p>
-                                            {exp.participants.length > 0 && (
-                                                <div className="flex items-center justify-center gap-0.5 mt-0.5">
-                                                    {exp.participants.slice(0, 3).map(p => {
-                                                        const cd = characterLookup.get(p.user_id);
-                                                        const color = cd?.color ?? '#6B7280';
-                                                        return (
-                                                            <div
-                                                                key={p.user_id}
-                                                                className="w-5 h-5 rounded-full flex items-center justify-center shrink-0"
-                                                                style={{ backgroundColor: `${color}33`, border: `1.5px solid ${color}66` }}
-                                                            >
-                                                                <span className="text-[8px] font-bold leading-none" style={{ color }}>
-                                                                    {p.name.charAt(0)}
-                                                                </span>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </div>
-                                            )}
-                                        </button>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                </div>
-
-                {/* Expense detail bottom sheet — theme-aware */}
-                {selectedExpense && (
-                    <div
-                        className="fixed inset-0 z-[110] flex flex-col justify-end bg-black/60"
-                        onClick={() => setSelectedExpense(null)}
-                    >
-                        <div
-                            className="bg-surface border-t border-border rounded-t-3xl p-5 overflow-y-auto shadow-2xl"
-                            style={{ maxHeight: '80dvh' }}
-                            onClick={e => e.stopPropagation()}
-                        >
-                            <div className="w-10 h-1 rounded-full bg-border mx-auto mb-5" />
-
-                            <div className="flex items-start justify-between mb-5">
-                                <div>
-                                    <h2 className="text-lg font-bold text-primary">{selectedExpense.title}</h2>
-                                    <p className="text-sm mt-0.5 text-secondary">Paid by {selectedExpense.payer_name}</p>
-                                </div>
-                                <div className="flex items-center gap-3">
-                                    <span className="text-xl font-black text-primary">${formatCurrency(selectedExpense.amount)}</span>
-                                    <button onClick={() => setSelectedExpense(null)} className="text-secondary hover:text-primary cursor-pointer transition-colors">
-                                        <XIcon className="w-5 h-5" />
-                                    </button>
-                                </div>
-                            </div>
-
-                            <p className="text-xs font-semibold uppercase tracking-wider text-secondary/60 mb-3">Split</p>
-                            <div className="space-y-3 mb-5">
-                                {selectedExpense.participants.map(p => {
-                                    const cd = characterLookup.get(p.user_id);
-                                    return (
-                                        <div key={p.user_id} className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <CharacterShape shape={cd?.shape ?? 'rect'} color={cd?.color ?? '#6B7280'} variant="cluster" />
-                                                <span className="text-sm font-medium text-primary/80">{p.name}</span>
-                                            </div>
-                                            <span className="text-sm font-semibold text-secondary">${formatCurrency(p.share_amount)}</span>
-                                        </div>
-                                    );
-                                })}
-                            </div>
-
-                            {mySettlements.length > 0 && (
-                                <>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-secondary/60 mb-3">You Owe</p>
-                                    <div className="space-y-2 mb-5">
-                                        {mySettlements.map((s, i) => (
-                                            <button
-                                                key={i}
-                                                onClick={() => { setSettleUpTarget(s); setSelectedExpense(null); }}
-                                                className="w-full flex items-center justify-between rounded-2xl px-4 py-3 cursor-pointer bg-accent/10 border border-accent/20 hover:bg-accent/15 transition-colors"
-                                            >
-                                                <span className="text-sm font-medium text-primary/80">{s.to_user_name}</span>
-                                                <div className="flex items-center gap-3">
-                                                    <span className="font-bold text-primary">${formatCurrency(s.amount)}</span>
-                                                    <span className="text-xs font-bold bg-accent text-white px-3 py-1.5 rounded-xl">Pay Balance</span>
-                                                </div>
-                                            </button>
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-
-                            {uniquePaymentRecords.length > 0 && (
-                                <>
-                                    <p className="text-xs font-semibold uppercase tracking-wider text-secondary/60 mb-3">Payments</p>
-                                    <div className="space-y-2 mb-5">
-                                        {uniquePaymentRecords.map(record => (
-                                            <PaymentRecordCard
-                                                key={record.id}
-                                                record={record}
-                                                currentUserId={user?.id || ''}
-                                                groupId={groupId || ''}
-                                                onUpdated={loadAll}
-                                                isProcessing={actionLoadingId === record.id}
-                                            />
-                                        ))}
-                                    </div>
-                                </>
-                            )}
-
-                            <div className="flex gap-3 pt-1">
-                                {selectedExpense.paid_by === user?.id && (
-                                    <button
-                                        onClick={() => { setExpenseToEdit(selectedExpense); setSelectedExpense(null); setShowAddExpense(true); }}
-                                        className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer bg-surface-light border border-border text-secondary hover:text-primary transition-colors"
-                                    >
-                                        Edit
-                                    </button>
-                                )}
-                                <button
-                                    onClick={() => handleDeleteExpense(selectedExpense)}
-                                    disabled={actionLoadingId === selectedExpense.id}
-                                    className="flex-1 py-2.5 text-sm font-semibold rounded-xl cursor-pointer bg-danger/10 text-danger border border-danger/20 transition-colors disabled:opacity-50"
-                                >
-                                    {actionLoadingId === selectedExpense.id ? 'Deleting…' : 'Delete'}
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                )}
-
-                {sharedModals}
-            </>
-        );
-    }
-
     // ── Tabbed layout ──────────────────────────────────────────────────────────
     return (
         <>
@@ -764,11 +442,10 @@ export default function GroupPage() {
                             { id: 'expenses', label: `Expenses (${expenses.length})` },
                             { id: 'balances', label: 'Balances' },
                             { id: 'settleup', label: `Settle up (${effectiveSettlements.length})` },
-                            { id: 'canvas', label: 'Canvas' },
                         ] as const).map(tab => (
                             <button
                                 key={tab.id}
-                                onClick={() => tab.id === 'canvas' ? setShowCanvas(true) : setActiveTab(tab.id)}
+                                onClick={() => setActiveTab(tab.id)}
                                 className={`px-4 py-2.5 text-sm font-semibold border-b-2 whitespace-nowrap transition-colors cursor-pointer ${activeTab === tab.id ? 'border-accent text-accent' : 'border-transparent text-secondary hover:text-primary'}`}
                             >
                                 {tab.label}

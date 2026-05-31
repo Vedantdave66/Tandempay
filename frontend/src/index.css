@@ -104,15 +104,6 @@ body {
 }
 
 /* ═══════════════════════════════════════════ */
-/* Blob Canvas Animation                       */
-/* ═══════════════════════════════════════════ */
-
-@keyframes blobDrift {
-  from { transform: translate(0, 0); }
-  to   { transform: translate(var(--blob-tx, 10px), var(--blob-ty, 10px)); }
-}
-
-/* ═══════════════════════════════════════════ */
 /* Scroll-Snap Tutorial Carousel               */
 /* ═══════════════════════════════════════════ */
 
