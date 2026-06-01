@@ -1,6 +1,6 @@
 # TandemPay — Session Handoff for Claude
 
-**Last updated:** 2026-06-01
+**Last updated:** 2026-06-01 (evening)
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -27,6 +27,30 @@ TandemPay = "Splitwise for Canadian roommates, free settlement on Interac." Wedg
 ---
 
 ## What was completed this session (2026-06-01)
+
+### Mobile character identity system — PRs #90–94 (branch `feat/mobile-group-card`)
+
+Full mobile redesign session. Everything below is merged to main (PR #94 pending CI — one commit, no backend changes, will merge automatically when green).
+
+#### Character fields wired end-to-end
+- `PATCH /api/auth/me` now accepts `character_shape`, `character_color`, `character_nickname` — added to `UserUpdate` schema with a `field_validator` rejecting invalid shapes. Handler in `auth.py` writes all three.
+- `GET /groups/{id}/balances` now returns `character_shape`, `character_color`, `character_nickname` on every `UserBalance` entry — added to the schema and the `balance_service.py` constructor call.
+- Mobile `User` interface and `UserBalance` interface both updated with optional `character_shape/color/nickname` fields. `authApi.updateProfile()` added for `PATCH /auth/me`.
+
+#### New mobile components
+- **`mobile/src/components/CharacterShape.tsx`** — ported from web. Now has four variants: `cluster`, `mini`, `hero`, `card`. New `eyeStyle` prop (`'dot'` default | `'ball'`): ball renders white outer circle + dark inner pupil. Mouth renders on `round` shape when config has `mouthLeft/mouthTop`. Existing variants untouched.
+- **`mobile/src/components/GroupCard.tsx`** — ported from web PRs #84–88. Dark surface card, `expo-linear-gradient` green glow (dims to 50% in light mode), characters at `zIndex:2` standing on the black name pill (`marginTop: -20`, `zIndex:1`). Nicknames above characters. `card` variant + `eyeStyle="ball"`. Balance pills, arrow button, `+N others` pill all present.
+- **`mobile/src/components/CharacterSetupModal.tsx`** — full-screen onboarding modal shown after registration when `character_nickname === null`. Animated hero character preview: `PanResponder` eye tracking, random blink loop, body `skewX` derived from touch offset. Shape picker (4 shapes), 8-color swatch palette, nickname input, "Let's go" CTA. Optional `onClose` prop makes it dismissible (used by dashboard character picker).
+
+#### Modified mobile screens
+- **`GroupsScreen`** — replaced inline row cards with `GroupCard`. Fetches per-group balances in parallel after `setGroups()` fires (balance failures silent).
+- **`DashboardScreen`** — full redesign matching web `DashboardPage`: hero `CharacterShape` in header, two balance stat cards (green owed / amber owing), `GroupCard` list, character customise row (opens `CharacterSetupModal`), Recent Activity footer (last 3 notifications). Dynamic `paddingBottom` from `useSafeAreaInsets`.
+- **`CustomTabBar`** — replaced hardcoded bottom offset with `useSafeAreaInsets()` so the floating bar clears the home indicator on all iPhones including Dynamic Island.
+
+#### RootNavigator
+- Wraps return in `Fragment`, renders `<CharacterSetupModal visible={!!user && user.character_nickname === null} />` as a sibling — appears automatically for new users, dismissed by `refreshUser()` after save.
+
+---
 
 ### PR #88 — Dashboard font-weight fix (commit `88f6535`, branch `fix/dashboard-font-weight`)
 
