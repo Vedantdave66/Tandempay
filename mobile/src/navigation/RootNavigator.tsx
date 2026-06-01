@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { Fragment } from 'react';
+import CharacterSetupModal from '../components/CharacterSetupModal';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
@@ -42,6 +43,7 @@ export default function RootNavigator() {
     };
 
     return (
+        <Fragment>
         <NavigationContainer theme={navigationTheme}>
             <Stack.Navigator
                 screenOptions={{
@@ -115,5 +117,7 @@ export default function RootNavigator() {
                 )}
             </Stack.Navigator>
         </NavigationContainer>
+        <CharacterSetupModal visible={!!user && user.character_nickname === null} />
+        </Fragment>
     );
 }
