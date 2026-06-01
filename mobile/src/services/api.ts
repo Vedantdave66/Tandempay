@@ -182,6 +182,7 @@ export interface UserBalance {
     net_balance: number;
     character_shape?: string;
     character_color?: string;
+    character_nickname?: string | null;
 }
 
 export interface Settlement {

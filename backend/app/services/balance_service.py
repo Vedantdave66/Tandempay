@@ -145,6 +145,7 @@ async def get_balances(
             avatar_color=user.avatar_color,
             character_shape=user.character_shape,
             character_color=user.character_color,
+            character_nickname=user.character_nickname,
             total_paid=paid,
             total_owed=owed,
             net_balance=net,

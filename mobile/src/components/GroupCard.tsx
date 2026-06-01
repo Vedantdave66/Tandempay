@@ -17,7 +17,7 @@ interface GroupCardProps {
 const SETTLED_THRESHOLD = 0.01;
 
 export default function GroupCard({ group, members = [], myNetBalance = 0, onPress }: GroupCardProps) {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const safeMembers = members ?? [];
     const visibleMembers = safeMembers.slice(0, 4);
     const extraCount = safeMembers.length > 4 ? safeMembers.length - 4 : 0;
@@ -30,32 +30,34 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
     return (
         <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[styles.card, { backgroundColor: colors.surface }]}>
 
-            {/* Green glow */}
+            {/* Green glow — full opacity dark, half in light */}
             <LinearGradient
                 colors={['rgba(34,197,94,0.18)', 'transparent']}
-                style={styles.glow}
+                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, opacity: isDark ? 1 : 0.5 }}
                 pointerEvents="none"
             />
 
-            {/* Character row */}
-            <View style={styles.characterRow}>
+            {/* Characters row — zIndex 2 so they stand in front of the pill */}
+            <View style={{ position: 'relative', zIndex: 2, flexDirection: 'row',
+                           justifyContent: 'space-evenly', alignItems: 'flex-end',
+                           paddingTop: 20, paddingHorizontal: 16 }}>
                 {balanceLoaded ? (
                     visibleMembers.map((m) => {
-                        const firstName = m.name.split(' ')[0];
                         const isCreator = m.user_id === group.created_by;
                         return (
-                            <View key={m.user_id} style={styles.characterCol}>
+                            <View key={m.user_id} style={{ alignItems: 'center' }}>
                                 {isCreator
-                                    ? <Crown color="#FCD34D" size={12} />
-                                    : <View style={styles.crownSpacer} />
+                                    ? <Crown size={12} color="#FBBF24" style={{ marginBottom: 2 }} />
+                                    : <View style={{ height: 14 }} />
                                 }
-                                <Text style={[styles.memberName, { color: colors.secondaryText }]}>
-                                    {firstName}
+                                <Text style={{ fontSize: 10, color: colors.secondaryText, marginBottom: 3, fontWeight: '500' }}>
+                                    {m.character_nickname ?? m.name.split(' ')[0]}
                                 </Text>
                                 <CharacterShape
                                     shape={m.character_shape ?? 'rect'}
                                     color={m.character_color ?? '#6B7280'}
-                                    variant="mini"
+                                    variant="card"
+                                    eyeStyle="ball"
                                 />
                             </View>
                         );
@@ -65,10 +67,14 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
                 )}
             </View>
 
-            {/* Group name pill */}
-            <View style={styles.namePillRow}>
-                <View style={styles.namePill}>
-                    <Text style={styles.namePillText} numberOfLines={1}>{group.name}</Text>
+            {/* Name pill — marginTop: -20 pulls it up behind the characters */}
+            <View style={{ zIndex: 1, alignItems: 'center', marginTop: -20, paddingHorizontal: 16 }}>
+                <View style={{ backgroundColor: '#000000', borderRadius: 999,
+                               paddingHorizontal: 28, paddingVertical: 12,
+                               alignSelf: 'center', maxWidth: '92%' }}>
+                    <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }} numberOfLines={1}>
+                        {group.name}
+                    </Text>
                 </View>
             </View>
 
@@ -139,54 +145,8 @@ const styles = StyleSheet.create({
         overflow: 'hidden',
         marginBottom: 16,
     },
-    glow: {
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: 0,
-        height: 112,
-    },
-    characterRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-evenly',
-        alignItems: 'flex-end',
-        paddingTop: 20,
-        paddingHorizontal: 16,
-        zIndex: 1,
-    },
     characterPlaceholder: {
         height: 64,
-    },
-    characterCol: {
-        alignItems: 'center',
-    },
-    crownSpacer: {
-        width: 12,
-        height: 12,
-    },
-    memberName: {
-        fontSize: 9,
-        marginBottom: 4,
-        fontWeight: '500',
-    },
-    namePillRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 12,
-        paddingHorizontal: 16,
-        zIndex: 1,
-    },
-    namePill: {
-        backgroundColor: '#000000',
-        borderRadius: 9999,
-        paddingHorizontal: 24,
-        paddingVertical: 10,
-        maxWidth: '100%',
-    },
-    namePillText: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: '#FFFFFF',
     },
     extraPillRow: {
         flexDirection: 'row',
