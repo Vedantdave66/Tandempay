@@ -1,6 +1,6 @@
 # TandemPay — Session Handoff for Claude
 
-**Last updated:** 2026-05-12
+**Last updated:** 2026-06-01
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -26,7 +26,19 @@ TandemPay = "Splitwise for Canadian roommates, free settlement on Interac." Wedg
 
 ---
 
-## What was completed this session (2026-05-12)
+## What was completed this session (2026-06-01)
+
+### PR #88 — Dashboard font-weight fix (commit `88f6535`, branch `fix/dashboard-font-weight`)
+
+`font-black` (weight 900) is outside Plus Jakarta Sans's supported range (300–800), causing browsers to synthesize the weight or fall back to system fonts — making dashboard headings look visually inconsistent with the sidebar.
+
+**Changes:** Replaced all `font-black` → `font-extrabold` (800) on the greeting, section headers, balance amounts, and empty-state heading in the Dashboard component. 5 additions / 5 deletions.
+
+**Files changed:** Dashboard component (Tailwind class swap only — no logic changes).
+
+---
+
+## What was completed in session (2026-05-12)
 
 ### 1. HTTP Security Headers (commit `12ed004`)
 
