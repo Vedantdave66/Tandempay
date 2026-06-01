@@ -151,6 +151,12 @@ async def update_me(
         if not stripped:
             raise HTTPException(status_code=422, detail="name cannot be blank")
         current_user.name = stripped
+    if data.character_shape is not None:
+        current_user.character_shape = data.character_shape
+    if data.character_color is not None:
+        current_user.character_color = data.character_color
+    if data.character_nickname is not None:
+        current_user.character_nickname = data.character_nickname.strip() or None
 
     await db.flush()
     await db.commit()
