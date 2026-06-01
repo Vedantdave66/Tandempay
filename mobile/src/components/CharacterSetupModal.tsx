@@ -11,6 +11,7 @@ import CharacterShape from './CharacterShape';
 
 interface CharacterSetupModalProps {
     visible: boolean;
+    onClose?: () => void;
 }
 
 const SHAPES = ['rect', 'tall', 'semi', 'round'] as const;
@@ -88,7 +89,7 @@ function PupilDot({ size, eyeX, eyeY }: {
 
 // ── Main component ────────────────────────────────────────────────────────────
 
-export default function CharacterSetupModal({ visible }: CharacterSetupModalProps) {
+export default function CharacterSetupModal({ visible, onClose }: CharacterSetupModalProps) {
     const { colors } = useTheme();
     const { refreshUser } = useAuth();
 
@@ -171,13 +172,20 @@ export default function CharacterSetupModal({ visible }: CharacterSetupModalProp
             visible={visible}
             animationType="slide"
             transparent={false}
-            onRequestClose={() => {}}
+            onRequestClose={onClose ?? (() => {})}
         >
             <ScrollView
                 style={[styles.root, { backgroundColor: colors.background }]}
                 contentContainerStyle={styles.content}
                 keyboardShouldPersistTaps="handled"
             >
+                {/* Close button — only when dismissible */}
+                {onClose && (
+                    <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+                        <Text style={[styles.closeBtnText, { color: colors.secondaryText }]}>✕</Text>
+                    </TouchableOpacity>
+                )}
+
                 {/* Heading */}
                 <Text style={[styles.heading, { color: colors.text }]}>
                     Choose your character
@@ -399,6 +407,20 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     buttonDisabled: { opacity: 0.4 },
+    closeBtn: {
+        position: 'absolute',
+        top: 16,
+        right: 16,
+        width: 36,
+        height: 36,
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 10,
+    },
+    closeBtnText: {
+        fontSize: 18,
+        fontWeight: '600',
+    },
     buttonText: {
         color: '#FFFFFF',
         fontSize: 17,

@@ -4,10 +4,12 @@ import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { Home, Send, Users, Crown, LayoutGrid } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
     const { colors, isDark } = useTheme();
     const { unreadCount } = useNotifications();
+    const insets = useSafeAreaInsets();
 
     const getIcon = (routeName: string, isFocused: boolean, color: string) => {
         const size = 22;
@@ -23,7 +25,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     };
 
     return (
-        <View style={styles.wrapper}>
+        <View style={[styles.wrapper, { bottom: insets.bottom + (Platform.OS === 'ios' ? 8 : 18) }]}>
             <View style={[styles.bar, { backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF' }]}>
                 {state.routes.map((route, index) => {
                     const { options } = descriptors[route.key];
@@ -80,7 +82,6 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
 const styles = StyleSheet.create({
     wrapper: {
         position: 'absolute',
-        bottom: Platform.OS === 'ios' ? 28 : 18,
         left: 24,
         right: 24,
     },
