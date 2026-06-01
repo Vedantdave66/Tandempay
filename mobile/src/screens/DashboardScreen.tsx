@@ -3,10 +3,17 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     SafeAreaView, ActivityIndicator, RefreshControl,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
-import { LogOut, Plus, Users, ArrowRight, Bell, ArrowDownLeft, ArrowUpRight, Palette } from 'lucide-react-native';
+import {
+    groupsApi, balancesApi, notificationsApi,
+    GroupListItem, UserBalance, NotificationOut,
+} from '../services/api';
+import {
+    LogOut, Plus, Users, ArrowRight, Bell, ArrowDownLeft, ArrowUpRight, Palette,
+    Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
+} from 'lucide-react-native';
 import ThemeToggle from '../components/ThemeToggle';
 import { useNotifications } from '../context/NotificationContext';
 import GroupCard from '../components/GroupCard';
@@ -14,15 +21,36 @@ import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import { formatCurrency } from '../utils/formatCurrency';
 
+// ── Notification helpers (mirrored from ActivityScreen) ───────────────────────
+const TYPE_CONFIG: Record<string, { icon: any; color: string }> = {
+    expense_added:        { icon: Receipt,     color: '#A8D5A2' },
+    settlement_requested: { icon: Handshake,   color: '#818CF8' },
+    payment_sent:         { icon: Send,        color: '#F59E0B' },
+    payment_confirmed:    { icon: CheckCheck,  color: '#A8D5A2' },
+    payment_declined:     { icon: ShieldAlert, color: '#E05252' },
+    friend_request:       { icon: UserPlus,    color: '#A8D5A2' },
+    friend_accepted:      { icon: Check,       color: '#A8D5A2' },
+};
+
+function timeAgo(d: string) {
+    const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+    if (diff < 1)    return 'Just now';
+    if (diff < 60)   return `${diff}m ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return `${Math.floor(diff / 1440)}d ago`;
+}
+
 export default function DashboardScreen({ navigation }: any) {
     const { user, logout } = useAuth();
     const { colors, isDark } = useTheme();
     const { unreadCount } = useNotifications();
+    const insets = useSafeAreaInsets();
 
     const [groups, setGroups] = useState<GroupListItem[]>([]);
     const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
     const [owedToMe, setOwedToMe] = useState(0);
     const [iOwe, setIOwe] = useState(0);
+    const [recentActivity, setRecentActivity] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showCharacterPicker, setShowCharacterPicker] = useState(false);
@@ -61,6 +89,10 @@ export default function DashboardScreen({ navigation }: any) {
             } catch {
                 // balance fetch failure is silent
             }
+
+            notificationsApi.list()
+                .then(data => setRecentActivity((data || []).slice(0, 3)))
+                .catch(() => {});
         } catch (err) {
             console.log('[Dashboard] Failed to load groups:', err);
         } finally {
@@ -206,7 +238,7 @@ export default function DashboardScreen({ navigation }: any) {
                 data={groups}
                 keyExtractor={(item) => item.id}
                 renderItem={renderGroup}
-                contentContainerStyle={styles.listContent}
+                contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 68 + 8 + 24 }]}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
@@ -263,6 +295,50 @@ export default function DashboardScreen({ navigation }: any) {
                         <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
                     </View>
                 }
+                ListFooterComponent={() => (
+                    <View style={{ marginTop: 24 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                            <Text style={[styles.listTitle, { color: colors.text }]}>Recent Activity</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
+                                <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>See all</Text>
+                            </TouchableOpacity>
+                        </View>
+                        {recentActivity.length === 0 ? (
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>No activity yet</Text>
+                            </View>
+                        ) : (
+                            recentActivity.map(n => {
+                                const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
+                                const IconComp = cfg.icon;
+                                return (
+                                    <TouchableOpacity
+                                        key={n.id}
+                                        style={[styles.activityRow, {
+                                            backgroundColor: n.read ? colors.surface : `${cfg.color}12`,
+                                            borderLeftColor: n.read ? 'transparent' : cfg.color,
+                                            borderColor: colors.border,
+                                        }]}
+                                        onPress={() => n.group_id && navigation.navigate('Group', { groupId: n.group_id })}
+                                        activeOpacity={0.7}
+                                    >
+                                        <View style={[styles.activityDot, { backgroundColor: cfg.color, opacity: n.read ? 0.3 : 1 }]} />
+                                        <View style={{ flex: 1 }}>
+                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
+                                                <Text style={[styles.activityTitle, { color: n.read ? colors.secondaryText : colors.text }]} numberOfLines={1}>
+                                                    {n.title}
+                                                </Text>
+                                                <Text style={{ fontSize: 11, color: colors.secondaryText }}>{timeAgo(n.created_at)}</Text>
+                                            </View>
+                                            <Text style={{ fontSize: 12, color: colors.secondaryText }} numberOfLines={1}>{n.message}</Text>
+                                        </View>
+                                        <IconComp size={15} color={cfg.color} style={{ opacity: n.read ? 0.4 : 1, marginLeft: 8 }} />
+                                    </TouchableOpacity>
+                                );
+                            })
+                        )}
+                    </View>
+                )}
                 ListEmptyComponent={
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Users color={colors.secondaryText} size={48} />
@@ -421,7 +497,6 @@ const styles = StyleSheet.create({
     // List
     listContent: {
         paddingHorizontal: 24,
-        paddingBottom: 140,
     },
     upsellBanner: {
         flexDirection: 'row',
@@ -470,6 +545,18 @@ const styles = StyleSheet.create({
     },
     emptyTitle: { fontSize: 17, fontWeight: '700' },
     emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+    activityRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 14,
+        marginBottom: 8,
+        borderLeftWidth: 3,
+        borderWidth: 0.5,
+        gap: 10,
+    },
+    activityDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
+    activityTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 6 },
 
     // FAB
     fab: {
