@@ -100,7 +100,7 @@ export default function DashboardPage() {
                     )}
                     {/* Greeting */}
                     <div className="flex-1 pb-8 sm:pb-10">
-                        <h1 className="text-4xl sm:text-5xl font-black text-primary tracking-tight mb-2">
+                        <h1 className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight mb-2">
                             Hey, {user?.name?.split(' ')[0]} 👋
                         </h1>
                         <p className="text-secondary text-base leading-relaxed">
@@ -125,7 +125,7 @@ export default function DashboardPage() {
                             </span>
                         </div>
                         <p className="text-sm font-medium text-secondary mb-1">You're owed</p>
-                        <p className="text-[2rem] font-black text-emerald-400 tracking-tight leading-none">
+                        <p className="text-[2rem] font-extrabold text-emerald-400 tracking-tight leading-none">
                             ${formatCurrency(owedToMe)}
                         </p>
                     </div>
@@ -144,7 +144,7 @@ export default function DashboardPage() {
                             </span>
                         </div>
                         <p className="text-sm font-medium text-secondary mb-1">You owe</p>
-                        <p className="text-[2rem] font-black text-amber-400 tracking-tight leading-none">
+                        <p className="text-[2rem] font-extrabold text-amber-400 tracking-tight leading-none">
                             ${formatCurrency(iOwe)}
                         </p>
                     </div>
@@ -171,7 +171,7 @@ export default function DashboardPage() {
             {/* Groups Section Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
                 <div>
-                    <h2 className="text-2xl font-black text-primary tracking-tight flex items-center gap-3">
+                    <h2 className="text-2xl font-extrabold text-primary tracking-tight flex items-center gap-3">
                         Your Shared Groups
                         <span className="text-xs font-semibold px-3 py-1 rounded-full bg-surface-light text-secondary border border-border/80">
                             {groups.length}
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                         <div className="absolute inset-0 bg-accent/5 rounded-[2rem] group-hover:bg-accent/10 transition-colors" />
                         <Users className="w-10 h-10 text-secondary" />
                     </div>
-                    <h3 className="text-2xl font-black text-primary mb-3">No groups yet</h3>
+                    <h3 className="text-2xl font-extrabold text-primary mb-3">No groups yet</h3>
                     <p className="text-base text-secondary mb-10 max-w-md mx-auto leading-relaxed">
                         Create your first group space to start tracking shared expenses with roommates, friends, or family.
                     </p>
