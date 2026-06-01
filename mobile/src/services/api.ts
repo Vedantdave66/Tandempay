@@ -57,6 +57,9 @@ export interface User {
     created_at: string;
     wallet_balance: number;
     subscription_tier: 'free' | 'pro' | null;
+    character_shape?: string | null;
+    character_color?: string | null;
+    character_nickname?: string | null;
 }
 
 export interface Token {
@@ -76,6 +79,13 @@ export const authApi = {
             body: JSON.stringify({ email, password }),
         }),
     me: () => request<User>('/auth/me'),
+    updateProfile: (data: {
+        name?: string;
+        interac_email?: string;
+        character_shape?: string;
+        character_color?: string;
+        character_nickname?: string;
+    }) => request<User>('/auth/me', { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
 // --- Groups ---
