@@ -61,9 +61,11 @@ export default function DashboardScreen({ navigation }: any) {
             console.log('[Dashboard] Raw groups response:', JSON.stringify(raw));
             const data: GroupListItem[] = Array.isArray(raw)
                 ? raw
-                : Array.isArray((raw as any)?.groups)
-                    ? (raw as any).groups
-                    : [];
+                : Array.isArray((raw as any)?.items)
+                    ? (raw as any).items
+                    : Array.isArray((raw as any)?.groups)
+                        ? (raw as any).groups
+                        : [];
             setGroups(data);
 
             try {
