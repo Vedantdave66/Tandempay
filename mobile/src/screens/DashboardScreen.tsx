@@ -1,31 +1,66 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, SafeAreaView, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
+import {
+    View, Text, StyleSheet, FlatList, TouchableOpacity,
+    SafeAreaView, ActivityIndicator, RefreshControl,
+} from 'react-native';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { groupsApi, GroupListItem } from '../services/api';
-import { LogOut, Plus, Users, ArrowRight, Bell } from 'lucide-react-native';
+import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
+import { LogOut, Plus, Users, ArrowRight, Bell, ArrowDownLeft, ArrowUpRight, Palette } from 'lucide-react-native';
 import ThemeToggle from '../components/ThemeToggle';
 import { useNotifications } from '../context/NotificationContext';
+import GroupCard from '../components/GroupCard';
+import CharacterShape from '../components/CharacterShape';
+import CharacterSetupModal from '../components/CharacterSetupModal';
+import { formatCurrency } from '../utils/formatCurrency';
 
 export default function DashboardScreen({ navigation }: any) {
     const { user, logout } = useAuth();
     const { colors, isDark } = useTheme();
     const { unreadCount } = useNotifications();
+
     const [groups, setGroups] = useState<GroupListItem[]>([]);
+    const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
+    const [owedToMe, setOwedToMe] = useState(0);
+    const [iOwe, setIOwe] = useState(0);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [showCharacterPicker, setShowCharacterPicker] = useState(false);
 
     const loadGroups = async () => {
         try {
             const raw = await groupsApi.list();
             console.log('[Dashboard] Raw groups response:', JSON.stringify(raw));
-            // Defensive: handle both plain array and wrapped { groups: [...] } shapes
             const data: GroupListItem[] = Array.isArray(raw)
                 ? raw
                 : Array.isArray((raw as any)?.groups)
                     ? (raw as any).groups
                     : [];
             setGroups(data);
+
+            try {
+                const entries = await Promise.all(
+                    data.map(g =>
+                        balancesApi.getBalances(g.id)
+                            .then(b => [g.id, b] as const)
+                            .catch(() => [g.id, [] as UserBalance[]] as const)
+                    )
+                );
+                const map = Object.fromEntries(entries);
+                setBalanceMap(map);
+
+                let owed = 0, owing = 0;
+                for (const [, members] of Object.entries(map)) {
+                    const me = (members as UserBalance[]).find(m => m.user_id === user?.id);
+                    if (!me) continue;
+                    if (Number(me.net_balance) > 0) owed += Number(me.net_balance);
+                    else if (Number(me.net_balance) < 0) owing += Math.abs(Number(me.net_balance));
+                }
+                setOwedToMe(owed);
+                setIOwe(owing);
+            } catch {
+                // balance fetch failure is silent
+            }
         } catch (err) {
             console.log('[Dashboard] Failed to load groups:', err);
         } finally {
@@ -35,9 +70,7 @@ export default function DashboardScreen({ navigation }: any) {
     };
 
     useEffect(() => {
-        const unsubscribe = navigation.addListener('focus', () => {
-            loadGroups();
-        });
+        const unsubscribe = navigation.addListener('focus', loadGroups);
         return unsubscribe;
     }, [navigation]);
 
@@ -46,39 +79,18 @@ export default function DashboardScreen({ navigation }: any) {
         loadGroups();
     };
 
-    const totalSpending = groups.reduce((acc, g) => acc + (Number(g.total_expenses) || 0), 0);
+    const firstName = user?.name?.split(' ')[0] ?? '';
 
     const renderGroup = ({ item }: { item: GroupListItem }) => {
-        // Deterministic dark color based on group ID
-        const palette = isDark 
-            ? ['#1e1b4b', '#064e3b', '#451a03', '#3b0764', '#0f172a']
-            : ['#EEF2FF', '#ECFDF5', '#FFF7ED', '#FAF5FF', '#F8FAFC'];
-        const textPalette = isDark ? '#F5F7FA' : '#1E293B';
-        
-        const num = Array.from(item.id.toString()).reduce((acc, char) => acc + char.charCodeAt(0), 0);
-        const bgColor = palette[num % palette.length];
-
-        const date = new Date(item.created_at);
-        const formattedDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
+        const members = balanceMap[item.id] ?? [];
+        const myBalance = members.find(m => m.user_id === user?.id);
         return (
-            <TouchableOpacity
-                style={[styles.groupCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            <GroupCard
+                group={item}
+                members={members}
+                myNetBalance={myBalance?.net_balance ?? 0}
                 onPress={() => navigation.navigate('Group', { groupId: item.id })}
-                activeOpacity={0.8}
-            >
-                <View style={[styles.groupIcon, { backgroundColor: bgColor }]}>
-                    <Users color={isDark ? '#A8D5A2' : '#6BBF67'} size={22} />
-                </View>
-                <View style={styles.groupInfo}>
-                    <Text style={[styles.groupName, { color: colors.text }]}>{item.name}</Text>
-                    <Text style={[styles.groupMeta, { color: colors.secondaryText }]}>{item.member_count} members • {formattedDate}</Text>
-                </View>
-                <View style={styles.groupAmountContainer}>
-                    <Text style={[styles.groupAmount, { color: colors.text }]}>${(Number(item.total_expenses) || 0).toFixed(2)}</Text>
-                    <ArrowRight color={colors.secondaryText} size={16} />
-                </View>
-            </TouchableOpacity>
+            />
         );
     };
 
@@ -94,19 +106,35 @@ export default function DashboardScreen({ navigation }: any) {
 
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+
+            {/* ── Header ── */}
             <View style={styles.header}>
-                <View>
-                    <View style={styles.greetingRow}>
-                        <Text style={[styles.greeting, { color: colors.text }]}>Hello, {user?.name.split(' ')[0]}</Text>
-                        {user?.subscription_tier === 'pro' && (
-                            <View style={styles.proBadge}>
-                                <Text style={styles.proBadgeText}>PRO</Text>
-                            </View>
-                        )}
+                {/* Character + greeting */}
+                <View style={styles.headerLeft}>
+                    <CharacterShape
+                        shape={user?.character_shape ?? 'rect'}
+                        color={user?.character_color ?? '#34D399'}
+                        variant="hero"
+                    />
+                    <View style={styles.greetingBlock}>
+                        <View style={styles.greetingRow}>
+                            <Text style={[styles.greeting, { color: colors.text }]}>
+                                Hey, {firstName} 👋
+                            </Text>
+                            {user?.subscription_tier === 'pro' && (
+                                <View style={styles.proBadge}>
+                                    <Text style={styles.proBadgeText}>PRO</Text>
+                                </View>
+                            )}
+                        </View>
+                        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
+                            Here's where things stand with your squads.
+                        </Text>
                     </View>
-                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Here is your summary</Text>
                 </View>
-                <View style={styles.headerActions}>
+
+                {/* Action buttons — aligned to top */}
+                <View style={[styles.headerActions, { alignSelf: 'flex-start' }]}>
                     <TouchableOpacity
                         onPress={() => navigation.navigate('Notifications')}
                         style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -121,38 +149,70 @@ export default function DashboardScreen({ navigation }: any) {
                         )}
                     </TouchableOpacity>
                     <ThemeToggle />
-                    <TouchableOpacity onPress={logout} style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <TouchableOpacity
+                        onPress={logout}
+                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
                         <LogOut color={colors.danger} size={20} />
                     </TouchableOpacity>
                 </View>
             </View>
 
-            <View style={styles.statsContainer}>
-                <View style={[styles.statCardPrimary, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(74, 222, 128, 0.2)' : 'rgba(22, 163, 74, 0.2)' }]}>
-                    <Text style={[styles.statLabelPrimary, { color: colors.accent }]}>Total Spending</Text>
-                    <Text style={[styles.statValuePrimary, { color: colors.text }]}>${totalSpending.toFixed(2)}</Text>
+            {/* ── Balance stat cards ── */}
+            <View style={styles.statsRow}>
+                {/* You're owed */}
+                <View style={[styles.statCard, {
+                    backgroundColor: 'rgba(34,197,94,0.08)',
+                    borderColor: 'rgba(34,197,94,0.2)',
+                }]}>
+                    <View style={styles.statCardTop}>
+                        <View style={[styles.statIcon, {
+                            backgroundColor: 'rgba(34,197,94,0.15)',
+                            borderColor: 'rgba(34,197,94,0.2)',
+                        }]}>
+                            <ArrowDownLeft color="#22C55E" size={18} />
+                        </View>
+                        <View style={[styles.badge, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.2)' }]}>
+                            <Text style={[styles.badgeText, { color: '#22C55E' }]}>INCOMING</Text>
+                        </View>
+                    </View>
+                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You're owed</Text>
+                    <Text style={[styles.statValue, { color: '#22C55E' }]}>${formatCurrency(owedToMe)}</Text>
                 </View>
-                <View style={styles.statRow}>
-                    <View style={[styles.statCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.statLabelSecondary, { color: colors.secondaryText }]}>Active Groups</Text>
-                        <Text style={[styles.statValueSecondary, { color: colors.text }]}>{groups.length}</Text>
+
+                {/* You owe */}
+                <View style={[styles.statCard, {
+                    backgroundColor: 'rgba(245,158,11,0.08)',
+                    borderColor: 'rgba(245,158,11,0.2)',
+                }]}>
+                    <View style={styles.statCardTop}>
+                        <View style={[styles.statIcon, {
+                            backgroundColor: 'rgba(245,158,11,0.15)',
+                            borderColor: 'rgba(245,158,11,0.2)',
+                        }]}>
+                            <ArrowUpRight color="#F59E0B" size={18} />
+                        </View>
+                        <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }]}>
+                            <Text style={[styles.badgeText, { color: '#F59E0B' }]}>OUTGOING</Text>
+                        </View>
                     </View>
-                    <View style={[styles.statCardSecondary, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.statLabelSecondary, { color: colors.secondaryText }]}>Avg / Group</Text>
-                        <Text style={[styles.statValueSecondary, { color: colors.text }]}>
-                            ${groups.length ? (totalSpending / groups.length).toFixed(2) : '0.00'}
-                        </Text>
-                    </View>
+                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You owe</Text>
+                    <Text style={[styles.statValue, { color: '#F59E0B' }]}>${formatCurrency(iOwe)}</Text>
                 </View>
             </View>
 
+            {/* ── Groups list ── */}
             <FlatList
                 data={groups}
                 keyExtractor={(item) => item.id}
                 renderItem={renderGroup}
                 contentContainerStyle={styles.listContent}
+                refreshControl={
+                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
+                }
                 ListHeaderComponent={
                     <View>
+                        {/* Pro upsell banner */}
                         {user?.subscription_tier !== 'pro' && (
                             <TouchableOpacity
                                 style={[styles.upsellBanner, {
@@ -172,83 +232,120 @@ export default function DashboardScreen({ navigation }: any) {
                                 <ArrowRight color={colors.accent} size={18} />
                             </TouchableOpacity>
                         )}
-                        <View style={styles.listHeader}>
-                            <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
-                        </View>
+
+                        {/* Character customise row */}
+                        <TouchableOpacity
+                            onPress={() => setShowCharacterPicker(true)}
+                            style={[styles.customiseRow, {
+                                backgroundColor: colors.surface,
+                                borderColor: colors.border,
+                            }]}
+                            activeOpacity={0.8}
+                        >
+                            <View style={[styles.customiseIcon, {
+                                backgroundColor: `${colors.accent}1A`,
+                                borderColor: `${colors.accent}33`,
+                            }]}>
+                                <Palette color={colors.accent} size={20} />
+                            </View>
+                            <View style={{ flex: 1 }}>
+                                <Text style={[styles.customiseTitle, { color: colors.text }]}>
+                                    Customise your character
+                                </Text>
+                                <Text style={[styles.customiseSub, { color: colors.secondaryText }]}>
+                                    Pick your colour, shape, and nickname
+                                </Text>
+                            </View>
+                            <ArrowRight color={colors.secondaryText} size={16} />
+                        </TouchableOpacity>
+
+                        {/* Section header */}
+                        <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
                     </View>
-                }
-                refreshControl={
-                    <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
                 ListEmptyComponent={
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Users color={colors.secondaryText} size={48} style={{ marginBottom: 16 }} />
+                        <Users color={colors.secondaryText} size={48} />
                         <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
-                        <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>Create a group to start tracking expenses.</Text>
+                        <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>
+                            Create a group to start tracking expenses.
+                        </Text>
                     </View>
                 }
             />
 
+            {/* FAB */}
             <TouchableOpacity
                 style={[styles.fab, { backgroundColor: colors.accent }]}
                 onPress={() => navigation.navigate('CreateGroup')}
                 activeOpacity={0.8}
             >
-                <Plus color={'#1A1A1A'} size={24} />
+                <Plus color={isDark ? '#064E3B' : '#1A1A1A'} size={24} />
             </TouchableOpacity>
+
+            {/* Character picker modal */}
+            <CharacterSetupModal
+                visible={showCharacterPicker}
+                onClose={() => setShowCharacterPicker(false)}
+            />
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: {
-        flex: 1,
-    },
-    center: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
+    safeArea: { flex: 1 },
+    center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+
+    // Header
     header: {
         flexDirection: 'row',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        alignItems: 'flex-start',
         paddingHorizontal: 24,
-        paddingTop: 28,
-        paddingBottom: 20,
+        paddingTop: 16,
+        paddingBottom: 16,
     },
-    headerActions: {
+    headerLeft: {
         flexDirection: 'row',
-        gap: 8,
+        alignItems: 'flex-end',
+        gap: 12,
+        flex: 1,
+    },
+    greetingBlock: {
+        flex: 1,
+        paddingBottom: 4,
     },
     greetingRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+        marginBottom: 3,
     },
     greeting: {
-        fontSize: 26,
-        fontWeight: '700',
+        fontSize: 22,
+        fontWeight: '800',
         letterSpacing: -0.3,
-        marginBottom: 3,
     },
     proBadge: {
         backgroundColor: '#16a34a',
         borderRadius: 4,
         paddingHorizontal: 5,
         paddingVertical: 2,
-        alignSelf: 'center',
-        marginBottom: 3,
     },
     proBadgeText: {
-        color: '#ffffff',
+        color: '#fff',
         fontSize: 10,
         fontWeight: '700',
         letterSpacing: 0.5,
     },
     subtitle: {
-        fontSize: 14,
-        fontWeight: '400',
+        fontSize: 12,
+        lineHeight: 17,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        gap: 8,
+        paddingTop: 4,
     },
     iconButton: {
         width: 40,
@@ -257,11 +354,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
     },
     bellBadge: {
         position: 'absolute',
@@ -275,60 +367,61 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 2,
     },
-    bellBadgeText: {
-        color: '#fff',
-        fontSize: 8,
-        fontWeight: '800',
-    },
-    statsContainer: {
-        paddingHorizontal: 24,
-        marginBottom: 28,
-    },
-    statCardPrimary: {
-        borderRadius: 20,
-        padding: 24,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.06,
-        shadowRadius: 16,
-        elevation: 4,
-    },
-    statLabelPrimary: {
-        fontSize: 13,
-        fontWeight: '600',
-        marginBottom: 6,
-        letterSpacing: 0.3,
-        textTransform: 'uppercase',
-    },
-    statValuePrimary: {
-        fontSize: 40,
-        fontWeight: '800',
-        letterSpacing: -1,
-    },
-    statRow: {
+    bellBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
+
+    // Stats
+    statsRow: {
         flexDirection: 'row',
         gap: 12,
+        paddingHorizontal: 24,
+        marginBottom: 20,
     },
-    statCardSecondary: {
+    statCard: {
         flex: 1,
-        borderRadius: 18,
-        padding: 18,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+        borderRadius: 20,
+        borderWidth: 1,
+        padding: 16,
     },
-    statLabelSecondary: {
-        fontSize: 12,
-        marginBottom: 6,
-        fontWeight: '500',
-        letterSpacing: 0.2,
+    statCardTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 12,
     },
-    statValueSecondary: {
-        fontSize: 24,
+    statIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    badge: {
+        borderRadius: 6,
+        borderWidth: 1,
+        paddingHorizontal: 6,
+        paddingVertical: 3,
+    },
+    badgeText: {
+        fontSize: 9,
         fontWeight: '700',
+        letterSpacing: 0.8,
+    },
+    statLabel: {
+        fontSize: 12,
+        fontWeight: '500',
+        marginBottom: 4,
+    },
+    statValue: {
+        fontSize: 26,
+        fontWeight: '800',
+        letterSpacing: -0.5,
+    },
+
+    // List
+    listContent: {
+        paddingHorizontal: 24,
+        paddingBottom: 140,
     },
     upsellBanner: {
         flexDirection: 'row',
@@ -336,98 +429,49 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         padding: 14,
+        marginBottom: 12,
+    },
+    upsellEmoji: { fontSize: 24, marginRight: 12 },
+    upsellTextBlock: { flex: 1 },
+    upsellTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
+    upsellSub: { fontSize: 12, lineHeight: 17 },
+    customiseRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
         marginBottom: 16,
     },
-    upsellEmoji: {
-        fontSize: 24,
-        marginRight: 12,
+    customiseIcon: {
+        width: 40,
+        height: 40,
+        borderRadius: 12,
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    upsellTextBlock: {
-        flex: 1,
-    },
-    upsellTitle: {
-        fontSize: 14,
-        fontWeight: '700',
-        marginBottom: 2,
-    },
-    upsellSub: {
-        fontSize: 12,
-        lineHeight: 17,
-    },
-    listHeader: {
-        marginBottom: 14,
-    },
+    customiseTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
+    customiseSub: { fontSize: 12 },
     listTitle: {
         fontSize: 18,
         fontWeight: '700',
         letterSpacing: -0.2,
-    },
-    listContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 140,
-    },
-    groupCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 18,
-        padding: 16,
-        marginBottom: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 10,
-        elevation: 3,
-    },
-    groupIcon: {
-        width: 48,
-        height: 48,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 14,
-    },
-    groupInfo: {
-        flex: 1,
-    },
-    groupName: {
-        fontSize: 15,
-        fontWeight: '700',
-        marginBottom: 3,
-    },
-    groupMeta: {
-        fontSize: 12,
-        fontWeight: '400',
-    },
-    groupAmountContainer: {
-        alignItems: 'flex-end',
-        flexDirection: 'row',
-        gap: 6,
-    },
-    groupAmount: {
-        fontSize: 15,
-        fontWeight: '700',
+        marginBottom: 14,
     },
     emptyState: {
         padding: 40,
         alignItems: 'center',
+        gap: 12,
         borderRadius: 20,
+        borderWidth: 1,
         marginTop: 12,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
     },
-    emptyTitle: {
-        fontSize: 17,
-        fontWeight: '700',
-        marginBottom: 6,
-    },
-    emptySubtitle: {
-        fontSize: 13,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
+    emptyTitle: { fontSize: 17, fontWeight: '700' },
+    emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+
+    // FAB
     fab: {
         position: 'absolute',
         bottom: 110,
@@ -443,4 +487,3 @@ const styles = StyleSheet.create({
         elevation: 8,
     },
 });
-
