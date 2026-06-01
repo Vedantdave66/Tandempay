@@ -170,6 +170,8 @@ export interface UserBalance {
     total_paid: number;
     total_owed: number;
     net_balance: number;
+    character_shape?: string;
+    character_color?: string;
 }
 
 export interface Settlement {

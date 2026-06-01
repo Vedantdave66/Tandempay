@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { formatCurrency } from '../utils/formatCurrency';
 import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     SafeAreaView, RefreshControl, ActivityIndicator
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
-import { groupsApi, GroupListItem } from '../services/api';
-import { Users, Plus, ArrowRight } from 'lucide-react-native';
+import { useAuth } from '../context/AuthContext';
+import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
+import { Users, Plus } from 'lucide-react-native';
+import GroupCard from '../components/GroupCard';
 
 export default function GroupsScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
+    const { user } = useAuth();
     const [groups, setGroups] = useState<GroupListItem[]>([]);
+    const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -18,13 +21,23 @@ export default function GroupsScreen({ navigation }: any) {
         try {
             const raw = await groupsApi.list();
             console.log('[Groups] Raw API response:', JSON.stringify(raw));
-            // Handle both plain array and wrapped { groups: [...] } responses
             const data: GroupListItem[] = Array.isArray(raw)
                 ? raw
                 : Array.isArray((raw as any)?.groups)
                     ? (raw as any).groups
                     : [];
             setGroups(data);
+
+            try {
+                const results = await Promise.all(
+                    data.map(g => balancesApi.getBalances(g.id).catch(() => []))
+                );
+                const map: Record<string, UserBalance[]> = {};
+                data.forEach((g, i) => { map[g.id] = results[i]; });
+                setBalanceMap(map);
+            } catch {
+                // balance fetch failure is silent — groups list already rendered
+            }
         } catch (err) {
             console.log('[Groups] Fetch error:', err);
         } finally {
@@ -38,37 +51,16 @@ export default function GroupsScreen({ navigation }: any) {
         return unsub;
     }, [navigation]);
 
-    const palette = isDark
-        ? ['#1e1b4b', '#064e3b', '#451a03', '#3b0764', '#0f172a']
-        : ['#EEF2FF', '#ECFDF5', '#FFF7ED', '#FAF5FF', '#F8FAFC'];
-
     const renderGroup = ({ item }: { item: GroupListItem }) => {
-        const num = Array.from(item.id).reduce((a, c) => a + c.charCodeAt(0), 0);
-        const bg = palette[num % palette.length];
-        const date = new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-
+        const members = balanceMap[item.id];
+        const myNetBalance = members?.find(m => m.user_id === user?.id)?.net_balance;
         return (
-            <TouchableOpacity
-                style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            <GroupCard
+                group={item}
+                members={members}
+                myNetBalance={myNetBalance}
                 onPress={() => navigation.navigate('Group', { groupId: item.id })}
-                activeOpacity={0.8}
-            >
-                <View style={[styles.icon, { backgroundColor: bg }]}>
-                    <Users color={isDark ? '#F5F7FA' : colors.accent} size={22} />
-                </View>
-                <View style={styles.info}>
-                    <Text style={[styles.name, { color: colors.text }]}>{item.name}</Text>
-                    <Text style={[styles.meta, { color: colors.secondaryText }]}>
-                        {item.member_count} members · {date}
-                    </Text>
-                </View>
-                <View style={styles.right}>
-                    <Text style={[styles.amount, { color: colors.text }]}>
-                        ${formatCurrency(item.total_expenses)}
-                    </Text>
-                    <ArrowRight color={colors.secondaryText} size={16} />
-                </View>
-            </TouchableOpacity>
+            />
         );
     };
 
@@ -128,19 +120,6 @@ const styles = StyleSheet.create({
     subtitle: { fontSize: 14, marginTop: 4 },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingHorizontal: 24, paddingBottom: 140 },
-    card: {
-        flexDirection: 'row', alignItems: 'center', borderRadius: 20,
-        padding: 16, marginBottom: 12, borderWidth: 1,
-    },
-    icon: {
-        width: 48, height: 48, borderRadius: 16,
-        alignItems: 'center', justifyContent: 'center', marginRight: 14,
-    },
-    info: { flex: 1 },
-    name: { fontSize: 16, fontWeight: '700', marginBottom: 4 },
-    meta: { fontSize: 12 },
-    right: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-    amount: { fontSize: 15, fontWeight: '700' },
     empty: {
         padding: 40, borderRadius: 24, borderWidth: 1,
         alignItems: 'center', gap: 12, marginTop: 12,
