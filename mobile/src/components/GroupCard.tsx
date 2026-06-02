@@ -15,16 +15,18 @@ interface GroupCardProps {
 }
 
 const darkStops = [
-  { offset: '0%',  color: '#28E06B' },
-  { offset: '30%', color: '#109A47' },
-  { offset: '52%', color: '#064D26' },
-  { offset: '78%', color: '#070A08' },
+  { offset: '0%',   color: '#28E06B' },
+  { offset: '30%',  color: '#109A47' },
+  { offset: '52%',  color: '#064D26' },
+  { offset: '78%',  color: '#070A08' },
+  { offset: '100%', color: '#070A08' },
 ];
 const lightStops = [
-  { offset: '0%',  color: '#3BE57F' },
-  { offset: '30%', color: '#8FE9B0' },
-  { offset: '56%', color: '#D8F4E1' },
-  { offset: '80%', color: '#F3FBF4' },
+  { offset: '0%',   color: '#3BE57F' },
+  { offset: '30%',  color: '#8FE9B0' },
+  { offset: '56%',  color: '#D8F4E1' },
+  { offset: '80%',  color: '#F3FBF4' },
+  { offset: '100%', color: '#F3FBF4' },
 ];
 
 const LADDER = [
@@ -62,13 +64,22 @@ export default function GroupCard({ group, members, myNetBalance, onPress }: Gro
     <View style={[styles.card, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
       <Svg style={StyleSheet.absoluteFillObject}>
         <Defs>
-          <RadialGradient id="glow" cx="50%" cy="46%" rx="46%" ry="31%">
+          <RadialGradient
+            id="glow"
+            cx="0.5"
+            cy="0.46"
+            r="0.52"
+            fx="0.5"
+            fy="0.46"
+            gradientUnits="objectBoundingBox"
+            gradientTransform="matrix(1, 0, 0, 0.67, 0, 0.152)"
+          >
             {(isDark ? darkStops : lightStops).map((s, i) =>
-              <Stop key={i} offset={s.offset} stopColor={s.color} />
+              <Stop key={i} offset={s.offset} stopColor={s.color} stopOpacity="1" />
             )}
           </RadialGradient>
         </Defs>
-        <Rect width="100%" height="100%" fill="url(#glow)" rx="40" />
+        <Rect width="100%" height="100%" fill="url(#glow)" rx="40" ry="40" />
       </Svg>
 
       {/* Character cluster */}
@@ -96,7 +107,11 @@ export default function GroupCard({ group, members, myNetBalance, onPress }: Gro
       </View>
 
       {/* Title pill — overlaps characters by 28px */}
-      <View style={[styles.titlePill, { backgroundColor: T.boxFill, marginTop: -28, zIndex: 2 }]}>
+      <View style={[styles.titlePill, {
+        backgroundColor: isDark ? '#070A08' : '#FFFFFF',
+        marginTop: -28,
+        zIndex: 2,
+      }]}>
         <Text style={[styles.titleText, { color: T.ink }]} numberOfLines={1}>
           {group.name}
         </Text>
