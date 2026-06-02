@@ -1,6 +1,13 @@
 import React from 'react';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
+import { useFonts } from 'expo-font';
+import {
+  PlusJakartaSans_400Regular,
+  PlusJakartaSans_600SemiBold,
+  PlusJakartaSans_700Bold,
+  PlusJakartaSans_800ExtraBold,
+} from '@expo-google-fonts/plus-jakarta-sans';
 import * as Sentry from '@sentry/react-native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider } from './src/context/AuthContext';
@@ -47,6 +54,14 @@ function ConnectedApp() {
 }
 
 export default function App() {
+  const [fontsLoaded] = useFonts({
+    PlusJakartaSans_400Regular,
+    PlusJakartaSans_600SemiBold,
+    PlusJakartaSans_700Bold,
+    PlusJakartaSans_800ExtraBold,
+  });
+  if (!fontsLoaded) return null;
+
   // STRIPE KEY — loaded from app.json extra.stripePublishableKey.
   // For live production builds, swap the value in app.json to pk_live_...
   const stripeKey: string =

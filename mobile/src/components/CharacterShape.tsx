@@ -41,14 +41,17 @@ export default function CharacterShape({
     color,
     variant = 'mini',
     eyeStyle = 'dot',
+    heightOverride,
 }: {
     shape: string;
     color: string;
     variant?: ShapeVariant;
     eyeStyle?: 'dot' | 'ball';
+    heightOverride?: number;
 }) {
     const table = MINI_CONFIGS[variant];
     const cfg = (table as Record<string, any>)[shape] ?? (table as Record<string, any>).rect;
+    const displayHeight = heightOverride ?? cfg.h;
 
     const tl: number = cfg.tl !== undefined ? cfg.tl : topRadius(cfg.radius);
     const tr: number = cfg.tr !== undefined ? cfg.tr : topRadius(cfg.radius);
@@ -92,7 +95,7 @@ export default function CharacterShape({
         <View
             style={{
                 width: cfg.w,
-                height: cfg.h,
+                height: displayHeight,
                 backgroundColor: color,
                 borderTopLeftRadius: tl,
                 borderTopRightRadius: tr,
