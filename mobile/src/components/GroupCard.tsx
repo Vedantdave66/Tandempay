@@ -1,215 +1,166 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, ArrowRight } from 'lucide-react-native';
+import { StyleSheet, TouchableOpacity, View, Text } from 'react-native';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import { ArrowRight } from 'lucide-react-native';
 import { GroupListItem, UserBalance } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import CharacterShape from './CharacterShape';
 
 interface GroupCardProps {
-    group: GroupListItem;
-    members?: UserBalance[];
-    myNetBalance?: number;
-    onPress: () => void;
+  group: GroupListItem;
+  members?: UserBalance[];
+  myNetBalance?: number;
+  onPress: () => void;
 }
 
-const SETTLED_THRESHOLD = 0.01;
+const darkStops = [
+  { offset: '0%',  color: '#28E06B' },
+  { offset: '30%', color: '#109A47' },
+  { offset: '52%', color: '#064D26' },
+  { offset: '78%', color: '#070A08' },
+];
+const lightStops = [
+  { offset: '0%',  color: '#3BE57F' },
+  { offset: '30%', color: '#8FE9B0' },
+  { offset: '56%', color: '#D8F4E1' },
+  { offset: '80%', color: '#F3FBF4' },
+];
 
-export default function GroupCard({ group, members = [], myNetBalance = 0, onPress }: GroupCardProps) {
-    const { colors, isDark } = useTheme();
-    const safeMembers = members ?? [];
-    const visibleMembers = safeMembers.slice(0, 4);
-    const extraCount = safeMembers.length > 4 ? safeMembers.length - 4 : 0;
-    const balanceLoaded = safeMembers.length > 0;
-    const balance = myNetBalance ?? 0;
-    const isOwe = balance < -SETTLED_THRESHOLD;
-    const isOwed = balance > SETTLED_THRESHOLD;
-    const isSettled = !isOwe && !isOwed;
+const LADDER = [
+  { height: 104, bodyRotate: '-4deg', nameRotate: '-8deg' },
+  { height: 138, bodyRotate:  '2deg', nameRotate:  '4deg' },
+  { height:  80, bodyRotate:  '0deg', nameRotate:  '6deg' },
+  { height: 122, bodyRotate:  '7deg', nameRotate: '-10deg' },
+];
 
-    return (
-        <TouchableOpacity onPress={onPress} activeOpacity={0.85} style={[styles.card, { backgroundColor: colors.surface }]}>
+export default function GroupCard({ group, members, myNetBalance, onPress }: GroupCardProps) {
+  const { isDark } = useTheme();
 
-            {/* Green glow — full opacity dark, half in light */}
-            <LinearGradient
-                colors={['rgba(34,197,94,0.18)', 'transparent']}
-                style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 120, opacity: isDark ? 1 : 0.5 }}
-                pointerEvents="none"
-            />
+  const visibleMembers = (members ?? []).slice(0, 4);
+  const extraCount = Math.max(0, (members ?? []).length - 4);
+  const absBalance = Math.abs(myNetBalance ?? 0);
+  const balanceType = !members?.length ? 'settled'
+    : (myNetBalance ?? 0) > 0.01 ? 'owed'
+    : (myNetBalance ?? 0) < -0.01 ? 'owe'
+    : 'settled';
 
-            {/* Characters row — zIndex 2 so they stand in front of the pill */}
-            <View style={{ position: 'relative', zIndex: 2, flexDirection: 'row',
-                           justifyContent: 'space-evenly', alignItems: 'flex-end',
-                           paddingTop: 20, paddingHorizontal: 16 }}>
-                {balanceLoaded ? (
-                    visibleMembers.map((m) => {
-                        const isCreator = m.user_id === group.created_by;
-                        return (
-                            <View key={m.user_id} style={{ alignItems: 'center' }}>
-                                {isCreator
-                                    ? <Crown size={12} color="#FBBF24" style={{ marginBottom: 2 }} />
-                                    : <View style={{ height: 14 }} />
-                                }
-                                <Text style={{ fontSize: 10, color: colors.secondaryText, marginBottom: 3, fontWeight: '500' }}>
-                                    {m.character_nickname ?? m.name.split(' ')[0]}
-                                </Text>
-                                <CharacterShape
-                                    shape={m.character_shape ?? 'rect'}
-                                    color={m.character_color ?? '#6B7280'}
-                                    variant="card"
-                                    eyeStyle="ball"
-                                />
-                            </View>
-                        );
-                    })
-                ) : (
-                    <View style={styles.characterPlaceholder} />
-                )}
-            </View>
+  const T = {
+    boxFill:    isDark ? '#0A0B0A'                : '#FFFFFF',
+    ink:        isDark ? '#FFFFFF'                : '#0E140F',
+    owe:        isDark ? '#F2C200'                : '#C28A00',
+    owed:       isDark ? '#27E06A'                : '#0E9F4F',
+    label:      isDark ? '#06371E'                : '#0A5F30',
+    othersFill: isDark ? '#2A2C2A'                : '#E6EAE5',
+    othersInk:  isDark ? '#D7DAD6'                : '#46504A',
+    nameInk:    isDark ? '#FFFFFF'                : '#0E140F',
+    arrowBg:    isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+  };
+  const balanceColor = balanceType === 'owe' ? T.owe : T.owed;
 
-            {/* Name pill — marginTop: -20 pulls it up behind the characters */}
-            <View style={{ zIndex: 1, alignItems: 'center', marginTop: -20, paddingHorizontal: 16 }}>
-                <View style={{ backgroundColor: '#000000', borderRadius: 999,
-                               paddingHorizontal: 28, paddingVertical: 12,
-                               alignSelf: 'center', maxWidth: '92%' }}>
-                    <Text style={{ color: '#fff', fontSize: 22, fontWeight: '800' }} numberOfLines={1}>
-                        {group.name}
-                    </Text>
-                </View>
-            </View>
-
-            {/* +N others pill */}
-            {extraCount > 0 && (
-                <View style={styles.extraPillRow}>
-                    <View style={[styles.extraPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.extraPillText, { color: colors.secondaryText }]}>+{extraCount} others</Text>
-                    </View>
-                </View>
+  return (
+    <View style={[styles.card, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+      <Svg style={StyleSheet.absoluteFillObject}>
+        <Defs>
+          <RadialGradient id="glow" cx="50%" cy="46%" rx="46%" ry="31%">
+            {(isDark ? darkStops : lightStops).map((s, i) =>
+              <Stop key={i} offset={s.offset} stopColor={s.color} />
             )}
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#glow)" rx="40" />
+      </Svg>
 
-            {/* Stats */}
-            <View style={styles.stats}>
-
-                {/* Total expenses */}
-                <View style={styles.statBlock}>
-                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>TOTAL EXPENSES</Text>
-                    <View style={[styles.statPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.statValue, { color: colors.text }]}>
-                            ${formatCurrency(group.total_expenses)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Balance */}
-                {balanceLoaded && (
-                    <View style={styles.statBlock}>
-                        <Text style={[styles.statLabel, { color: colors.secondaryText }]}>
-                            {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
-                        </Text>
-                        <View style={[styles.balancePill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Text style={[
-                                styles.balanceValue,
-                                { color: isOwed ? '#22c55e' : isOwe ? '#f59e0b' : '#22c55e' },
-                            ]}>
-                                {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
-                            </Text>
-                            <TouchableOpacity
-                                onPress={onPress}
-                                style={[
-                                    styles.arrowBtn,
-                                    {
-                                        backgroundColor: isOwed
-                                            ? 'rgba(34,197,94,0.15)'
-                                            : isOwe
-                                            ? 'rgba(245,158,11,0.15)'
-                                            : colors.border,
-                                    },
-                                ]}
-                            >
-                                <ArrowRight
-                                    size={14}
-                                    color={isOwed ? '#22c55e' : isOwe ? '#f59e0b' : colors.secondaryText}
-                                />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
+      {/* Character cluster */}
+      <View style={styles.cluster}>
+        {visibleMembers.map((m, i) => {
+          const slot = LADDER[i % 4];
+          return (
+            <View key={m.user_id} style={styles.memberCol}>
+              <Text style={[styles.nameLabel, { color: T.nameInk,
+                transform: [{ rotate: slot.nameRotate }] }]}>
+                {(m.character_nickname ?? m.name.split(' ')[0]).toLowerCase()}
+              </Text>
+              <View style={{ transform: [{ rotate: slot.bodyRotate }],
+                             transformOrigin: 'bottom center' }}>
+                <CharacterShape
+                  shape={m.character_shape ?? 'rect'}
+                  color={m.character_color ?? '#6B7280'}
+                  variant="card"
+                  eyeStyle="ball"
+                  heightOverride={slot.height}
+                />
+              </View>
             </View>
+          );
+        })}
+      </View>
+
+      {/* Title pill — overlaps characters by 42px */}
+      <View style={[styles.titlePill, { backgroundColor: T.boxFill, marginTop: -42, zIndex: 2 }]}>
+        <Text style={[styles.titleText, { color: T.ink }]} numberOfLines={1}>
+          {group.name}
+        </Text>
+      </View>
+
+      {/* +N others pill */}
+      {extraCount > 0 && (
+        <View style={[styles.othersPill, { backgroundColor: T.othersFill }]}>
+          <Text style={[styles.othersText, { color: T.othersInk }]}>+{extraCount} others</Text>
+        </View>
+      )}
+
+      {/* Total Expenses */}
+      <Text style={[styles.sectionLabel, { color: T.label }]}>TOTAL EXPENSES</Text>
+      <View style={[styles.valueBox, { backgroundColor: T.boxFill,
+        borderWidth: isDark ? 0 : 1, borderColor: 'rgba(0,0,0,0.05)' }]}>
+        <Text style={[styles.amountText, { color: T.ink }]}>
+          ${formatCurrency(group.total_expenses)}
+        </Text>
+      </View>
+
+      {/* Balance */}
+      <Text style={[styles.sectionLabel, { color: T.label }]}>
+        {balanceType === 'owe' ? 'YOU OWE' : "YOU'RE OWED"}
+      </Text>
+      <View style={[styles.valueBox, styles.valueBoxRow, { backgroundColor: T.boxFill,
+        borderWidth: isDark ? 0 : 1, borderColor: 'rgba(0,0,0,0.05)' }]}>
+        <Text style={[styles.amountText, { color: balanceColor }]}>
+          {balanceType === 'settled' ? '$0.00' : `$${absBalance.toFixed(2)}`}
+        </Text>
+        <TouchableOpacity onPress={onPress}
+          style={[styles.arrowBtn, { backgroundColor: T.arrowBg,
+            borderColor: balanceColor }]}>
+          <ArrowRight size={20} color={balanceColor} strokeWidth={2.4} />
         </TouchableOpacity>
-    );
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    card: {
-        borderRadius: 16,
-        overflow: 'hidden',
-        marginBottom: 16,
-    },
-    characterPlaceholder: {
-        height: 64,
-    },
-    extraPillRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 6,
-        zIndex: 1,
-    },
-    extraPill: {
-        borderRadius: 9999,
-        borderWidth: 1,
-        paddingHorizontal: 12,
-        paddingVertical: 4,
-    },
-    extraPillText: {
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    stats: {
-        paddingHorizontal: 20,
-        paddingTop: 12,
-        paddingBottom: 20,
-        alignItems: 'center',
-        gap: 8,
-        zIndex: 1,
-    },
-    statBlock: {
-        alignItems: 'center',
-        gap: 4,
-    },
-    statLabel: {
-        fontSize: 10,
-        fontWeight: '600',
-        letterSpacing: 1.5,
-    },
-    statPill: {
-        borderRadius: 9999,
-        borderWidth: 1,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
-    },
-    statValue: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    balancePill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderRadius: 9999,
-        borderWidth: 1,
-        paddingLeft: 16,
-        paddingRight: 6,
-        paddingVertical: 6,
-        gap: 8,
-    },
-    balanceValue: {
-        fontSize: 14,
-        fontWeight: '600',
-    },
-    arrowBtn: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+  card:        { borderRadius: 40, overflow: 'hidden', borderWidth: 1,
+                 marginBottom: 16, padding: 0 },
+  cluster:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center',
+                 gap: 2, paddingTop: 28, paddingHorizontal: 26, zIndex: 1 },
+  memberCol:   { alignItems: 'center', gap: 6 },
+  nameLabel:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13,
+                 textShadowColor: 'rgba(0,0,0,0.4)',
+                 textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  titlePill:   { borderRadius: 999, width: '92%', alignSelf: 'center',
+                 height: 72, alignItems: 'center', justifyContent: 'center',
+                 paddingHorizontal: 24 },
+  titleText:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 30, letterSpacing: -1 },
+  othersPill:  { alignSelf: 'center', borderRadius: 999, paddingHorizontal: 18,
+                 paddingVertical: 7, marginTop: 14 },
+  othersText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 },
+  sectionLabel:{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11, letterSpacing: 1.6,
+                 textAlign: 'center', marginTop: 22, marginBottom: 10 },
+  valueBox:    { borderRadius: 26, height: 80, marginHorizontal: 26,
+                 alignItems: 'center', justifyContent: 'center' },
+  valueBoxRow: { flexDirection: 'row', justifyContent: 'space-between',
+                 paddingHorizontal: 18, marginBottom: 26 },
+  amountText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 42, letterSpacing: -1 },
+  arrowBtn:    { width: 52, height: 52, borderRadius: 26, alignItems: 'center',
+                 justifyContent: 'center', borderWidth: 1.5 },
 });
