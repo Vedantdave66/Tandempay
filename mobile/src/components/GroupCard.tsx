@@ -28,10 +28,10 @@ const lightStops = [
 ];
 
 const LADDER = [
-  { height: 104, bodyRotate: '-4deg', nameRotate: '-8deg' },
-  { height: 138, bodyRotate:  '2deg', nameRotate:  '4deg' },
-  { height:  80, bodyRotate:  '0deg', nameRotate:  '6deg' },
-  { height: 122, bodyRotate:  '7deg', nameRotate: '-10deg' },
+  { height: 56,  bodyRotate: '-4deg', nameRotate: '-8deg'  },
+  { height: 72,  bodyRotate:  '2deg', nameRotate:  '4deg'  },
+  { height: 42,  bodyRotate:  '0deg', nameRotate:  '6deg'  },
+  { height: 64,  bodyRotate:  '7deg', nameRotate: '-10deg' },
 ];
 
 export default function GroupCard({ group, members, myNetBalance, onPress }: GroupCardProps) {
@@ -87,7 +87,6 @@ export default function GroupCard({ group, members, myNetBalance, onPress }: Gro
                   shape={m.character_shape ?? 'rect'}
                   color={m.character_color ?? '#6B7280'}
                   variant="card"
-                  eyeStyle="ball"
                   heightOverride={slot.height}
                 />
               </View>
@@ -96,8 +95,8 @@ export default function GroupCard({ group, members, myNetBalance, onPress }: Gro
         })}
       </View>
 
-      {/* Title pill — overlaps characters by 42px */}
-      <View style={[styles.titlePill, { backgroundColor: T.boxFill, marginTop: -42, zIndex: 2 }]}>
+      {/* Title pill — overlaps characters by 28px */}
+      <View style={[styles.titlePill, { backgroundColor: T.boxFill, marginTop: -28, zIndex: 2 }]}>
         <Text style={[styles.titleText, { color: T.ink }]} numberOfLines={1}>
           {group.name}
         </Text>
@@ -148,19 +147,19 @@ const styles = StyleSheet.create({
                  textShadowColor: 'rgba(0,0,0,0.4)',
                  textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   titlePill:   { borderRadius: 999, width: '92%', alignSelf: 'center',
-                 height: 72, alignItems: 'center', justifyContent: 'center',
-                 paddingHorizontal: 24 },
-  titleText:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 30, letterSpacing: -1 },
+                 height: 52, alignItems: 'center', justifyContent: 'center',
+                 paddingHorizontal: 20, marginTop: -28, zIndex: 2 },
+  titleText:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, letterSpacing: -0.5 },
   othersPill:  { alignSelf: 'center', borderRadius: 999, paddingHorizontal: 18,
                  paddingVertical: 7, marginTop: 14 },
   othersText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 },
-  sectionLabel:{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 11, letterSpacing: 1.6,
-                 textAlign: 'center', marginTop: 22, marginBottom: 10 },
-  valueBox:    { borderRadius: 26, height: 80, marginHorizontal: 26,
+  sectionLabel:{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 10, letterSpacing: 1.4,
+                 textAlign: 'center', marginTop: 14, marginBottom: 8 },
+  valueBox:    { borderRadius: 20, height: 60, marginHorizontal: 20,
                  alignItems: 'center', justifyContent: 'center' },
   valueBoxRow: { flexDirection: 'row', justifyContent: 'space-between',
-                 paddingHorizontal: 18, marginBottom: 26 },
-  amountText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 42, letterSpacing: -1 },
-  arrowBtn:    { width: 52, height: 52, borderRadius: 26, alignItems: 'center',
+                 paddingHorizontal: 16, marginBottom: 20 },
+  amountText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 30, letterSpacing: -0.5 },
+  arrowBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center',
                  justifyContent: 'center', borderWidth: 1.5 },
 });
