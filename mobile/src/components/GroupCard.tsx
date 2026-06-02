@@ -1,257 +1,180 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, ArrowRight } from 'lucide-react-native';
+import { StyleSheet, TouchableOpacity, View, Text } from 'react-native';
+import Svg, { Defs, RadialGradient, Stop, Rect } from 'react-native-svg';
+import { ArrowRight } from 'lucide-react-native';
 import { GroupListItem, UserBalance } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import CharacterShape from './CharacterShape';
 
 interface GroupCardProps {
-    group: GroupListItem;
-    members?: UserBalance[];
-    myNetBalance?: number;
-    onPress: () => void;
+  group: GroupListItem;
+  members?: UserBalance[];
+  myNetBalance?: number;
+  onPress: () => void;
 }
 
-const SETTLED_THRESHOLD = 0.01;
-
-// Per-slot body + name tilt for the lively "peeking" cluster. Heights come from
-// the member's own shape (CharacterShape 'card' variant), so we only inject tilt.
-const TILT = [
-    { body: -4, name: -8 },
-    { body: 2,  name: 4 },
-    { body: 0,  name: 6 },
-    { body: 7,  name: -10 },
+const darkStops = [
+  { offset: '0%',   color: '#28E06B' },
+  { offset: '30%',  color: '#109A47' },
+  { offset: '52%',  color: '#064D26' },
+  { offset: '78%',  color: '#070A08' },
+  { offset: '100%', color: '#070A08' },
+];
+const lightStops = [
+  { offset: '0%',   color: '#3BE57F' },
+  { offset: '30%',  color: '#8FE9B0' },
+  { offset: '56%',  color: '#D8F4E1' },
+  { offset: '80%',  color: '#F3FBF4' },
+  { offset: '100%', color: '#F3FBF4' },
 ];
 
-export default function GroupCard({ group, members = [], myNetBalance = 0, onPress }: GroupCardProps) {
-    const { colors, isDark } = useTheme();
-    const safeMembers = members ?? [];
-    const visibleMembers = safeMembers.slice(0, 4);
-    const extraCount = safeMembers.length > 4 ? safeMembers.length - 4 : 0;
-    const balanceLoaded = safeMembers.length > 0;
-    const balance = myNetBalance ?? 0;
-    const isOwe = balance < -SETTLED_THRESHOLD;
-    const isOwed = balance > SETTLED_THRESHOLD;
-    const isSettled = !isOwe && !isOwed;
+const LADDER = [
+  { height: 56,  bodyRotate: '-4deg', nameRotate: '-8deg'  },
+  { height: 72,  bodyRotate:  '2deg', nameRotate:  '4deg'  },
+  { height: 42,  bodyRotate:  '0deg', nameRotate:  '6deg'  },
+  { height: 64,  bodyRotate:  '7deg', nameRotate: '-10deg' },
+];
 
-    // accent = amount color, drives balance text + arrow ring
-    const accent = isOwe ? colors.groupOwe : colors.groupOwed;
-    const boxStyle = {
-        backgroundColor: colors.groupBoxFill,
-        borderWidth: 1,
-        borderColor: colors.groupBoxBorder,
-        // subtle lift only matters in light; transparent shadow color = no-op in dark
-        shadowColor: colors.groupBoxShadow,
-        shadowOpacity: isDark ? 0 : 1,
-        shadowRadius: 12,
-        shadowOffset: { width: 0, height: 6 },
-        elevation: isDark ? 0 : 3,
-    };
+export default function GroupCard({ group, members, myNetBalance, onPress }: GroupCardProps) {
+  const { isDark } = useTheme();
 
-    return (
-        <TouchableOpacity
-            onPress={onPress}
-            activeOpacity={0.9}
-            style={[styles.card, { backgroundColor: colors.groupGlow[0] }]}
-        >
-            {/* Green glow — full-bleed vertical ramp, brightest band vertically centered.
-                (expo-linear-gradient can't do radial; this 5-stop vertical reproduces the
-                 mock's centered-glow falloff. For a true radial, swap in react-native-svg's
-                 <RadialGradient> — see handoff note.) */}
-            <LinearGradient
-                colors={colors.groupGlow}
-                locations={[0, 0.3, 0.46, 0.62, 1]}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-            />
+  const visibleMembers = (members ?? []).slice(0, 4);
+  const extraCount = Math.max(0, (members ?? []).length - 4);
+  const absBalance = Math.abs(myNetBalance ?? 0);
+  const balanceType = !members?.length ? 'settled'
+    : (myNetBalance ?? 0) > 0.01 ? 'owed'
+    : (myNetBalance ?? 0) < -0.01 ? 'owe'
+    : 'settled';
 
-            {/* Characters row — zIndex 1 so the title pill can overlap them */}
-            <View style={styles.clusterRow}>
-                {balanceLoaded ? (
-                    visibleMembers.map((m, i) => {
-                        const isCreator = m.user_id === group.created_by;
-                        const tilt = TILT[i] ?? TILT[0];
-                        return (
-                            <View key={m.user_id} style={{ alignItems: 'center' }}>
-                                {isCreator
-                                    ? <Crown size={12} color="#FBBF24" style={{ marginBottom: 2 }} />
-                                    : <View style={{ height: 14 }} />
-                                }
-                                <Text style={{
-                                    fontSize: 11, color: colors.groupNameInk, marginBottom: 4,
-                                    fontWeight: '700', transform: [{ rotate: `${tilt.name}deg` }],
-                                    textShadowColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
-                                    textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
-                                }}>
-                                    {m.character_nickname ?? m.name.split(' ')[0]}
-                                </Text>
-                                <View style={{ transform: [{ rotate: `${tilt.body}deg` }] }}>
-                                    <CharacterShape
-                                        shape={m.character_shape ?? 'rect'}
-                                        color={m.character_color ?? '#6B7280'}
-                                        variant="card"
-                                    />
-                                </View>
-                            </View>
-                        );
-                    })
-                ) : (
-                    <View style={styles.characterPlaceholder} />
-                )}
-            </View>
+  const T = {
+    boxFill:    isDark ? '#0A0B0A'                : '#FFFFFF',
+    ink:        isDark ? '#FFFFFF'                : '#0E140F',
+    owe:        isDark ? '#F2C200'                : '#C28A00',
+    owed:       isDark ? '#27E06A'                : '#0E9F4F',
+    label:      isDark ? '#06371E'                : '#0A5F30',
+    othersFill: isDark ? '#2A2C2A'                : '#E6EAE5',
+    othersInk:  isDark ? '#D7DAD6'                : '#46504A',
+    nameInk:    isDark ? '#FFFFFF'                : '#0E140F',
+    arrowBg:    isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+  };
+  const balanceColor = balanceType === 'owe' ? T.owe : T.owed;
 
-            {/* Title pill — overlaps the characters (zIndex 2, pulled up) */}
-            <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: 16 }}>
-                <View style={[styles.titlePill, boxStyle, { width: '100%' }]}>
-                    <Text style={{ color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
-                        {group.name}
-                    </Text>
-                </View>
-            </View>
-
-            {/* +N others pill */}
-            {extraCount > 0 && (
-                <View style={styles.extraPillRow}>
-                    <View style={[styles.extraPill, { backgroundColor: colors.groupOthersFill }]}>
-                        <Text style={[styles.extraPillText, { color: colors.groupOthersInk }]}>+{extraCount} others</Text>
-                    </View>
-                </View>
+  return (
+    <View style={[styles.card, { borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]}>
+      <Svg style={StyleSheet.absoluteFillObject}>
+        <Defs>
+          <RadialGradient
+            id="glow"
+            cx="0.5"
+            cy="0.46"
+            r="0.52"
+            fx="0.5"
+            fy="0.46"
+            gradientUnits="objectBoundingBox"
+            gradientTransform="matrix(1, 0, 0, 0.67, 0, 0.152)"
+          >
+            {(isDark ? darkStops : lightStops).map((s, i) =>
+              <Stop key={i} offset={s.offset} stopColor={s.color} stopOpacity="1" />
             )}
+          </RadialGradient>
+        </Defs>
+        <Rect width="100%" height="100%" fill="url(#glow)" rx="40" ry="40" />
+      </Svg>
 
-            {/* Stats */}
-            <View style={styles.stats}>
-
-                {/* Total expenses */}
-                <View style={styles.statBlock}>
-                    <Text style={[styles.statLabel, { color: colors.groupLabel }]}>TOTAL EXPENSES</Text>
-                    <View style={[styles.statPill, boxStyle]}>
-                        <Text style={[styles.statValue, { color: colors.text }]}>
-                            ${formatCurrency(group.total_expenses)}
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Balance */}
-                {balanceLoaded && (
-                    <View style={styles.statBlock}>
-                        <Text style={[styles.statLabel, { color: colors.groupLabel }]}>
-                            {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
-                        </Text>
-                        <View style={[styles.balancePill, boxStyle]}>
-                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent }]}>
-                                {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
-                            </Text>
-                            <TouchableOpacity
-                                onPress={onPress}
-                                style={[styles.arrowBtn, {
-                                    backgroundColor: colors.groupArrowBg,
-                                    borderWidth: 1.5,
-                                    borderColor: isSettled ? colors.groupOwed : accent,
-                                }]}
-                            >
-                                <ArrowRight size={18} color={isSettled ? colors.groupOwed : accent} />
-                            </TouchableOpacity>
-                        </View>
-                    </View>
-                )}
+      {/* Character cluster */}
+      <View style={styles.cluster}>
+        {visibleMembers.map((m, i) => {
+          const slot = LADDER[i % 4];
+          return (
+            <View key={m.user_id} style={styles.memberCol}>
+              <Text style={[styles.nameLabel, { color: T.nameInk,
+                transform: [{ rotate: slot.nameRotate }] }]}>
+                {(m.character_nickname ?? m.name.split(' ')[0]).toLowerCase()}
+              </Text>
+              <View style={{ transform: [{ rotate: slot.bodyRotate }],
+                             transformOrigin: 'bottom center' }}>
+                <CharacterShape
+                  shape={m.character_shape ?? 'rect'}
+                  color={m.character_color ?? '#6B7280'}
+                  variant="card"
+                  heightOverride={slot.height}
+                />
+              </View>
             </View>
+          );
+        })}
+      </View>
+
+      {/* Title pill — overlaps characters by 28px */}
+      <View style={[styles.titlePill, {
+        backgroundColor: isDark ? '#070A08' : '#FFFFFF',
+        marginTop: -28,
+        zIndex: 2,
+      }]}>
+        <Text style={[styles.titleText, { color: T.ink }]} numberOfLines={1}>
+          {group.name}
+        </Text>
+      </View>
+
+      {/* +N others pill */}
+      {extraCount > 0 && (
+        <View style={[styles.othersPill, { backgroundColor: T.othersFill }]}>
+          <Text style={[styles.othersText, { color: T.othersInk }]}>+{extraCount} others</Text>
+        </View>
+      )}
+
+      {/* Total Expenses */}
+      <Text style={[styles.sectionLabel, { color: T.label }]}>TOTAL EXPENSES</Text>
+      <View style={[styles.valueBox, { backgroundColor: T.boxFill,
+        borderWidth: isDark ? 0 : 1, borderColor: 'rgba(0,0,0,0.05)' }]}>
+        <Text style={[styles.amountText, { color: T.ink }]}>
+          ${formatCurrency(group.total_expenses)}
+        </Text>
+      </View>
+
+      {/* Balance */}
+      <Text style={[styles.sectionLabel, { color: T.label }]}>
+        {balanceType === 'owe' ? 'YOU OWE' : "YOU'RE OWED"}
+      </Text>
+      <View style={[styles.valueBox, styles.valueBoxRow, { backgroundColor: T.boxFill,
+        borderWidth: isDark ? 0 : 1, borderColor: 'rgba(0,0,0,0.05)' }]}>
+        <Text style={[styles.amountText, { color: balanceColor }]}>
+          {balanceType === 'settled' ? '$0.00' : `$${absBalance.toFixed(2)}`}
+        </Text>
+        <TouchableOpacity onPress={onPress}
+          style={[styles.arrowBtn, { backgroundColor: T.arrowBg,
+            borderColor: balanceColor }]}>
+          <ArrowRight size={20} color={balanceColor} strokeWidth={2.4} />
         </TouchableOpacity>
-    );
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    card: {
-        borderRadius: 28,
-        overflow: 'hidden',
-        marginBottom: 16,
-        paddingBottom: 4,
-    },
-    clusterRow: {
-        position: 'relative',
-        zIndex: 1,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'flex-end',
-        gap: 2,
-        paddingTop: 22,
-        paddingHorizontal: 18,
-    },
-    characterPlaceholder: {
-        height: 80,
-    },
-    titlePill: {
-        borderRadius: 999,
-        height: 64,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 20,
-    },
-    extraPillRow: {
-        flexDirection: 'row',
-        justifyContent: 'center',
-        marginTop: 12,
-        zIndex: 1,
-    },
-    extraPill: {
-        borderRadius: 9999,
-        paddingHorizontal: 16,
-        paddingVertical: 6,
-    },
-    extraPillText: {
-        fontSize: 13,
-        fontWeight: '700',
-    },
-    stats: {
-        paddingHorizontal: 22,
-        paddingTop: 18,
-        paddingBottom: 22,
-        alignItems: 'stretch',
-        gap: 16,
-        zIndex: 1,
-    },
-    statBlock: {
-        alignItems: 'stretch',
-        gap: 8,
-    },
-    statLabel: {
-        fontSize: 12,
-        fontWeight: '800',
-        letterSpacing: 1.5,
-        textAlign: 'center',
-    },
-    statPill: {
-        borderRadius: 22,
-        minHeight: 64,
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 20,
-    },
-    statValue: {
-        fontSize: 30,
-        fontWeight: '700',
-        letterSpacing: -0.5,
-    },
-    balancePill: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderRadius: 22,
-        minHeight: 64,
-        paddingLeft: 24,
-        paddingRight: 12,
-    },
-    balanceValue: {
-        fontSize: 30,
-        fontWeight: '700',
-        letterSpacing: -0.5,
-    },
-    arrowBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
+  card:        { borderRadius: 40, overflow: 'hidden', borderWidth: 1,
+                 marginBottom: 16, padding: 0 },
+  cluster:     { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'center',
+                 gap: 2, paddingTop: 28, paddingHorizontal: 26, zIndex: 1 },
+  memberCol:   { alignItems: 'center', gap: 6 },
+  nameLabel:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 13,
+                 textShadowColor: 'rgba(0,0,0,0.4)',
+                 textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
+  titlePill:   { borderRadius: 999, width: '92%', alignSelf: 'center',
+                 height: 52, alignItems: 'center', justifyContent: 'center',
+                 paddingHorizontal: 20, marginTop: -28, zIndex: 2 },
+  titleText:   { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 22, letterSpacing: -0.5 },
+  othersPill:  { alignSelf: 'center', borderRadius: 999, paddingHorizontal: 18,
+                 paddingVertical: 7, marginTop: 14 },
+  othersText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 14 },
+  sectionLabel:{ fontFamily: 'PlusJakartaSans_800ExtraBold', fontSize: 10, letterSpacing: 1.4,
+                 textAlign: 'center', marginTop: 14, marginBottom: 8 },
+  valueBox:    { borderRadius: 20, height: 60, marginHorizontal: 20,
+                 alignItems: 'center', justifyContent: 'center' },
+  valueBoxRow: { flexDirection: 'row', justifyContent: 'space-between',
+                 paddingHorizontal: 16, marginBottom: 20 },
+  amountText:  { fontFamily: 'PlusJakartaSans_700Bold', fontSize: 30, letterSpacing: -0.5 },
+  arrowBtn:    { width: 40, height: 40, borderRadius: 20, alignItems: 'center',
+                 justifyContent: 'center', borderWidth: 1.5 },
 });
