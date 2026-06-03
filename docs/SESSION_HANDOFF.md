@@ -159,7 +159,12 @@ Show me the updated settlement component with the badge added.
 2. Test end-to-end: send a real Interac e-Transfer, forward confirmation email to `anything@inbound.tandempay.ca`, verify settlement auto-confirms.
 3. Open PR `feat/interac-email-parsing → main`.
 
----
+- Balance bars in group Balances tab: character avatars centred (fixed-width container)
+- GroupCard web + mobile: subtle grey border, gradient extended, "you're owed" bolder
+- Dashboard: "Customise" button moved to top-right badge on character avatar
+- CurvedMenu: "TandemPay" wordmark is sole hover/pin trigger; duplicate text removed
+- INCOMING/OUTGOING stat cards on dashboard: now clickable, show per-group/per-person breakdown
+- GroupCard dark mode: visible box fills, tilt cluster, balance colours
 
 ## Free vs Pro feature split
 
@@ -167,7 +172,7 @@ Free tier: Unlimited groups/members, equal-split expenses, debt simplification, 
 
 Pro tier ($3.99/mo or $29.99/yr): Recurring expenses (HEADLINE), itemized split + receipt OCR, advanced split types, multi-currency, cross-group dashboard, push notifications, unlimited history, expense categories + summaries, CSV/PDF export, priority support.
 
----
+### Roadmap
 
 ## Remaining roadmap after R2
 

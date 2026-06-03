@@ -100,7 +100,7 @@ export default function LinkBankModal({ isOpen, onClose, onSuccess }: LinkBankMo
                             <div>
                                 <h2 className="text-2xl font-bold text-primary mb-2">Link your bank account</h2>
                                 <p className="text-secondary text-sm">
-                                    Tandem uses Plaid to securely connect your accounts. We never see or store your login credentials.
+                                    TandemPay uses Plaid to securely connect your accounts. We never see or store your login credentials.
                                 </p>
                             </div>
 
@@ -152,7 +152,7 @@ export default function LinkBankModal({ isOpen, onClose, onSuccess }: LinkBankMo
                                 <CheckCircle2 className="w-10 h-10 text-emerald-500 relative z-10" />
                             </div>
                             <h3 className="text-2xl font-black text-primary">Account Linked</h3>
-                            <p className="text-secondary text-sm text-center">Your bank account is now ready to use with Tandem.</p>
+                            <p className="text-secondary text-sm text-center">Your bank account is now ready to use with TandemPay.</p>
                         </div>
                     )}
                 </div>
