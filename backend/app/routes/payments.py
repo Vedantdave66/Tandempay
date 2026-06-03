@@ -228,5 +228,5 @@ async def create_payment(
     except Exception as e:
         logger.error(f"[{correlation_id}] Stripe creation error: {str(e)}")
         await db.rollback()
-        raise HTTPException(status_code=400, detail=str(e))
+        raise HTTPException(status_code=400, detail="Payment could not be initiated. Please try again or contact support.")
 

@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { formatCurrency } from '../utils/currency';
-import { Plus, Users, ArrowRight, Palette, ArrowDownLeft, ArrowUpRight } from 'lucide-react';
+import { Plus, Users, ArrowRight, Palette, ArrowDownLeft, ArrowUpRight, X, ChevronRight } from 'lucide-react';
 import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
@@ -19,6 +19,7 @@ export default function DashboardPage() {
     const [owedToMe, setOwedToMe] = useState(0);
     const [iOwe, setIOwe] = useState(0);
     const [groupBalances, setGroupBalances] = useState<Record<string, UserBalance[]>>({});
+    const [activeBreakdown, setActiveBreakdown] = useState<'incoming' | 'outgoing' | null>(null);
 
     useEffect(() => {
         loadGroups();
@@ -58,6 +59,40 @@ export default function DashboardPage() {
     // Auto-refresh: poll every 30s + re-fetch on tab focus/visibility
     useAutoRefresh(loadGroups, 30000, !loading);
 
+    // One row per debtor in groups where I'm net positive
+    const incomingRows = useMemo(() => {
+        if (!user?.id) return [];
+        const rows: { groupId: string; groupName: string; personName: string; amount: number }[] = [];
+        for (const group of groups) {
+            const balances = groupBalances[group.id];
+            if (!balances) continue;
+            const mine = balances.find(b => b.user_id === user.id);
+            if (!mine || mine.net_balance <= 0) continue;
+            for (const b of balances) {
+                if (b.user_id === user.id || Number(b.net_balance) >= 0) continue;
+                rows.push({ groupId: group.id, groupName: group.name, personName: b.name, amount: Math.abs(Number(b.net_balance)) });
+            }
+        }
+        return rows.sort((a, b) => b.amount - a.amount);
+    }, [groups, groupBalances, user?.id]);
+
+    // One row per group where I'm net negative; top creditor as representative name
+    const outgoingRows = useMemo(() => {
+        if (!user?.id) return [];
+        const rows: { groupId: string; groupName: string; personName: string; amount: number }[] = [];
+        for (const group of groups) {
+            const balances = groupBalances[group.id];
+            if (!balances) continue;
+            const mine = balances.find(b => b.user_id === user.id);
+            if (!mine || mine.net_balance >= 0) continue;
+            const topCreditor = balances
+                .filter(b => b.user_id !== user.id && Number(b.net_balance) > 0)
+                .sort((a, b) => Number(b.net_balance) - Number(a.net_balance))[0];
+            rows.push({ groupId: group.id, groupName: group.name, personName: topCreditor?.name ?? '', amount: Math.abs(Number(mine.net_balance)) });
+        }
+        return rows.sort((a, b) => b.amount - a.amount);
+    }, [groups, groupBalances, user?.id]);
+
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!newGroupName.trim()) return;
@@ -93,11 +128,24 @@ export default function DashboardPage() {
                         style={{ backgroundColor: user.character_color }}
                     />
                 )}
+                {/* Customise badge — top-right of hero card */}
+                <Link
+                    to="/settings/character"
+                    aria-label="Customise character"
+                    className="group/badge absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/40 hover:bg-accent/90 hover:scale-110 transition-all cursor-pointer"
+                >
+                    <Palette className="w-4 h-4 text-white" />
+                    <span className="absolute top-full right-0 mt-2 px-2 py-1 text-xs font-semibold bg-surface border border-border rounded-lg text-primary whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                        Customise character
+                    </span>
+                </Link>
                 <div className="relative z-10 flex items-end gap-6 sm:gap-8">
-                    {/* Character — hero size, standing at left edge */}
-                    {user?.character_shape && user?.character_color && (
-                        <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
-                    )}
+                    {/* Character — hero size */}
+                    <div className="relative shrink-0">
+                        {user?.character_shape && user?.character_color && (
+                            <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
+                        )}
+                    </div>
                     {/* Greeting */}
                     <div className="flex-1 pb-4 sm:pb-6">
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight mb-2">
@@ -130,7 +178,7 @@ export default function DashboardPage() {
             {/* Balance Cards */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mb-10">
                 {/* You're owed */}
-                <div className="relative overflow-hidden bg-surface-light/50 border border-emerald-500/20 rounded-3xl p-7 group hover:border-emerald-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
+                <div onClick={() => setActiveBreakdown('incoming')} className="relative overflow-hidden bg-surface-light/50 border border-emerald-500/20 rounded-3xl p-7 group hover:border-emerald-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm cursor-pointer">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-emerald-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-emerald-500/10 transition-colors duration-500" />
                     <div className="relative z-10">
                         <div className="flex justify-between items-start mb-6">
@@ -149,7 +197,7 @@ export default function DashboardPage() {
                 </div>
 
                 {/* You owe */}
-                <div className="relative overflow-hidden bg-surface-light/50 border border-amber-500/20 rounded-3xl p-7 group hover:border-amber-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm">
+                <div onClick={() => setActiveBreakdown('outgoing')} className="relative overflow-hidden bg-surface-light/50 border border-amber-500/20 rounded-3xl p-7 group hover:border-amber-500/40 transition-all duration-500 shadow-xl shadow-black/20 backdrop-blur-sm cursor-pointer">
                     <div className="absolute top-0 right-0 w-40 h-40 bg-amber-500/5 rounded-full blur-2xl -translate-y-1/2 translate-x-1/2 group-hover:bg-amber-500/10 transition-colors duration-500" />
                     <div className="relative z-10">
                         <div className="flex justify-between items-start mb-6">
@@ -265,6 +313,69 @@ export default function DashboardPage() {
                             />
                     ))}
                 </div>
+            )}
+            {/* Balance breakdown sheet */}
+            {activeBreakdown && (
+                <>
+                    <div
+                        className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
+                        onClick={() => setActiveBreakdown(null)}
+                    />
+                    <div className="fixed bottom-0 left-0 right-0 z-50 flex flex-col bg-surface border-t border-border/60 rounded-t-[2rem] shadow-2xl shadow-black/60 max-h-[70vh]">
+                        {/* Drag handle */}
+                        <div className="flex justify-center pt-3 pb-1 shrink-0">
+                            <div className="w-10 h-1 rounded-full bg-border" />
+                        </div>
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-6 pt-3 pb-4 border-b border-border/40 shrink-0">
+                            <div>
+                                <h3 className="text-lg font-bold text-primary">
+                                    {activeBreakdown === 'incoming' ? "You're owed" : 'You owe'}
+                                </h3>
+                                <p className="text-xs text-secondary mt-0.5">
+                                    {activeBreakdown === 'incoming'
+                                        ? `${incomingRows.length} item${incomingRows.length !== 1 ? 's' : ''}`
+                                        : `${outgoingRows.length} item${outgoingRows.length !== 1 ? 's' : ''}`}
+                                </p>
+                            </div>
+                            <button
+                                onClick={() => setActiveBreakdown(null)}
+                                className="w-8 h-8 rounded-full bg-surface-light flex items-center justify-center hover:bg-border transition-colors cursor-pointer"
+                            >
+                                <X className="w-4 h-4 text-secondary" />
+                            </button>
+                        </div>
+                        {/* Rows */}
+                        <div className="overflow-y-auto flex-1 px-4 py-3 space-y-1">
+                            {(activeBreakdown === 'incoming' ? incomingRows : outgoingRows).map((row, i) => (
+                                <Link
+                                    key={`${row.groupId}-${i}`}
+                                    to={`/groups/${row.groupId}`}
+                                    onClick={() => setActiveBreakdown(null)}
+                                    className="flex items-center gap-3 px-4 py-3.5 rounded-2xl hover:bg-surface-light transition-colors group/row"
+                                >
+                                    <div className="flex-1 min-w-0">
+                                        <p className="text-sm font-semibold text-primary truncate">{row.groupName}</p>
+                                        <p className="text-xs text-secondary mt-0.5">
+                                            {activeBreakdown === 'incoming'
+                                                ? <><span className="text-emerald-400 font-medium">{row.personName}</span> owes you</>
+                                                : <>you owe{row.personName ? <> <span className="text-amber-400 font-medium">{row.personName}</span></> : ' this group'}</>}
+                                        </p>
+                                    </div>
+                                    <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className={`text-base font-bold ${activeBreakdown === 'incoming' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                                            ${formatCurrency(row.amount)}
+                                        </span>
+                                        <ChevronRight className="w-4 h-4 text-secondary/40 group-hover/row:text-secondary transition-colors" />
+                                    </div>
+                                </Link>
+                            ))}
+                            {(activeBreakdown === 'incoming' ? incomingRows : outgoingRows).length === 0 && (
+                                <p className="text-center text-secondary text-sm py-10">Nothing to show here.</p>
+                            )}
+                        </div>
+                    </div>
+                </>
             )}
         </div>
     );

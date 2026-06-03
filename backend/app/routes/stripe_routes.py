@@ -168,38 +168,44 @@ async def stripe_webhook(request: Request, db: AsyncSession = Depends(get_db)):
                         # STRICT TRANSFER VALIDATION
                         try:
                             latest_charge_id = intent.latest_charge
-                            if latest_charge_id:
-                                charge = stripe.Charge.retrieve(latest_charge_id)
-                                transfer_id = charge.transfer
-                                if transfer_id:
-                                    transfer = stripe.Transfer.retrieve(transfer_id)
-                                    if transfer.status != "succeeded":
-                                        logger.error(f"Transfer {transfer_id} failed for payment {payment_id}")
-                                        payment.status = "failed"
-                                        await db.commit()
-                                        return {"status": "failed"}
-                                    logger.info(f"Transfer {transfer_id} verified as succeeded")
+                            if not latest_charge_id:
+                                logger.warning(f"No charge found for payment {payment_id}")
+                                return {"status": "no_transfer_found"}
+                            charge = stripe.Charge.retrieve(latest_charge_id)
+                            transfer_id = charge.transfer
+                            if not transfer_id:
+                                logger.warning(f"No transfer found on charge for payment {payment_id}")
+                                return {"status": "no_transfer_found"}
+                            transfer = stripe.Transfer.retrieve(transfer_id)
+                            if transfer.status != "succeeded":
+                                logger.error(f"Transfer {transfer_id} failed for payment {payment_id}")
+                                payment.status = "failed"
+                                await db.commit()
+                                return {"status": "failed"}
+                            logger.info(f"Transfer {transfer_id} verified as succeeded")
+
+                            payment.status = "succeeded"
+
+                            # Calculate +2 business days for payout arrival
+                            from datetime import datetime, timedelta, timezone
+                            now = datetime.now(timezone.utc)
+                            days_to_add = 2
+                            while days_to_add > 0:
+                                now += timedelta(days=1)
+                                if now.weekday() < 5:
+                                    days_to_add -= 1
+                            payment.payout_arrival_date = now.strftime("%b %d")
+
+                            if payment.settlement_id and payment.settlement_id != "none":
+                                settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
+                                settlement = settlement_res.scalars().first()
+                                if settlement:
+                                    settlement.status = "settled"
+                            logger.info(f"Payment {payment_id} marked as succeeded")
                         except Exception as transfer_err:
                             logger.error(f"Transfer validation error: {str(transfer_err)}")
-
-                        payment.status = "succeeded"
-                        
-                        # Calculate +2 business days for payout arrival
-                        from datetime import datetime, timedelta, timezone
-                        now = datetime.now(timezone.utc)
-                        days_to_add = 2
-                        while days_to_add > 0:
-                            now += timedelta(days=1)
-                            if now.weekday() < 5:
-                                days_to_add -= 1
-                        payment.payout_arrival_date = now.strftime("%b %d")
-
-                        if payment.settlement_id and payment.settlement_id != "none":
-                            settlement_res = await db.execute(select(SettlementRecord).where(SettlementRecord.id == payment.settlement_id))
-                            settlement = settlement_res.scalars().first()
-                            if settlement:
-                                settlement.status = "settled"
-                        logger.info(f"Payment {payment_id} marked as succeeded")
+                            await db.commit()
+                            return {"status": "verification_error"}
         
         elif event.type == 'payment_intent.payment_failed':
             intent = event.data.object

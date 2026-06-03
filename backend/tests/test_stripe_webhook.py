@@ -111,7 +111,17 @@ async def test_a_payment_success_marks_settlement_paid(client: AsyncClient):
         await db.commit()
 
     mock_event = _mock_succeeded_event(payment.id)
-    with patch("stripe.Webhook.construct_event", return_value=mock_event):
+    mock_event.data.object.latest_charge = "ch_test_mock123"
+
+    mock_charge = MagicMock()
+    mock_charge.transfer = "tr_test_mock456"
+
+    mock_transfer = MagicMock()
+    mock_transfer.status = "succeeded"
+
+    with patch("stripe.Webhook.construct_event", return_value=mock_event), \
+         patch("stripe.Charge.retrieve", return_value=mock_charge), \
+         patch("stripe.Transfer.retrieve", return_value=mock_transfer):
         resp = await client.post("/api/stripe/webhook", content=b"{}", headers=_WEBHOOK_HEADERS)
 
     assert resp.status_code == 200
@@ -168,9 +178,17 @@ async def test_c_duplicate_event_is_idempotent(client: AsyncClient):
     mock_event.id = shared_event_id
     mock_event.type = "payment_intent.succeeded"
     mock_event.data.object.metadata = {"payment_id": payment.id}
-    mock_event.data.object.latest_charge = None
+    mock_event.data.object.latest_charge = "ch_test_mock123"
 
-    with patch("stripe.Webhook.construct_event", return_value=mock_event):
+    mock_charge = MagicMock()
+    mock_charge.transfer = "tr_test_mock456"
+
+    mock_transfer = MagicMock()
+    mock_transfer.status = "succeeded"
+
+    with patch("stripe.Webhook.construct_event", return_value=mock_event), \
+         patch("stripe.Charge.retrieve", return_value=mock_charge), \
+         patch("stripe.Transfer.retrieve", return_value=mock_transfer):
         r1 = await client.post("/api/stripe/webhook", content=b"{}", headers=_WEBHOOK_HEADERS)
         r2 = await client.post("/api/stripe/webhook", content=b"{}", headers=_WEBHOOK_HEADERS)
 

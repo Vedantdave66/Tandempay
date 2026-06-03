@@ -21,6 +21,8 @@ const PANEL_SLIDE = {
     exit:    { x: 'calc(-100% - 100px)',  transition: { duration: 0.8, ease: EASE } },
 };
 
+const PIN_KEY = 'sidebar_pinned';
+
 // ── Nav items ──────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
@@ -40,9 +42,16 @@ function isActive(href: string, pathname: string, search: string): boolean {
     return pathname === href;
 }
 
+// Returns true only on pointer-capable, non-mobile viewports
+function canHover() {
+    return (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(hover: hover)').matches &&
+        window.innerWidth >= 768
+    );
+}
+
 // ── Curve SVG — right edge of left-sliding panel ──────────────────────────────
-// SVG sits 99px to the right of the panel and fills with bg-surface so it adapts
-// to the active theme. Path morphs from a rightward bulge (entry) to straight (rest).
 
 function Curve() {
     const [H, setH] = useState(window.innerHeight);
@@ -191,6 +200,8 @@ export default function CurvedMenu() {
 
     const handleNavigate = (href: string) => {
         navigate(href);
+        // Keep isPinned — sidebar should survive navigation if user pinned it.
+        // Only clear the hover state.
         setIsOpen(false);
         setShowProfile(false);
     };
@@ -261,9 +272,6 @@ export default function CurvedMenu() {
                                 <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                                     <Wallet className="w-4 h-4 text-white" />
                                 </div>
-                                <span className="text-base font-bold text-primary">
-                                    TandemPay
-                                </span>
                             </div>
 
                             {/* Nav items */}
