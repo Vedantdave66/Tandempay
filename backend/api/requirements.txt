@@ -11,6 +11,7 @@ stripe
 plaid-python
 resend
 slowapi
+python-multipart
 alembic
 apscheduler
 sentry-sdk[fastapi]
