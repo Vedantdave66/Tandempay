@@ -128,6 +128,22 @@ export default function CurvedMenu() {
     const location = useLocation();
 
     const [isOpen, setIsOpen]                 = useState(false);
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Hover open/close only on pointer-capable devices — no listener spam on touch
+    const hasHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+
+    const handleTriggerEnter = () => {
+        if (!hasHover) return;
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+        setIsOpen(true);
+    };
+    const handleTriggerLeave = () => {
+        if (!hasHover) return;
+        hoverTimeoutRef.current = setTimeout(() => setIsOpen(false), 150);
+    };
+    const cancelClose = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
     const [showProfile, setShowProfile]       = useState(false);
     const [profileName, setProfileName]       = useState('');
     const [profileInterac, setProfileInterac] = useState('');
@@ -188,19 +204,32 @@ export default function CurvedMenu() {
 
     return (
         <>
-            {/* Logo trigger — fixed top-left, always on top */}
-            <motion.button
-                onClick={() => setIsOpen(v => !v)}
-                aria-label={isOpen ? 'Close menu' : 'Open menu'}
-                animate={{ scale: isOpen ? 0.88 : 1 }}
-                whileTap={{ scale: 0.82 }}
-                transition={{ duration: 0.2, ease: 'easeOut' }}
-                className="fixed left-0 top-0 m-4 z-[60] cursor-pointer"
-            >
-                <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
-                    <Wallet className="w-5 h-5 text-white" />
-                </div>
-            </motion.button>
+            {/* Nav trigger — fixed top-left, always on top */}
+            <div className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5">
+                {/* Logo — decorative only, no click */}
+                <motion.div
+                    animate={{ scale: isOpen ? 0.88 : 1 }}
+                    whileTap={{ scale: 0.82 }}
+                    transition={{ duration: 0.2, ease: 'easeOut' }}
+                >
+                    <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
+                        <Wallet className="w-5 h-5 text-white" />
+                    </div>
+                </motion.div>
+
+                {/* TandemPay wordmark — click + hover trigger */}
+                <motion.button
+                    onClick={() => setIsOpen(v => !v)}
+                    onMouseEnter={handleTriggerEnter}
+                    onMouseLeave={handleTriggerLeave}
+                    aria-label={isOpen ? 'Close menu' : 'Open menu'}
+                    animate={{ opacity: isOpen ? 0.7 : 1 }}
+                    transition={{ duration: 0.2 }}
+                    className="text-sm font-bold text-primary hover:text-accent transition-colors cursor-pointer select-none"
+                >
+                    TandemPay
+                </motion.button>
+            </div>
 
             <AnimatePresence mode="wait">
                 {isOpen && (
@@ -223,6 +252,8 @@ export default function CurvedMenu() {
                             initial="initial"
                             animate="enter"
                             exit="exit"
+                            onMouseEnter={cancelClose}
+                            onMouseLeave={handleTriggerLeave}
                             className="fixed left-0 top-0 z-50 h-[100dvh] w-80 flex flex-col bg-surface border-r border-border"
                         >
                             {/* Brand header */}

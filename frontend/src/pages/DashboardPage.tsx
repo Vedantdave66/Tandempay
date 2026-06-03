@@ -84,7 +84,7 @@ export default function DashboardPage() {
             <div className="fixed inset-0 opacity-[0.015] pointer-events-none -z-10" style={{ backgroundImage: 'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22/%3E%3C/svg%3E")' }} />
 
             {/* Hero Header */}
-            <div className="relative mb-8 px-8 pt-8 pb-0 sm:px-10 sm:pt-10 rounded-[2rem] overflow-hidden border border-border/60 bg-surface/40 backdrop-blur-xl shadow-2xl shadow-black/40">
+            <div className="relative mb-8 px-8 pt-8 sm:px-10 sm:pt-10 rounded-[2rem] overflow-hidden border border-border/60 bg-surface/40 backdrop-blur-xl shadow-2xl shadow-black/40">
                 <div className="absolute inset-0 bg-gradient-to-br from-accent/5 via-transparent to-indigo/5 opacity-60" />
                 {/* Personalised ambient glow behind character */}
                 {user?.character_color && (
@@ -99,7 +99,7 @@ export default function DashboardPage() {
                         <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
                     )}
                     {/* Greeting */}
-                    <div className="flex-1 pb-8 sm:pb-10">
+                    <div className="flex-1 pb-4 sm:pb-6">
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight mb-2">
                             Hey, {user?.name?.split(' ')[0]} 👋
                         </h1>
@@ -107,6 +107,23 @@ export default function DashboardPage() {
                             Here's where things stand with your squads.
                         </p>
                     </div>
+                </div>
+
+                {/* Character customise row — lives inside the hero, near the greeting */}
+                <div className="relative z-10 pb-6 sm:pb-8">
+                    <Link
+                        to="/settings/character"
+                        className="flex items-center gap-4 p-4 bg-surface/50 border border-border/60 rounded-2xl hover:border-accent/30 hover:bg-surface transition-all group"
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
+                            <Palette className="w-5 h-5 text-accent" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <p className="text-sm font-semibold text-primary">Customise your character</p>
+                            <p className="text-xs text-secondary">Pick your colour, shape, and nickname</p>
+                        </div>
+                        <ArrowRight className="w-4 h-4 text-secondary group-hover:text-accent transition-colors shrink-0" />
+                    </Link>
                 </div>
             </div>
 
@@ -152,21 +169,6 @@ export default function DashboardPage() {
             </div>
 
             <ProUpsellBanner />
-
-            {/* Character customiser quick-link */}
-            <Link
-                to="/settings/character"
-                className="flex items-center gap-4 p-4 mb-8 bg-surface/50 border border-border/60 rounded-2xl hover:border-accent/30 hover:bg-surface transition-all group"
-            >
-                <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
-                    <Palette className="w-5 h-5 text-accent" />
-                </div>
-                <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-primary">Customise your character</p>
-                    <p className="text-xs text-secondary">Pick your colour, shape, and nickname</p>
-                </div>
-                <ArrowRight className="w-4 h-4 text-secondary group-hover:text-accent transition-colors shrink-0" />
-            </Link>
 
             {/* Groups Section Header */}
             <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-8">
