@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { formatCurrency } from '../utils/currency';
-import { X, Send, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, Sparkles, AlertCircle } from 'lucide-react';
+import { X, Send, CreditCard, Copy, CheckCircle2, ArrowRight, Loader2, AlertCircle, Building2 } from 'lucide-react';
 import { Settlement, settlementRecordsApi } from '../services/api';
 import Avatar from './Avatar';
+import CharacterShape from './CharacterShape';
 import StripePaymentModal from './StripePaymentModal';
 
 interface SettleUpModalProps {
     groupId: string;
+    groupName?: string;
     settlement: Settlement;
     currentUserId: string;
     onClose: () => void;
@@ -15,7 +17,7 @@ interface SettleUpModalProps {
 
 type Step = 'method' | 'etransfer' | 'sent_confirmation';
 
-export default function SettleUpModal({ groupId, settlement, currentUserId, onClose, onSettled }: SettleUpModalProps) {
+export default function SettleUpModal({ groupId, groupName, settlement, currentUserId, onClose, onSettled }: SettleUpModalProps) {
     const [step, setStep] = useState<Step>('method');
     const [loading, setLoading] = useState(false);
     const [copied, setCopied] = useState(false);
@@ -28,6 +30,10 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
     const recipientEmail = isPayer ? settlement.to_user_email : settlement.from_user_email;
     const recipientColor = isPayer ? settlement.to_avatar_color : settlement.from_avatar_color;
     const hasInteracEmail = isPayer ? !!settlement.to_interac_email : true;
+
+    const characterShape = settlement.to_character_shape ?? 'rect';
+    const characterColor = settlement.to_character_color ?? recipientColor;
+    const characterNickname = settlement.to_character_nickname ?? null;
 
     const stripeFee = (settlement.amount * 0.029 + 0.30).toFixed(2);
 
@@ -66,8 +72,6 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
         }
     };
 
-    // Interac button: just navigate — record is created on confirm to avoid
-    // a premature POST that conflicts if the user switches to card.
     const handleSelectEtransfer = () => {
         setError('');
         setStep('etransfer');
@@ -106,140 +110,173 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
     };
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-black/70 backdrop-blur-md" onClick={onClose} />
 
-            <div className="relative bg-surface border border-border rounded-3xl w-full max-w-md mx-4 shadow-[0_25px_60px_rgba(0,0,0,0.6)] overflow-hidden">
-                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-80 h-40 bg-accent/5 rounded-full blur-3xl pointer-events-none" />
+            <div className="relative bg-surface border border-border rounded-3xl w-full max-w-xl shadow-[0_25px_60px_rgba(0,0,0,0.6)] overflow-hidden flex flex-col md:flex-row">
 
-                {/* ── HEADER ── */}
-                <div className="relative flex items-center justify-between p-6 pb-4">
-                    <div className="flex items-center gap-3">
-                        <Avatar name={recipientName} color={recipientColor} size="sm" />
-                        <div>
-                            <p className="text-xs text-secondary">Settling with</p>
-                            <p className="text-sm font-bold text-primary">{recipientName}</p>
+                {/* ── CLOSE ── */}
+                <button
+                    onClick={onClose}
+                    className="absolute top-4 right-4 z-10 w-9 h-9 rounded-xl bg-surface-light border border-border flex items-center justify-center hover:bg-border transition-colors cursor-pointer"
+                    aria-label="Close"
+                >
+                    <X className="w-4 h-4 text-secondary" />
+                </button>
+
+                {/* ── LEFT PANE ── */}
+                <div
+                    className="bg-surface-light border-b border-border md:border-b-0 md:border-r md:w-56 md:shrink-0 flex flex-col items-center justify-center gap-4 px-8 py-8 md:py-12"
+                    style={{ backgroundImage: 'radial-gradient(120% 80% at 50% 0%, rgba(74,222,128,0.18), transparent 62%)' }}
+                >
+                    {characterNickname && (
+                        <div className="bg-surface border border-border rounded-full px-3 py-1 text-xs font-semibold text-secondary">
+                            {characterNickname}
                         </div>
-                        <p className="text-2xl font-black text-primary ml-2">
-                            ${formatCurrency(settlement?.amount)}
+                    )}
+
+                    <CharacterShape shape={characterShape} color={characterColor} variant="hero" />
+
+                    <div className="text-center space-y-2">
+                        <p className="text-sm text-secondary">
+                            You owe {characterNickname ?? recipientName}
+                        </p>
+                        <p className="text-4xl font-black text-gold leading-none">
+                            ${formatCurrency(settlement.amount)}
                         </p>
                     </div>
-                    <button
-                        onClick={onClose}
-                        className="w-9 h-9 rounded-xl bg-surface-light border border-border flex items-center justify-center hover:bg-border transition-colors cursor-pointer"
-                        aria-label="Close"
-                    >
-                        <X className="w-4 h-4 text-secondary" />
-                    </button>
+
+                    {groupName && (
+                        <div className="bg-surface border border-border rounded-full px-3 py-1.5 text-xs text-secondary font-medium max-w-[180px] truncate">
+                            {groupName}
+                        </div>
+                    )}
                 </div>
 
-                <div className="relative px-6 pb-6">
+                {/* ── RIGHT PANE ── */}
+                <div className="flex-1 p-6 flex flex-col justify-center min-w-0">
                     {error && (
                         <div className="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl p-3 mb-4">
                             {error}
                         </div>
                     )}
 
-                    {/* ── METHOD SELECTION ── */}
+                    {/* ── METHOD ── */}
                     {step === 'method' && (
-                        <div className="space-y-3">
-                            {/* PRIMARY — Interac */}
-                            <button
-                                onClick={handleSelectEtransfer}
-                                disabled={loading}
-                                className="w-full text-left p-5 rounded-2xl bg-gradient-to-br from-accent/10 to-accent/5 border-2 border-accent/40 hover:border-accent/70 transition-all duration-300 cursor-pointer group disabled:opacity-50"
-                            >
-                                <div className="flex items-start justify-between mb-1">
-                                    <p className="text-sm font-bold text-primary">Send via Interac e-Transfer</p>
-                                    {loading
-                                        ? <Loader2 className="w-4 h-4 text-accent animate-spin mt-0.5" />
-                                        : <ArrowRight className="w-4 h-4 text-accent/50 group-hover:text-accent transition-colors mt-0.5" />
-                                    }
+                        <div className="space-y-4">
+                            {/* Interac — hero */}
+                            <div className="rounded-2xl bg-gradient-to-br from-accent/10 to-accent/5 border-2 border-accent/40 p-5 space-y-3">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 rounded-xl bg-accent/15 flex items-center justify-center shrink-0">
+                                        <Building2 className="w-5 h-5 text-accent" />
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <div className="flex items-center gap-2 flex-wrap">
+                                            <p className="text-sm font-bold text-primary">Interac e-Transfer</p>
+                                            <span className="bg-accent text-[#064E3B] rounded-full px-3 py-1 text-xs font-black shrink-0">FREE</span>
+                                        </div>
+                                        <p className="text-xs text-accent font-medium">Free · Arrives in ~30 seconds</p>
+                                    </div>
                                 </div>
-                                <p className="text-xs text-accent font-medium mb-3">Free&nbsp; • &nbsp;Arrives in ~30 seconds</p>
-                                <div className="flex items-start gap-1.5">
-                                    <Sparkles className="w-3.5 h-3.5 text-secondary shrink-0 mt-0.5" />
-                                    <p className="text-[11px] text-secondary leading-snug">
-                                        We'll auto-confirm this payment when your bank sends the receipt email — no need to come back here.
-                                    </p>
-                                </div>
-                            </button>
+                                <p className="text-xs text-secondary leading-snug">
+                                    We'll auto-confirm once your bank sends you a confirmation email.
+                                </p>
+                                <button
+                                    onClick={handleSelectEtransfer}
+                                    disabled={loading}
+                                    className="w-full bg-gradient-to-r from-accent to-emerald-500 text-[#064E3B] font-bold py-3.5 rounded-xl transition-all duration-200 disabled:opacity-50 cursor-pointer"
+                                >
+                                    Send via Interac
+                                </button>
+                            </div>
 
-                            {/* SECONDARY — Card */}
+                            {/* OR divider */}
+                            <div className="flex items-center gap-3">
+                                <div className="flex-1 h-px bg-border" />
+                                <span className="text-xs text-secondary">OR</span>
+                                <div className="flex-1 h-px bg-border" />
+                            </div>
+
+                            {/* Card — secondary */}
                             <button
                                 onClick={handleSelectStripe}
                                 disabled={loading}
-                                className="w-full text-left px-4 py-3 rounded-xl bg-surface-light border border-border hover:border-border/60 transition-all duration-200 cursor-pointer group disabled:opacity-50 flex items-center gap-3"
+                                className="w-full text-left px-4 py-3.5 rounded-xl bg-surface-light border border-border hover:border-border/60 transition-all duration-200 cursor-pointer flex items-center gap-3 disabled:opacity-50"
                             >
                                 <CreditCard className="w-4 h-4 text-secondary shrink-0" />
-                                <div className="flex-1">
-                                    <p className="text-sm font-medium text-secondary group-hover:text-primary transition-colors">Pay with card instead</p>
-                                    <p className="text-[11px] text-secondary/60">${stripeFee} fee&nbsp; • &nbsp;Arrives in 2 business days</p>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-medium text-secondary">Pay with card instead</p>
+                                    <p className="text-[11px] text-secondary/60">
+                                        ${stripeFee} fee · you'll pay ${(settlement.amount + Number(stripeFee)).toFixed(2)}
+                                    </p>
                                 </div>
-                                <ArrowRight className="w-3.5 h-3.5 text-secondary/30 group-hover:text-secondary transition-colors" />
+                                {loading
+                                    ? <Loader2 className="w-4 h-4 text-secondary animate-spin shrink-0" />
+                                    : <ArrowRight className="w-4 h-4 text-secondary/40 shrink-0" />
+                                }
                             </button>
-
-                            {/* FOOTER disclaimer */}
-                            <p className="text-[11px] text-secondary/50 text-center pt-1 leading-snug">
-                                {recipientName} receives the full ${formatCurrency(settlement?.amount)} via Interac.
-                                Card payments include the processor fee.
-                            </p>
                         </div>
                     )}
 
-                    {/* ── E-TRANSFER DETAIL ── */}
+                    {/* ── E-TRANSFER ── */}
                     {step === 'etransfer' && (
-                        <div className="space-y-5">
-                            <div className="bg-surface-light border border-border rounded-2xl p-5">
-                                <div className="flex items-center gap-4 mb-5">
-                                    <Avatar name={recipientName} color={recipientColor} size="md" />
-                                    <div>
-                                        <p className="text-sm font-bold text-primary">{recipientName}</p>
-                                        <p className="text-xs text-secondary/60">Recipient</p>
-                                    </div>
-                                </div>
-
-                                <div className="space-y-3">
-                                    {!hasInteracEmail && (
-                                        <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3">
-                                            <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-                                            <p className="text-xs text-amber-300 leading-snug">
-                                                <span className="font-semibold">{recipientName}</span> hasn't added their Interac email yet.
-                                                Ask them to add it in their profile, or send to their account email instead.
-                                            </p>
-                                        </div>
-                                    )}
-                                    <div className="flex items-center justify-between bg-bg rounded-xl px-4 py-3 border border-border">
-                                        <div>
-                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">
-                                                {hasInteracEmail ? 'Interac Email' : 'Account Email'}
-                                            </p>
-                                            <p className="text-sm font-bold text-primary">{recipientEmail}</p>
-                                        </div>
-                                        <button
-                                            onClick={handleCopyEmail}
-                                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-border transition-all cursor-pointer"
-                                        >
-                                            {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-accent" /> : <Copy className="w-3.5 h-3.5 text-secondary" />}
-                                            <span className="text-xs text-secondary font-medium">{copied ? 'Copied' : 'Copy'}</span>
-                                        </button>
-                                    </div>
-
-                                    <div className="flex items-center justify-between bg-bg rounded-xl px-4 py-3 border border-border">
-                                        <div>
-                                            <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">Amount</p>
-                                            <p className="text-lg font-black text-accent">${formatCurrency(settlement?.amount)}</p>
-                                        </div>
-                                    </div>
+                        <div className="space-y-4">
+                            {/* Recipient header */}
+                            <div className="flex items-center gap-3">
+                                <Avatar name={recipientName} color={recipientColor} size="sm" />
+                                <div>
+                                    <p className="text-sm font-bold text-primary">{recipientName}</p>
+                                    <p className="text-xs text-secondary/60">Recipient</p>
                                 </div>
                             </div>
 
+                            {/* Interac email warning */}
+                            {!hasInteracEmail && (
+                                <div className="flex items-start gap-2.5 bg-amber-500/10 border border-amber-500/25 rounded-xl px-4 py-3">
+                                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                                    <p className="text-xs text-amber-300 leading-snug">
+                                        <span className="font-semibold">{recipientName}</span> hasn't added their Interac email yet.
+                                        Ask them to add it in their profile, or send to their account email instead.
+                                    </p>
+                                </div>
+                            )}
+
+                            {/* Copyable email */}
+                            <div className="flex items-center justify-between bg-bg border border-border rounded-xl px-4 py-3">
+                                <div className="min-w-0 mr-3">
+                                    <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">
+                                        {hasInteracEmail ? 'Interac Email' : 'Account Email'}
+                                    </p>
+                                    <p className="text-sm font-bold text-primary truncate">{recipientEmail}</p>
+                                </div>
+                                <button
+                                    onClick={handleCopyEmail}
+                                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface hover:bg-surface-hover border border-border transition-all cursor-pointer shrink-0"
+                                >
+                                    {copied
+                                        ? <CheckCircle2 className="w-3.5 h-3.5 text-accent" />
+                                        : <Copy className="w-3.5 h-3.5 text-secondary" />
+                                    }
+                                    <span className="text-xs text-secondary font-medium">{copied ? 'Copied' : 'Copy'}</span>
+                                </button>
+                            </div>
+
+                            {/* Amount */}
+                            <div className="bg-bg border border-border rounded-xl px-4 py-3">
+                                <p className="text-[10px] text-secondary uppercase tracking-widest mb-0.5">Amount</p>
+                                <p className="text-lg font-black text-accent">${formatCurrency(settlement.amount)}</p>
+                            </div>
+
+                            {/* Mark sent */}
                             <button
                                 onClick={handleMarkSent}
                                 disabled={loading}
-                                className="w-full bg-gradient-to-r from-accent to-emerald-500 hover:from-accent-hover hover:to-emerald-600 text-[#064E3B] font-bold py-3.5 rounded-xl transition-all duration-300 disabled:opacity-50 cursor-pointer shadow-lg shadow-accent/20"
+                                className="w-full bg-gradient-to-r from-accent to-emerald-500 text-[#064E3B] font-bold py-3.5 rounded-xl transition-all duration-200 disabled:opacity-50 cursor-pointer shadow-lg shadow-accent/20"
                             >
-                                {loading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : "I sent it on my banking app"}
+                                {loading
+                                    ? <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                                    : "I sent it on my banking app"
+                                }
                             </button>
                         </div>
                     )}
@@ -251,14 +288,14 @@ export default function SettleUpModal({ groupId, settlement, currentUserId, onCl
                                 <Send className="w-9 h-9 text-accent" />
                             </div>
                             <div>
-                                <h3 className="text-xl font-black text-primary mb-1">Payment marked as sent</h3>
+                                <h3 className="text-xl font-black text-primary mb-2">Payment marked as sent</h3>
                                 <p className="text-sm text-secondary">
-                                    We'll auto-confirm once your bank email arrives. No action needed.
+                                    We'll auto-confirm once your bank sends you a confirmation email.
                                 </p>
                             </div>
                             <button
                                 onClick={() => { onSettled(); onClose(); }}
-                                className="w-full bg-accent hover:bg-accent-hover text-white font-bold py-3.5 rounded-xl transition-all duration-300 cursor-pointer shadow-lg shadow-accent/20 border-none"
+                                className="w-full bg-gradient-to-r from-accent to-emerald-500 text-[#064E3B] font-bold py-3.5 rounded-xl transition-all duration-200 cursor-pointer shadow-lg shadow-accent/20"
                             >
                                 Done
                             </button>
