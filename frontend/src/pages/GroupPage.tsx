@@ -503,7 +503,9 @@ export default function GroupPage() {
                                     const isNegative = bal.net_balance < -0.01;
                                     return (
                                         <div key={bal.user_id} className="flex items-center gap-3 bg-surface rounded-xl p-3 border border-border">
-                                            <CharacterShape shape={cd.shape} color={cd.color} variant="mini" />
+                                            <div className="w-12 shrink-0 flex items-end justify-center">
+                                                <CharacterShape shape={cd.shape} color={cd.color} variant="mini" />
+                                            </div>
                                             <div className="flex-1 min-w-0">
                                                 <div className="flex items-center justify-between mb-1.5">
                                                     <p className="text-sm font-semibold text-primary truncate">{bal.name}</p>
