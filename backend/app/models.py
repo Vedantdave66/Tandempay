@@ -150,6 +150,7 @@ class SettlementRecord(Base):
     )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+    auto_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
 
     group: Mapped["Group"] = relationship(back_populates="settlement_records")
     payer: Mapped["User"] = relationship(foreign_keys=[payer_id])
@@ -366,6 +367,42 @@ class RevokedToken(Base):
     user_id: Mapped[str] = mapped_column(String, nullable=False)  # not FK — survives user deletion
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class InteracEmailLog(Base):
+    """Immutable audit record for every inbound Interac confirmation email.
+
+    Rows are write-once. No FK constraint on settlement_id so the log
+    survives settlement deletion. Indexed for feed-style pagination and
+    ops dashboard queries.
+    """
+    __tablename__ = "interac_email_logs"
+
+    id: Mapped[str] = mapped_column(
+        String, primary_key=True, default=lambda: str(uuid.uuid4())
+    )
+
+    # ── Email envelope ────────────────────────────────────────────────────────
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=lambda: datetime.now(timezone.utc),
+        nullable=False,
+        index=True,
+    )
+    from_email: Mapped[str] = mapped_column(String(255), nullable=False)
+    subject: Mapped[str] = mapped_column(String(500), nullable=False)
+    raw_subject: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
+
+    # ── Parsed fields ─────────────────────────────────────────────────────────
+    bank: Mapped[str] = mapped_column(String(20), nullable=False)  # RBC | TD | Scotia | BMO | CIBC | NBC | other
+    direction: Mapped[str] = mapped_column(String(10), nullable=False)  # sent | received | unknown
+    parsed_amount: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2, asdecimal=True), nullable=True)
+    parsed_name: Mapped[Optional[str]] = mapped_column(String(200), nullable=True)
+
+    # ── Match result ──────────────────────────────────────────────────────────
+    matched: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    settlement_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)  # not FK — survives settlement deletion
+    failure_reason: Mapped[Optional[str]] = mapped_column(String(500), nullable=True)
 
 
 class PasswordResetToken(Base):

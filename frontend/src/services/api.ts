@@ -243,6 +243,8 @@ export interface SettlementRecord {
     amount: number;
     method: string;
     status: string; // pending | sent | settled | declined
+    // TODO(backend): add auto_confirmed boolean column to settlement_records table
+    auto_confirmed?: boolean;
     created_at: string;
     updated_at: string;
 }

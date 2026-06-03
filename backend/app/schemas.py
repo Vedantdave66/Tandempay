@@ -318,6 +318,7 @@ class SettlementRecordOut(BaseModel):
     amount: Decimal
     method: str
     status: str
+    auto_confirmed: bool = False
     created_at: datetime
     updated_at: datetime
 

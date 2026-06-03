@@ -26,7 +26,7 @@ from sqlalchemy import text
 from app.config import get_settings
 from app.context import request_id_var
 from app.database import engine  # used by APScheduler-started services via app.database
-from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments
+from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments, interac_routes
 from app.routes import reminders
 from app.routes import audit_log
 from app.routes import subscription_routes
@@ -328,6 +328,7 @@ app.include_router(audit_log.router)
 app.include_router(subscription_routes.router)
 app.include_router(recurring_routes.router)
 app.include_router(export_routes.router)
+app.include_router(interac_routes.router)
 
 @app.get("/")
 async def root():

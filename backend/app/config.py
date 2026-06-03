@@ -30,6 +30,9 @@ class Settings(BaseSettings):
     STRIPE_WEBHOOK_SECRET: str = ""
     STRIPE_PRO_PRICE_ID: str = ""
 
+    # SendGrid Inbound Parse — set in Vercel backend env vars as SENDGRID_WEBHOOK_SECRET
+    SENDGRID_WEBHOOK_SECRET: str = ""
+
     # Sentry — leave empty to disable monitoring entirely (safe for local dev)
     SENTRY_DSN: str = ""
     ENVIRONMENT: str = "development"  # override to "production" on Vercel
