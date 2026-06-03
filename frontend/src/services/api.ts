@@ -221,6 +221,10 @@ export interface Settlement {
     to_interac_email: string | null;
     to_avatar_color: string;
     amount: number;
+    // Optional — present when backend includes character data on suggested settlements
+    to_character_shape?: string;
+    to_character_color?: string;
+    to_character_nickname?: string;
 }
 
 export const balancesApi = {

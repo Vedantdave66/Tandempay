@@ -237,6 +237,7 @@ export default function GroupPage() {
             {settleUpTarget && groupId && user && (
                 <SettleUpModal
                     groupId={groupId}
+                    groupName={group?.name}
                     settlement={settleUpTarget}
                     currentUserId={user.id}
                     onClose={() => setSettleUpTarget(null)}
