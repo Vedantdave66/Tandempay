@@ -90,13 +90,8 @@ function NavItem({ label, icon: Icon, index, active, pro, isPro, onNavigate }: N
             initial="initial"
             whileHover="whileHover"
             onClick={onNavigate}
-            className={`w-full flex items-center gap-4 py-4 border-b transition-colors duration-300 cursor-pointer text-left ${
-                active ? 'border-accent/40' : 'border-border/50 hover:border-border'
-            }`}
+            className="w-full flex items-center gap-4 py-4 transition-colors duration-300 cursor-pointer text-left"
         >
-            <span className={`text-xs font-mono tabular-nums w-5 shrink-0 ${active ? 'text-accent' : 'text-secondary/50'}`}>
-                0{index}
-            </span>
             <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-accent' : 'text-secondary'}`} />
 
             <motion.span
