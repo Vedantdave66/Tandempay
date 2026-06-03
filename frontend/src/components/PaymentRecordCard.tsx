@@ -91,12 +91,22 @@ export default function PaymentRecordCard({ record, currentUserId, groupId, onUp
                 </div>
             )}
 
-            {record.status === 'settled' && (
+            {record.status === 'settled' && record.auto_confirmed && record.method === 'interac' ? (
+                <div
+                    title="Confirmed automatically from your bank email"
+                    className="flex items-center gap-2 justify-center py-2 bg-green-500/10 border border-green-500/20 rounded-xl"
+                >
+                    <CheckCircle2 className="w-4 h-4 text-green-400 dark:text-green-400 shrink-0" />
+                    <span className="text-xs font-semibold text-green-600 dark:text-green-400">
+                        Auto-confirmed via Interac
+                    </span>
+                </div>
+            ) : record.status === 'settled' ? (
                 <div className="flex items-center gap-2 justify-center py-2 bg-accent/5 border border-accent/10 rounded-xl">
                     <CheckCircle2 className="w-4 h-4 text-accent" />
                     <span className="text-xs font-semibold text-accent">Balance Paid</span>
                 </div>
-            )}
+            ) : null}
         </div>
     );
 }
