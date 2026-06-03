@@ -138,10 +138,16 @@ async def update_me(
       - has_completed_payment  (bool)   — set after first Stripe payment to suppress trust screen
       - interac_email          (str)    — Interac e-Transfer email address
       - name                   (str)    — display name
+      - character_shape        (str)    — avatar shape; one of rect, tall, semi, round
+      - character_color        (str)    — avatar fill colour in #RRGGBB format
+      - character_nickname     (str)    — short nickname shown on avatar; empty string clears it
 
     Explicitly forbidden: email, hashed_password, wallet_balance,
     stripe_account_id, avatar_color, id, created_at.
     """
+    _VALID_SHAPES = {'rect', 'tall', 'semi', 'round'}
+    _HEX_COLOR_RE = __import__('re').compile(r'^#[0-9A-Fa-f]{6}$')
+
     if data.has_completed_payment is not None:
         current_user.has_completed_payment = data.has_completed_payment
     if data.interac_email is not None:
@@ -152,8 +158,12 @@ async def update_me(
             raise HTTPException(status_code=422, detail="name cannot be blank")
         current_user.name = stripped
     if data.character_shape is not None:
+        if data.character_shape not in _VALID_SHAPES:
+            raise HTTPException(status_code=422, detail=f"character_shape must be one of {sorted(_VALID_SHAPES)}")
         current_user.character_shape = data.character_shape
     if data.character_color is not None:
+        if not _HEX_COLOR_RE.match(data.character_color):
+            raise HTTPException(status_code=422, detail="character_color must be a 6-digit hex colour, e.g. #34D399")
         current_user.character_color = data.character_color
     if data.character_nickname is not None:
         current_user.character_nickname = data.character_nickname.strip() or None
@@ -264,16 +274,16 @@ async def forgot_password(request: Request, data: PasswordResetRequest, db: Asyn
         reset_link = f"{settings.FRONTEND_URL}/reset-password?token={raw_token}"
         logger.info(f"forgot_password: reset link generated for user_id={user.id}")
 
+        await db.commit()
+
         email_result = await asyncio.to_thread(send_reset_email_sync, user.email, reset_link)
 
         if not email_result["success"]:
-            logger.error(f"forgot_password: email dispatch failed — {email_result['error']}")
+            logger.error(f"forgot_password: token committed but email dispatch failed — {email_result['error']}")
             raise HTTPException(
                 status_code=503,
                 detail="Email service temporarily unavailable. Please try again later."
             )
-
-        await db.commit()
     else:
         logger.info("forgot_password: reset requested for unregistered email (not disclosed to caller)")
 

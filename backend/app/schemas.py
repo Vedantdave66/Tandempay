@@ -136,12 +136,10 @@ class UserOut(BaseModel):
     character_nickname: Optional[str] = None
 
 
-_VALID_SHAPES = {'rect', 'tall', 'semi', 'round'}
-
 class UserUpdate(BaseModel):
     """Safe partial-update schema for PATCH /api/auth/me.
 
-    Only these three fields may be updated via this endpoint.
+    Only the following fields may be updated via this endpoint.
     Email, password, financial fields, and role flags are explicitly
     excluded — they have dedicated, higher-scrutiny endpoints.
     """
@@ -150,14 +148,7 @@ class UserUpdate(BaseModel):
     name: Optional[ShortName] = None
     character_shape: Optional[str] = Field(default=None, max_length=20)
     character_color: Optional[str] = Field(default=None, max_length=7)
-    character_nickname: Optional[str] = Field(default=None, max_length=50, strip_whitespace=True)
-
-    @field_validator('character_shape')
-    @classmethod
-    def validate_shape(cls, v: Optional[str]) -> Optional[str]:
-        if v is not None and v not in _VALID_SHAPES:
-            raise ValueError(f"character_shape must be one of {sorted(_VALID_SHAPES)}")
-        return v
+    character_nickname: Optional[str] = Field(default=None, max_length=50)
 
 
 # ── Groups ────────────────────────────────────────────────────────────────────
