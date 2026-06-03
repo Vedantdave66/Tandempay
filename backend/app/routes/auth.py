@@ -13,7 +13,6 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from app.database import get_db
 from app.config import get_settings
 from app.models import User, PasswordResetToken, RevokedToken
-from app.audit_log import AuditLog
 from app.schemas import UserRegister, UserLogin, Token, UserOut, UserUpdate, PasswordResetRequest, PasswordResetConfirm
 import smtplib
 from email.mime.text import MIMEText
