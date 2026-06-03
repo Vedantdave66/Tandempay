@@ -29,6 +29,18 @@ export const Colors = {
     // Shadows
     shadow: 'rgba(0,0,0,0.05)',
     cardShadow: 'rgba(0,0,0,0.06)',
+    // GroupCard
+    groupGlow:       ['#F3FBF4', '#D8F4E1', '#8FE9B0', '#D8F4E1', '#F3FBF4'] as [string, string, string, string, string],
+    groupBoxFill:    '#FFFFFF',
+    groupBoxBorder:  'rgba(0,0,0,0.05)',
+    groupBoxShadow:  'rgba(20,60,35,0.10)',
+    groupLabel:      '#0A5F30',
+    groupOwe:        '#C28A00',
+    groupOwed:       '#0E9F4F',
+    groupOthersFill: '#E6EAE5',
+    groupOthersInk:  '#46504A',
+    groupNameInk:    '#0E140F',
+    groupArrowBg:    'rgba(0,0,0,0.03)',
   },
   dark: {
     // Text
@@ -56,5 +68,17 @@ export const Colors = {
     // Shadows
     shadow: 'rgba(0,0,0,0.3)',
     cardShadow: 'rgba(0,0,0,0.4)',
+    // GroupCard
+    groupGlow:       ['#070A08', '#0A4A26', '#1AA94E', '#0A4A26', '#070A08'] as [string, string, string, string, string],
+    groupBoxFill:    '#0A0B0A',
+    groupBoxBorder:  'transparent',
+    groupBoxShadow:  'transparent',
+    groupLabel:      '#0B6B38',
+    groupOwe:        '#F2C200',
+    groupOwed:       '#27E06A',
+    groupOthersFill: '#2A2C2A',
+    groupOthersInk:  '#D7DAD6',
+    groupNameInk:    '#FFFFFF',
+    groupArrowBg:    'rgba(255,255,255,0.04)',
   },
 };
