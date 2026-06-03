@@ -21,6 +21,8 @@ const PANEL_SLIDE = {
     exit:    { x: 'calc(-100% - 100px)',  transition: { duration: 0.8, ease: EASE } },
 };
 
+const PIN_KEY = 'sidebar_pinned';
+
 // ── Nav items ──────────────────────────────────────────────────────────────────
 
 const NAV_ITEMS = [
@@ -40,9 +42,16 @@ function isActive(href: string, pathname: string, search: string): boolean {
     return pathname === href;
 }
 
+// Returns true only on pointer-capable, non-mobile viewports
+function canHover() {
+    return (
+        typeof window !== 'undefined' &&
+        window.matchMedia('(hover: hover)').matches &&
+        window.innerWidth >= 768
+    );
+}
+
 // ── Curve SVG — right edge of left-sliding panel ──────────────────────────────
-// SVG sits 99px to the right of the panel and fills with bg-surface so it adapts
-// to the active theme. Path morphs from a rightward bulge (entry) to straight (rest).
 
 function Curve() {
     const [H, setH] = useState(window.innerHeight);
@@ -127,23 +136,38 @@ export default function CurvedMenu() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    const [isOpen, setIsOpen]                 = useState(false);
-    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-    // Hover open/close only on pointer-capable devices — no listener spam on touch
-    const hasHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
+    // isPinned — click-toggled, survives navigation, persisted in localStorage
+    const [isPinned, setIsPinned] = useState<boolean>(() => {
+        try { return localStorage.getItem(PIN_KEY) === 'true'; } catch { return false; }
+    });
+    // isHovered — ephemeral, driven by mouse enter/leave
+    const [isHovered, setIsHovered] = useState(false);
+    const isOpen = isPinned || isHovered;
 
-    const handleTriggerEnter = () => {
-        if (!hasHover) return;
+    const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        try { localStorage.setItem(PIN_KEY, String(isPinned)); } catch {}
+    }, [isPinned]);
+
+    // Click wordmark: toggle pin. If unpinning while not hovered, sidebar will close.
+    const handleWordmarkClick = () => {
+        setIsPinned(v => !v);
+    };
+
+    // Hover enter on trigger or panel — cancel any pending close, mark hovered
+    const handleEnter = () => {
+        if (!canHover()) return;
         if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-        setIsOpen(true);
+        setIsHovered(true);
     };
-    const handleTriggerLeave = () => {
-        if (!hasHover) return;
-        hoverTimeoutRef.current = setTimeout(() => setIsOpen(false), 150);
+
+    // Hover leave on trigger or panel — schedule close after 200ms (unless pinned)
+    const handleLeave = () => {
+        if (!canHover()) return;
+        hoverTimeoutRef.current = setTimeout(() => setIsHovered(false), 200);
     };
-    const cancelClose = () => {
-        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-    };
+
     const [showProfile, setShowProfile]       = useState(false);
     const [profileName, setProfileName]       = useState('');
     const [profileInterac, setProfileInterac] = useState('');
@@ -191,7 +215,9 @@ export default function CurvedMenu() {
 
     const handleNavigate = (href: string) => {
         navigate(href);
-        setIsOpen(false);
+        // Keep isPinned — sidebar should survive navigation if user pinned it.
+        // Only clear the hover state.
+        setIsHovered(false);
         setShowProfile(false);
     };
 
@@ -205,11 +231,14 @@ export default function CurvedMenu() {
     return (
         <>
             {/* Nav trigger — fixed top-left, always on top */}
-            <div className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5">
-                {/* Logo — decorative only, no click */}
+            <div
+                className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5"
+                onMouseEnter={handleEnter}
+                onMouseLeave={handleLeave}
+            >
+                {/* Logo — decorative only */}
                 <motion.div
                     animate={{ scale: isOpen ? 0.88 : 1 }}
-                    whileTap={{ scale: 0.82 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                 >
                     <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
@@ -217,15 +246,13 @@ export default function CurvedMenu() {
                     </div>
                 </motion.div>
 
-                {/* TandemPay wordmark — click + hover trigger */}
+                {/* TandemPay wordmark — sole interactive trigger */}
                 <motion.button
-                    onClick={() => setIsOpen(v => !v)}
-                    onMouseEnter={handleTriggerEnter}
-                    onMouseLeave={handleTriggerLeave}
-                    aria-label={isOpen ? 'Close menu' : 'Open menu'}
-                    animate={{ opacity: isOpen ? 0.7 : 1 }}
+                    onClick={handleWordmarkClick}
+                    aria-label={isPinned ? 'Unpin menu' : 'Pin menu open'}
+                    animate={{ opacity: isPinned ? 0.7 : 1 }}
                     transition={{ duration: 0.2 }}
-                    className="text-sm font-bold text-primary hover:text-accent transition-colors cursor-pointer select-none"
+                    className="text-sm font-bold text-primary hover:text-accent hover:underline decoration-accent/50 underline-offset-2 transition-colors cursor-pointer select-none"
                 >
                     TandemPay
                 </motion.button>
@@ -234,26 +261,31 @@ export default function CurvedMenu() {
             <AnimatePresence mode="wait">
                 {isOpen && (
                     <>
-                        {/* Backdrop */}
-                        <motion.div
-                            key="backdrop"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            exit={{ opacity: 0 }}
-                            transition={{ duration: 0.35, ease: 'easeOut' }}
-                            className="fixed inset-0 z-40"
-                            onClick={() => setIsOpen(false)}
-                        />
+                        {/* Backdrop — only renders when pinned; click to unpin */}
+                        {isPinned && (
+                            <motion.div
+                                key="backdrop"
+                                initial={{ opacity: 0 }}
+                                animate={{ opacity: 1 }}
+                                exit={{ opacity: 0 }}
+                                transition={{ duration: 0.35, ease: 'easeOut' }}
+                                className="fixed inset-0 z-40"
+                                onClick={() => setIsPinned(false)}
+                            />
+                        )}
 
-                        {/* Sliding panel */}
+                        {/* Sliding panel
+                            — hover preview: slightly translucent (opacity 0.93)
+                            — pinned: fully opaque                              */}
                         <motion.div
                             key="panel"
                             variants={PANEL_SLIDE}
                             initial="initial"
                             animate="enter"
                             exit="exit"
-                            onMouseEnter={cancelClose}
-                            onMouseLeave={handleTriggerLeave}
+                            onMouseEnter={handleEnter}
+                            onMouseLeave={handleLeave}
+                            style={{ opacity: isPinned ? 1 : 0.93 }}
                             className="fixed left-0 top-0 z-50 h-[100dvh] w-80 flex flex-col bg-surface border-r border-border"
                         >
                             {/* Brand header */}
@@ -264,6 +296,12 @@ export default function CurvedMenu() {
                                 <span className="text-base font-bold text-primary">
                                     TandemPay
                                 </span>
+                                {/* Pin indicator */}
+                                {isPinned && (
+                                    <span className="ml-auto text-[10px] font-semibold text-accent/60 uppercase tracking-widest">
+                                        pinned
+                                    </span>
+                                )}
                             </div>
 
                             {/* Nav items */}

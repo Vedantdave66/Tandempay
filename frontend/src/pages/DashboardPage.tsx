@@ -94,12 +94,24 @@ export default function DashboardPage() {
                     />
                 )}
                 <div className="relative z-10 flex items-end gap-6 sm:gap-8">
-                    {/* Character — hero size, standing at left edge */}
-                    {user?.character_shape && user?.character_color && (
-                        <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
-                    )}
+                    {/* Character — hero size with edit badge */}
+                    <div className="relative shrink-0">
+                        {user?.character_shape && user?.character_color && (
+                            <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
+                        )}
+                        <Link
+                            to="/settings/character"
+                            aria-label="Customise character"
+                            className="group/badge absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/40 hover:bg-accent/90 hover:scale-110 transition-all cursor-pointer"
+                        >
+                            <Palette className="w-4 h-4 text-white" />
+                            <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs font-semibold bg-surface border border-border rounded-lg text-primary whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                                Customise character
+                            </span>
+                        </Link>
+                    </div>
                     {/* Greeting */}
-                    <div className="flex-1 pb-4 sm:pb-6">
+                    <div className="flex-1 pb-8 sm:pb-10">
                         <h1 className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight mb-2">
                             Hey, {user?.name?.split(' ')[0]} 👋
                         </h1>
@@ -107,23 +119,6 @@ export default function DashboardPage() {
                             Here's where things stand with your squads.
                         </p>
                     </div>
-                </div>
-
-                {/* Character customise row — lives inside the hero, near the greeting */}
-                <div className="relative z-10 pb-6 sm:pb-8">
-                    <Link
-                        to="/settings/character"
-                        className="flex items-center gap-4 p-4 bg-surface/50 border border-border/60 rounded-2xl hover:border-accent/30 hover:bg-surface transition-all group"
-                    >
-                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
-                            <Palette className="w-5 h-5 text-accent" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-primary">Customise your character</p>
-                            <p className="text-xs text-secondary">Pick your colour, shape, and nickname</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-secondary group-hover:text-accent transition-colors shrink-0" />
-                    </Link>
                 </div>
             </div>
 
