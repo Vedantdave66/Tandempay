@@ -102,7 +102,7 @@ function NavItem({ label, icon: Icon, index, active, pro, isPro, onNavigate }: N
             <motion.span
                 variants={{ initial: { x: 0 }, whileHover: { x: -8 } }}
                 transition={{ type: 'spring', staggerChildren: 0.04, delayChildren: 0.1 }}
-                className={`text-2xl font-light tracking-tight leading-none select-none ${
+                className={`text-2xl font-semibold tracking-tight leading-none select-none ${
                     active ? 'text-accent' : 'text-primary'
                 }`}
             >
@@ -217,7 +217,7 @@ export default function CurvedMenu() {
                             animate={{ opacity: 1 }}
                             exit={{ opacity: 0 }}
                             transition={{ duration: 0.35, ease: 'easeOut' }}
-                            className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px]"
+                            className="fixed inset-0 z-40"
                             onClick={() => setIsOpen(false)}
                         />
 

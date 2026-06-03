@@ -15,16 +15,21 @@ const LADDER = [
 ];
 
 function useDarkMode() {
-  const [isDark, setIsDark] = useState(() =>
-    document.documentElement.classList.contains('dark')
-  );
+  const isDarkNow = () =>
+    document.documentElement.classList.contains('dark') ||
+    document.documentElement.getAttribute('data-theme') === 'dark' ||
+    document.body.classList.contains('dark');
+
+  const [isDark, setIsDark] = useState(isDarkNow);
+
   useEffect(() => {
-    const obs = new MutationObserver(() =>
-      setIsDark(document.documentElement.classList.contains('dark'))
-    );
-    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    setIsDark(isDarkNow()); // re-read after hydration
+    const obs = new MutationObserver(() => setIsDark(isDarkNow()));
+    obs.observe(document.documentElement, { attributes: true });
+    obs.observe(document.body, { attributes: true });
     return () => obs.disconnect();
   }, []);
+
   return isDark;
 }
 
