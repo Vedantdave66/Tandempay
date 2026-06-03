@@ -1,4 +1,5 @@
 import logging
+from decimal import Decimal
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,7 @@ from app.routes.auth import get_current_user
 from app.idempotency import idempotent
 from app.services.audit import log_action
 from app.audit_log import AuditActions
+from app.services.balance_service import _compute_balances
 
 router = APIRouter(prefix="/api/groups/{group_id}/settlement-records", tags=["settlement-records"])
 
@@ -85,6 +87,21 @@ async def create_settlement(
 
     if data.payee_id == current_user.id:
         raise HTTPException(status_code=400, detail="Cannot settle with yourself")
+
+    # Validate amount does not exceed actual debt
+    balance_data = await _compute_balances(group_id, db)
+    paid = balance_data["total_paid"].get(current_user.id, Decimal("0"))
+    owed = balance_data["total_owed"].get(current_user.id, Decimal("0"))
+    adj  = balance_data["settlement_adjustments"].get(current_user.id, Decimal("0"))
+    net  = paid - owed + adj
+    max_settleable = abs(net) if net < Decimal("0") else Decimal("0")
+    if max_settleable == Decimal("0"):
+        raise HTTPException(status_code=400, detail="You have no outstanding debt to this member.")
+    if data.amount > max_settleable + Decimal("0.01"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Settlement amount exceeds outstanding debt. Maximum: ${max_settleable:.2f}",
+        )
 
     # Create the record
     record = SettlementRecord(
