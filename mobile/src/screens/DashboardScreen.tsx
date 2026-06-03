@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
-    SafeAreaView, ActivityIndicator, RefreshControl,
+    View, Text, StyleSheet, TouchableOpacity,
+    ActivityIndicator, RefreshControl, Animated,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
@@ -54,6 +54,25 @@ export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showCharacterPicker, setShowCharacterPicker] = useState(false);
+
+    // ── Scroll-driven animation ──────────────────────────────────────────────
+    const scrollY = useRef(new Animated.Value(0)).current;
+
+    const heroOpacity = scrollY.interpolate({
+        inputRange: [0, 100],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+    });
+    const heroTranslate = scrollY.interpolate({
+        inputRange: [0, 100],
+        outputRange: [0, -20],
+        extrapolate: 'clamp',
+    });
+    const compactOpacity = scrollY.interpolate({
+        inputRange: [60, 110],
+        outputRange: [0, 1],
+        extrapolate: 'clamp',
+    });
 
     const loadGroups = async () => {
         try {
@@ -130,170 +149,181 @@ export default function DashboardScreen({ navigation }: any) {
 
     if (loading && !refreshing) {
         return (
-            <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+            <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={[styles.screen, { backgroundColor: colors.background }]}>
 
-            {/* ── Header ── */}
-            <View style={styles.header}>
-                {/* Character + greeting */}
-                <View style={styles.headerLeft}>
-                    <CharacterShape
-                        shape={user?.character_shape ?? 'rect'}
-                        color={user?.character_color ?? '#34D399'}
-                        variant="hero"
-                    />
-                    <View style={styles.greetingBlock}>
-                        <View style={styles.greetingRow}>
-                            <Text style={[styles.greeting, { color: colors.text }]}>
-                                Hey, {firstName} 👋
-                            </Text>
-                            {user?.subscription_tier === 'pro' && (
-                                <View style={styles.proBadge}>
-                                    <Text style={styles.proBadgeText}>PRO</Text>
-                                </View>
-                            )}
-                        </View>
-                        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-                            Here's where things stand with your squads.
-                        </Text>
-                    </View>
-                </View>
-
-                {/* Action buttons — aligned to top */}
-                <View style={[styles.headerActions, { alignSelf: 'flex-start' }]}>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Notifications')}
-                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    >
-                        <Bell color={colors.secondaryText} size={20} />
-                        {unreadCount > 0 && (
-                            <View style={styles.bellBadge}>
-                                <Text style={styles.bellBadgeText}>
-                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                </Text>
-                            </View>
-                        )}
-                    </TouchableOpacity>
-                    <ThemeToggle />
-                    <TouchableOpacity
-                        onPress={logout}
-                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    >
-                        <LogOut color={colors.danger} size={20} />
-                    </TouchableOpacity>
-                </View>
-            </View>
-
-            {/* ── Balance stat cards ── */}
-            <View style={styles.statsRow}>
-                {/* You're owed */}
-                <View style={[styles.statCard, {
-                    backgroundColor: 'rgba(34,197,94,0.08)',
-                    borderColor: 'rgba(34,197,94,0.2)',
-                }]}>
-                    <View style={styles.statCardTop}>
-                        <View style={[styles.statIcon, {
-                            backgroundColor: 'rgba(34,197,94,0.15)',
-                            borderColor: 'rgba(34,197,94,0.2)',
-                        }]}>
-                            <ArrowDownLeft color="#22C55E" size={18} />
-                        </View>
-                        <View style={[styles.badge, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.2)' }]}>
-                            <Text style={[styles.badgeText, { color: '#22C55E' }]}>INCOMING</Text>
-                        </View>
-                    </View>
-                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You're owed</Text>
-                    <Text style={[styles.statValue, { color: '#22C55E' }]}>${formatCurrency(owedToMe)}</Text>
-                </View>
-
-                {/* You owe */}
-                <View style={[styles.statCard, {
-                    backgroundColor: 'rgba(245,158,11,0.08)',
-                    borderColor: 'rgba(245,158,11,0.2)',
-                }]}>
-                    <View style={styles.statCardTop}>
-                        <View style={[styles.statIcon, {
-                            backgroundColor: 'rgba(245,158,11,0.15)',
-                            borderColor: 'rgba(245,158,11,0.2)',
-                        }]}>
-                            <ArrowUpRight color="#F59E0B" size={18} />
-                        </View>
-                        <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }]}>
-                            <Text style={[styles.badgeText, { color: '#F59E0B' }]}>OUTGOING</Text>
-                        </View>
-                    </View>
-                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You owe</Text>
-                    <Text style={[styles.statValue, { color: '#F59E0B' }]}>${formatCurrency(iOwe)}</Text>
-                </View>
-            </View>
-
-            {/* ── Groups list ── */}
-            <FlatList
+            {/* ── Groups list (full-screen scroll container) ── */}
+            <Animated.FlatList
                 data={groups}
                 keyExtractor={(item) => item.id}
                 renderItem={renderGroup}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                    { useNativeDriver: true }
+                )}
+                scrollEventThrottle={16}
                 contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 68 + 8 + 24 }]}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
                 ListHeaderComponent={
                     <View>
-                        {/* Pro upsell banner */}
-                        {user?.subscription_tier !== 'pro' && (
+                        {/* ── Hero block — fades + slides up as user scrolls ── */}
+                        <Animated.View style={{
+                            opacity: heroOpacity,
+                            transform: [{ translateY: heroTranslate }],
+                        }}>
+                            {/* Header */}
+                            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+                                {/* Character + greeting */}
+                                <View style={styles.headerLeft}>
+                                    <CharacterShape
+                                        shape={user?.character_shape ?? 'rect'}
+                                        color={user?.character_color ?? '#34D399'}
+                                        variant="hero"
+                                    />
+                                    <View style={styles.greetingBlock}>
+                                        <View style={styles.greetingRow}>
+                                            <Text style={[styles.greeting, { color: colors.text }]}>
+                                                Hey, {firstName} 👋
+                                            </Text>
+                                            {user?.subscription_tier === 'pro' && (
+                                                <View style={styles.proBadge}>
+                                                    <Text style={styles.proBadgeText}>PRO</Text>
+                                                </View>
+                                            )}
+                                        </View>
+                                        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
+                                            Here's where things stand with your squads.
+                                        </Text>
+                                    </View>
+                                </View>
+
+                                {/* Action buttons */}
+                                <View style={[styles.headerActions, { alignSelf: 'flex-start' }]}>
+                                    <TouchableOpacity
+                                        onPress={() => navigation.navigate('Notifications')}
+                                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                    >
+                                        <Bell color={colors.secondaryText} size={20} />
+                                        {unreadCount > 0 && (
+                                            <View style={styles.bellBadge}>
+                                                <Text style={styles.bellBadgeText}>
+                                                    {unreadCount > 9 ? '9+' : unreadCount}
+                                                </Text>
+                                            </View>
+                                        )}
+                                    </TouchableOpacity>
+                                    <ThemeToggle />
+                                    <TouchableOpacity
+                                        onPress={logout}
+                                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                    >
+                                        <LogOut color={colors.danger} size={20} />
+                                    </TouchableOpacity>
+                                </View>
+                            </View>
+
+                            {/* Balance stat cards */}
+                            <View style={styles.statsRow}>
+                                {/* You're owed */}
+                                <View style={[styles.statCard, {
+                                    backgroundColor: 'rgba(34,197,94,0.08)',
+                                    borderColor: 'rgba(34,197,94,0.2)',
+                                }]}>
+                                    <View style={styles.statCardTop}>
+                                        <View style={[styles.statIcon, {
+                                            backgroundColor: 'rgba(34,197,94,0.15)',
+                                            borderColor: 'rgba(34,197,94,0.2)',
+                                        }]}>
+                                            <ArrowDownLeft color="#22C55E" size={18} />
+                                        </View>
+                                        <View style={[styles.badge, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.2)' }]}>
+                                            <Text style={[styles.badgeText, { color: '#22C55E' }]}>INCOMING</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You're owed</Text>
+                                    <Text style={[styles.statValue, { color: '#22C55E' }]}>${formatCurrency(owedToMe)}</Text>
+                                </View>
+
+                                {/* You owe */}
+                                <View style={[styles.statCard, {
+                                    backgroundColor: 'rgba(245,158,11,0.08)',
+                                    borderColor: 'rgba(245,158,11,0.2)',
+                                }]}>
+                                    <View style={styles.statCardTop}>
+                                        <View style={[styles.statIcon, {
+                                            backgroundColor: 'rgba(245,158,11,0.15)',
+                                            borderColor: 'rgba(245,158,11,0.2)',
+                                        }]}>
+                                            <ArrowUpRight color="#F59E0B" size={18} />
+                                        </View>
+                                        <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }]}>
+                                            <Text style={[styles.badgeText, { color: '#F59E0B' }]}>OUTGOING</Text>
+                                        </View>
+                                    </View>
+                                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You owe</Text>
+                                    <Text style={[styles.statValue, { color: '#F59E0B' }]}>${formatCurrency(iOwe)}</Text>
+                                </View>
+                            </View>
+
+                            {/* Pro upsell banner */}
+                            {user?.subscription_tier !== 'pro' && (
+                                <TouchableOpacity
+                                    style={[styles.upsellBanner, {
+                                        backgroundColor: isDark ? 'rgba(74,222,128,0.08)' : 'rgba(22,163,74,0.06)',
+                                        borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.2)',
+                                    }]}
+                                    onPress={() => navigation.navigate('ProUpgrade')}
+                                    activeOpacity={0.85}
+                                >
+                                    <Text style={styles.upsellEmoji}>👑</Text>
+                                    <View style={styles.upsellTextBlock}>
+                                        <Text style={[styles.upsellTitle, { color: colors.text }]}>Unlock Pro features</Text>
+                                        <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
+                                            Recurring splits, CSV export & more — from $4.99/mo
+                                        </Text>
+                                    </View>
+                                    <ArrowRight color={colors.accent} size={18} />
+                                </TouchableOpacity>
+                            )}
+
+                            {/* Character customise row */}
                             <TouchableOpacity
-                                style={[styles.upsellBanner, {
-                                    backgroundColor: isDark ? 'rgba(74,222,128,0.08)' : 'rgba(22,163,74,0.06)',
-                                    borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.2)',
+                                onPress={() => setShowCharacterPicker(true)}
+                                style={[styles.customiseRow, {
+                                    backgroundColor: colors.surface,
+                                    borderColor: colors.border,
                                 }]}
-                                onPress={() => navigation.navigate('ProUpgrade')}
-                                activeOpacity={0.85}
+                                activeOpacity={0.8}
                             >
-                                <Text style={styles.upsellEmoji}>👑</Text>
-                                <View style={styles.upsellTextBlock}>
-                                    <Text style={[styles.upsellTitle, { color: colors.text }]}>Unlock Pro features</Text>
-                                    <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
-                                        Recurring splits, CSV export & more — from $4.99/mo
+                                <View style={[styles.customiseIcon, {
+                                    backgroundColor: `${colors.accent}1A`,
+                                    borderColor: `${colors.accent}33`,
+                                }]}>
+                                    <Palette color={colors.accent} size={20} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.customiseTitle, { color: colors.text }]}>
+                                        Customise your character
+                                    </Text>
+                                    <Text style={[styles.customiseSub, { color: colors.secondaryText }]}>
+                                        Pick your colour, shape, and nickname
                                     </Text>
                                 </View>
-                                <ArrowRight color={colors.accent} size={18} />
+                                <ArrowRight color={colors.secondaryText} size={16} />
                             </TouchableOpacity>
-                        )}
+                        </Animated.View>
 
-                        {/* Character customise row */}
-                        <TouchableOpacity
-                            onPress={() => setShowCharacterPicker(true)}
-                            style={[styles.customiseRow, {
-                                backgroundColor: colors.surface,
-                                borderColor: colors.border,
-                            }]}
-                            activeOpacity={0.8}
-                        >
-                            <View style={[styles.customiseIcon, {
-                                backgroundColor: `${colors.accent}1A`,
-                                borderColor: `${colors.accent}33`,
-                            }]}>
-                                <Palette color={colors.accent} size={20} />
-                            </View>
-                            <View style={{ flex: 1 }}>
-                                <Text style={[styles.customiseTitle, { color: colors.text }]}>
-                                    Customise your character
-                                </Text>
-                                <Text style={[styles.customiseSub, { color: colors.secondaryText }]}>
-                                    Pick your colour, shape, and nickname
-                                </Text>
-                            </View>
-                            <ArrowRight color={colors.secondaryText} size={16} />
-                        </TouchableOpacity>
-
-                        {/* Section header */}
+                        {/* Section header — outside hero so it stays visible */}
                         <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
                     </View>
                 }
@@ -352,6 +382,45 @@ export default function DashboardScreen({ navigation }: any) {
                 }
             />
 
+            {/* ── Compact sticky balance bar — fades in as hero fades out ── */}
+            <Animated.View style={{
+                position: 'absolute',
+                top: insets.top,
+                left: 0,
+                right: 0,
+                zIndex: 10,
+                opacity: compactOpacity,
+                paddingHorizontal: 16,
+                paddingVertical: 8,
+            }}
+                pointerEvents="none"
+            >
+                <View style={{
+                    flexDirection: 'row',
+                    gap: 8,
+                    backgroundColor: colors.surface,
+                    borderRadius: 999,
+                    paddingHorizontal: 16,
+                    paddingVertical: 8,
+                    borderWidth: 0.5,
+                    borderColor: colors.border,
+                }}>
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                        <ArrowDownLeft size={14} color="#22C55E" />
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#22C55E' }}>
+                            ${formatCurrency(owedToMe)}
+                        </Text>
+                    </View>
+                    <View style={{ width: 0.5, backgroundColor: colors.border }} />
+                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#F59E0B' }}>
+                            ${formatCurrency(iOwe)}
+                        </Text>
+                        <ArrowUpRight size={14} color="#F59E0B" />
+                    </View>
+                </View>
+            </Animated.View>
+
             {/* FAB */}
             <TouchableOpacity
                 style={[styles.fab, { backgroundColor: colors.accent }]}
@@ -366,12 +435,12 @@ export default function DashboardScreen({ navigation }: any) {
                 visible={showCharacterPicker}
                 onClose={() => setShowCharacterPicker(false)}
             />
-        </SafeAreaView>
+        </View>
     );
 }
 
 const styles = StyleSheet.create({
-    safeArea: { flex: 1 },
+    screen: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
@@ -380,7 +449,6 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         justifyContent: 'space-between',
         paddingHorizontal: 24,
-        paddingTop: 16,
         paddingBottom: 16,
     },
     headerLeft: {
