@@ -50,8 +50,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
   const isSettled = !isOwe && !isOwed;
   const balanceColor = isOwe ? '#F2C200' : '#27E06A';
 
-  const darkGlow  = 'radial-gradient(ellipse 92% 62% at 50% 46%, #28E06B 0%, #109A47 30%, #064D26 52%, #070A08 78%)';
-  const lightGlow = 'radial-gradient(ellipse 96% 64% at 50% 44%, #3BE57F 0%, #8FE9B0 30%, #D8F4E1 56%, #F3FBF4 80%)';
+  const darkGlow  = 'radial-gradient(ellipse 92% 74% at 50% 46%, #28E06B 0%, #109A47 30%, #064D26 52%, #070A08 88%)';
+  const lightGlow = 'radial-gradient(ellipse 96% 76% at 50% 44%, #3BE57F 0%, #8FE9B0 30%, #D8F4E1 56%, #F3FBF4 90%)';
 
   const boxStyle: React.CSSProperties = {
     backgroundColor: isDark ? '#0A0B0A' : '#FFFFFF',
@@ -63,7 +63,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
     <div
       onClick={() => navigate(`/groups/${group.id}`)}
       style={{ background: isDark ? darkGlow : lightGlow, borderRadius: 28, overflow: 'hidden',
-               border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+               border: isDark ? '1px solid rgba(255,255,255,0.12)' : '1px solid rgba(0,0,0,0.10)',
                cursor: 'pointer', userSelect: 'none' }}
     >
       {/* Characters row */}
@@ -124,7 +124,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
 
         {/* Total expenses */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase',
+          <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: 1.5, textTransform: 'uppercase',
                          color: isDark ? '#0B6B38' : '#0A5F30' }}>
             Total Expenses
           </span>
@@ -140,8 +140,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0 }: Gro
         {/* Balance */}
         {balanceLoaded && (
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
-            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase',
-                           color: isDark ? '#0B6B38' : '#0A5F30' }}>
+            <span style={{ fontSize: 10, fontWeight: 900, letterSpacing: 1.5, textTransform: 'uppercase',
+                           color: isDark ? '#4ADE80' : '#0A5F30' }}>
               {isOwed ? "You're Owed" : isOwe ? 'You Owe' : 'Status'}
             </span>
             <div style={{ ...boxStyle, borderRadius: 22, padding: '10px 12px 10px 24px', width: '100%',
