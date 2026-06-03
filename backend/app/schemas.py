@@ -88,6 +88,20 @@ class SettlementStatus(str, Enum):
 
 # ── Auth ──────────────────────────────────────────────────────────────────────
 
+def validate_password_complexity(v: str) -> str:
+    import re
+    missing = []
+    if not re.search(r'[A-Z]', v):
+        missing.append("an uppercase letter")
+    if not re.search(r'[0-9]', v):
+        missing.append("a digit")
+    if not re.search(r"""[!@#$%^&*()\-_=+\[\]{}|;':",.<>?/`~]""", v):
+        missing.append("a special character (!@#$%^&*()-_=+[]{}|;':\",.<>?/`~)")
+    if missing:
+        raise ValueError("Password must contain: " + ", ".join(missing))
+    return v
+
+
 class UserRegister(BaseModel):
     name: ShortName
     email: EmailStr
@@ -97,6 +111,11 @@ class UserRegister(BaseModel):
         description="Must be at least 8 characters",
     )
     interac_email: Optional[EmailStr] = None
+
+    @field_validator("password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 
 class UserLogin(BaseModel):
@@ -111,6 +130,11 @@ class PasswordResetRequest(BaseModel):
 class PasswordResetConfirm(BaseModel):
     token: str = Field(min_length=1, max_length=512)
     new_password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        return validate_password_complexity(v)
 
 
 class Token(BaseModel):
