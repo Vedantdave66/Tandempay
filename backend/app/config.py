@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     ADMIN_SECRET: str
 
     ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 1440
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
 
     SMTP_SERVER: str = "smtp.gmail.com"
     SMTP_PORT: int = 587

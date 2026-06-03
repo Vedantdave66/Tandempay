@@ -352,6 +352,22 @@ class RecurringExpense(Base):
     created_by: Mapped["User"] = relationship(foreign_keys=[created_by_id])
 
 
+class RevokedToken(Base):
+    """JWT revocation list. Populated on logout; lookup is by jti claim.
+
+    TODO: scheduled job should DELETE WHERE expires_at < NOW() to prevent
+    unbounded table growth. Rows older than ACCESS_TOKEN_EXPIRE_MINUTES are
+    unreachable by any live token so they are safe to purge.
+    """
+    __tablename__ = "revoked_tokens"
+
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    jti: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    user_id: Mapped[str] = mapped_column(String, nullable=False)  # not FK — survives user deletion
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    revoked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
 class PasswordResetToken(Base):
     """Single-use, time-limited password reset token stored as a SHA-256 hash.
 
