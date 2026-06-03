@@ -1,147 +1,162 @@
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Crown, ArrowRight } from 'lucide-react';
 import { GroupListItem, UserBalance } from '../services/api';
 import { formatCurrency } from '../utils/currency';
-import { ArrowRight, Crown } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
 import CharacterShape from './CharacterShape';
-
-interface GroupCardProps {
-    group: GroupListItem;
-    members?: UserBalance[];
-    myNetBalance?: number;
-}
 
 const SETTLED_THRESHOLD = 0.01;
 
-export default function GroupCard({ group, members = [], myNetBalance = 0 }: GroupCardProps) {
-    const navigate = useNavigate();
-    const visibleMembers = members.slice(0, 4);
-    const extraCount = members.length > 4 ? members.length - 4 : 0;
-    const balanceLoaded = members.length > 0;
-    const isOwe = myNetBalance < -SETTLED_THRESHOLD;
-    const isOwed = myNetBalance > SETTLED_THRESHOLD;
-    const isSettled = !isOwe && !isOwed;
+const LADDER = [
+  { height: 104, bodyRotate: -4, nameRotate: -8  },
+  { height: 138, bodyRotate:  2, nameRotate:  4  },
+  { height:  80, bodyRotate:  0, nameRotate:  6  },
+  { height: 122, bodyRotate:  7, nameRotate: -10 },
+];
 
-    return (
-        <div
-            onClick={() => navigate(`/groups/${group.id}`)}
-            className="relative overflow-hidden bg-surface-light rounded-2xl cursor-pointer select-none flex flex-col"
-        >
-            {/* Radial green glow — same intensity in light + dark */}
-            <div
-                className="absolute inset-x-0 top-0 h-56 pointer-events-none"
-                style={{
-                    background:
-                        'radial-gradient(ellipse at top, #22c55e30 0%, transparent 60%)',
-                }}
-            />
-
-            {/* ── Characters row — evenly spread across full card width ── */}
-            <div className="relative z-10 flex justify-evenly items-end pt-5 px-4">
-                {balanceLoaded ? (
-                    visibleMembers.map((m) => {
-                        const firstName = m.name.split(' ')[0];
-                        const isCreator = m.user_id === group.created_by;
-                        return (
-                            <div key={m.user_id} className="flex flex-col items-center">
-                                {isCreator ? (
-                                    <Crown className="w-3 h-3 text-amber-400 mb-0.5 drop-shadow-sm" />
-                                ) : (
-                                    <div className="w-3 h-3 mb-0.5" />
-                                )}
-                                <span className="text-[9px] text-secondary mb-1 leading-none font-medium">
-                                    {firstName}
-                                </span>
-                                <CharacterShape
-                                    shape={m.character_shape ?? 'rect'}
-                                    color={m.character_color ?? '#6B7280'}
-                                    variant="mini"
-                                />
-                            </div>
-                        );
-                    })
-                ) : (
-                    <div className="h-16" />
-                )}
-            </div>
-
-            {/* ── Group name pill ─────────────────────────────────────── */}
-            <div className="relative z-10 flex justify-center mt-3 px-4">
-                <div className="w-fit bg-black rounded-full px-6 py-2.5 max-w-full">
-                    <h3 className="text-2xl font-bold text-white truncate">{group.name}</h3>
-                </div>
-            </div>
-
-            {/* +N others pill */}
-            {extraCount > 0 && (
-                <div className="relative z-10 flex justify-center mt-1.5">
-                    <div className="bg-surface border border-border/40 rounded-full px-3 py-1">
-                        <span className="text-xs text-secondary font-medium">+{extraCount} others</span>
-                    </div>
-                </div>
-            )}
-
-            {/* ── Stats — centered ────────────────────────────────────── */}
-            <div className="relative z-10 px-5 pt-3 pb-5 flex flex-col items-center gap-2">
-
-                {/* Total expenses */}
-                <div className="flex flex-col items-center gap-1">
-                    <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">
-                        Total Expenses
-                    </span>
-                    <div className="inline-flex items-center bg-surface border border-border/40 rounded-full px-4 py-2">
-                        <span className="text-primary font-semibold text-sm">
-                            ${formatCurrency(group.total_expenses)}
-                        </span>
-                    </div>
-                </div>
-
-                {/* Balance row */}
-                {balanceLoaded && (
-                    <div className="flex flex-col items-center gap-1">
-                        <span className="text-[10px] uppercase tracking-widest text-secondary font-semibold">
-                            {isOwed ? "You're Owed" : isOwe ? 'You Owe' : 'Status'}
-                        </span>
-                        <div className="inline-flex items-center bg-surface border border-border/40 rounded-full pl-4 pr-1.5 py-1.5 gap-2">
-                            <span
-                                className={`font-semibold text-sm ${
-                                    isOwed
-                                        ? 'text-green-500'
-                                        : isOwe
-                                        ? 'text-amber-500'
-                                        : 'text-green-500'
-                                }`}
-                            >
-                                {isSettled
-                                    ? '✓ Settled'
-                                    : `$${formatCurrency(Math.abs(myNetBalance))}`}
-                            </span>
-                            <button
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    navigate(`/groups/${group.id}`);
-                                }}
-                                className={`w-7 h-7 rounded-full flex items-center justify-center transition-colors ${
-                                    isOwed
-                                        ? 'bg-green-500/15 hover:bg-green-500/30'
-                                        : isOwe
-                                        ? 'bg-amber-500/15 hover:bg-amber-500/30'
-                                        : 'bg-border/40 hover:bg-border/70'
-                                }`}
-                            >
-                                <ArrowRight
-                                    className={`w-3.5 h-3.5 ${
-                                        isOwed
-                                            ? 'text-green-500'
-                                            : isOwe
-                                            ? 'text-amber-500'
-                                            : 'text-secondary'
-                                    }`}
-                                />
-                            </button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
+function useDarkMode() {
+  const [isDark, setIsDark] = useState(() =>
+    document.documentElement.classList.contains('dark')
+  );
+  useEffect(() => {
+    const obs = new MutationObserver(() =>
+      setIsDark(document.documentElement.classList.contains('dark'))
     );
+    obs.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => obs.disconnect();
+  }, []);
+  return isDark;
+}
+
+interface GroupCardProps {
+  group: GroupListItem;
+  members?: UserBalance[];
+  myNetBalance?: number;
+}
+
+export default function GroupCard({ group, members = [], myNetBalance = 0 }: GroupCardProps) {
+  const navigate = useNavigate();
+  const isDark = useDarkMode();
+  const visibleMembers = members.slice(0, 4);
+  const extraCount = members.length > 4 ? members.length - 4 : 0;
+  const balanceLoaded = members.length > 0;
+  const isOwe  = myNetBalance < -SETTLED_THRESHOLD;
+  const isOwed = myNetBalance >  SETTLED_THRESHOLD;
+  const isSettled = !isOwe && !isOwed;
+  const balanceColor = isOwe ? '#F2C200' : '#27E06A';
+
+  const darkGlow  = 'radial-gradient(ellipse 92% 62% at 50% 46%, #28E06B 0%, #109A47 30%, #064D26 52%, #070A08 78%)';
+  const lightGlow = 'radial-gradient(ellipse 96% 64% at 50% 44%, #3BE57F 0%, #8FE9B0 30%, #D8F4E1 56%, #F3FBF4 80%)';
+
+  const boxStyle: React.CSSProperties = {
+    backgroundColor: isDark ? '#0A0B0A' : '#FFFFFF',
+    border: isDark ? 'none' : '1px solid rgba(0,0,0,0.05)',
+    boxShadow: isDark ? 'none' : '0 6px 18px rgba(20,60,35,0.10)',
+  };
+
+  return (
+    <div
+      onClick={() => navigate(`/groups/${group.id}`)}
+      style={{ background: isDark ? darkGlow : lightGlow, borderRadius: 28, overflow: 'hidden',
+               border: isDark ? '1px solid rgba(255,255,255,0.06)' : '1px solid rgba(0,0,0,0.06)',
+               cursor: 'pointer', userSelect: 'none' }}
+    >
+      {/* Characters row */}
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'flex-end',
+                    gap: 2, paddingTop: 22, paddingLeft: 18, paddingRight: 18, position: 'relative', zIndex: 1 }}>
+        {balanceLoaded ? visibleMembers.map((m, i) => {
+          const slot = LADDER[i] ?? LADDER[0];
+          const displayName = m.character_nickname ?? m.name.split(' ')[0];
+          return (
+            <div key={m.user_id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+              {m.user_id === group.created_by
+                ? <Crown style={{ width: 12, height: 12, color: '#FBBF24', marginBottom: 2 }} />
+                : <div style={{ height: 14 }} />}
+              <span style={{ fontSize: 11, color: isDark ? '#FFFFFF' : '#0E140F', marginBottom: 4,
+                              fontWeight: 700, transform: `rotate(${slot.nameRotate}deg)`,
+                              textShadow: isDark ? '0 1px 3px rgba(0,0,0,0.4)' : '0 1px 2px rgba(255,255,255,0.55)' }}>
+                {displayName}
+              </span>
+              <div style={{ transform: `rotate(${slot.bodyRotate}deg)`, transformOrigin: 'bottom center' }}>
+                <CharacterShape
+                  shape={m.character_shape ?? 'rect'}
+                  color={m.character_color ?? '#6B7280'}
+                  variant="card"
+                />
+              </div>
+            </div>
+          );
+        }) : <div style={{ height: 80 }} />}
+      </div>
+
+      {/* Title pill — overlaps characters */}
+      <div style={{ position: 'relative', zIndex: 2, display: 'flex', justifyContent: 'center',
+                    marginTop: -22, padding: '0 16px' }}>
+        <div style={{ ...boxStyle, borderRadius: 999, padding: '12px 28px', maxWidth: '92%',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <h3 style={{ color: isDark ? '#FFFFFF' : '#0E140F', fontSize: 26, fontWeight: 700,
+                       letterSpacing: -0.5, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden',
+                       textOverflow: 'ellipsis' }}>
+            {group.name}
+          </h3>
+        </div>
+      </div>
+
+      {/* +N others */}
+      {extraCount > 0 && (
+        <div style={{ display: 'flex', justifyContent: 'center', marginTop: 12 }}>
+          <div style={{ backgroundColor: isDark ? '#2A2C2A' : '#E6EAE5', borderRadius: 999,
+                        padding: '5px 14px' }}>
+            <span style={{ fontSize: 13, fontWeight: 700, color: isDark ? '#D7DAD6' : '#46504A' }}>
+              +{extraCount} others
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Stats */}
+      <div style={{ padding: '16px 22px 22px', display: 'flex', flexDirection: 'column', gap: 14 }}>
+
+        {/* Total expenses */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase',
+                         color: isDark ? '#0B6B38' : '#0A5F30' }}>
+            Total Expenses
+          </span>
+          <div style={{ ...boxStyle, borderRadius: 22, padding: '14px 24px', width: '100%',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <span style={{ color: isDark ? '#FFFFFF' : '#0E140F', fontSize: 28, fontWeight: 700,
+                           letterSpacing: -0.5 }}>
+              ${formatCurrency(group.total_expenses)}
+            </span>
+          </div>
+        </div>
+
+        {/* Balance */}
+        {balanceLoaded && (
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: 1.5, textTransform: 'uppercase',
+                           color: isDark ? '#0B6B38' : '#0A5F30' }}>
+              {isOwed ? "You're Owed" : isOwe ? 'You Owe' : 'Status'}
+            </span>
+            <div style={{ ...boxStyle, borderRadius: 22, padding: '10px 12px 10px 24px', width: '100%',
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span style={{ color: isSettled ? '#27E06A' : balanceColor, fontSize: 28, fontWeight: 700,
+                             letterSpacing: -0.5 }}>
+                {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(myNetBalance))}`}
+              </span>
+              <button
+                onClick={(e) => { e.stopPropagation(); navigate(`/groups/${group.id}`); }}
+                style={{ width: 44, height: 44, borderRadius: 22, border: `1.5px solid ${isSettled ? '#27E06A' : balanceColor}`,
+                         backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+                         display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}
+              >
+                <ArrowRight style={{ width: 18, height: 18, color: isSettled ? '#27E06A' : balanceColor }} />
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }

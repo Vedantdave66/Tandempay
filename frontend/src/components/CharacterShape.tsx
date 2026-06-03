@@ -17,6 +17,12 @@ export const MINI_CONFIGS = {
         semi:  { w: 100, h: 54, radius: '50px 50px 0 0', eyeTop: 14, eyeLeft: 34, eyeSize: 9, eyeGap: 14 },
         round: { w: 72, h: 96,  radius: '36px 36px 0 0', eyeTop: 22, eyeLeft: 22, eyeSize: 9, eyeGap: 10 },
     },
+    card: {
+        rect:  { w: 38, h: 64,  radius: '7px 7px 0 0',   eyeTop: 12, eyeLeft: 9,  eyeSize: 6, eyeGap: 7 },
+        tall:  { w: 28, h: 80,  radius: '4px 4px 0 0',   eyeTop: 15, eyeLeft: 5,  eyeSize: 6, eyeGap: 5 },
+        semi:  { w: 66, h: 38,  radius: '33px 33px 0 0', eyeTop: 10, eyeLeft: 22, eyeSize: 6, eyeGap: 9 },
+        round: { w: 50, h: 64,  radius: '25px 25px 0 0', eyeTop: 14, eyeLeft: 14, eyeSize: 6, eyeGap: 7 },
+    },
 } as const;
 
 export type ShapeVariant = keyof typeof MINI_CONFIGS;
