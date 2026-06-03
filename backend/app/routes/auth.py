@@ -1,6 +1,7 @@
 import hashlib
 import random
 import secrets
+import uuid
 import bcrypt
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, status, Header
@@ -11,7 +12,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 from app.database import get_db
 from app.config import get_settings
-from app.models import User, PasswordResetToken
+from app.models import User, PasswordResetToken, RevokedToken
 from app.schemas import UserRegister, UserLogin, Token, UserOut, UserUpdate, PasswordResetRequest, PasswordResetConfirm
 import smtplib
 from email.mime.text import MIMEText
@@ -44,7 +45,7 @@ def verify_password(password: str, hashed: str) -> bool:
 def create_access_token(data: dict) -> str:
     to_encode = data.copy()
     expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "jti": str(uuid.uuid4())})
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
@@ -60,7 +61,14 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
         user_id: str = payload.get("sub")
         if user_id is None:
             raise credentials_exception
+        jti: str = payload.get("jti")
+        if jti is None:
+            raise credentials_exception
     except JWTError:
+        raise credentials_exception
+
+    revoked = await db.execute(select(RevokedToken).where(RevokedToken.jti == jti))
+    if revoked.scalars().first():
         raise credentials_exception
 
     result = await db.execute(select(User).where(User.id == user_id))
@@ -71,7 +79,8 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 
 
 @router.post("/register", response_model=Token)
-async def register(data: UserRegister, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/hour", error_message="Too many registration attempts. Please try again later.")
+async def register(request: Request, data: UserRegister, db: AsyncSession = Depends(get_db)):
     email_lower = data.email.lower()
     # Check if email already exists
     result = await db.execute(select(User).where(User.email == email_lower))
@@ -123,6 +132,26 @@ async def login(request: Request, data: UserLogin, db: AsyncSession = Depends(ge
 @router.get("/me", response_model=UserOut)
 async def me(current_user: User = Depends(get_current_user)):
     return current_user
+
+
+@router.post("/logout")
+async def logout(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    # TODO: scheduled job should DELETE FROM revoked_tokens WHERE expires_at < NOW()
+    try:
+        payload = jwt.decode(credentials.credentials, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        jti: str = payload.get("jti")
+        exp = payload.get("exp")
+        if jti and exp:
+            expires_at = datetime.fromtimestamp(exp, tz=timezone.utc)
+            db.add(RevokedToken(jti=jti, user_id=current_user.id, expires_at=expires_at))
+            await db.commit()
+    except JWTError:
+        pass  # token already invalid — logout is still successful
+    return {"message": "Logged out successfully"}
 
 
 @router.patch("/me", response_model=UserOut)
@@ -336,22 +365,34 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
 
 # ─── Admin: Mass Password Reset ─────────────────────────────────────────────────
 
+# SECURITY: IP-restrict via Vercel Firewall before production traffic.
 @router.post("/admin/reset-all-passwords")
+@limiter.limit("3/hour", error_message="Too many admin requests.")
 async def admin_reset_all_passwords(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
     """
     Admin-only endpoint: sends a password reset email to every user in the database.
     Protected by the X-Admin-Secret header.
-    
+
     Usage:
         curl -X POST https://api.tandempay.ca/api/auth/admin/reset-all-passwords \
              -H "X-Admin-Secret: <your-admin-secret>"
     """
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
-    
+
+    db.add(AuditLog(
+        actor_id="admin",
+        action="admin.mass_password_reset",
+        entity_type="system",
+        entity_id="all_users",
+        action_metadata={"triggered_by": "admin_endpoint"},
+    ))
+    await db.flush()
+
     # Fetch all users
     result = await db.execute(select(User))
     users = result.scalars().all()
@@ -418,8 +459,11 @@ async def admin_reset_all_passwords(
     }
 
 
+# SECURITY: IP-restrict via Vercel Firewall before production traffic.
 @router.post("/admin/diagnose-hashes")
+@limiter.limit("3/hour", error_message="Too many admin requests.")
 async def admin_diagnose_hashes(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
@@ -429,7 +473,16 @@ async def admin_diagnose_hashes(
     """
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
-    
+
+    db.add(AuditLog(
+        actor_id="admin",
+        action="admin.diagnose_hashes",
+        entity_type="system",
+        entity_id="all_users",
+        action_metadata={},
+    ))
+    await db.commit()
+
     result = await db.execute(select(User))
     users = result.scalars().all()
     

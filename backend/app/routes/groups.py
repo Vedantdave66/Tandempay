@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func as sa_func
+from sqlalchemy import select, func as sa_func, literal
 from sqlalchemy.orm import selectinload
 from decimal import Decimal
 import logging
@@ -57,20 +57,25 @@ async def list_groups(
     )
     total = total_q.scalar_one()
 
+    total_subq = (
+        select(sa_func.coalesce(sa_func.sum(Expense.amount), literal(Decimal("0"))))
+        .where(Expense.group_id == Group.id)
+        .correlate(Group)
+        .scalar_subquery()
+    )
+
     result = await db.execute(
-        select(Group)
+        select(Group, total_subq.label("total_expenses"))
         .where(Group.id.in_(member_q))
         .options(selectinload(Group.members))
-        .options(selectinload(Group.expenses))
         .order_by(Group.created_at.desc())
         .limit(limit)
         .offset(offset)
     )
-    groups = result.scalars().all()
+    rows = result.all()
 
     out = []
-    for g in groups:
-        total_exp = sum(e.amount for e in g.expenses)
+    for g, total_exp in rows:
         out.append(GroupListOut(
             id=g.id,
             name=g.name,

@@ -99,14 +99,19 @@ async def create_expense(
     payer_result = await db.execute(select(User).where(User.id == data.paid_by))
     payer = payer_result.scalar_one()
 
-    # Build participant output with names
-    participant_outs = []
-    for ep in participants:
-        user_result = await db.execute(select(User).where(User.id == ep.user_id))
-        u = user_result.scalar_one()
-        participant_outs.append(ExpenseParticipantOut(
-            user_id=u.id, name=u.name, share_amount=ep.share_amount, avatar_color=u.avatar_color
-        ))
+    # Build participant output with names — single batched fetch
+    participant_user_ids = [ep.user_id for ep in participants]
+    users_result = await db.execute(select(User).where(User.id.in_(participant_user_ids)))
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+    participant_outs = [
+        ExpenseParticipantOut(
+            user_id=ep.user_id,
+            name=users_by_id[ep.user_id].name,
+            share_amount=ep.share_amount,
+            avatar_color=users_by_id[ep.user_id].avatar_color,
+        )
+        for ep in participants
+    ]
 
     # Notify participants (except the creator)
     for ep in participants:
@@ -294,13 +299,18 @@ async def update_expense(
     payer_result = await db.execute(select(User).where(User.id == expense.paid_by))
     payer = payer_result.scalar_one()
 
-    participant_outs = []
-    for ep in new_participants:
-        user_result = await db.execute(select(User).where(User.id == ep.user_id))
-        u = user_result.scalar_one()
-        participant_outs.append(ExpenseParticipantOut(
-            user_id=u.id, name=u.name, share_amount=ep.share_amount, avatar_color=u.avatar_color
-        ))
+    participant_user_ids = [ep.user_id for ep in new_participants]
+    users_result = await db.execute(select(User).where(User.id.in_(participant_user_ids)))
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+    participant_outs = [
+        ExpenseParticipantOut(
+            user_id=ep.user_id,
+            name=users_by_id[ep.user_id].name,
+            share_amount=ep.share_amount,
+            avatar_color=users_by_id[ep.user_id].avatar_color,
+        )
+        for ep in new_participants
+    ]
 
     return ExpenseOut(
         id=expense.id,
