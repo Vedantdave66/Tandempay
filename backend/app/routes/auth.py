@@ -365,22 +365,34 @@ async def reset_password(request: Request, data: PasswordResetConfirm, db: Async
 
 # ─── Admin: Mass Password Reset ─────────────────────────────────────────────────
 
+# SECURITY: IP-restrict via Vercel Firewall before production traffic.
 @router.post("/admin/reset-all-passwords")
+@limiter.limit("3/hour", error_message="Too many admin requests.")
 async def admin_reset_all_passwords(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
     """
     Admin-only endpoint: sends a password reset email to every user in the database.
     Protected by the X-Admin-Secret header.
-    
+
     Usage:
         curl -X POST https://api.tandempay.ca/api/auth/admin/reset-all-passwords \
              -H "X-Admin-Secret: <your-admin-secret>"
     """
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
-    
+
+    db.add(AuditLog(
+        actor_id="admin",
+        action="admin.mass_password_reset",
+        entity_type="system",
+        entity_id="all_users",
+        action_metadata={"triggered_by": "admin_endpoint"},
+    ))
+    await db.flush()
+
     # Fetch all users
     result = await db.execute(select(User))
     users = result.scalars().all()
@@ -447,8 +459,11 @@ async def admin_reset_all_passwords(
     }
 
 
+# SECURITY: IP-restrict via Vercel Firewall before production traffic.
 @router.post("/admin/diagnose-hashes")
+@limiter.limit("3/hour", error_message="Too many admin requests.")
 async def admin_diagnose_hashes(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
@@ -458,7 +473,16 @@ async def admin_diagnose_hashes(
     """
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
-    
+
+    db.add(AuditLog(
+        actor_id="admin",
+        action="admin.diagnose_hashes",
+        entity_type="system",
+        entity_id="all_users",
+        action_metadata={},
+    ))
+    await db.commit()
+
     result = await db.execute(select(User))
     users = result.scalars().all()
     
