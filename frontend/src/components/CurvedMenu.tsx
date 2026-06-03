@@ -202,7 +202,7 @@ export default function CurvedMenu() {
         navigate(href);
         // Keep isPinned — sidebar should survive navigation if user pinned it.
         // Only clear the hover state.
-        setIsHovered(false);
+        setIsOpen(false);
         setShowProfile(false);
     };
 
@@ -272,12 +272,6 @@ export default function CurvedMenu() {
                                 <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                                     <Wallet className="w-4 h-4 text-white" />
                                 </div>
-                                {/* Pin indicator */}
-                                {isPinned && (
-                                    <span className="ml-auto text-[10px] font-semibold text-accent/60 uppercase tracking-widest">
-                                        pinned
-                                    </span>
-                                )}
                             </div>
 
                             {/* Nav items */}
