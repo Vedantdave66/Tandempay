@@ -1,6 +1,6 @@
 # TandemPay — Session Handoff for Claude
 
-**Last updated:** 2026-06-01 (evening)
+**Last updated:** 2026-06-02
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -23,6 +23,57 @@ Use this to bring a fresh Claude conversation up to speed without scrolling chat
 ## Strategic direction (one paragraph)
 
 TandemPay = "Splitwise for Canadian roommates, free settlement on Interac." Wedge audience is roommates with recurring shared bills. Interac e-Transfer is the primary settlement path (free, ~30 sec), with auto-confirmation via email parsing as the unique magic. Stripe Connect stays as a backup "Pay by card" option. Monetization is a Pro subscription at $3.99/mo or $29.99/yr via regular Stripe Subscriptions. Pro headline feature is recurring expenses for shared bills. See memory file `project_tandempay_strategy.md` for the full version and the Free/Pro feature split.
+
+---
+
+## What was completed this session (2026-06-02)
+
+### GroupCard + Dashboard visual overhaul — PR #98 (branch `fix/groups-api-items-fallback`, merged to main)
+
+Full UI polish pass across mobile and web. No backend changes.
+
+#### Mobile — `mobile/src/constants/Colors.ts`
+- Added 11 `group*` tokens to both `light` and `dark` palettes: `groupGlow`, `groupBoxFill`, `groupBoxBorder`, `groupBoxShadow`, `groupLabel`, `groupOwe`, `groupOwed`, `groupOthersFill`, `groupOthersInk`, `groupNameInk`, `groupArrowBg`.
+- `groupGlow` typed as `[string, string, string, string, string]` tuple so `expo-linear-gradient`'s `colors` prop accepts it without a cast.
+- **Why this was needed:** GroupCard was using `colors.surface` for the title pill and value boxes — the same colour as the card background — making them invisible (black-on-black) in dark mode.
+
+#### Mobile — `mobile/src/components/GroupCard.tsx` (full rewrite)
+- Replaced `react-native-svg` `<RadialGradient>` with `expo-linear-gradient` 5-stop vertical glow.
+- All surfaces now read from `colors.group*` tokens — no hardcoded hex values.
+- Dark mode: `groupBoxFill: '#0A0B0A'` renders as visible black silhouettes against the bright `#1AA94E` centre glow.
+- Light mode: white elevated boxes (`groupBoxFill: '#FFFFFF'`, subtle border + shadow) on a soft mint glow.
+- Characters peek above title pill with per-slot tilt (`TILT` array, ±4°–7° body, ±6°–10° name); crown icon for group creator.
+- `+N others` pill appears when group has more than 4 members.
+- Balance amount is gold when you owe / green when owed; arrow ring colour matches.
+- Removed `eyeStyle="ball"` prop from `<CharacterShape>` (separate follow-up edit).
+
+#### Mobile — `mobile/src/screens/DashboardScreen.tsx`
+- **Safe area fix:** replaced `SafeAreaView` with plain `View`; header container uses `paddingTop: insets.top + 12` — no bleed under Dynamic Island or status bar.
+- **Collapsing hero:** `FlatList` → `Animated.FlatList` with `scrollY` ref (`useNativeDriver: true`). Header + balance stat cards + pro upsell + customise row moved into `ListHeaderComponent`, wrapped in `Animated.View` with `heroOpacity` (`inputRange: [0, 100]`) and `heroTranslate` (`outputRange: [0, -20]`).
+- **Compact sticky balance bar:** absolutely positioned at `top: insets.top`, fades in over `inputRange: [60, 110]` as the hero fades out. Renders as a sibling outside the FlatList so it overlays scrolling content. `pointerEvents="none"` so it doesn't intercept taps.
+
+#### Web — `frontend/src/services/api.ts`
+- Added `character_nickname: string | null` to `UserBalance` interface.
+
+#### Web — `frontend/src/components/CharacterShape.tsx`
+- Added `card` variant to `MINI_CONFIGS` with dimensions matching mobile (`rect` 38×64, `tall` 28×80, `semi` 66×38, `round` 50×64). Used `radius` strings (web format) derived from the mobile `tl`/`tr` values — no other changes to the component.
+
+#### Web — `frontend/src/components/GroupCard.tsx` (full rewrite)
+- Replaced Tailwind-based card with inline-style version matching the mobile design.
+- Radial-gradient glow via CSS `background` (dark: `#28E06B → #070A08`; light: `#3BE57F → #F3FBF4`).
+- `useDarkMode()` hook using `MutationObserver` on `document.documentElement` — checks `classList.contains('dark')`, `data-theme="dark"`, and `document.body.classList.contains('dark')`; re-reads on mount after hydration. Observes both `documentElement` and `body`.
+- `LADDER` tilt array for character cluster (body ±4°–7°, name ±8°–10°), matching mobile.
+- `character_nickname` used as display name (falls back to first name).
+- `card` variant on `<CharacterShape>`.
+- Themed box styles: dark = near-black pill + no shadow; light = white + border + drop shadow.
+- Arrow ring colour tracks owe/owed/settled.
+- Props interface unchanged — drop-in replacement, no changes to `DashboardPage.tsx`.
+
+#### Web — `frontend/src/components/CurvedMenu.tsx`
+- Nav item font: `font-light` → `font-semibold`.
+- Removed backdrop `bg-black/40 backdrop-blur-[2px]` — overlay now transparent (click-to-close preserved).
+- Removed per-item index number span (`0{index}`).
+- Removed `border-b` and active/inactive border colour classes from `motion.button` — clean borderless nav rows.
 
 ---
 
@@ -143,7 +194,19 @@ All temporary Sentry validation scaffolding removed:
 
 ---
 
-## Key files changed this session
+## Key files changed this session (2026-06-02)
+
+```
+mobile/src/constants/Colors.ts                — added 11 group* theme tokens (light + dark)
+mobile/src/components/GroupCard.tsx           — full rewrite: LinearGradient glow, group* tokens, tilt cluster
+mobile/src/screens/DashboardScreen.tsx        — safe area fix, Animated.FlatList, collapsing hero, compact bar
+frontend/src/services/api.ts                  — UserBalance.character_nickname added
+frontend/src/components/CharacterShape.tsx    — card variant added to MINI_CONFIGS
+frontend/src/components/GroupCard.tsx         — full rewrite matching mobile, useDarkMode hook
+frontend/src/components/CurvedMenu.tsx        — font-semibold nav, no backdrop blur, no index/dividers
+```
+
+## Key files changed in session (2026-06-01 / earlier)
 
 ```
 vercel.json                          — frontend security headers + CSP (incl. Sentry ingest)
@@ -256,6 +319,6 @@ These are non-code requirements that must be addressed before TandemPay handles 
 ## What to do first in the new session
 
 Open with:
-> "I'm picking up TandemPay work. Memory has the project context and the handoff doc is at `docs/SESSION_HANDOFF.md`. We just finished Phase 3 #1 (security headers, A grade) and Phase 3 #2 (Sentry — operational on backend and frontend, mobile pending EAS build). The next prompt I need is Phase 3 #3: the audit log for financial actions. Please write that prompt in my Phase-suite style."
+> "I'm picking up TandemPay work. Memory has the project context and the handoff doc is at `docs/SESSION_HANDOFF.md`. The last session (2026-06-02) was a UI polish pass — GroupCard dark/light mode fix on mobile + web, DashboardScreen collapsing hero, and CurvedMenu nav cleanup (PR #98, merged to main). Branch `fix/groups-api-items-fallback` still has post-merge commits not yet in a new PR. The next focus is product work: either R1 (Settle Up modal redesign) or R2 (Interac email-parsing backend service)."
 
-The new Claude will read memory, glance at the handoff doc for any specific commit IDs or details, and produce the audit log prompt ready to paste into Antigravity.
+The new Claude will read memory, check the handoff doc, and be ready to continue from there.
