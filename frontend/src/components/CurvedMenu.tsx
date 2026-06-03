@@ -136,38 +136,23 @@ export default function CurvedMenu() {
     const navigate = useNavigate();
     const location = useLocation();
 
-    // isPinned — click-toggled, survives navigation, persisted in localStorage
-    const [isPinned, setIsPinned] = useState<boolean>(() => {
-        try { return localStorage.getItem(PIN_KEY) === 'true'; } catch { return false; }
-    });
-    // isHovered — ephemeral, driven by mouse enter/leave
-    const [isHovered, setIsHovered] = useState(false);
-    const isOpen = isPinned || isHovered;
-
+    const [isOpen, setIsOpen]                 = useState(false);
     const hoverTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    // Hover open/close only on pointer-capable devices — no listener spam on touch
+    const hasHover = typeof window !== 'undefined' && window.matchMedia('(hover: hover)').matches;
 
-    useEffect(() => {
-        try { localStorage.setItem(PIN_KEY, String(isPinned)); } catch {}
-    }, [isPinned]);
-
-    // Click wordmark: toggle pin. If unpinning while not hovered, sidebar will close.
-    const handleWordmarkClick = () => {
-        setIsPinned(v => !v);
-    };
-
-    // Hover enter on trigger or panel — cancel any pending close, mark hovered
-    const handleEnter = () => {
-        if (!canHover()) return;
+    const handleTriggerEnter = () => {
+        if (!hasHover) return;
         if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
-        setIsHovered(true);
+        setIsOpen(true);
     };
-
-    // Hover leave on trigger or panel — schedule close after 200ms (unless pinned)
-    const handleLeave = () => {
-        if (!canHover()) return;
-        hoverTimeoutRef.current = setTimeout(() => setIsHovered(false), 200);
+    const handleTriggerLeave = () => {
+        if (!hasHover) return;
+        hoverTimeoutRef.current = setTimeout(() => setIsOpen(false), 150);
     };
-
+    const cancelClose = () => {
+        if (hoverTimeoutRef.current) clearTimeout(hoverTimeoutRef.current);
+    };
     const [showProfile, setShowProfile]       = useState(false);
     const [profileName, setProfileName]       = useState('');
     const [profileInterac, setProfileInterac] = useState('');
@@ -231,14 +216,11 @@ export default function CurvedMenu() {
     return (
         <>
             {/* Nav trigger — fixed top-left, always on top */}
-            <div
-                className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5"
-                onMouseEnter={handleEnter}
-                onMouseLeave={handleLeave}
-            >
-                {/* Logo — decorative only */}
+            <div className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5">
+                {/* Logo — decorative only, no click */}
                 <motion.div
                     animate={{ scale: isOpen ? 0.88 : 1 }}
+                    whileTap={{ scale: 0.82 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                 >
                     <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
@@ -246,13 +228,15 @@ export default function CurvedMenu() {
                     </div>
                 </motion.div>
 
-                {/* TandemPay wordmark — sole interactive trigger */}
+                {/* TandemPay wordmark — click + hover trigger */}
                 <motion.button
-                    onClick={handleWordmarkClick}
-                    aria-label={isPinned ? 'Unpin menu' : 'Pin menu open'}
-                    animate={{ opacity: isPinned ? 0.7 : 1 }}
+                    onClick={() => setIsOpen(v => !v)}
+                    onMouseEnter={handleTriggerEnter}
+                    onMouseLeave={handleTriggerLeave}
+                    aria-label={isOpen ? 'Close menu' : 'Open menu'}
+                    animate={{ opacity: isOpen ? 0.7 : 1 }}
                     transition={{ duration: 0.2 }}
-                    className="text-sm font-bold text-primary hover:text-accent hover:underline decoration-accent/50 underline-offset-2 transition-colors cursor-pointer select-none"
+                    className="text-sm font-bold text-primary hover:text-accent transition-colors cursor-pointer select-none"
                 >
                     TandemPay
                 </motion.button>
@@ -261,31 +245,26 @@ export default function CurvedMenu() {
             <AnimatePresence mode="wait">
                 {isOpen && (
                     <>
-                        {/* Backdrop — only renders when pinned; click to unpin */}
-                        {isPinned && (
-                            <motion.div
-                                key="backdrop"
-                                initial={{ opacity: 0 }}
-                                animate={{ opacity: 1 }}
-                                exit={{ opacity: 0 }}
-                                transition={{ duration: 0.35, ease: 'easeOut' }}
-                                className="fixed inset-0 z-40"
-                                onClick={() => setIsPinned(false)}
-                            />
-                        )}
+                        {/* Backdrop */}
+                        <motion.div
+                            key="backdrop"
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            exit={{ opacity: 0 }}
+                            transition={{ duration: 0.35, ease: 'easeOut' }}
+                            className="fixed inset-0 z-40"
+                            onClick={() => setIsOpen(false)}
+                        />
 
-                        {/* Sliding panel
-                            — hover preview: slightly translucent (opacity 0.93)
-                            — pinned: fully opaque                              */}
+                        {/* Sliding panel */}
                         <motion.div
                             key="panel"
                             variants={PANEL_SLIDE}
                             initial="initial"
                             animate="enter"
                             exit="exit"
-                            onMouseEnter={handleEnter}
-                            onMouseLeave={handleLeave}
-                            style={{ opacity: isPinned ? 1 : 0.93 }}
+                            onMouseEnter={cancelClose}
+                            onMouseLeave={handleTriggerLeave}
                             className="fixed left-0 top-0 z-50 h-[100dvh] w-80 flex flex-col bg-surface border-r border-border"
                         >
                             {/* Brand header */}
