@@ -293,9 +293,6 @@ export default function CurvedMenu() {
                                 <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                                     <Wallet className="w-4 h-4 text-white" />
                                 </div>
-                                <span className="text-base font-bold text-primary">
-                                    TandemPay
-                                </span>
                                 {/* Pin indicator */}
                                 {isPinned && (
                                     <span className="ml-auto text-[10px] font-semibold text-accent/60 uppercase tracking-widest">

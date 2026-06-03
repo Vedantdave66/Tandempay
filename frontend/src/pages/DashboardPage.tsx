@@ -93,22 +93,23 @@ export default function DashboardPage() {
                         style={{ backgroundColor: user.character_color }}
                     />
                 )}
+                {/* Customise badge — top-right of hero card */}
+                <Link
+                    to="/settings/character"
+                    aria-label="Customise character"
+                    className="group/badge absolute top-3 right-3 z-20 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/40 hover:bg-accent/90 hover:scale-110 transition-all cursor-pointer"
+                >
+                    <Palette className="w-4 h-4 text-white" />
+                    <span className="absolute top-full right-0 mt-2 px-2 py-1 text-xs font-semibold bg-surface border border-border rounded-lg text-primary whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none shadow-lg">
+                        Customise character
+                    </span>
+                </Link>
                 <div className="relative z-10 flex items-end gap-6 sm:gap-8">
-                    {/* Character — hero size with edit badge */}
+                    {/* Character — hero size */}
                     <div className="relative shrink-0">
                         {user?.character_shape && user?.character_color && (
                             <CharacterShape shape={user.character_shape} color={user.character_color} variant="hero" />
                         )}
-                        <Link
-                            to="/settings/character"
-                            aria-label="Customise character"
-                            className="group/badge absolute -bottom-1 -right-1 w-8 h-8 rounded-full bg-accent flex items-center justify-center shadow-lg shadow-accent/40 hover:bg-accent/90 hover:scale-110 transition-all cursor-pointer"
-                        >
-                            <Palette className="w-4 h-4 text-white" />
-                            <span className="absolute bottom-full right-0 mb-2 px-2 py-1 text-xs font-semibold bg-surface border border-border rounded-lg text-primary whitespace-nowrap opacity-0 group-hover/badge:opacity-100 transition-opacity pointer-events-none shadow-lg">
-                                Customise character
-                            </span>
-                        </Link>
                     </div>
                     {/* Greeting */}
                     <div className="flex-1 pb-8 sm:pb-10">
