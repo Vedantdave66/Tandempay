@@ -22,7 +22,7 @@ export default function AuthCard({ children, footer }: AuthCardProps) {
                     <div className="w-12 h-12 bg-gradient-to-br from-accent to-emerald-600 rounded-2xl flex items-center justify-center shadow-lg shadow-accent/30 auth-logo-pulse">
                         <Wallet className="w-6 h-6 text-white" />
                     </div>
-                    <span className="text-2xl font-bold text-primary">Tandem</span>
+                    <span className="text-2xl font-bold text-primary">TandemPay</span>
                 </div>
 
                 {/* Card — glassmorphism + entrance animation */}

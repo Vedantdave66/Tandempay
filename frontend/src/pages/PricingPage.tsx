@@ -72,7 +72,7 @@ export default function PricingPage() {
                         <div className="w-8 h-8 bg-gradient-to-br from-accent to-emerald-500 rounded-lg flex items-center justify-center shadow-sm shadow-accent/20">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-lg font-bold text-primary">Tandem</span>
+                        <span className="text-lg font-bold text-primary">TandemPay</span>
                     </Link>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />

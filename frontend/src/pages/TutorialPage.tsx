@@ -40,7 +40,7 @@ const steps = [
         id: 'expenses',
         step: '02',
         title: 'Log Shared Expenses',
-        description: 'Who paid for what? Add expenses in seconds. Split equally or by exact amounts per person. No math, no drama — Tandem handles it all automatically.',
+        description: 'Who paid for what? Add expenses in seconds. Split equally or by exact amounts per person. No math, no drama — TandemPay handles it all automatically.',
         icon: Receipt,
         accent: '#F59E0B',
         accentBg: 'rgba(245,158,11,0.08)',
@@ -67,7 +67,7 @@ const steps = [
         id: 'balances',
         step: '03',
         title: 'Smart Balance Simplification',
-        description: "Tandem's algorithm calculates the minimum number of transactions needed to settle everyone up. A owes B, B owes C? We collapse it into one clean payment.",
+        description: "TandemPay's algorithm calculates the minimum number of transactions needed to settle everyone up. A owes B, B owes C? We collapse it into one clean payment.",
         icon: TrendingUp,
         accent: '#4ADE80',
         accentBg: 'rgba(74,222,128,0.08)',
@@ -94,7 +94,7 @@ const steps = [
         id: 'reminders',
         step: '04',
         title: 'Automated Reminders',
-        description: "Tired of awkwardly asking for money? Set a recurring reminder on any expense. Tandem will gently notify your friend every few days — so you don't have to.",
+        description: "Tired of awkwardly asking for money? Set a recurring reminder on any expense. TandemPay will gently notify your friend every few days — so you don't have to.",
         icon: Bell,
         accent: '#FB923C',
         accentBg: 'rgba(251,146,60,0.08)',
@@ -141,7 +141,7 @@ const steps = [
         id: 'settle',
         step: '06',
         title: 'Pay Right Inside the App',
-        description: "No more app-switching. Pay with Apple Pay, Google Pay, or card directly through Tandem. Balances update instantly. Everyone sees it. Done.",
+        description: "No more app-switching. Pay with Apple Pay, Google Pay, or card directly through TandemPay. Balances update instantly. Everyone sees it. Done.",
         icon: Send,
         accent: '#4ADE80',
         accentBg: 'rgba(74,222,128,0.08)',
@@ -214,7 +214,7 @@ export default function TutorialPage() {
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ADE80, #16A34A)', boxShadow: '0 4px 14px rgba(74,222,128,0.3)' }}>
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
-                        <span className="font-bold hidden sm:block" style={{ color: 'var(--color-primary-base)' }}>Tandem</span>
+                        <span className="font-bold hidden sm:block" style={{ color: 'var(--color-primary-base)' }}>TandemPay</span>
                         <ThemeToggle />
                     </div>
                 </div>

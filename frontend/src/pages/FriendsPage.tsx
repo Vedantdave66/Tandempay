@@ -389,7 +389,7 @@ export default function FriendsPage() {
                     </div>
                     <h2 className="text-2xl font-bold text-primary mb-2">Send a Friend Request</h2>
                     <p className="text-secondary mb-8 max-w-md mx-auto leading-relaxed">
-                        Enter your friend's email address below to send them an invite to connect on Tandem.
+                        Enter your friend's email address below to send them an invite to connect on TandemPay.
                     </p>
 
                     {addMessage && (
