@@ -4,6 +4,7 @@ import { Check, Crown, Loader2, Wallet } from 'lucide-react';
 import { BASE_URL } from '../services/api';
 import ThemeToggle from '../components/ThemeToggle';
 import { useAuth } from '../context/AuthContext';
+import TandemPayLogo from '../components/TandemPayLogo';
 
 const FREE_FEATURES = [
     'Unlimited friends',
@@ -72,7 +73,7 @@ export default function PricingPage() {
                         <div className="w-8 h-8 bg-gradient-to-br from-accent to-emerald-500 rounded-lg flex items-center justify-center shadow-sm shadow-accent/20">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
-                        <span className="text-lg font-bold text-primary">TandemPay</span>
+                        <TandemPayLogo size={18} />
                     </Link>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />

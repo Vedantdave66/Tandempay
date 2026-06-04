@@ -10,6 +10,7 @@ import Avatar from './Avatar';
 import ThemeToggle from './ThemeToggle';
 import NotificationBell from './NotificationBell';
 import { authApi } from '../services/api';
+import TandemPayLogo from './TandemPayLogo';
 
 // ── Animation constants ────────────────────────────────────────────────────────
 
@@ -238,7 +239,7 @@ export default function CurvedMenu() {
                     transition={{ duration: 0.2 }}
                     className="text-sm font-bold text-primary hover:text-accent transition-colors cursor-pointer select-none"
                 >
-                    TandemPay
+                    <TandemPayLogo />
                 </motion.button>
             </div>
 
