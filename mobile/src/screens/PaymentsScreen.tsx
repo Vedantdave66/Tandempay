@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { formatCurrency } from '../utils/formatCurrency';
 import {
     View,
@@ -12,17 +13,14 @@ import {
     RefreshControl,
     Modal,
     TextInput,
-    Clipboard,
 } from 'react-native';
-import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
-import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, ArrowDownToLine, X, RotateCcw, Zap, Copy, Sparkles, ChevronRight } from 'lucide-react-native';
-import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut, paymentsApi } from '../services/api';
-
-type SettleStep = 'method' | 'etransfer' | 'sent_confirmation';
+import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
+import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut } from '../services/api';
 
 export default function PaymentsScreen() {
+    const navigation = useNavigation<any>();
     const { colors, isDark } = useTheme();
     const { user } = useAuth();
     
@@ -35,26 +33,6 @@ export default function PaymentsScreen() {
     
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    // Tracks which settlement_id is currently being paid via Stripe sheet.
-    const [stripePayingId, setStripePayingId] = useState<string | null>(null);
-
-    const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
-
-    // Settle-up bottom sheet
-    const [settleModalPayment, setSettleModalPayment] = useState<SettlementRecordOut | null>(null);
-    const [settleStep, setSettleStep] = useState<SettleStep>('method');
-    const [settleLoading, setSettleLoading] = useState(false);
-    const [settleCopied, setSettleCopied] = useState(false);
-
-    const openSettleModal = (payment: SettlementRecordOut) => {
-        setSettleModalPayment(payment);
-        setSettleStep('method');
-    };
-    const closeSettleModal = () => {
-        setSettleModalPayment(null);
-        setSettleStep('method');
-    };
 
     // Modal state for Add Funds / Withdraw
     const [fundModalVisible, setFundModalVisible] = useState(false);
@@ -84,10 +62,10 @@ export default function PaymentsScreen() {
         }
     }, [masterTab]);
 
-    useEffect(() => {
+    useFocusEffect(useCallback(() => {
         setLoading(true);
         loadData();
-    }, [loadData]);
+    }, [loadData]));
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -138,66 +116,6 @@ export default function PaymentsScreen() {
         Alert.alert('Stripe Connect', 'Connect your bank with Stripe to receive instant payouts. Use the Web App at tandempay.ca to link securely.');
     };
 
-    /**
-     * Open the Stripe payment sheet for a specific settlement.
-     *
-     * Flow:
-     *  1. POST /api/payments/create  →  { client_secret }
-     *  2. initPaymentSheet({ paymentIntentClientSecret: client_secret })
-     *  3. presentPaymentSheet()
-     *  4a. Success  → alert + refresh list
-     *  4b. Cancelled → silent (user dismissed intentionally)
-     *  4c. Error    → Alert with message
-     *
-     * The existing "Mark as Sent" / "Confirm" flow is untouched — this is an
-     * additional payment path for users who want to pay via card.
-     */
-    const handleStripePayment = async (payment: SettlementRecordOut) => {
-        if (stripePayingId) return; // prevent double-tap
-        setStripePayingId(payment.id);
-        try {
-            // Step 1: create PaymentIntent on the backend
-            const { client_secret } = await paymentsApi.createPaymentIntent({
-                payee_id: payment.payee_id,
-                // Backend expects amount in CENTS (int). payment.amount is dollars from the DB.
-                // e.g. $25.50 → 2550 cents. Math.round handles any floating-point edge cases.
-                amount: Math.round(Number(payment.amount) * 100),
-                settlement_id: payment.id,
-            });
-
-            // Step 2: initialise the payment sheet
-            const { error: initError } = await initPaymentSheet({
-                paymentIntentClientSecret: client_secret,
-                merchantDisplayName: 'TandemPay',
-                // Apple Pay / Google Pay config (optional but recommended)
-                applePay: { merchantCountryCode: 'CA' },
-                googlePay: { merchantCountryCode: 'CA', testEnv: true },
-            });
-            if (initError) {
-                Alert.alert('Payment Error', initError.message);
-                return;
-            }
-
-            // Step 3: present the sheet to the user
-            const { error: presentError } = await presentPaymentSheet();
-
-            if (!presentError) {
-                // 4a: Success
-                Alert.alert('✅ Payment Successful', `$${formatCurrency(payment.amount)} sent to ${payment.payee_name}.`);
-                loadData(); // refresh the list
-            } else if (presentError.code === 'Canceled') {
-                // 4b: User dismissed — do nothing
-            } else {
-                // 4c: Real error
-                Alert.alert('Payment Failed', presentError.message);
-            }
-        } catch (err: any) {
-            Alert.alert('Payment Error', err.message || 'Something went wrong. Please try again.');
-        } finally {
-            setStripePayingId(null);
-        }
-    };
-
     const renderInitials = (name: string) => {
         return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     };
@@ -242,7 +160,7 @@ export default function PaymentsScreen() {
                         {isPayer && payment.status === 'pending' && (
                             <TouchableOpacity
                                 style={[styles.actionBtn, { backgroundColor: colors.accent }]}
-                                onPress={() => openSettleModal(payment)}
+                                onPress={() => navigation.navigate('SettleUp', { payment })}
                             >
                                 <Send size={16} color="white" />
                                 <Text style={styles.actionText}>Settle up</Text>
@@ -430,195 +348,6 @@ export default function PaymentsScreen() {
                     </>
                 )}
             </ScrollView>
-
-            {/* ── SETTLE-UP BOTTOM SHEET ── */}
-            <Modal
-                visible={settleModalPayment !== null}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={closeSettleModal}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-
-                        {/* Header */}
-                        <View style={styles.modalHeader}>
-                            <View>
-                                <Text style={[styles.modalTitle, { color: colors.text }]}>
-                                    {settleStep === 'method' ? 'Settle up' :
-                                     settleStep === 'etransfer' ? 'Send e-Transfer' :
-                                     'Payment sent'}
-                                </Text>
-                                {settleModalPayment && settleStep === 'method' && (
-                                    <Text style={{ color: colors.secondaryText, fontSize: 14, marginTop: 2 }}>
-                                        ${formatCurrency(settleModalPayment.amount)} to {settleModalPayment.payee_name}
-                                    </Text>
-                                )}
-                            </View>
-                            <TouchableOpacity onPress={closeSettleModal} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
-                                <X size={18} color={colors.text} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* METHOD step */}
-                        {settleStep === 'method' && settleModalPayment && (() => {
-                            const fee = (Number(settleModalPayment.amount) * 0.029 + 0.30).toFixed(2);
-                            return (
-                                <View style={{ gap: 12 }}>
-                                    {/* PRIMARY — Interac */}
-                                    <TouchableOpacity
-                                        style={[styles.primaryMethodCard, { borderColor: colors.accent }]}
-                                        onPress={async () => {
-                                            setSettleLoading(true);
-                                            try {
-                                                await settlementsApi.create(
-                                                    settleModalPayment.group_id,
-                                                    settleModalPayment.payee_id,
-                                                    Number(settleModalPayment.amount),
-                                                    'etransfer'
-                                                );
-                                                setSettleStep('etransfer');
-                                            } catch (err: any) {
-                                                Alert.alert('Error', err.message || 'Could not initiate transfer');
-                                            } finally {
-                                                setSettleLoading(false);
-                                            }
-                                        }}
-                                        disabled={settleLoading}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.primaryMethodTitle, { color: colors.text }]}>
-                                                Send via Interac e-Transfer
-                                            </Text>
-                                            <Text style={[styles.primaryMethodSub, { color: colors.accent }]}>
-                                                Free  •  Arrives in ~30 seconds
-                                            </Text>
-                                            <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginTop: 10, gap: 6 }}>
-                                                <Sparkles size={13} color={colors.secondaryText} style={{ marginTop: 1 }} />
-                                                <Text style={[styles.autoConfirmNote, { color: colors.secondaryText }]}>
-                                                    We'll auto-confirm this payment when your bank sends the receipt email — no need to come back here.
-                                                </Text>
-                                            </View>
-                                        </View>
-                                        {settleLoading
-                                            ? <ActivityIndicator color={colors.accent} />
-                                            : <ChevronRight size={18} color={colors.accent} />
-                                        }
-                                    </TouchableOpacity>
-
-                                    {/* SECONDARY — Card */}
-                                    <TouchableOpacity
-                                        style={[styles.secondaryMethodRow, { borderColor: colors.border, backgroundColor: colors.background }]}
-                                        onPress={() => {
-                                            closeSettleModal();
-                                            handleStripePayment(settleModalPayment);
-                                        }}
-                                        disabled={stripePayingId !== null}
-                                    >
-                                        <CreditCard size={16} color={colors.secondaryText} />
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[styles.secondaryMethodLabel, { color: colors.secondaryText }]}>
-                                                Pay with card instead
-                                            </Text>
-                                            <Text style={[styles.secondaryMethodSub, { color: colors.secondaryText }]}>
-                                                ${fee} fee  •  Arrives in 2 business days
-                                            </Text>
-                                        </View>
-                                        <ChevronRight size={14} color={colors.secondaryText} />
-                                    </TouchableOpacity>
-
-                                    {/* Footer disclaimer */}
-                                    <Text style={[styles.settleDisclaimer, { color: colors.secondaryText }]}>
-                                        {settleModalPayment.payee_name} receives the full ${formatCurrency(settleModalPayment.amount)} via Interac. Card payments include the processor fee.
-                                    </Text>
-                                </View>
-                            );
-                        })()}
-
-                        {/* ETRANSFER step */}
-                        {settleStep === 'etransfer' && settleModalPayment && (
-                            <View style={{ gap: 16 }}>
-                                <View style={[styles.emailBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.emailLabel, { color: colors.secondaryText }]}>RECIPIENT EMAIL</Text>
-                                        <Text style={[styles.emailValue, { color: colors.text }]}>{settleModalPayment.payee_email}</Text>
-                                    </View>
-                                    <TouchableOpacity
-                                        style={[styles.copyBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                        onPress={() => {
-                                            Clipboard.setString(settleModalPayment.payee_email);
-                                            setSettleCopied(true);
-                                            setTimeout(() => setSettleCopied(false), 2000);
-                                        }}
-                                    >
-                                        {settleCopied
-                                            ? <CheckCircle2 size={14} color={colors.accent} />
-                                            : <Copy size={14} color={colors.secondaryText} />
-                                        }
-                                        <Text style={[styles.copyBtnText, { color: colors.secondaryText }]}>
-                                            {settleCopied ? 'Copied' : 'Copy'}
-                                        </Text>
-                                    </TouchableOpacity>
-                                </View>
-
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: colors.accent, opacity: settleLoading ? 0.6 : 1 }]}
-                                    disabled={settleLoading}
-                                    onPress={async () => {
-                                        setSettleLoading(true);
-                                        try {
-                                            const all = await meApi.getPayments();
-                                            const rec = all.find(r =>
-                                                r.payer_id === settleModalPayment.payer_id &&
-                                                r.payee_id === settleModalPayment.payee_id &&
-                                                r.status === 'pending'
-                                            );
-                                            if (rec) {
-                                                await settlementsApi.updateStatus(settleModalPayment.group_id, rec.id, 'sent');
-                                            }
-                                            setSettleStep('sent_confirmation');
-                                        } catch (err: any) {
-                                            Alert.alert('Error', err.message || 'Failed to mark as sent');
-                                        } finally {
-                                            setSettleLoading(false);
-                                        }
-                                    }}
-                                >
-                                    {settleLoading
-                                        ? <ActivityIndicator color="white" />
-                                        : <>
-                                            <Send size={16} color="white" />
-                                            <Text style={styles.actionText}>I sent it on my banking app</Text>
-                                          </>
-                                    }
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                        {/* SENT CONFIRMATION step */}
-                        {settleStep === 'sent_confirmation' && (
-                            <View style={{ alignItems: 'center', gap: 16, paddingVertical: 8 }}>
-                                <View style={[styles.successIcon, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}44` }]}>
-                                    <Send size={32} color={colors.accent} />
-                                </View>
-                                <View style={{ alignItems: 'center' }}>
-                                    <Text style={[styles.successTitle, { color: colors.text }]}>Payment marked as sent</Text>
-                                    <Text style={[styles.successSub, { color: colors.secondaryText }]}>
-                                        We'll auto-confirm once your bank email arrives. No action needed.
-                                    </Text>
-                                </View>
-                                <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: colors.accent }]}
-                                    onPress={() => { closeSettleModal(); loadData(); }}
-                                >
-                                    <Text style={styles.actionText}>Done</Text>
-                                </TouchableOpacity>
-                            </View>
-                        )}
-
-                    </View>
-                </View>
-            </Modal>
 
             {/* FUND MODAL */}
             <Modal visible={fundModalVisible} animationType="slide" transparent={true}>
@@ -956,103 +685,4 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
     },
 
-    // Settle-up modal styles
-    primaryMethodCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-        padding: 18,
-        borderRadius: 18,
-        borderWidth: 2,
-        backgroundColor: 'rgba(52, 211, 153, 0.06)',
-    },
-    primaryMethodTitle: {
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginBottom: 4,
-    },
-    primaryMethodSub: {
-        fontSize: 13,
-        fontWeight: '600',
-    },
-    autoConfirmNote: {
-        fontSize: 12,
-        lineHeight: 17,
-        flex: 1,
-    },
-    secondaryMethodRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 10,
-        paddingHorizontal: 14,
-        paddingVertical: 12,
-        borderRadius: 14,
-        borderWidth: 1,
-    },
-    secondaryMethodLabel: {
-        fontSize: 14,
-        fontWeight: '500',
-    },
-    secondaryMethodSub: {
-        fontSize: 11,
-        marginTop: 1,
-        opacity: 0.7,
-    },
-    settleDisclaimer: {
-        fontSize: 11,
-        textAlign: 'center',
-        lineHeight: 16,
-        opacity: 0.6,
-    },
-    emailBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        gap: 12,
-    },
-    emailLabel: {
-        fontSize: 10,
-        fontWeight: 'bold',
-        letterSpacing: 1.2,
-        marginBottom: 4,
-    },
-    emailValue: {
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-    copyBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 6,
-        borderRadius: 8,
-        borderWidth: 1,
-    },
-    copyBtnText: {
-        fontSize: 12,
-        fontWeight: '600',
-    },
-    successIcon: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 2,
-    },
-    successTitle: {
-        fontSize: 19,
-        fontWeight: 'bold',
-        textAlign: 'center',
-        marginBottom: 6,
-    },
-    successSub: {
-        fontSize: 13,
-        textAlign: 'center',
-        lineHeight: 20,
-    },
 });

@@ -19,6 +19,7 @@ import ProUpgradeScreen from '../screens/ProUpgradeScreen';
 import RecurringScreen from '../screens/RecurringScreen';
 import ExportScreen from '../screens/ExportScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
+import SettleUpScreen from '../screens/SettleUpScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -111,6 +112,11 @@ export default function RootNavigator() {
                         <Stack.Screen
                             name="Notifications"
                             component={NotificationsScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="SettleUp"
+                            component={SettleUpScreen}
                             options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>
