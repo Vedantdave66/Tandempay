@@ -217,7 +217,10 @@ export default function CurvedMenu() {
     return (
         <>
             {/* Nav trigger — fixed top-left, always on top */}
-            <div className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5">
+            <div
+                className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5 transition-opacity duration-150"
+                style={{ opacity: isOpen ? 0 : 1, pointerEvents: isOpen ? 'none' : 'auto' }}
+            >
                 {/* Logo — decorative only, no click */}
                 <motion.div
                     animate={{ scale: isOpen ? 0.88 : 1 }}
