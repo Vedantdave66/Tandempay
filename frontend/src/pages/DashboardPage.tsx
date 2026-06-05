@@ -157,22 +157,6 @@ export default function DashboardPage() {
                     </div>
                 </div>
 
-                {/* Character customise row — lives inside the hero, near the greeting */}
-                <div className="relative z-10 pb-6 sm:pb-8">
-                    <Link
-                        to="/settings/character"
-                        className="flex items-center gap-4 p-4 bg-surface/50 border border-border/60 rounded-2xl hover:border-accent/30 hover:bg-surface transition-all group"
-                    >
-                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center border border-accent/20 shrink-0">
-                            <Palette className="w-5 h-5 text-accent" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <p className="text-sm font-semibold text-primary">Customise your character</p>
-                            <p className="text-xs text-secondary">Pick your colour, shape, and nickname</p>
-                        </div>
-                        <ArrowRight className="w-4 h-4 text-secondary group-hover:text-accent transition-colors shrink-0" />
-                    </Link>
-                </div>
             </div>
 
             {/* Balance Cards */}
