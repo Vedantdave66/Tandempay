@@ -89,7 +89,7 @@ export default function RegisterPage() {
                     <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
                         <Wallet className="w-5 h-5 text-white" />
                     </div>
-                    <TandemPayLogo size={20} />
+                    <TandemPayLogo size="nav" />
                 </div>
 
                 {/* Characters */}
@@ -124,7 +124,7 @@ export default function RegisterPage() {
                         <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
                             <Wallet className="w-5 h-5 text-white" />
                         </div>
-                        <TandemPayLogo size={20} />
+                        <TandemPayLogo size="nav" />
                     </div>
 
                     <div className="text-center mb-8">

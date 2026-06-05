@@ -152,7 +152,7 @@ export default function LoadingScreen() {
         </div>
 
         <div style={{ position: 'relative', zIndex: 1, marginTop: 30 }}>
-          <TandemPayLogo size={26} />
+          <TandemPayLogo size="md" />
         </div>
         <div style={{ position: 'relative', zIndex: 1, marginTop: 8, fontSize: 13.5, fontWeight: 600, color: t.sub }}>
           {nick ? `Hi ${nick} — getting your groups in order…` : 'Getting your groups in order…'}

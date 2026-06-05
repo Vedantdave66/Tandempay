@@ -60,7 +60,7 @@ export default function LandingPage() {
                         <div className="relative w-10 h-10 bg-gradient-to-br from-accent to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
                             <Wallet className="w-5 h-5 text-white" />
                         </div>
-                        <TandemPayLogo size={19} className="relative hidden sm:block" />
+                        <TandemPayLogo size="nav" className="relative hidden sm:block" />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-6">
                         <ThemeToggle />
@@ -338,7 +338,7 @@ export default function LandingPage() {
                          <div className="col-span-2">
                             <div className="flex items-center gap-2 mb-4">
                                 <Wallet className="w-5 h-5 text-accent" />
-                                <TandemPayLogo size={19} />
+                                <TandemPayLogo size="nav" />
                             </div>
                             <p className="text-sm text-secondary max-w-xs">
                                 The Canadian way to split expenses and settle balances with roommates and friends.

@@ -1,4 +1,26 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+
+type LogoVariant = 'light' | 'dark' | 'green' | 'auto';
+type LogoSize    = 'nav' | 'md' | 'lg';
+
+interface TandemPayLogoProps {
+  variant?:   LogoVariant;
+  size?:      LogoSize;
+  className?: string;
+  style?:     React.CSSProperties;
+}
+
+const SIZES: Record<LogoSize, number> = {
+  nav: 19,
+  md:  32,
+  lg:  48,
+};
+
+const COLORS: Record<Exclude<LogoVariant, 'auto'>, { tandem: string; slash: string; pay: string; slashOpacity: number }> = {
+  light: { tandem: '#020617', slash: '#16A34A', pay: '#16A34A', slashOpacity: 0.85 },
+  dark:  { tandem: '#ffffff', slash: '#16A34A', pay: '#16A34A', slashOpacity: 0.85 },
+  green: { tandem: '#ffffff', slash: 'rgba(255,255,255,0.5)', pay: 'rgba(255,255,255,0.70)', slashOpacity: 1 },
+};
 
 function useDarkMode() {
   const isDarkNow = () =>
@@ -19,76 +41,61 @@ function useDarkMode() {
   return isDark;
 }
 
-interface TandemPayLogoProps {
-  size?: number;
-  className?: string;
-  /** 'auto' (default) respects dark/light mode; 'onGreen' for green backgrounds */
-  variant?: 'auto' | 'onGreen';
-}
-
-export default function TandemPayLogo({ size = 26, className, variant = 'auto' }: TandemPayLogoProps) {
+export const TandemPayLogo: React.FC<TandemPayLogoProps> = ({
+  variant = 'auto',
+  size = 'nav',
+  className,
+  style,
+}) => {
   const isDark = useDarkMode();
-
-  let tandemColor: string;
-  let slashColor: string;
-  let slashOpacity: number;
-  let payColor: string;
-  let payOpacity: number;
-
-  if (variant === 'onGreen') {
-    tandemColor  = '#FFFFFF';
-    slashColor   = 'rgba(255,255,255,0.5)';
-    slashOpacity = 1;
-    payColor     = '#FFFFFF';
-    payOpacity   = 0.7;
-  } else if (isDark) {
-    tandemColor  = '#FFFFFF';
-    slashColor   = '#4ADE80';
-    slashOpacity = 0.85;
-    payColor     = '#4ADE80';
-    payOpacity   = 1;
-  } else {
-    tandemColor  = '#020617';
-    slashColor   = '#16A34A';
-    slashOpacity = 0.85;
-    payColor     = '#16A34A';
-    payOpacity   = 1;
-  }
-
-  const hMargin = size * 0.18;
+  const fs = SIZES[size];
+  const resolvedVariant: Exclude<LogoVariant, 'auto'> =
+    variant === 'auto' ? (isDark ? 'dark' : 'light') : variant;
+  const colors = COLORS[resolvedVariant];
 
   return (
     <span
       className={className}
       style={{
-        display: 'inline-flex',
-        alignItems: 'center',
-        fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        fontSize: size,
-        fontWeight: 800,
+        display:       'inline-flex',
+        alignItems:    'center',
+        fontFamily:    "'Plus Jakarta Sans', sans-serif",
+        fontWeight:    800,
+        fontSize:      fs,
         letterSpacing: '-0.025em',
+        lineHeight:    1,
+        userSelect:    'none',
+        // Pointer-events on wrapper only — prevents gap-flicker in hover menus
+        // caused by the rotated slash's visual bounds extending beyond its CSS box.
+        pointerEvents: 'none',
+        ...style,
       }}
     >
-      <span style={{ color: tandemColor }}>Tandem</span>
+      {/* "Tandem" */}
+      <span style={{ color: colors.tandem, pointerEvents: 'none' }}>Tandem</span>
 
-      {/* Hairline slash */}
+      {/* Slash */}
       <span
         aria-hidden="true"
         style={{
-          display:         'inline-block',
-          width:           1.5,
-          height:          size * 1.1,
-          backgroundColor: slashColor,
-          opacity:         slashOpacity,
-          transform:       'rotate(18deg)',
-          borderRadius:    1,
-          marginLeft:      hMargin,
-          marginRight:     hMargin,
-          flexShrink:      0,
+          display:       'inline-block',
+          flexShrink:    0,
+          alignSelf:     'center',
+          width:         '1.5px',
+          height:        `${1.1 * fs}px`,
+          background:    colors.slash,
+          opacity:       colors.slashOpacity,
+          transform:     'rotate(18deg)',
+          margin:        `0.05em ${0.18 * fs}px 0`,
+          borderRadius:  '0.75px',
+          pointerEvents: 'none',
         }}
       />
 
-      <span style={{ color: payColor, opacity: payOpacity }}>Pay</span>
+      {/* "Pay" */}
+      <span style={{ color: colors.pay, pointerEvents: 'none' }}>Pay</span>
     </span>
   );
-}
+};
+
+export default TandemPayLogo;
