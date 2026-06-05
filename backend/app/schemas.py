@@ -27,6 +27,17 @@ from pydantic import (
     StringConstraints,
     field_validator,
 )
+from better_profanity import profanity as _profanity
+
+_profanity.load_censor_words()
+
+
+def _clean_nickname(v: str | None) -> str | None:
+    if v is None:
+        return v
+    if _profanity.contains_profanity(v):
+        raise ValueError("Nickname contains prohibited language.")
+    return " ".join(v.split())
 
 
 # ── Pagination ────────────────────────────────────────────────────────────────
@@ -173,6 +184,11 @@ class UserUpdate(BaseModel):
     character_shape: Optional[str] = Field(default=None, max_length=20)
     character_color: Optional[str] = Field(default=None, max_length=7)
     character_nickname: Optional[str] = Field(default=None, max_length=50)
+
+    @field_validator("character_nickname", mode="before")
+    @classmethod
+    def validate_nickname(cls, v: str | None) -> str | None:
+        return _clean_nickname(v)
 
 
 # ── Groups ────────────────────────────────────────────────────────────────────
