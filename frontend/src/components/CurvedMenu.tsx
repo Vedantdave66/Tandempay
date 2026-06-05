@@ -218,13 +218,14 @@ export default function CurvedMenu() {
         <>
             {/* Nav trigger — fixed top-left, always on top */}
             <div
-                className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5 transition-opacity duration-150"
+                className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5 transition-opacity duration-150 cursor-pointer"
                 style={{ opacity: isOpen ? 0 : 1, pointerEvents: isOpen ? 'none' : 'auto' }}
+                onMouseEnter={handleTriggerEnter}
+                onMouseLeave={handleTriggerLeave}
             >
-                {/* Logo — decorative only, no click */}
+                {/* Wallet icon */}
                 <motion.div
                     animate={{ scale: isOpen ? 0.88 : 1 }}
-                    whileTap={{ scale: 0.82 }}
                     transition={{ duration: 0.2, ease: 'easeOut' }}
                 >
                     <div className="w-11 h-11 bg-accent rounded-xl flex items-center justify-center shadow-lg shadow-accent/30">
@@ -232,18 +233,8 @@ export default function CurvedMenu() {
                     </div>
                 </motion.div>
 
-                {/* TandemPay wordmark — click + hover trigger */}
-                <motion.button
-                    onClick={() => setIsOpen(v => !v)}
-                    onMouseEnter={handleTriggerEnter}
-                    onMouseLeave={handleTriggerLeave}
-                    aria-label={isOpen ? 'Close menu' : 'Open menu'}
-                    animate={{ opacity: isOpen ? 0.7 : 1 }}
-                    transition={{ duration: 0.2 }}
-                    className="text-sm font-bold text-primary hover:text-accent transition-colors cursor-pointer select-none"
-                >
-                    <TandemPayLogo />
-                </motion.button>
+                {/* TandemPay wordmark — hover trigger only */}
+                <TandemPayLogo />
             </div>
 
             <AnimatePresence mode="wait">
