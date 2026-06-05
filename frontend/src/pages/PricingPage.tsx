@@ -73,7 +73,7 @@ export default function PricingPage() {
                         <div className="w-8 h-8 bg-gradient-to-br from-accent to-emerald-500 rounded-lg flex items-center justify-center shadow-sm shadow-accent/20">
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
-                        <TandemPayLogo size={18} />
+                        <TandemPayLogo size="nav" />
                     </Link>
                     <div className="flex items-center gap-3">
                         <ThemeToggle />
