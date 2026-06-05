@@ -3,6 +3,7 @@ import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { groupsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
 import { Wallet } from 'lucide-react';
+import TandemPayLogo from '../components/TandemPayLogo';
 
 export default function InvitePage() {
     const { groupId } = useParams<{ groupId: string }>();
@@ -44,6 +45,12 @@ export default function InvitePage() {
     return (
         <div className="min-h-screen bg-bg flex items-center justify-center p-4">
             <div className="w-full max-w-sm text-center">
+                <div className="flex items-center justify-center gap-2.5 mb-8">
+                    <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
+                        <Wallet className="w-4 h-4 text-white" />
+                    </div>
+                    <TandemPayLogo size={19} />
+                </div>
                 <div className="w-16 h-16 bg-accent rounded-2xl flex items-center justify-center mx-auto mb-6 shadow-lg shadow-accent/20 animate-pulse">
                     <Wallet className="w-8 h-8 text-white" />
                 </div>

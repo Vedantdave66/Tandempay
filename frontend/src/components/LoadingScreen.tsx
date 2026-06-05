@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import TandemPayLogo from './TandemPayLogo';
 
 const KEYFRAMES = `
   @keyframes tp-hop {
@@ -150,8 +151,8 @@ export default function LoadingScreen() {
           <Toon t={t} grad={t.supp[2]} {...SUPPORT[2]} delay={0.33} />
         </div>
 
-        <div style={{ position: 'relative', zIndex: 1, marginTop: 30, fontSize: 26, fontWeight: 700, letterSpacing: '-0.4px', color: t.ink }}>
-          Tandem<b style={{ color: t.accent, fontWeight: 800 }}>Pay</b>
+        <div style={{ position: 'relative', zIndex: 1, marginTop: 30 }}>
+          <TandemPayLogo size={26} />
         </div>
         <div style={{ position: 'relative', zIndex: 1, marginTop: 8, fontSize: 13.5, fontWeight: 600, color: t.sub }}>
           {nick ? `Hi ${nick} — getting your groups in order…` : 'Getting your groups in order…'}
