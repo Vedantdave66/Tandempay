@@ -18,8 +18,8 @@ const EASE: [number, number, number, number] = [0.76, 0, 0.24, 1];
 
 const PANEL_SLIDE = {
     initial: { x: 'calc(-100% - 100px)' },
-    enter:   { x: '0',                    transition: { duration: 0.8, ease: EASE } },
-    exit:    { x: 'calc(-100% - 100px)',  transition: { duration: 0.8, ease: EASE } },
+    enter:   { x: '0',                    transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
+    exit:    { x: 'calc(-100% - 100px)',  transition: { duration: 0.22, ease: [0.25, 0.1, 0.25, 1] as [number, number, number, number] } },
 };
 
 const PIN_KEY = 'sidebar_pinned';
