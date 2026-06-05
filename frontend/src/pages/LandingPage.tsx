@@ -3,6 +3,7 @@ import { Wallet, Shield, Zap, TrendingUp, Users, ArrowRight, PlayCircle, Bell, U
 import { useScrollReveal } from '../hooks/useScrollReveal';
 import React, { useEffect, useState } from 'react';
 import ThemeToggle from '../components/ThemeToggle';
+import TandemPayLogo from '../components/TandemPayLogo';
 
 // Reusable animated wrapper for scroll reveals
 function Reveal({ children, className = '', delay = 0, fadeOnly = false }: { children: React.ReactNode, className?: string, delay?: number, fadeOnly?: boolean }) {
@@ -59,7 +60,7 @@ export default function LandingPage() {
                         <div className="relative w-10 h-10 bg-gradient-to-br from-accent to-emerald-500 rounded-xl flex items-center justify-center shadow-lg shadow-accent/20">
                             <Wallet className="w-5 h-5 text-white" />
                         </div>
-                        <span className="relative text-xl font-bold tracking-tight text-primary hidden sm:block">TandemPay</span>
+                        <TandemPayLogo size={19} className="relative hidden sm:block" />
                     </div>
                     <div className="flex items-center gap-2 sm:gap-6">
                         <ThemeToggle />
@@ -337,7 +338,7 @@ export default function LandingPage() {
                          <div className="col-span-2">
                             <div className="flex items-center gap-2 mb-4">
                                 <Wallet className="w-5 h-5 text-accent" />
-                                <span className="text-xl font-bold text-primary">TandemPay</span>
+                                <TandemPayLogo size={19} />
                             </div>
                             <p className="text-sm text-secondary max-w-xs">
                                 The Canadian way to split expenses and settle balances with roommates and friends.

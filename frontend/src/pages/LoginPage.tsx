@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Label } from "../components/ui/label";
 import { Eye, EyeOff, Wallet } from "lucide-react";
+import TandemPayLogo from "../components/TandemPayLogo";
 import Characters from "../components/Characters";
 
 export default function LoginPage() {
@@ -52,7 +53,7 @@ export default function LoginPage() {
           <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center shadow-lg">
             <Wallet className="w-5 h-5 text-white" />
           </div>
-          <span className="text-xl font-bold tracking-tight text-primary">TandemPay</span>
+          <TandemPayLogo size={20} />
         </div>
 
         {/* Characters */}
@@ -87,7 +88,7 @@ export default function LoginPage() {
             <div className="w-9 h-9 bg-gradient-to-br from-emerald-400 to-emerald-600 rounded-xl flex items-center justify-center">
               <Wallet className="w-5 h-5 text-white" />
             </div>
-            <span className="text-xl font-bold text-primary">TandemPay</span>
+            <TandemPayLogo size={20} />
           </div>
 
           <div className="text-center mb-10">

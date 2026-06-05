@@ -5,6 +5,7 @@ import {
     Bell, CreditCard, Send, ArrowRight, ChevronDown
 } from 'lucide-react';
 import ThemeToggle from '../components/ThemeToggle';
+import TandemPayLogo from '../components/TandemPayLogo';
 
 const steps = [
     {
@@ -214,7 +215,7 @@ export default function TutorialPage() {
                         <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #4ADE80, #16A34A)', boxShadow: '0 4px 14px rgba(74,222,128,0.3)' }}>
                             <Wallet className="w-4 h-4 text-white" />
                         </div>
-                        <span className="font-bold hidden sm:block" style={{ color: 'var(--color-primary-base)' }}>TandemPay</span>
+                        <TandemPayLogo size={19} className="hidden sm:block" />
                         <ThemeToggle />
                     </div>
                 </div>

@@ -219,7 +219,7 @@ export default function CurvedMenu() {
             {/* Nav trigger — fixed top-left, always on top */}
             <div
                 className="fixed left-0 top-0 m-4 z-[60] flex items-center gap-2.5 transition-opacity duration-150"
-                style={{ opacity: isOpen ? 0 : 1, pointerEvents: isOpen ? 'none' : 'auto' }}
+                style={{ opacity: isOpen ? 0 : 1 }}
             >
                 {/* Logo — decorative only, no click */}
                 <motion.div
@@ -276,6 +276,7 @@ export default function CurvedMenu() {
                                 <div className="w-8 h-8 bg-accent rounded-lg flex items-center justify-center shrink-0">
                                     <Wallet className="w-4 h-4 text-white" />
                                 </div>
+                                <TandemPayLogo size={19} />
                             </div>
 
                             {/* Nav items */}
