@@ -71,10 +71,8 @@ export const TandemPayLogo: React.FC<TandemPayLogoProps> = ({
         ...style,
       }}
     >
-      {/* "Tandem" */}
       <span style={{ color: colors.tandem, pointerEvents: 'none' }}>Tandem</span>
 
-      {/* Slash */}
       <span
         aria-hidden="true"
         style={{
@@ -92,7 +90,6 @@ export const TandemPayLogo: React.FC<TandemPayLogoProps> = ({
         }}
       />
 
-      {/* "Pay" */}
       <span style={{ color: colors.pay, pointerEvents: 'none' }}>Pay</span>
     </span>
   );
