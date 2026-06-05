@@ -22,23 +22,73 @@ function useDarkMode() {
 interface TandemPayLogoProps {
   size?: number;
   className?: string;
+  /** 'auto' (default) respects dark/light mode; 'onGreen' for green backgrounds */
+  variant?: 'auto' | 'onGreen';
 }
 
-export default function TandemPayLogo({ size = 26, className }: TandemPayLogoProps) {
+export default function TandemPayLogo({ size = 26, className, variant = 'auto' }: TandemPayLogoProps) {
   const isDark = useDarkMode();
+
+  let tandemColor: string;
+  let slashColor: string;
+  let slashOpacity: number;
+  let payColor: string;
+  let payOpacity: number;
+
+  if (variant === 'onGreen') {
+    tandemColor  = '#FFFFFF';
+    slashColor   = 'rgba(255,255,255,0.5)';
+    slashOpacity = 1;
+    payColor     = '#FFFFFF';
+    payOpacity   = 0.7;
+  } else if (isDark) {
+    tandemColor  = '#FFFFFF';
+    slashColor   = '#4ADE80';
+    slashOpacity = 0.85;
+    payColor     = '#4ADE80';
+    payOpacity   = 1;
+  } else {
+    tandemColor  = '#020617';
+    slashColor   = '#16A34A';
+    slashOpacity = 0.85;
+    payColor     = '#16A34A';
+    payOpacity   = 1;
+  }
+
+  const hMargin = size * 0.18;
 
   return (
     <span
       className={className}
       style={{
-        fontSize: size,
-        letterSpacing: '-0.4px',
+        display: 'inline-flex',
+        alignItems: 'center',
         fontFamily: "'Plus Jakarta Sans', system-ui, sans-serif",
-        color: isDark ? '#F2FBF5' : '#0E140F',
+        fontSize: size,
+        fontWeight: 800,
+        letterSpacing: '-0.025em',
       }}
     >
-      <span style={{ fontWeight: 700 }}>Tandem</span>
-      <span style={{ fontWeight: 800, color: 'var(--color-accent)' }}>Pay</span>
+      <span style={{ color: tandemColor }}>Tandem</span>
+
+      {/* Hairline slash */}
+      <span
+        aria-hidden="true"
+        style={{
+          display:         'inline-block',
+          width:           1.5,
+          height:          size * 1.1,
+          backgroundColor: slashColor,
+          opacity:         slashOpacity,
+          transform:       'rotate(18deg)',
+          borderRadius:    1,
+          marginLeft:      hMargin,
+          marginRight:     hMargin,
+          flexShrink:      0,
+        }}
+      />
+
+      <span style={{ color: payColor, opacity: payOpacity }}>Pay</span>
     </span>
   );
 }
