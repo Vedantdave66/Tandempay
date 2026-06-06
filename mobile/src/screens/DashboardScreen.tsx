@@ -12,11 +12,12 @@ import {
     GroupListItem, UserBalance, NotificationOut,
 } from '../services/api';
 import {
-    Bell, Plus, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
+    Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
 } from 'lucide-react-native';
 import { useNotifications } from '../context/NotificationContext';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
+import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 
 // ── Notification helpers (mirrored from ActivityScreen) ───────────────────────
@@ -113,7 +114,7 @@ export default function DashboardScreen({ navigation }: any) {
 
     if (loading && !refreshing) {
         return (
-            <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
+            <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
@@ -122,7 +123,7 @@ export default function DashboardScreen({ navigation }: any) {
     }
 
     return (
-        <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
+        <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
             <ScrollView
                 contentContainerStyle={{ paddingBottom: 120 }}
                 showsVerticalScrollIndicator={false}
@@ -130,15 +131,14 @@ export default function DashboardScreen({ navigation }: any) {
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
             >
-                {/* Header */}
-                <View style={styles.topBar}>
-                    {/* TODO: swap for a shared <Logo size={18} /> once a mobile wordmark component exists */}
-                    <Text style={[styles.wordmark, { color: colors.text }]}>TandemPay</Text>
+                {/* Header row */}
+                <View style={styles.headerRow}>
+                    <Logo size={18} />
                     <TouchableOpacity
                         onPress={() => navigation.navigate('Notifications')}
-                        style={[styles.bellBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
                     >
-                        <Bell color={colors.secondaryText} size={18} />
+                        <Bell color={colors.secondaryText} size={20} />
                         {unreadCount > 0 && (
                             <View style={[styles.bellDot, { borderColor: colors.background }]} />
                         )}
@@ -148,10 +148,10 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* Hero card */}
                 <LinearGradient
                     colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
-                    style={styles.hero}
+                    style={styles.heroCard}
                 >
                     <View style={styles.heroTop}>
-                        <View>
+                        <View style={styles.heroLeft}>
                             <Text style={[styles.heroGreeting, { color: colors.secondaryText }]}>Good morning</Text>
                             <Text style={[styles.heroName, { color: colors.text }]}>{firstName} 👋</Text>
                         </View>
@@ -161,14 +161,15 @@ export default function DashboardScreen({ navigation }: any) {
                             variant="hero"
                         />
                     </View>
+
                     <View style={styles.statsRow}>
                         <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
-                            <Text style={[styles.statLabel, { color: colors.secondaryText }]}>YOU'RE OWED</Text>
-                            <Text style={[styles.statValue, { color: colors.accent }]}>${formatCurrency(owedToMe)}</Text>
+                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU'RE OWED</Text>
+                            <Text style={[styles.statPillValue, { color: colors.accent }]}>${formatCurrency(owedToMe)}</Text>
                         </View>
                         <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
-                            <Text style={[styles.statLabel, { color: colors.secondaryText }]}>YOU OWE</Text>
-                            <Text style={[styles.statValue, { color: colors.warningBright }]}>${formatCurrency(iOwe)}</Text>
+                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU OWE</Text>
+                            <Text style={[styles.statPillValue, { color: colors.warningBright }]}>${formatCurrency(iOwe)}</Text>
                         </View>
                     </View>
                 </LinearGradient>
@@ -177,24 +178,22 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your squads</Text>
-                        <View style={[styles.countBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Text style={[styles.countBadgeText, { color: colors.secondaryText }]}>{groups.length}</Text>
+                        <View style={[styles.countBadge, { backgroundColor: colors.accent }]}>
+                            <Text style={[styles.countBadgeText, { color: isDark ? '#0D2B12' : '#0A5F30' }]}>{groups.length}</Text>
                         </View>
                     </View>
                     <TouchableOpacity
                         onPress={() => navigation.navigate('CreateGroup')}
-                        style={[styles.newBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                        activeOpacity={0.8}
+                        style={[styles.ghostButton, { borderColor: colors.border }]}
                     >
-                        <Plus size={14} color={colors.accent} />
-                        <Text style={[styles.newBtnText, { color: colors.accentDark }]}>New</Text>
+                        <Text style={[styles.ghostButtonText, { color: colors.accentDark }]}>+ New</Text>
                     </TouchableOpacity>
                 </View>
 
                 {groups.length === 0 ? (
-                    <View style={[styles.emptySquads, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.emptySquadsText, { color: colors.secondaryText }]}>
-                            No squads yet — create one to start splitting expenses.
+                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+                            No squads yet — create one to get started.
                         </Text>
                     </View>
                 ) : (
@@ -207,31 +206,32 @@ export default function DashboardScreen({ navigation }: any) {
                             const members = balanceMap[item.id] ?? [];
                             const myBalance = members.find(m => m.user_id === user?.id);
                             return (
-                                <View key={item.id} style={styles.squadCardWrap}>
-                                    {/* TODO: GroupCard has no `compact` size yet — reusing the standard card in a horizontal scroller */}
-                                    <GroupCard
-                                        group={item}
-                                        members={members}
-                                        myNetBalance={myBalance?.net_balance ?? 0}
-                                        onPress={() => navigation.navigate('Group', { groupId: item.id })}
-                                    />
-                                </View>
+                                <GroupCard
+                                    key={item.id}
+                                    group={item}
+                                    members={members}
+                                    myNetBalance={myBalance?.net_balance ?? 0}
+                                    compact
+                                    onPress={() => navigation.navigate('Group', { groupId: item.id })}
+                                />
                             );
                         })}
                     </ScrollView>
                 )}
 
                 {/* Recent activity */}
-                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: 20, marginBottom: 12, marginTop: 8 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: 20, marginTop: 28, marginBottom: 14 }]}>
                     Recent activity
                 </Text>
                 <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     {recentActivity.length === 0 ? (
-                        <Text style={[styles.emptyActivityText, { color: colors.secondaryText }]}>No activity yet</Text>
+                        <Text style={[styles.emptyText, { color: colors.secondaryText, padding: 20, textAlign: 'center' }]}>
+                            No activity yet
+                        </Text>
                     ) : (
                         recentActivity.map((n, i) => {
-                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: colors.secondaryText };
-                            const Icon = cfg.icon;
+                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
+                            const IconComp = cfg.icon;
                             return (
                                 <TouchableOpacity
                                     key={n.id}
@@ -243,11 +243,15 @@ export default function DashboardScreen({ navigation }: any) {
                                     activeOpacity={0.7}
                                 >
                                     <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
-                                        <Icon size={18} color={cfg.color} />
+                                        <IconComp size={18} color={cfg.color} />
                                     </View>
                                     <View style={{ flex: 1 }}>
-                                        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>{n.title}</Text>
-                                        <Text style={[styles.activityMessage, { color: colors.secondaryText }]} numberOfLines={1}>{n.message}</Text>
+                                        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+                                            {n.title}
+                                        </Text>
+                                        <Text style={[styles.activityMessage, { color: colors.secondaryText }]} numberOfLines={1}>
+                                            {n.message}
+                                        </Text>
                                     </View>
                                     <Text style={[styles.activityTime, { color: colors.faintText }]}>{timeAgo(n.created_at)}</Text>
                                 </TouchableOpacity>
@@ -265,19 +269,15 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
-    topBar: {
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingTop: 8,
+        paddingBottom: 16,
     },
-    wordmark: {
-        fontSize: 18,
-        fontWeight: '800',
-        letterSpacing: -0.3,
-    },
-    bellBtn: {
+    bellButton: {
         width: 38,
         height: 38,
         borderRadius: 12,
@@ -297,17 +297,19 @@ const styles = StyleSheet.create({
     },
 
     // Hero
-    hero: {
+    heroCard: {
         marginHorizontal: 16,
         borderRadius: 24,
         padding: 20,
-        gap: 16,
     },
     heroTop: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
+        gap: 12,
+        marginBottom: 16,
     },
+    heroLeft: { flexShrink: 1 },
     heroGreeting: {
         fontSize: 13,
         fontWeight: '600',
@@ -316,7 +318,7 @@ const styles = StyleSheet.create({
     heroName: {
         fontSize: 28,
         fontWeight: '800',
-        letterSpacing: -0.4,
+        letterSpacing: -0.5,
     },
     statsRow: {
         flexDirection: 'row',
@@ -327,25 +329,25 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         padding: 14,
     },
-    statLabel: {
+    statPillLabel: {
         fontSize: 11,
         fontWeight: '700',
-        letterSpacing: 0.8,
+        letterSpacing: 0.7,
         marginBottom: 4,
     },
-    statValue: {
+    statPillValue: {
         fontSize: 22,
         fontWeight: '800',
-        letterSpacing: -0.3,
+        letterSpacing: -0.4,
     },
 
-    // Squads
+    // Squads section
     sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: 20,
-        paddingTop: 22,
+        paddingTop: 26,
         paddingBottom: 12,
     },
     sectionTitleRow: {
@@ -355,7 +357,7 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: 18,
-        fontWeight: '800',
+        fontWeight: '700',
         letterSpacing: -0.2,
     },
     countBadge: {
@@ -371,36 +373,29 @@ const styles = StyleSheet.create({
         fontSize: 12,
         fontWeight: '700',
     },
-    newBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        borderRadius: 11,
+    ghostButton: {
         borderWidth: 1,
+        borderRadius: 11,
         paddingHorizontal: 13,
         paddingVertical: 8,
     },
-    newBtnText: {
+    ghostButtonText: {
         fontSize: 13,
         fontWeight: '700',
     },
     squadsRow: {
         paddingHorizontal: 20,
         gap: 12,
-        paddingBottom: 6,
     },
-    squadCardWrap: {
-        width: 280,
-    },
-    emptySquads: {
+    emptyState: {
         marginHorizontal: 20,
+        padding: 32,
         borderRadius: 20,
         borderWidth: 1,
-        padding: 24,
         alignItems: 'center',
     },
-    emptySquadsText: {
-        fontSize: 14,
+    emptyText: {
+        fontSize: 13,
         textAlign: 'center',
         lineHeight: 20,
     },
@@ -411,11 +406,6 @@ const styles = StyleSheet.create({
         borderRadius: 16,
         borderWidth: 1,
         overflow: 'hidden',
-    },
-    emptyActivityText: {
-        fontSize: 14,
-        textAlign: 'center',
-        padding: 28,
     },
     activityRow: {
         flexDirection: 'row',
@@ -431,7 +421,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     activityTitle: {
-        fontSize: 13.5,
+        fontSize: 14,
         fontWeight: '600',
         marginBottom: 2,
     },
@@ -440,5 +430,6 @@ const styles = StyleSheet.create({
     },
     activityTime: {
         fontSize: 11,
+        marginLeft: 8,
     },
 });
