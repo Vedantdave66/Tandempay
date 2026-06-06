@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
     SafeAreaView, KeyboardAvoidingView, Platform, Alert, ActivityIndicator, ScrollView
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { groupsApi } from '../services/api';
 import { Users, X } from 'lucide-react-native';
@@ -92,32 +93,32 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(14),
         borderBottomWidth: 1,
     },
-    headerTitle: { fontSize: 17, fontWeight: '700' },
+    headerTitle: { fontSize: ms(17), fontWeight: '700' },
     closeBtn: {
-        width: 40, height: 40, borderRadius: 20,
+        width: 40, height: 40, borderRadius: ms(20),
         alignItems: 'center', justifyContent: 'center', borderWidth: 1,
     },
-    content: { alignItems: 'center', paddingHorizontal: 24, paddingTop: 40, paddingBottom: 40 },
+    content: { alignItems: 'center', paddingHorizontal: scale(24), paddingTop: vs(40), paddingBottom: vs(40) },
     iconWrap: {
-        width: 80, height: 80, borderRadius: 24,
+        width: 80, height: 80, borderRadius: ms(24),
         alignItems: 'center', justifyContent: 'center',
-        borderWidth: 1, marginBottom: 24,
+        borderWidth: 1, marginBottom: vs(24),
     },
-    title: { fontSize: 26, fontWeight: '900', marginBottom: 8 },
-    subtitle: { fontSize: 15, textAlign: 'center', marginBottom: 36, lineHeight: 22 },
-    fieldWrap: { width: '100%', marginBottom: 24 },
-    label: { fontSize: 13, fontWeight: '600', marginBottom: 8, textTransform: 'uppercase', letterSpacing: 0.5 },
+    title: { fontSize: ms(26), fontWeight: '900', marginBottom: vs(8) },
+    subtitle: { fontSize: ms(15), textAlign: 'center', marginBottom: vs(36), lineHeight: 22 },
+    fieldWrap: { width: '100%', marginBottom: vs(24) },
+    label: { fontSize: ms(13), fontWeight: '600', marginBottom: vs(8), textTransform: 'uppercase', letterSpacing: 0.5 },
     input: {
-        width: '100%', padding: 16, borderRadius: 16,
-        borderWidth: 1, fontSize: 16,
+        width: '100%', padding: scale(16), borderRadius: ms(16),
+        borderWidth: 1, fontSize: ms(16),
     },
     btn: {
-        width: '100%', padding: 18, borderRadius: 16,
+        width: '100%', padding: scale(18), borderRadius: ms(16),
         alignItems: 'center',
     },
-    btnText: { color: '#064E3B', fontWeight: '800', fontSize: 16 },
+    btnText: { color: '#064E3B', fontWeight: '800', fontSize: ms(16) },
 });

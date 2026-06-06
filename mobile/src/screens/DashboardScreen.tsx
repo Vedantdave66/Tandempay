@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity,
     ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
@@ -126,7 +127,7 @@ export default function DashboardScreen({ navigation }: any) {
     return (
         <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
             <ScrollView
-                contentContainerStyle={{ paddingBottom: 120 }}
+                contentContainerStyle={{ paddingBottom: vs(120) }}
                 showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
@@ -224,12 +225,12 @@ export default function DashboardScreen({ navigation }: any) {
                 )}
 
                 {/* Recent activity */}
-                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: 20, marginTop: 28, marginBottom: 14 }]}>
+                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(28), marginBottom: vs(14) }]}>
                     Recent activity
                 </Text>
                 <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     {recentActivity.length === 0 ? (
-                        <Text style={[styles.emptyText, { color: colors.secondaryText, padding: 20, textAlign: 'center' }]}>
+                        <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }]}>
                             No activity yet
                         </Text>
                     ) : (
@@ -277,19 +278,19 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 16,
+        paddingHorizontal: scale(20),
+        paddingTop: vs(8),
+        paddingBottom: vs(16),
     },
     headerRightRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: scale(8),
     },
     bellButton: {
-        width: 38,
-        height: 38,
-        borderRadius: 12,
+        width: scale(38),
+        height: scale(38),
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -298,54 +299,54 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 7,
         right: 8,
-        width: 8,
-        height: 8,
-        borderRadius: 4,
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
         backgroundColor: '#E05252',
         borderWidth: 1.5,
     },
 
     // Hero
     heroCard: {
-        marginHorizontal: 16,
-        borderRadius: 24,
-        padding: 20,
+        marginHorizontal: scale(16),
+        borderRadius: ms(24),
+        padding: scale(20),
     },
     heroTop: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 16,
+        gap: scale(12),
+        marginBottom: vs(16),
     },
     heroLeft: { flexShrink: 1 },
     heroGreeting: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
-        marginBottom: 2,
+        marginBottom: vs(2),
     },
     heroName: {
-        fontSize: 28,
+        fontSize: ms(26),
         fontWeight: '800',
         letterSpacing: -0.5,
     },
     statsRow: {
         flexDirection: 'row',
-        gap: 10,
+        gap: scale(10),
     },
     statPill: {
         flex: 1,
-        borderRadius: 16,
-        padding: 14,
+        borderRadius: ms(16),
+        padding: scale(14),
     },
     statPillLabel: {
-        fontSize: 11,
+        fontSize: ms(11),
         fontWeight: '700',
         letterSpacing: 0.7,
-        marginBottom: 4,
+        marginBottom: vs(4),
     },
     statPillValue: {
-        fontSize: 22,
+        fontSize: ms(20),
         fontWeight: '800',
         letterSpacing: -0.4,
     },
@@ -355,90 +356,90 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingTop: 26,
-        paddingBottom: 12,
+        paddingHorizontal: scale(20),
+        paddingTop: vs(26),
+        paddingBottom: vs(12),
     },
     sectionTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: scale(8),
     },
     sectionTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: '700',
         letterSpacing: -0.2,
     },
     countBadge: {
-        minWidth: 24,
-        height: 24,
-        borderRadius: 12,
-        paddingHorizontal: 7,
+        minWidth: scale(24),
+        height: scale(24),
+        borderRadius: scale(12),
+        paddingHorizontal: scale(7),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
     },
     countBadgeText: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '700',
     },
     ghostButton: {
         borderWidth: 1,
-        borderRadius: 11,
-        paddingHorizontal: 13,
-        paddingVertical: 8,
+        borderRadius: ms(11),
+        paddingHorizontal: scale(13),
+        paddingVertical: vs(8),
     },
     ghostButtonText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '700',
     },
     squadsRow: {
-        paddingHorizontal: 20,
-        gap: 12,
+        paddingHorizontal: scale(20),
+        gap: scale(12),
     },
     emptyState: {
-        marginHorizontal: 20,
-        padding: 32,
-        borderRadius: 20,
+        marginHorizontal: scale(20),
+        padding: scale(32),
+        borderRadius: ms(20),
         borderWidth: 1,
         alignItems: 'center',
     },
     emptyText: {
-        fontSize: 13,
+        fontSize: ms(13),
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: ms(20),
     },
 
     // Activity
     activityCard: {
-        marginHorizontal: 16,
-        borderRadius: 16,
+        marginHorizontal: scale(16),
+        borderRadius: ms(16),
         borderWidth: 1,
         overflow: 'hidden',
     },
     activityRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
+        gap: scale(12),
+        padding: scale(14),
     },
     activityIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
     },
     activityTitle: {
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: '600',
-        marginBottom: 2,
+        marginBottom: vs(2),
     },
     activityMessage: {
-        fontSize: 12,
+        fontSize: ms(12),
     },
     activityTime: {
-        fontSize: 11,
-        marginLeft: 8,
+        fontSize: ms(11),
+        marginLeft: scale(8),
     },
 });

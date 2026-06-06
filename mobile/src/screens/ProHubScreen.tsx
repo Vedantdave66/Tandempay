@@ -8,6 +8,7 @@ import {
     Alert,
     Linking,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
@@ -52,7 +53,7 @@ export default function ProHubScreen() {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
-            <ScrollView contentContainerStyle={{ paddingBottom: 120 }} showsVerticalScrollIndicator={false}>
+            <ScrollView contentContainerStyle={{ paddingBottom: vs(120) }} showsVerticalScrollIndicator={false}>
                 {/* Hero */}
                 <LinearGradient
                     colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
@@ -144,39 +145,39 @@ const styles = StyleSheet.create({
 
     hero: {
         alignItems: 'center',
-        paddingVertical: 32,
-        paddingHorizontal: 20,
-        gap: 4,
+        paddingVertical: vs(32),
+        paddingHorizontal: scale(20),
+        gap: vs(4),
     },
     heroName: {
-        fontSize: 22,
+        fontSize: ms(22),
         fontWeight: '800',
         letterSpacing: -0.3,
-        marginTop: 12,
+        marginTop: vs(12),
     },
     heroEmail: {
-        fontSize: 14,
+        fontSize: ms(14),
     },
     customiseChip: {
-        marginTop: 12,
+        marginTop: vs(12),
         borderRadius: 999,
-        paddingHorizontal: 16,
-        paddingVertical: 8,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(8),
     },
     customiseChipText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '700',
     },
 
     body: {
-        paddingHorizontal: 16,
-        paddingTop: 16,
-        gap: 14,
+        paddingHorizontal: scale(16),
+        paddingTop: vs(16),
+        gap: vs(14),
     },
 
     // Pro card
     proCard: {
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
         overflow: 'hidden',
     },
@@ -184,15 +185,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: 20,
+        padding: scale(20),
     },
     proHeaderRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 8,
+        gap: vs(8),
     },
     proTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: '800',
         color: '#fff',
         letterSpacing: -0.2,
@@ -200,73 +201,73 @@ const styles = StyleSheet.create({
     priceChip: {
         backgroundColor: '#fff',
         borderRadius: 999,
-        paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(5),
     },
     priceChipText: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '800',
         color: '#16A34A',
     },
     proBody: {
-        padding: 20,
-        gap: 12,
+        padding: scale(20),
+        gap: vs(12),
     },
     featureRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
+        gap: vs(10),
     },
     featureText: {
         flex: 1,
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '500',
         lineHeight: 18,
     },
     upgradeBtn: {
-        marginTop: 4,
-        borderRadius: 13,
-        paddingVertical: 14,
+        marginTop: vs(4),
+        borderRadius: ms(13),
+        paddingVertical: vs(14),
         alignItems: 'center',
     },
     upgradeBtnText: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '700',
     },
 
     // Settings
     settingsCard: {
-        borderRadius: 16,
+        borderRadius: ms(16),
         borderWidth: 1,
         overflow: 'hidden',
     },
     settingsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
+        gap: vs(12),
+        padding: scale(14),
     },
     settingsIconWrap: {
         width: 36,
         height: 36,
-        borderRadius: 10,
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
     },
     settingsLabel: {
         flex: 1,
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '500',
     },
 
     // Sign out
     signOutBtn: {
-        borderRadius: 16,
-        padding: 18,
+        borderRadius: ms(16),
+        padding: scale(18),
         alignItems: 'center',
     },
     signOutText: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '600',
     },
 });

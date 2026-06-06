@@ -7,6 +7,7 @@ import {
     ScrollView,
     TouchableOpacity,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { Users, Receipt, Send, CheckCircle2, ArrowLeft } from 'lucide-react-native';
 
@@ -143,61 +144,61 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
-        paddingVertical: 14,
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(14),
         borderBottomWidth: 1,
     },
     backBtn: {
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
     },
-    headerTitle: { fontSize: 17, fontWeight: '700' },
+    headerTitle: { fontSize: ms(17), fontWeight: '700' },
     headerSpacer: { width: 40 },   // mirrors backBtn width to keep title centred
 
     scroll: {
-        paddingHorizontal: 20,
-        paddingTop: 24,
-        paddingBottom: 48,
-        gap: 16,
+        paddingHorizontal: scale(20),
+        paddingTop: vs(24),
+        paddingBottom: vs(48),
+        gap: vs(16),
     },
 
     heroRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 10,
-        marginBottom: 8,
+        gap: vs(10),
+        marginBottom: vs(8),
     },
     heroText: {
-        fontSize: 20,
+        fontSize: ms(20),
         fontWeight: '800',
         letterSpacing: -0.3,
     },
 
     card: {
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
-        padding: 18,
-        gap: 12,
+        padding: scale(18),
+        gap: vs(12),
     },
     cardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        marginBottom: 4,
+        gap: vs(12),
+        marginBottom: vs(4),
     },
     iconBox: {
         width: 44,
         height: 44,
-        borderRadius: 14,
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
     },
     cardTitle: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '800',
         flex: 1,
         flexWrap: 'wrap',
@@ -207,34 +208,34 @@ const styles = StyleSheet.create({
     bulletRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 10,
+        gap: vs(10),
     },
     bullet: {
         width: 6,
         height: 6,
-        borderRadius: 3,
-        marginTop: 7,
+        borderRadius: ms(3),
+        marginTop: vs(7),
         flexShrink: 0,
     },
     bulletText: {
-        fontSize: 14,
+        fontSize: ms(14),
         lineHeight: 21,
         flex: 1,
     },
 
     tip: {
-        borderRadius: 16,
+        borderRadius: ms(16),
         borderWidth: 1,
-        padding: 16,
-        gap: 6,
+        padding: scale(16),
+        gap: vs(6),
     },
     tipLabel: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '800',
         letterSpacing: 0.5,
     },
     tipText: {
-        fontSize: 13,
+        fontSize: ms(13),
         lineHeight: 19,
     },
 
@@ -242,14 +243,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: vs(8),
         height: 56,
-        borderRadius: 28,
-        marginTop: 8,
+        borderRadius: ms(28),
+        marginTop: vs(8),
     },
     gotItText: {
         color: '#064E3B',
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '900',
     },
 });

@@ -9,6 +9,7 @@ import {
   FlatList,
   Animated
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Wallet, Receipt, TrendingUp, Send, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
@@ -184,71 +185,71 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 24,
-    paddingVertical: 16,
+    paddingHorizontal: scale(24),
+    paddingVertical: vs(16),
   },
   logoRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: vs(12),
   },
   logoIcon: {
     width: 36,
     height: 36,
-    borderRadius: 10,
+    borderRadius: ms(10),
     alignItems: 'center',
     justifyContent: 'center',
   },
   logoText: {
-    fontSize: 20,
+    fontSize: ms(20),
     fontWeight: 'bold',
     letterSpacing: -0.5,
   },
   slide: {
     flex: 1,
     alignItems: 'center',
-    paddingHorizontal: 32,
-    paddingTop: 60,
+    paddingHorizontal: scale(32),
+    paddingTop: vs(60),
   },
   iconCircle: {
     width: 120,
     height: 120,
-    borderRadius: 60,
+    borderRadius: ms(60),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 40,
+    marginBottom: vs(40),
     borderWidth: 1,
   },
   title: {
-    fontSize: 36,
+    fontSize: ms(36),
     fontWeight: '900',
     textAlign: 'center',
-    marginBottom: 16,
+    marginBottom: vs(16),
     lineHeight: 40,
   },
   subtitle: {
-    fontSize: 16,
+    fontSize: ms(16),
     textAlign: 'center',
     lineHeight: 24,
   },
   footer: {
-    paddingHorizontal: 24,
-    paddingBottom: 40,
+    paddingHorizontal: scale(24),
+    paddingBottom: vs(40),
   },
   indicatorContainer: {
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 40,
-    gap: 8,
+    marginBottom: vs(40),
+    gap: vs(8),
   },
   dot: {
     height: 8,
-    borderRadius: 4,
+    borderRadius: ms(4),
   },
   buttonRow: {
     flexDirection: 'row',
-    gap: 12,
+    gap: vs(12),
     height: 60,
   },
   nextBtn: {
@@ -256,30 +257,30 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    borderRadius: 16,
+    gap: vs(8),
+    borderRadius: ms(16),
     borderWidth: 1,
     borderColor: 'transparent',
     backgroundColor: 'rgba(74, 222, 128, 0.1)',
   },
   nextText: {
-    fontSize: 18,
+    fontSize: ms(18),
     fontWeight: 'bold',
   },
   loginBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 16,
+    borderRadius: ms(16),
     borderWidth: 1,
   },
   loginText: {
-    fontSize: 16,
+    fontSize: ms(16),
     fontWeight: 'bold',
   },
   registerBtn: {
     flex: 2,
-    borderRadius: 16,
+    borderRadius: ms(16),
     overflow: 'hidden',
   },
   gradientBtn: {
@@ -287,11 +288,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 4,
+    gap: vs(4),
   },
   registerText: {
     color: 'white',
-    fontSize: 16,
+    fontSize: ms(16),
     fontWeight: 'bold',
   },
 });

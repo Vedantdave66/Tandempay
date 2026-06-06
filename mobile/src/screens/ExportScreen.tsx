@@ -9,6 +9,7 @@ import {
     Alert,
     Linking,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Download, FileText, Sheet, Crown } from 'lucide-react-native';
@@ -120,31 +121,31 @@ export default function ExportScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safeArea: { flex: 1 },
     header: {
-        paddingHorizontal: 24,
-        paddingTop: 28,
-        paddingBottom: 20,
+        paddingHorizontal: scale(24),
+        paddingTop: vs(28),
+        paddingBottom: vs(20),
     },
     pageTitle: {
-        fontSize: 22,
+        fontSize: ms(22),
         fontWeight: '800',
         letterSpacing: -0.3,
-        marginBottom: 3,
+        marginBottom: vs(3),
     },
     pageSubtitle: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '400',
     },
     scrollContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 48,
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(48),
     },
     exportCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 18,
+        borderRadius: ms(18),
         borderWidth: 1,
-        padding: 16,
-        marginBottom: 12,
+        padding: scale(16),
+        marginBottom: vs(12),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
@@ -157,43 +158,43 @@ const styles = StyleSheet.create({
     cardIcon: {
         width: 48,
         height: 48,
-        borderRadius: 14,
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 14,
+        marginRight: scale(14),
     },
     cardText: { flex: 1 },
     cardLabel: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '700',
-        marginBottom: 3,
+        marginBottom: vs(3),
     },
     cardDesc: {
-        fontSize: 12,
+        fontSize: ms(12),
     },
     upsellCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 10,
-        borderRadius: 14,
+        gap: vs(10),
+        borderRadius: ms(14),
         borderWidth: 1,
-        padding: 14,
-        marginTop: 4,
+        padding: scale(14),
+        marginTop: vs(4),
     },
     upsellText: { flex: 1 },
     upsellTitle: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
-        marginBottom: 4,
+        marginBottom: vs(4),
     },
     learnMore: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
     },
     proNote: {
-        fontSize: 12,
+        fontSize: ms(12),
         textAlign: 'center',
-        marginTop: 8,
+        marginTop: vs(8),
         lineHeight: 18,
     },
 });

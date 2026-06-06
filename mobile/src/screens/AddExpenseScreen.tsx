@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import {
     View, Text, StyleSheet, TextInput, TouchableOpacity,
-    SafeAreaView, KeyboardAvoidingView, Platform, Alert,
+    KeyboardAvoidingView, Platform, Alert,
     ActivityIndicator, ScrollView
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { expensesApi, GroupMember } from '../services/api';
 import { X, Check, ArrowLeft } from 'lucide-react-native';
@@ -74,7 +76,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
                         {payer && (
                             <CharacterShape shape="rect" color={payer.avatar_color} variant="mini" />
                         )}
-                        <View style={{ flex: 1, marginLeft: 12 }}>
+                        <View style={{ flex: 1, marginLeft: scale(12) }}>
                             <Text style={[styles.headerTitle, { color: colors.text }]}>
                                 {step === 1 ? 'New expense' : "Who's splitting?"}
                             </Text>
@@ -103,7 +105,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
                             />
 
                             {/* How much */}
-                            <Text style={[styles.label, { color: colors.faintText, marginTop: 22 }]}>How much?</Text>
+                            <Text style={[styles.label, { color: colors.faintText, marginTop: vs(22) }]}>How much?</Text>
                             <View style={styles.amountRow}>
                                 <Text style={[styles.amountSign, { color: colors.accent }]}>$</Text>
                                 <TextInput
@@ -117,7 +119,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
                             </View>
 
                             {/* Who paid */}
-                            <Text style={[styles.label, { color: colors.faintText, marginTop: 22 }]}>Who paid?</Text>
+                            <Text style={[styles.label, { color: colors.faintText, marginTop: vs(22) }]}>Who paid?</Text>
                             <View style={styles.chipRow}>
                                 {members.map(m => {
                                     const selected = paidBy === m.user_id;
@@ -217,61 +219,61 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
 
 const styles = StyleSheet.create({
     safe: { flex: 1 },
-    content: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 40 },
+    content: { paddingHorizontal: scale(20), paddingTop: vs(12), paddingBottom: vs(40) },
     handle: {
-        width: 40, height: 4, borderRadius: 2,
-        alignSelf: 'center', marginBottom: 16,
+        width: scale(40), height: vs(4), borderRadius: ms(2),
+        alignSelf: 'center', marginBottom: vs(16),
     },
     header: {
-        flexDirection: 'row', alignItems: 'center', marginBottom: 18,
+        flexDirection: 'row', alignItems: 'center', marginBottom: vs(18),
     },
-    headerTitle: { fontSize: 18, fontWeight: '700', letterSpacing: -0.2 },
-    headerSubtitle: { fontSize: 13, marginTop: 2 },
+    headerTitle: { fontSize: ms(17), fontWeight: '700', letterSpacing: -0.2 },
+    headerSubtitle: { fontSize: ms(13), marginTop: vs(2) },
     closeBtn: {
-        width: 34, height: 34, borderRadius: 17,
+        width: scale(34), height: scale(34), borderRadius: scale(17),
         alignItems: 'center', justifyContent: 'center', borderWidth: 1,
     },
-    label: { fontSize: 13, fontWeight: '700', marginBottom: 7 },
+    label: { fontSize: ms(13), fontWeight: '700', marginBottom: vs(7) },
     textInput: {
-        fontSize: 15, borderBottomWidth: 1, paddingVertical: 10,
+        fontSize: ms(15), borderBottomWidth: 1, paddingVertical: vs(10),
     },
     amountRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 6,
+        flexDirection: 'row', alignItems: 'center', gap: scale(6),
     },
-    amountSign: { fontSize: 17, fontWeight: '700' },
-    amountInput: { flex: 1, fontSize: 17, fontWeight: '700', paddingVertical: 10 },
+    amountSign: { fontSize: ms(17), fontWeight: '700' },
+    amountInput: { flex: 1, fontSize: ms(17), fontWeight: '700', paddingVertical: vs(10) },
     chipRow: {
-        flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 18,
+        flexDirection: 'row', flexWrap: 'wrap', gap: scale(8), marginBottom: vs(18),
     },
     payerChip: {
-        flexDirection: 'row', alignItems: 'center', gap: 9,
-        borderRadius: 12, paddingHorizontal: 14, paddingVertical: 9,
+        flexDirection: 'row', alignItems: 'center', gap: scale(9),
+        borderRadius: ms(12), paddingHorizontal: scale(14), paddingVertical: vs(9),
     },
-    payerChipText: { fontSize: 13, fontWeight: '600' },
+    payerChipText: { fontSize: ms(13), fontWeight: '600' },
     cta: {
-        height: 52, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginTop: 8,
+        height: vs(52), borderRadius: ms(16), alignItems: 'center', justifyContent: 'center', marginTop: vs(8),
     },
-    ctaText: { color: '#0A5F30', fontWeight: '700', fontSize: 15 },
+    ctaText: { color: '#0A5F30', fontWeight: '700', fontSize: ms(15) },
 
     backRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 5, marginBottom: 12,
+        flexDirection: 'row', alignItems: 'center', gap: scale(5), marginBottom: vs(12),
     },
-    backText: { fontSize: 14, fontWeight: '600' },
-    splittingText: { fontSize: 16, fontWeight: '600', marginBottom: 16 },
+    backText: { fontSize: ms(14), fontWeight: '600' },
+    splittingText: { fontSize: ms(15), fontWeight: '600', marginBottom: vs(16) },
     memberRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 12,
-        padding: 14, borderRadius: 13, borderWidth: 1.5, marginBottom: 8,
+        flexDirection: 'row', alignItems: 'center', gap: scale(12),
+        padding: scale(14), borderRadius: ms(13), borderWidth: 1.5, marginBottom: vs(8),
     },
-    memberName: { flex: 1, fontSize: 15, fontWeight: '500' },
-    memberAmount: { fontSize: 15, fontWeight: '700', marginRight: 8 },
+    memberName: { flex: 1, fontSize: ms(15), fontWeight: '500' },
+    memberAmount: { fontSize: ms(15), fontWeight: '700', marginRight: scale(8) },
     checkbox: {
-        width: 24, height: 24, borderRadius: 12, borderWidth: 2,
+        width: scale(24), height: scale(24), borderRadius: scale(12), borderWidth: 2,
         alignItems: 'center', justifyContent: 'center',
     },
     summaryBar: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        borderRadius: 13, paddingHorizontal: 15, paddingVertical: 11, marginTop: 4, marginBottom: 12,
+        borderRadius: ms(13), paddingHorizontal: scale(15), paddingVertical: vs(11), marginTop: vs(4), marginBottom: vs(12),
     },
-    summaryText: { fontSize: 14 },
-    summaryEach: { fontSize: 14, fontWeight: '700' },
+    summaryText: { fontSize: ms(14) },
+    summaryEach: { fontSize: ms(14), fontWeight: '700' },
 });

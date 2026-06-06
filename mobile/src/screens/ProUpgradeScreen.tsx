@@ -8,6 +8,7 @@ import {
     SafeAreaView,
     Linking,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { ArrowLeft, RefreshCw, FileDown, Camera, SlidersHorizontal, Zap } from 'lucide-react-native';
@@ -127,109 +128,109 @@ export default function ProUpgradeScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safeArea: { flex: 1 },
     backButton: {
-        padding: 16,
-        paddingBottom: 8,
+        padding: scale(16),
+        paddingBottom: vs(8),
     },
     scrollContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 40,
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(40),
     },
     heroContainer: {
         alignItems: 'center',
-        paddingVertical: 28,
+        paddingVertical: vs(28),
     },
     crownEmoji: {
-        fontSize: 56,
-        marginBottom: 12,
+        fontSize: ms(56),
+        marginBottom: vs(12),
     },
     heroTitle: {
-        fontSize: 30,
+        fontSize: ms(30),
         fontWeight: '800',
         letterSpacing: -0.5,
-        marginBottom: 6,
+        marginBottom: vs(6),
     },
     heroSubtitle: {
-        fontSize: 15,
+        fontSize: ms(15),
         textAlign: 'center',
     },
     featuresCard: {
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
-        marginBottom: 28,
+        marginBottom: vs(28),
         overflow: 'hidden',
     },
     featureRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        padding: scale(16),
     },
     featureIconWrap: {
         width: 42,
         height: 42,
-        borderRadius: 12,
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 14,
+        marginRight: scale(14),
     },
     featureText: { flex: 1 },
     featureTitle: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '600',
-        marginBottom: 2,
+        marginBottom: vs(2),
     },
     featureDesc: {
-        fontSize: 13,
+        fontSize: ms(13),
         lineHeight: 18,
     },
     pricingContainer: {
         flexDirection: 'row',
         alignItems: 'flex-end',
         justifyContent: 'center',
-        marginBottom: 20,
-        gap: 4,
+        marginBottom: vs(20),
+        gap: vs(4),
     },
     pricingFrom: {
-        fontSize: 16,
-        marginBottom: 6,
+        fontSize: ms(16),
+        marginBottom: vs(6),
     },
     pricingAmount: {
-        fontSize: 44,
+        fontSize: ms(44),
         fontWeight: '800',
         letterSpacing: -1,
         lineHeight: 50,
     },
     pricingPeriod: {
-        fontSize: 16,
-        marginBottom: 8,
+        fontSize: ms(16),
+        marginBottom: vs(8),
     },
     upgradeButton: {
-        borderRadius: 16,
-        paddingVertical: 18,
+        borderRadius: ms(16),
+        paddingVertical: vs(18),
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: vs(12),
     },
     upgradeButtonText: {
         color: '#1A1A1A',
-        fontSize: 17,
+        fontSize: ms(17),
         fontWeight: '700',
     },
     disclaimer: {
-        fontSize: 12,
+        fontSize: ms(12),
         textAlign: 'center',
     },
     proConfirmContainer: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 32,
+        paddingHorizontal: scale(32),
     },
     proTitle: {
-        fontSize: 28,
+        fontSize: ms(28),
         fontWeight: '800',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     proSubtitle: {
-        fontSize: 15,
+        fontSize: ms(15),
         textAlign: 'center',
     },
 });

@@ -4,6 +4,7 @@ import {
     SafeAreaView, KeyboardAvoidingView, Platform, Alert,
     ActivityIndicator, FlatList
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { friendsApi, Friend } from '../services/api';
 import { Search, UserPlus, X, Check, Send } from 'lucide-react-native';
@@ -129,14 +130,14 @@ export default function AddFriendScreen({ navigation }: any) {
 
                     {/* Current friends list for reference */}
                     {friends.length > 0 && (
-                        <View style={{ marginTop: 32, width: '100%' }}>
+                        <View style={{ marginTop: vs(32), width: '100%' }}>
                             <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>YOUR FRIENDS ({friends.length})</Text>
                             {friends.slice(0, 5).map(f => (
                                 <View key={f.id} style={[styles.friendRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <Avatar name={f.name} color={f.avatar_color} size={38} />
-                                    <View style={{ flex: 1, marginLeft: 12 }}>
-                                        <Text style={[{ fontSize: 14, fontWeight: '600', color: colors.text }]}>{f.name}</Text>
-                                        <Text style={[{ fontSize: 12, color: colors.secondaryText }]}>{f.email}</Text>
+                                    <View style={{ flex: 1, marginLeft: scale(12) }}>
+                                        <Text style={[{ fontSize: ms(14), fontWeight: '600', color: colors.text }]}>{f.name}</Text>
+                                        <Text style={[{ fontSize: ms(12), color: colors.secondaryText }]}>{f.email}</Text>
                                     </View>
                                     <Check color={colors.accent} size={16} />
                                 </View>
@@ -153,23 +154,23 @@ const styles = StyleSheet.create({
     safe: { flex: 1 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 20, paddingVertical: 14, borderBottomWidth: 1,
+        paddingHorizontal: scale(20), paddingVertical: vs(14), borderBottomWidth: 1,
     },
-    headerTitle: { fontSize: 17, fontWeight: '700' },
-    closeBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
-    content: { flex: 1, alignItems: 'center', paddingHorizontal: 24, paddingTop: 36 },
-    iconWrap: { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: 20 },
-    title: { fontSize: 22, fontWeight: '900', marginBottom: 8 },
-    subtitle: { fontSize: 14, textAlign: 'center', marginBottom: 24, lineHeight: 20 },
-    msgBox: { flexDirection: 'row', alignItems: 'center', gap: 8, padding: 12, borderRadius: 12, borderWidth: 1, width: '100%', marginBottom: 16 },
-    msgText: { fontSize: 13, fontWeight: '600', flex: 1 },
+    headerTitle: { fontSize: ms(17), fontWeight: '700' },
+    closeBtn: { width: 40, height: 40, borderRadius: ms(20), alignItems: 'center', justifyContent: 'center', borderWidth: 1 },
+    content: { flex: 1, alignItems: 'center', paddingHorizontal: scale(24), paddingTop: vs(36) },
+    iconWrap: { width: 72, height: 72, borderRadius: ms(22), alignItems: 'center', justifyContent: 'center', borderWidth: 1, marginBottom: vs(20) },
+    title: { fontSize: ms(22), fontWeight: '900', marginBottom: vs(8) },
+    subtitle: { fontSize: ms(14), textAlign: 'center', marginBottom: vs(24), lineHeight: 20 },
+    msgBox: { flexDirection: 'row', alignItems: 'center', gap: vs(8), padding: scale(12), borderRadius: ms(12), borderWidth: 1, width: '100%', marginBottom: vs(16) },
+    msgText: { fontSize: ms(13), fontWeight: '600', flex: 1 },
     inputRow: {
-        flexDirection: 'row', alignItems: 'center', gap: 10,
-        padding: 16, borderRadius: 16, borderWidth: 1, width: '100%', marginBottom: 14,
+        flexDirection: 'row', alignItems: 'center', gap: vs(10),
+        padding: scale(16), borderRadius: ms(16), borderWidth: 1, width: '100%', marginBottom: vs(14),
     },
-    input: { flex: 1, fontSize: 15 },
-    btn: { flexDirection: 'row', width: '100%', padding: 16, borderRadius: 16, alignItems: 'center', justifyContent: 'center', gap: 6 },
-    btnText: { color: 'white', fontWeight: '800', fontSize: 15 },
-    sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 10, alignSelf: 'flex-start' },
-    friendRow: { flexDirection: 'row', alignItems: 'center', padding: 12, borderRadius: 14, borderWidth: 1, marginBottom: 8, width: '100%' },
+    input: { flex: 1, fontSize: ms(15) },
+    btn: { flexDirection: 'row', width: '100%', padding: scale(16), borderRadius: ms(16), alignItems: 'center', justifyContent: 'center', gap: vs(6) },
+    btnText: { color: 'white', fontWeight: '800', fontSize: ms(15) },
+    sectionLabel: { fontSize: ms(11), fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(10), alignSelf: 'flex-start' },
+    friendRow: { flexDirection: 'row', alignItems: 'center', padding: scale(12), borderRadius: ms(14), borderWidth: 1, marginBottom: vs(8), width: '100%' },
 });
