@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-03
+**Last updated:** 2026-06-06
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -11,8 +11,9 @@
 - **Production is live and healthy.**
 - **Production readiness score: ~83/100** — closed beta safe.
 - **All 11 production hardening fixes are merged and deployed** (see below).
-- **Alembic migration for `revoked_tokens` table has been run against prod Supabase.**
-- **Interac email parsing (R2) is in progress** on branch `feat/interac-email-parsing`.
+- **R1–R5 of the post-launch roadmap are all merged into `main`** — Settle Up redesign, Interac email auto-confirm, Pro subscription billing, recurring expenses, and CSV/PDF export are live in production. See "Roadmap status" below; the table that previously listed these as remaining is now stale.
+- **Mobile UI revamp (Dashboard/Groups/GroupDetail/Friends/Profile/TabBar/AddExpense + LimelightNav tab bar) shipped 2026-06-06** via PRs #123, #124, #125 — all merged into `main`.
+- **Latest Alembic head: `a107c01bd8f1`** (`add_auto_confirmed_to_settlement_records`, chained on `7af805ecb0e7` interac_email_logs ← `20d7c91bb5df` revoked_tokens). Confirm these have been run against prod Supabase before relying on the Interac auto-confirm flow in production.
 
 ---
 
@@ -49,7 +50,32 @@ Claude reviewed the entire codebase and scored it **66/100**. All 11 critical/ma
 
 ---
 
-## R2 — Interac Email Parsing (IN PROGRESS)
+## Mobile UI revamp session (2026-06-06) — branch `feat/revamp-friends-profile-tabbar-addexpense`
+
+### What shipped
+- **PR #123** "feat: full mobile UI revamp (A+B+C)" → **MERGED** into `main` (Dashboard, Groups, GroupDetail, Friends, Profile, TabBar, AddExpense rewrites)
+- **PR #124** "fix: post-revamp follow-ups" → **MERGED** into `main`. Included: PaymentsScreen null-guards + array-extraction for paginated API responses, `ThemeToggle` added to Dashboard header, `Logo.tsx` slash-thickness fix, `GroupCard` clipping/alignment fixes, `CharacterShape` taller `semi` shape in card variant, ProHub "Customise character" Alert copy
+- **PR #125** "feat: LimelightNav tab bar + recurring merge-conflict fixes" → **OPEN**, base `main`, head `feat/revamp-friends-profile-tabbar-addexpense`. Contains:
+  - Full rewrite of `mobile/src/components/CustomTabBar.tsx` — "LimelightNav" pattern: `Animated.spring`-driven indicator that measures each tab's center-X via `onLayout` and glides to the active tab (`useNativeDriver: true`, `tension: 180, friction: 20`), plus a `LinearGradient` cone-glow beneath it
+  - Recurring-bug fix commit (see below)
+
+### ⚠️ Recurring systemic bug — watch for this every time `main` merges into this branch
+Every `git merge origin/main` (or merge of `main`) into `feat/revamp-friends-profile-tabbar-addexpense` reintroduces two bugs that apparently live unresolved in `main` itself:
+1. **`mobile/src/constants/Colors.ts`** — duplicate keys `accentBg`, `accentBgFaint`, `warningBg`, `warningBright`, `faintText` declared twice in both the `light` and `dark` palettes (once early in the object, once again under the `// Faint variants used for chips, pills, icon tiles` comment). Causes TS1117 "duplicate object literal property" errors. **Fix:** delete the *first* declarations, keep the later "Faint variants" block (it wins at runtime per JS object-literal semantics — last write wins).
+2. **`mobile/src/screens/DashboardScreen.tsx`** — `styles` defines `safe: { flex: 1 }` but the JSX references `styles.screen`, causing TS2339 errors. **Fix:** rename `safe` → `screen`.
+
+This was hit and fixed identically **three separate times** in one session (commits `9947e42`, then again, then `f3e4bcb`). If you're merging `main` into a feature branch and `npx tsc --noEmit` lights up with these exact errors, apply the same two fixes — don't waste time re-diagnosing.
+
+### Stranded-commit pattern (also recurring)
+Twice this session, a PR merged into `main` while follow-up commits kept landing on the same feature branch — leaving them stranded (not in `main`, not covered by any open PR). Detection: `git merge-base --is-ancestor <latest-sha> origin/main` returns false, or `git log --oneline origin/main..origin/<branch>` lists unmerged commits. **Resolution both times:** open a fresh follow-up PR from the same branch into `main` (PR #124, then PR #125) rather than trying to amend a merged PR.
+
+### Pending for next session
+- **PR #125 needs review/merge.** Manual checks still outstanding: limelight indicator animation on device, light/dark palette rendering.
+- After #125 merges, re-check for stranded commits before starting new mobile work — the pattern is likely to repeat if anyone pushes to this branch concurrently.
+
+---
+
+## R2 — Interac Email Parsing — ✅ DONE (merged 2026-06-03, PRs #104, #105, #106)
 
 ### Infrastructure (DONE)
 - SendGrid account created
@@ -59,106 +85,27 @@ Claude reviewed the entire codebase and scored it **66/100**. All 11 critical/ma
 - SendGrid API key created (`tandempay-inbound`) with Inbound Parse + Mail Send permissions
 - `SENDGRID_WEBHOOK_SECRET` added to Vercel backend environment variables
 
-### Code (branch: `feat/interac-email-parsing`)
+### Code — all merged into `main`
 
-| # | Prompt | Status |
+| # | Item | Status |
 |---|---|---|
-| R2-1 | `InteracEmailLog` model + Alembic migration | ✅ DONE |
+| R2-1 | `InteracEmailLog` model + Alembic migration `7af805ecb0e7` | ✅ DONE |
 | R2-2 | `email_parser.py` — bank regex patterns (Big 5 + NBC + credit unions) | ✅ DONE |
 | R2-3 | `interac_matcher.py` — fuzzy name matching + `confirm_settlement` | ✅ DONE |
-| R2-4 | `interac_routes.py` — POST /api/interac/inbound webhook + main.py registration | ⏳ NEXT |
-| R2-5 | Frontend "Auto-confirmed via Interac ✅" badge on settled settlements | ⏳ PENDING |
+| R2-4 | `interac_routes.py` — `POST /api/interac/inbound` SendGrid webhook, `SENDGRID_WEBHOOK_SECRET` in `config.py`, router registered in `main.py` | ✅ DONE — confirmed live in `backend/app/routes/interac_routes.py` on `main` |
+| R2-5 | `PaymentRecordCard.tsx` — green "Auto-confirmed via Interac" pill, shown when `status === 'settled' && auto_confirmed && method === 'interac'` | ✅ DONE — confirmed live on `main` (line ~94) |
+| — | `auto_confirmed` boolean added to `SettlementRecord` model + schema; Alembic migration `a107c01bd8f1`; `confirm_settlement` stamps the field | ✅ DONE |
 
-### What to do first in the new session
-Continue on branch `feat/interac-email-parsing`. Run R2-4 prompt first, then R2-5.
+Landed via PR #104 (webhook route + auto_confirmed field + frontend badge), PR #105 (Interac email parsing follow-ups across web pages), and PR #106 (R1 Settle Up redesign bundled with Interac auto-confirm wiring).
 
-**R2-4 prompt:**
-```
-FILE: backend/app/routes/interac_routes.py (NEW FILE)
-FILE: backend/app/main.py (add router)
-FILE: backend/app/config.py (add SENDGRID_WEBHOOK_SECRET)
-
-PROBLEM:
-Need a POST /api/interac/inbound endpoint that receives SendGrid Inbound
-Parse webhooks, parses the email, attempts settlement matching, and logs
-everything to InteracEmailLog.
-
-TASK:
-1. config.py: add SENDGRID_WEBHOOK_SECRET: str = "" to Settings.
-
-2. interac_routes.py — create router with POST /api/interac/inbound:
-   - Accepts multipart/form-data (SendGrid Inbound Parse format)
-   - Extracts fields: `from` (sender), `to` (recipient), `subject`,
-     `email` (raw MIME — present when "Send Raw" is enabled)
-   - Calls parse_email_body(email) to get plain text
-   - Calls parse_interac_email(subject, body_text)
-   - Creates InteracEmailLog entry immediately (before matching)
-   - If parsing succeeded: calls match_settlement(parsed, to_address, db)
-   - If match found: calls confirm_settlement(settlement, log, db)
-   - If no match: sets log.failure_reason = "no_matching_settlement"
-   - Always returns HTTP 200 (SendGrid retries on non-200)
-   - Rate limit: @limiter.limit("60/minute") — banks can send bursts
-
-3. main.py: import and register interac_routes.router.
-
-SECURITY:
-- SendGrid Inbound Parse does NOT send a signature on raw MIME webhooks.
-  Instead, verify the request comes from SendGrid's IP ranges by checking
-  the X-Forwarded-For or client IP against SendGrid's published IP list.
-  For now: log a WARNING if SENDGRID_WEBHOOK_SECRET is set and the header
-  is missing, but do not block (Vercel proxies make IP checking unreliable).
-  Add a TODO comment for production IP allowlisting.
-- Never log the raw email body — only subject, from, parsed fields.
-
-RULES:
-- The endpoint must return 200 even on parse failure or match failure —
-  SendGrid will retry indefinitely on any non-200 response.
-- Add the SENDGRID_WEBHOOK_SECRET to Vercel env var instructions in a comment.
-- Follow the existing route pattern (APIRouter, get_db, logger).
-
-Show me interac_routes.py in full, the config.py addition, and the
-main.py router registration line.
-```
-
-**R2-5 prompt:**
-```
-FILE: frontend/src/components/SettlementCard.tsx (or wherever individual
-settlements are rendered in the group detail / settle-up view)
-
-PROBLEM:
-When a settlement is auto-confirmed via Interac email parsing, users should
-see a clear visual indicator so they know the magic worked.
-
-TASK:
-In the settlement list/card component, when settlement.status === "settled"
-AND settlement.method === "interac", show a small badge:
-
-  ✅ Auto-confirmed via Interac
-
-Badge style:
-- Small pill, green background (use existing accent colour token)
-- Text: "Auto-confirmed" with CheckCircle2 from lucide
-- Appears inline with settlement amount or below status text
-- Tooltip on hover: "Confirmed automatically from your bank email"
-
-RULES:
-- Only show when BOTH status === "settled" AND method === "interac".
-- If no `auto_confirmed` field exists yet, add it as optional boolean
-  defaulting to false and note a backend field is needed.
-- Do not change any settlement logic — display only.
-- Match existing dark/light mode styling.
-
-Show me the updated settlement component with the badge added.
-```
-
-### After R2-4 and R2-5
-1. Run Alembic migration for `interac_email_logs` table against prod:
+### Still to verify (non-code / ops)
+1. Confirm Alembic migrations `7af805ecb0e7` and `a107c01bd8f1` have been run against prod Supabase (latest head is `a107c01bd8f1` — see "Critical reference points"):
    ```
    $env:DATABASE_URL="postgresql+asyncpg://..." ; alembic upgrade head
    ```
-2. Test end-to-end: send a real Interac e-Transfer, forward confirmation email to `anything@inbound.tandempay.ca`, verify settlement auto-confirms.
-3. Open PR `feat/interac-email-parsing → main`.
+2. Test end-to-end in prod: send a real Interac e-Transfer, forward the confirmation email to `anything@inbound.tandempay.ca`, verify the settlement auto-confirms and the badge appears.
 
+### Misc completed UI items (from this and prior sessions, all live on `main`)
 - Balance bars in group Balances tab: character avatars centred (fixed-width container)
 - GroupCard web + mobile: subtle grey border, gradient extended, "you're owed" bolder
 - Dashboard: "Customise" button moved to top-right badge on character avatar
@@ -172,16 +119,20 @@ Free tier: Unlimited groups/members, equal-split expenses, debt simplification, 
 
 Pro tier ($3.99/mo or $29.99/yr): Recurring expenses (HEADLINE), itemized split + receipt OCR, advanced split types, multi-currency, cross-group dashboard, push notifications, unlimited history, expense categories + summaries, CSV/PDF export, priority support.
 
-### Roadmap
+## Roadmap status — R1–R5 are ALL DONE and merged into `main`
 
-## Remaining roadmap after R2
+The table below previously listed these as "remaining roadmap after R2." That was stale — verification against GitHub on 2026-06-06 shows every item is merged and live:
 
-| # | Item | Notes |
-|---|---|---|
-| R1 | Settle Up modal redesign (Interac primary, card secondary) | Prompt written in prior session |
-| R3 | Pro subscription billing infrastructure | Regular Stripe Subscriptions, paywall middleware |
-| R4 | Recurring expenses feature | Pro headline. RecurringExpense model + scheduler + UI |
-| R5+ | Remaining Pro features | Multi-currency, itemized split, OCR, CSV export, push notifs |
+| # | Item | Status | Evidence |
+|---|---|---|---|
+| R1 | Settle Up modal redesign (Interac primary, card secondary) | ✅ DONE | PR #106 "feat: R1 Settle Up redesign + rebrand + Interac auto-confirm" (merged 2026-06-03) |
+| R2 | Interac email parsing | ✅ DONE | See section above |
+| R3 | Pro subscription billing infrastructure | ✅ DONE | PR #5 "feat: Pro subscription billing infrastructure (R3)" (merged 2026-05-22) — `subscription_tier`/`stripe_customer_id` on `users`, migration `20260522_add_subscription_fields` |
+| R4 | Recurring expenses feature | ✅ DONE | PR #6 "feat: Recurring Expenses Automation (Phase 4 R4)" (merged 2026-05-22) — `RecurringExpense` model, `recurring_routes.py`, `reminder_scheduler.py`/`scheduler.py`, migration `20260522_add_recurring_expenses`, integration tests in PR #50 |
+| R5 | CSV/PDF export | ✅ DONE | PR #7 "feat: CSV/PDF Export (Phase 4 R5)" (merged 2026-05-22), refined in PR #24 "restructure tab nav + Pro hub, Recurring, Export screens" |
+| R5+ | Multi-currency, itemized split, receipt OCR, mobile Pro tier | ✅ DONE (UI scaffolding at minimum) | PR #21 "Feat/mobile pro tier", PR #24 (Pro hub/Export/OCR screens), PR #25 (OCR copy fix), PR #20 (crown badge + `/pro-success` page + checkout wiring) |
+
+**Nothing from the original R1–R5 roadmap remains open.** If there's a next phase (R6+), it hasn't been documented yet — define it fresh rather than trusting the old table.
 
 ---
 
@@ -207,9 +158,16 @@ Pro tier ($3.99/mo or $29.99/yr): Recurring expenses (HEADLINE), itemized split 
 - **GitHub:** `github.com/Vedantdave66/Tandempay`
 - **Vercel projects:** `tandempay-api` (backend), `tandempay` (frontend)
 - **Database:** Supabase Postgres via Transaction Pooler. `DATABASE_URL` uses `postgresql+asyncpg://` on port 6543.
-- **Alembic baseline:** `1a2b3c4d5e6f_initial_schema.py`. Latest migration: `20d7c91bb5df_add_revoked_tokens_table.py`.
+- **Alembic baseline:** `1a2b3c4d5e6f_initial_schema.py`. Latest head: `a107c01bd8f1_add_auto_confirmed_to_settlement_records.py` (chain: `... → 20d7c91bb5df_add_revoked_tokens_table → 534d32e54b2b_merge_heads → 7af805ecb0e7_add_interac_email_logs_table → a107c01bd8f1_add_auto_confirmed_to_settlement_records`). Verify this has been run against prod.
 - **SendGrid:** Domain `tandempay.ca` authenticated. Inbound Parse on `inbound.tandempay.ca`.
 
 ## What to open with in the new session
 
-> "Picking up TandemPay R2 (Interac email parsing). Branch is `feat/interac-email-parsing`. R2-1 (InteracEmailLog model), R2-2 (email_parser.py), and R2-3 (interac_matcher.py) are done. Next is R2-4 (webhook route) then R2-5 (frontend badge). Prompts are in the handoff doc."
+> "TandemPay's R1–R5 roadmap (Settle Up redesign, Interac auto-confirm, Pro billing, recurring expenses, CSV/PDF export) and the mobile UI revamp (PRs #123–#125) are all merged into `main`. Before starting new feature work: (1) confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), (2) do an end-to-end Interac auto-confirm test against the live inbound parse address, (3) decide what the next roadmap phase (R6+) should be — there's no documented next item."
+
+## Open items / things to double-check next session
+
+1. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase; the doc previously only confirmed `20d7c91bb5df`.
+2. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+3. **Pre-launch checklist** (below) — still appears to be open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+4. **Define R6+** — the roadmap table that used to list "remaining" items is now fully done; there's no documented next phase.
