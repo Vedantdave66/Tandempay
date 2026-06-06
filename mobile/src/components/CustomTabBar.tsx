@@ -1,7 +1,7 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Home, Send, Users, Crown, LayoutGrid } from 'lucide-react-native';
+import { Home, Users, Wallet, Bell, User } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -11,124 +11,107 @@ export default function CustomTabBar({ state, descriptors, navigation }: BottomT
     const { unreadCount } = useNotifications();
     const insets = useSafeAreaInsets();
 
-    const getIcon = (routeName: string, isFocused: boolean, color: string) => {
-        const size = 22;
-        const sw = isFocused ? 2.5 : 1.8;
+    const getIcon = (routeName: string, color: string) => {
         switch (routeName) {
-            case 'Home':     return <Home size={size} color={color} strokeWidth={sw} />;
-            case 'Groups':   return <LayoutGrid size={size} color={color} strokeWidth={sw} />;
-            case 'Payments': return <Send size={size} color={color} strokeWidth={sw} />;
-            case 'Friends':  return <Users size={size} color={color} strokeWidth={sw} />;
-            case 'Pro':      return <Crown size={size} color={color} strokeWidth={sw} />;
-            default:         return <Home size={size} color={color} strokeWidth={sw} />;
+            case 'Home':     return <Home size={22} color={color} />;
+            case 'Groups':   return <Users size={22} color={color} />;
+            case 'Payments': return <Wallet size={22} color={color} />;
+            case 'Friends':  return <Bell size={22} color={color} />;
+            case 'Me':       return <User size={22} color={color} />;
+            default:         return <Home size={22} color={color} />;
         }
     };
 
     return (
-        <View style={[styles.wrapper, { bottom: insets.bottom + (Platform.OS === 'ios' ? 8 : 18) }]}>
-            <View style={[styles.bar, { backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF' }]}>
-                {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
-                    const isFocused = state.index === index;
+        <View
+            style={[
+                styles.bar,
+                {
+                    backgroundColor: isDark ? 'rgba(14,17,14,0.94)' : 'rgba(255,255,255,0.94)',
+                    borderTopColor: colors.border,
+                    height: 64 + insets.bottom,
+                    paddingBottom: insets.bottom,
+                },
+            ]}
+        >
+            {state.routes.map((route, index) => {
+                const { options } = descriptors[route.key];
+                const isFocused = state.index === index;
 
-                    const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        });
-                        if (!isFocused && !event.defaultPrevented) {
-                            navigation.navigate(route.name, route.params);
-                        }
-                    };
+                const onPress = () => {
+                    const event = navigation.emit({
+                        type: 'tabPress',
+                        target: route.key,
+                        canPreventDefault: true,
+                    });
+                    if (!isFocused && !event.defaultPrevented) {
+                        navigation.navigate(route.name, route.params);
+                    }
+                };
 
-                    const onLongPress = () => {
-                        navigation.emit({ type: 'tabLongPress', target: route.key });
-                    };
+                const onLongPress = () => {
+                    navigation.emit({ type: 'tabLongPress', target: route.key });
+                };
 
-                    const iconColor = isFocused ? '#1A1A1A' : colors.tabIconDefault;
-                    const showBadge = false; // notification badge moved to DashboardScreen header
+                const tintColor = isFocused ? colors.accent : colors.tabIconDefault;
+                const showBadge = route.name === 'Friends' && unreadCount > 0;
 
-                    return (
-                        <TouchableOpacity
-                            key={route.key}
-                            accessibilityRole="button"
-                            accessibilityState={isFocused ? { selected: true } : {}}
-                            accessibilityLabel={options.tabBarAccessibilityLabel}
-                            testID={(options as any).tabBarTestID}
-                            onPress={onPress}
-                            onLongPress={onLongPress}
-                            style={styles.tabItem}
-                            activeOpacity={0.75}
-                        >
-                            <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
-                                {getIcon(route.name, isFocused, iconColor)}
-                                {showBadge && (
-                                    <View style={styles.badge}>
-                                        <Text style={styles.badgeText}>
-                                            {unreadCount > 9 ? '9+' : unreadCount}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
+                return (
+                    <TouchableOpacity
+                        key={route.key}
+                        accessibilityRole="button"
+                        accessibilityState={isFocused ? { selected: true } : {}}
+                        accessibilityLabel={options.tabBarAccessibilityLabel}
+                        testID={(options as any).tabBarTestID}
+                        onPress={onPress}
+                        onLongPress={onLongPress}
+                        style={styles.tabItem}
+                        activeOpacity={0.75}
+                    >
+                        <View style={[styles.iconWrap, isFocused && { backgroundColor: colors.accentBg }]}>
+                            {getIcon(route.name, tintColor)}
+                            {showBadge && <View style={[styles.badge, { borderColor: colors.surface }]} />}
+                        </View>
+                        <Text style={[styles.label, { color: tintColor, fontWeight: isFocused ? '700' : '600' }]}>
+                            {route.name}
+                        </Text>
+                    </TouchableOpacity>
+                );
+            })}
         </View>
     );
 }
 
 const styles = StyleSheet.create({
-    wrapper: {
-        position: 'absolute',
-        left: 24,
-        right: 24,
-    },
     bar: {
         flexDirection: 'row',
-        height: 68,
-        borderRadius: 40,
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        paddingHorizontal: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 24,
-        elevation: 12,
+        borderTopWidth: 1,
     },
     tabItem: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
-        height: '100%',
+        gap: 3,
+        paddingTop: 10,
     },
     iconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
+        width: 44,
+        height: 28,
+        borderRadius: 8,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    iconWrapActive: {
-        backgroundColor: '#A8D5A2',
     },
     badge: {
         position: 'absolute',
-        top: 6,
-        right: 6,
-        minWidth: 16,
-        height: 16,
-        borderRadius: 8,
+        top: -2,
+        right: 4,
+        width: 8,
+        height: 8,
+        borderRadius: 4,
         backgroundColor: '#E05252',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 3,
+        borderWidth: 1.5,
     },
-    badgeText: {
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: '800',
+    label: {
+        fontSize: 10,
     },
 });

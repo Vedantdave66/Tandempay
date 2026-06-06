@@ -172,6 +172,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
                                 { text: "OK", onPress: () => navigation.navigate("Payments") }
                             ]);
+                            loadData();
                         } catch (err: any) {
                             Alert.alert("Error", err.message);
                         }
@@ -659,13 +660,13 @@ const styles = StyleSheet.create({
 
     emptyState: {
         padding: 40,
-        borderRadius: 24,
+        borderRadius: 20,
         borderWidth: 1,
         alignItems: 'center',
     },
     emptyText: { fontSize: 14 },
 
-    // Modal Styles
+    // Members modal (unchanged)
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',

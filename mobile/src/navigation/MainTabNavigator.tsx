@@ -22,7 +22,7 @@ export default function MainTabNavigator() {
             <Tab.Screen name="Groups" component={GroupsScreen} />
             <Tab.Screen name="Payments" component={PaymentsScreen} />
             <Tab.Screen name="Friends" component={FriendsScreen} />
-            <Tab.Screen name="Pro" component={ProHubScreen} />
+            <Tab.Screen name="Me" component={ProHubScreen} options={{ tabBarLabel: 'Me' }} />
         </Tab.Navigator>
     );
 }

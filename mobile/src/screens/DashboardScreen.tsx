@@ -265,7 +265,7 @@ export default function DashboardScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    screen: { flex: 1 },
+    safe: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
@@ -367,6 +367,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 7,
         alignItems: 'center',
         justifyContent: 'center',
+        borderWidth: 1,
     },
     countBadgeText: {
         fontSize: 12,
