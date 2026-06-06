@@ -49,17 +49,30 @@ export default function FriendsScreen() {
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
 
+    function toArray<T>(raw: any): T[] {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.items)) return raw.items;
+        if (Array.isArray(raw?.friends)) return raw.friends;
+        if (Array.isArray(raw?.data)) return raw.data;
+        return [];
+    }
+
     const loadData = async () => {
         try {
-            const [friendsData, requestsData] = await Promise.all([
+            const [friendsRaw, requestsRaw] = await Promise.all([
                 friendsApi.getMyFriends(),
                 friendsApi.getPendingRequests()
             ]);
-            setFriends(friendsData);
-            setRequests(requestsData);
+            setFriends(toArray(friendsRaw));
+            // getPendingRequests returns { sent: [], received: [] } — handle both shapes
+            const reqObj = requestsRaw as any;
+            setRequests({
+                sent: toArray(reqObj?.sent ?? reqObj),
+                received: toArray(reqObj?.received ?? []),
+            });
 
             notificationsApi.list()
-                .then(data => setActivity((data || []).slice(0, 8)))
+                .then(raw => setActivity(toArray<any>(raw).slice(0, 8)))
                 .catch(() => {});
         } catch (err) {
             console.error(err);
