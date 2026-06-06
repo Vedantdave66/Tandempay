@@ -10,13 +10,13 @@ export default function Logo({ size = 17 }: { size?: number }) {
         <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontWeight: '800', fontSize, color: colors.text, letterSpacing: -0.4 }}>Tandem</Text>
             <View style={{
-                width: 1.5,
-                height: fontSize * 1.1,
+                width: 2,
+                height: fontSize * 1.15,
                 backgroundColor: colors.accent,
-                borderRadius: 2,
-                opacity: 0.85,
-                marginHorizontal: fontSize * 0.18,
+                borderRadius: 1,
                 transform: [{ rotate: '18deg' }],
+                opacity: 0.85,
+                marginHorizontal: Math.round(fontSize * 0.18),
             }} />
             <Text style={{ fontWeight: '800', fontSize, color: colors.accent, letterSpacing: -0.4 }}>Pay</Text>
         </View>

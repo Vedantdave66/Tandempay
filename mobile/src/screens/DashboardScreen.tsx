@@ -15,6 +15,7 @@ import {
     Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
 } from 'lucide-react-native';
 import { useNotifications } from '../context/NotificationContext';
+import ThemeToggle from '../components/ThemeToggle';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
 import Logo from '../components/Logo';
@@ -134,15 +135,18 @@ export default function DashboardScreen({ navigation }: any) {
                 {/* Header row */}
                 <View style={styles.headerRow}>
                     <Logo size={18} />
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Notifications')}
-                        style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    >
-                        <Bell color={colors.secondaryText} size={20} />
-                        {unreadCount > 0 && (
-                            <View style={[styles.bellDot, { borderColor: colors.background }]} />
-                        )}
-                    </TouchableOpacity>
+                    <View style={styles.headerRightRow}>
+                        <ThemeToggle />
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        >
+                            <Bell color={colors.secondaryText} size={20} />
+                            {unreadCount > 0 && (
+                                <View style={[styles.bellDot, { borderColor: colors.background }]} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Hero card */}
@@ -276,6 +280,11 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 8,
         paddingBottom: 16,
+    },
+    headerRightRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     bellButton: {
         width: 38,
