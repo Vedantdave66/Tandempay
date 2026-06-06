@@ -5,7 +5,6 @@ import {
     View,
     Text,
     StyleSheet,
-    SafeAreaView,
     ScrollView,
     TouchableOpacity,
     ActivityIndicator,
@@ -14,6 +13,8 @@ import {
     Modal,
     TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
@@ -182,17 +183,17 @@ export default function PaymentsScreen() {
                         )}
                         {isPayer && payment.status === 'sent' && (
                             <Text style={[styles.waitingText, { color: colors.secondaryText }]}>
-                                <Clock size={14} color={colors.secondaryText} style={{ marginRight: 4 }}/> Waiting for them to confirm...
+                                <Clock size={14} color={colors.secondaryText} style={{ marginRight: scale(4) }}/> Waiting for them to confirm...
                             </Text>
                         )}
 
                         {!isPayer && payment.status === 'pending' && (
                             <Text style={[styles.waitingText, { color: colors.secondaryText }]}>
-                                <Clock size={14} color={colors.secondaryText} style={{ marginRight: 4 }}/> Waiting for them to send money...
+                                <Clock size={14} color={colors.secondaryText} style={{ marginRight: scale(4) }}/> Waiting for them to send money...
                             </Text>
                         )}
                         {!isPayer && payment.status === 'sent' && (
-                            <View style={{ flexDirection: 'row', gap: 8, width: '100%' }}>
+                            <View style={{ flexDirection: 'row', gap: vs(8), width: '100%' }}>
                                 <TouchableOpacity 
                                     style={[styles.actionBtn, { backgroundColor: colors.accent, flex: 2 }]}
                                     onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'settled')}
@@ -246,26 +247,26 @@ export default function PaymentsScreen() {
                 <Text style={[styles.title, { color: colors.text }]}>Payments & Wallet</Text>
                 
                 {/* Master Segmented Control */}
-                <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 16 }]}>
+                <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: vs(16) }]}>
                     <TouchableOpacity 
                         style={[styles.segment, masterTab === 'wallet' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white', shadowOpacity: masterTab === 'wallet' ? 0.1 : 0 }]}
                         onPress={() => setMasterTab('wallet')}
                     >
-                        <Wallet size={16} color={masterTab === 'wallet' ? colors.text : colors.secondaryText} style={{ marginRight: 6 }} />
+                        <Wallet size={16} color={masterTab === 'wallet' ? colors.text : colors.secondaryText} style={{ marginRight: scale(6) }} />
                         <Text style={[styles.segmentText, { color: masterTab === 'wallet' ? colors.text : colors.secondaryText, fontWeight: masterTab === 'wallet' ? 'bold' : 'normal' }]}>Wallet</Text>
                     </TouchableOpacity>
                     <TouchableOpacity 
                         style={[styles.segment, masterTab === 'settle' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white', shadowOpacity: masterTab === 'settle' ? 0.1 : 0 }]}
                         onPress={() => setMasterTab('settle')}
                     >
-                        <Send size={16} color={masterTab === 'settle' ? colors.text : colors.secondaryText} style={{ marginRight: 6 }} />
+                        <Send size={16} color={masterTab === 'settle' ? colors.text : colors.secondaryText} style={{ marginRight: scale(6) }} />
                         <Text style={[styles.segmentText, { color: masterTab === 'settle' ? colors.text : colors.secondaryText, fontWeight: masterTab === 'settle' ? 'bold' : 'normal' }]}>Settle Up</Text>
                     </TouchableOpacity>
                 </View>
 
                 {/* Sub Segmented Control (Only for Settle Up) */}
                 {masterTab === 'settle' && (
-                    <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 8 }]}>
+                    <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: vs(8) }]}>
                         <TouchableOpacity 
                             style={[styles.segment, settleTab === 'pending' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white', shadowOpacity: settleTab === 'pending' ? 0.1 : 0 }]}
                             onPress={() => setSettleTab('pending')}
@@ -287,7 +288,7 @@ export default function PaymentsScreen() {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
             >
                 {loading && !refreshing ? (
-                    <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
                 ) : masterTab === 'settle' ? (
                     <>
                         {(settleTab === 'pending' ? pendingPayments : historyPayments).length === 0 ? (
@@ -333,10 +334,10 @@ export default function PaymentsScreen() {
 
                             {/* Stripe Receiving Card */}
                             <View style={[styles.walletCard, { backgroundColor: isDark ? colors.surface : 'white', borderColor: colors.border }]}>
-                                <View style={[styles.walletIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)', alignSelf: 'center', marginBottom: 12 }]}>
+                                <View style={[styles.walletIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)', alignSelf: 'center', marginBottom: vs(12) }]}>
                                     <CreditCard size={24} color="#6366F1" />
                                 </View>
-                                <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: 8 }]}>Receive Payments</Text>
+                                <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: vs(8) }]}>Receive Payments</Text>
                                 <Text style={[styles.walletDesc, { color: colors.secondaryText }]}>Connect your bank with Stripe to receive instant payouts from friends.</Text>
                                 <TouchableOpacity style={[styles.walletBtnFull, { backgroundColor: '#6366F1', marginTop: 'auto' }]} onPress={handleStripeConnect}>
                                     <Text style={[styles.walletBtnText, { color: 'white' }]}>Connect Stripe ↗</Text>
@@ -345,7 +346,7 @@ export default function PaymentsScreen() {
                         </ScrollView>
 
                         <Text style={[styles.ledgerSectionTitle, { color: colors.text }]}>
-                            <RotateCcw size={16} color={colors.secondaryText} style={{ marginRight: 8 }} />
+                            <RotateCcw size={16} color={colors.secondaryText} style={{ marginRight: scale(8) }} />
                             Ledger History
                         </Text>
                         
@@ -375,7 +376,7 @@ export default function PaymentsScreen() {
                                 <X size={20} color={colors.text} />
                             </TouchableOpacity>
                         </View>
-                        <Text style={{ color: colors.secondaryText, marginBottom: 16 }}>
+                        <Text style={{ color: colors.secondaryText, marginBottom: vs(16) }}>
                             {fundModalType === 'add' ? 'Enter amount to deposit into your Tandem wallet.' : `Enter amount to withdraw. Available: $${formatCurrency(walletBalance)}`}
                         </Text>
 
@@ -410,44 +411,44 @@ export default function PaymentsScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1 },
     header: {
-        paddingHorizontal: 24,
-        paddingTop: 24,
-        paddingBottom: 8,
+        paddingHorizontal: scale(24),
+        paddingTop: vs(24),
+        paddingBottom: vs(8),
     },
     title: {
-        fontSize: 32,
+        fontSize: ms(32),
         fontWeight: '900',
-        marginBottom: 20,
+        marginBottom: vs(20),
     },
     segmentContainer: {
         flexDirection: 'row',
-        padding: 4,
-        borderRadius: 12,
+        padding: scale(4),
+        borderRadius: ms(12),
         borderWidth: 1,
     },
     segment: {
         flex: 1,
         flexDirection: 'row',
-        paddingVertical: 10,
+        paddingVertical: vs(10),
         alignItems: 'center',
         justifyContent: 'center',
-        borderRadius: 8,
+        borderRadius: ms(8),
     },
     segmentText: {
-        fontSize: 14,
+        fontSize: ms(14),
     },
     container: {
-        paddingHorizontal: 24,
-        paddingTop: 16,
-        paddingBottom: 140,
+        paddingHorizontal: scale(24),
+        paddingTop: vs(16),
+        paddingBottom: vs(140),
     },
     
     // Settle Up Styles
     card: {
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
-        marginBottom: 16,
-        padding: 16,
+        marginBottom: vs(16),
+        padding: scale(16),
     },
     cardHeader: {
         flexDirection: 'row',
@@ -461,23 +462,23 @@ const styles = StyleSheet.create({
     avatar: {
         width: 44,
         height: 44,
-        borderRadius: 22,
+        borderRadius: ms(22),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: scale(12),
     },
-    avatarText: { color: 'white', fontWeight: 'bold', fontSize: 16 },
-    cardTitle: { fontSize: 12, marginBottom: 2 },
-    cardName: { fontSize: 16, fontWeight: 'bold' },
-    amount: { fontSize: 22, fontWeight: '900' },
+    avatarText: { color: 'white', fontWeight: 'bold', fontSize: ms(16) },
+    cardTitle: { fontSize: ms(12), marginBottom: vs(2) },
+    cardName: { fontSize: ms(16), fontWeight: 'bold' },
+    amount: { fontSize: ms(22), fontWeight: '900' },
     statusBanner: {
-        marginTop: 16,
-        padding: 12,
-        borderRadius: 12,
+        marginTop: vs(16),
+        padding: scale(12),
+        borderRadius: ms(12),
     },
-    statusText: { fontSize: 13 },
+    statusText: { fontSize: ms(13) },
     actions: {
-        marginTop: 16,
+        marginTop: vs(16),
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -485,157 +486,157 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
+        gap: vs(8),
         height: 48,
-        borderRadius: 12,
+        borderRadius: ms(12),
         width: '100%',
     },
-    actionText: { color: 'white', fontWeight: 'bold', fontSize: 15 },
-    waitingText: { fontSize: 14, fontStyle: 'italic', textAlign: 'center', width: '100%' },
+    actionText: { color: 'white', fontWeight: 'bold', fontSize: ms(15) },
+    waitingText: { fontSize: ms(14), fontStyle: 'italic', textAlign: 'center', width: '100%' },
     emptyState: {
-        padding: 40,
-        borderRadius: 24,
+        padding: scale(40),
+        borderRadius: ms(24),
         borderWidth: 1,
         alignItems: 'center',
-        marginTop: 20,
+        marginTop: vs(20),
     },
     iconContainer: {
         width: 80,
         height: 80,
-        borderRadius: 40,
+        borderRadius: ms(40),
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
-    emptyTitle: { fontSize: 20, fontWeight: 'bold', marginBottom: 12 },
-    emptyDesc: { fontSize: 14, textAlign: 'center', lineHeight: 22 },
+    emptyTitle: { fontSize: ms(20), fontWeight: 'bold', marginBottom: vs(12) },
+    emptyDesc: { fontSize: ms(14), textAlign: 'center', lineHeight: 22 },
 
     // Wallet Styles
     walletCardsScroll: {
-        paddingBottom: 24,
-        gap: 16,
+        paddingBottom: vs(24),
+        gap: vs(16),
     },
     walletCard: {
         width: 280,
-        borderRadius: 24,
-        padding: 24,
+        borderRadius: ms(24),
+        padding: scale(24),
         borderWidth: 1,
-        marginRight: 16, // using marginRight here because gap sometimes acts up in horizontal scrollviews on old RN
+        marginRight: scale(16), // using marginRight here because gap sometimes acts up in horizontal scrollviews on old RN
     },
     walletCardHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
     walletIconBox: {
         width: 40,
         height: 40,
-        borderRadius: 12,
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: scale(12),
     },
     walletCardTitle: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: 'bold',
         color: '#111827',
     },
     walletAvailable: {
-        fontSize: 13,
+        fontSize: ms(13),
         color: '#4B5563',
-        marginBottom: 4,
+        marginBottom: vs(4),
     },
     walletBalanceText: {
-        fontSize: 36,
+        fontSize: ms(36),
         fontWeight: '900',
         color: '#111827',
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
     walletButtons: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 16,
+        gap: vs(12),
+        marginBottom: vs(16),
     },
     walletBtn: {
         flex: 1,
         height: 40,
-        borderRadius: 20,
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
     },
     walletBtnFull: {
         flexDirection: 'row',
         height: 44,
-        borderRadius: 22,
+        borderRadius: ms(22),
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
     },
     walletBtnText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: 'bold',
     },
     walletPowered: {
-        fontSize: 11,
+        fontSize: ms(11),
         color: '#6B7280',
         textAlign: 'center',
     },
     walletDesc: {
-        fontSize: 13,
+        fontSize: ms(13),
         textAlign: 'center',
         lineHeight: 20,
-        marginBottom: 20,
+        marginBottom: vs(20),
     },
     ledgerSectionTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: 'bold',
-        marginBottom: 16,
+        marginBottom: vs(16),
         flexDirection: 'row',
         alignItems: 'center',
     },
     ledgerContainer: {
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
         overflow: 'hidden',
     },
     ledgerEmpty: {
-        padding: 40,
+        padding: scale(40),
         alignItems: 'center',
         justifyContent: 'center',
     },
     ledgerEmptyText: {
-        marginTop: 12,
-        fontSize: 14,
+        marginTop: vs(12),
+        fontSize: ms(14),
     },
     ledgerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 16,
+        padding: scale(16),
         borderBottomWidth: 1,
     },
     ledgerIcon: {
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: scale(12),
     },
     ledgerType: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: 'bold',
-        marginBottom: 2,
+        marginBottom: vs(2),
     },
     ledgerDate: {
-        fontSize: 12,
+        fontSize: ms(12),
     },
     ledgerAmount: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: 'bold',
-        marginBottom: 2,
+        marginBottom: vs(2),
     },
     ledgerStatus: {
-        fontSize: 11,
+        fontSize: ms(11),
         fontWeight: 'bold',
     },
 
@@ -648,23 +649,23 @@ const styles = StyleSheet.create({
     modalContent: {
         borderTopLeftRadius: 32,
         borderTopRightRadius: 32,
-        padding: 24,
+        padding: scale(24),
         minHeight: '40%',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: vs(16),
     },
     modalTitle: {
-        fontSize: 24,
+        fontSize: ms(24),
         fontWeight: '900',
     },
     closeModalBtn: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: ms(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -672,30 +673,30 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 2,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        marginBottom: 24,
+        borderRadius: ms(16),
+        paddingHorizontal: scale(16),
+        marginBottom: vs(24),
         height: 60,
     },
     currencySymbol: {
-        fontSize: 24,
+        fontSize: ms(24),
         fontWeight: 'bold',
-        marginRight: 8,
+        marginRight: scale(8),
     },
     input: {
         flex: 1,
-        fontSize: 24,
+        fontSize: ms(24),
         fontWeight: 'bold',
     },
     submitBtn: {
         height: 56,
-        borderRadius: 28,
+        borderRadius: ms(28),
         alignItems: 'center',
         justifyContent: 'center',
     },
     submitBtnText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: 'bold',
     },
 

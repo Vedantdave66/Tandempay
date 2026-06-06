@@ -5,6 +5,7 @@ import { Crown, ArrowRight } from 'lucide-react-native';
 import { GroupListItem, UserBalance } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils/formatCurrency';
+import { scale, vs, ms } from '../utils/responsive';
 import CharacterShape from './CharacterShape';
 
 interface GroupCardProps {
@@ -80,11 +81,11 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                         return (
                             <View key={m.user_id} style={{ alignItems: 'center' }}>
                                 {isCreator
-                                    ? <Crown size={12} color="#FBBF24" style={{ marginBottom: 2 }} />
+                                    ? <Crown size={12} color="#FBBF24" style={{ marginBottom: vs(2) }} />
                                     : <View style={{ height: 14 }} />
                                 }
                                 <Text style={{
-                                    fontSize: 11, color: colors.groupNameInk, marginBottom: 4,
+                                    fontSize: ms(11), color: colors.groupNameInk, marginBottom: vs(4),
                                     fontWeight: '700', transform: [{ rotate: `${tilt.name}deg` }],
                                     textShadowColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
                                     textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
@@ -109,9 +110,9 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
             </View>
 
             {/* Title pill — overlaps the characters (zIndex 2, pulled up) */}
-            <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: 16 }}>
+            <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: scale(16) }}>
                 <View style={[styles.titlePill, boxStyle, compact && styles.titlePillCompact, { width: '100%' }]}>
-                    <Text style={{ color: colors.text, fontSize: compact ? 20 : 30, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
+                    <Text style={{ color: colors.text, fontSize: compact ? ms(18) : ms(24, 0.3), fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
                         {group.name}
                     </Text>
                 </View>
@@ -169,19 +170,19 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
 
 const styles = StyleSheet.create({
     card: {
-        borderRadius: 28,
+        borderRadius: ms(28),
         overflow: 'visible',
-        marginBottom: 16,
-        paddingBottom: 4,
+        marginBottom: vs(16),
+        paddingBottom: vs(4),
     },
     cardCompact: {
-        width: 222,
-        marginBottom: 0,
-        marginRight: 0,
+        width: scale(218),
+        marginBottom: vs(0),
+        marginRight: scale(0),
     },
     gradientClip: {
         ...StyleSheet.absoluteFillObject,
-        borderRadius: 28,
+        borderRadius: ms(28),
         overflow: 'hidden',
     },
     clusterRow: {
@@ -190,82 +191,82 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'flex-end',
-        gap: 2,
-        paddingTop: 22,
-        paddingHorizontal: 20,
+        gap: scale(2),
+        paddingTop: vs(22),
+        paddingHorizontal: scale(20),
         overflow: 'visible',
     },
     clusterRowCompact: {
-        paddingTop: 16,
-        paddingHorizontal: 12,
+        paddingTop: vs(16),
+        paddingHorizontal: scale(12),
     },
     characterPlaceholder: {
-        height: 80,
+        height: vs(80),
     },
     titlePill: {
         borderRadius: 999,
-        height: 64,
+        height: vs(60),
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: scale(20),
     },
     titlePillCompact: {
-        height: 48,
-        paddingHorizontal: 16,
+        height: vs(46),
+        paddingHorizontal: scale(16),
     },
     extraPillRow: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: 12,
+        marginTop: vs(12),
         zIndex: 1,
     },
     extraPill: {
         borderRadius: 9999,
-        paddingHorizontal: 16,
-        paddingVertical: 6,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(6),
     },
     extraPillText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '700',
     },
     stats: {
-        paddingHorizontal: 22,
-        paddingTop: 18,
-        paddingBottom: 22,
+        paddingHorizontal: scale(22),
+        paddingTop: vs(18),
+        paddingBottom: vs(22),
         alignItems: 'stretch',
-        gap: 16,
+        gap: vs(16),
         zIndex: 1,
     },
     statsCompact: {
-        paddingHorizontal: 14,
-        paddingTop: 12,
-        paddingBottom: 14,
-        gap: 10,
+        paddingHorizontal: scale(14),
+        paddingTop: vs(12),
+        paddingBottom: vs(14),
+        gap: vs(10),
     },
     statBlock: {
         alignItems: 'stretch',
-        gap: 8,
+        gap: vs(8),
     },
     statLabel: {
-        fontSize: 12,
+        fontSize: ms(11),
         fontWeight: '800',
         letterSpacing: 1.5,
         textAlign: 'center',
     },
     statPill: {
-        borderRadius: 22,
-        minHeight: 64,
+        borderRadius: ms(22),
+        minHeight: vs(60),
         alignItems: 'center',
         justifyContent: 'center',
-        paddingHorizontal: 20,
+        paddingHorizontal: scale(20),
     },
     statPillCompact: {
-        minHeight: 44,
-        borderRadius: 18,
-        paddingHorizontal: 16,
+        minHeight: vs(42),
+        borderRadius: ms(18),
+        paddingHorizontal: scale(16),
     },
     statValue: {
-        fontSize: 30,
+        fontSize: ms(26, 0.3),
         fontWeight: '700',
         letterSpacing: -0.5,
     },
@@ -273,32 +274,32 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        borderRadius: 22,
-        minHeight: 64,
-        paddingLeft: 24,
-        paddingRight: 12,
+        borderRadius: ms(22),
+        minHeight: vs(60),
+        paddingLeft: scale(24),
+        paddingRight: scale(12),
     },
     balancePillCompact: {
-        minHeight: 44,
-        borderRadius: 18,
-        paddingLeft: 16,
-        paddingRight: 8,
+        minHeight: vs(42),
+        borderRadius: ms(18),
+        paddingLeft: scale(16),
+        paddingRight: scale(8),
     },
     balanceValue: {
-        fontSize: 30,
+        fontSize: ms(26, 0.3),
         fontWeight: '700',
         letterSpacing: -0.5,
     },
     arrowBtn: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
+        width: scale(44),
+        height: scale(44),
+        borderRadius: scale(22),
         alignItems: 'center',
         justifyContent: 'center',
     },
     arrowBtnCompact: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: scale(34),
+        height: scale(34),
+        borderRadius: scale(17),
     },
 });

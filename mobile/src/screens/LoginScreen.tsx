@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform, SafeAreaView } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
 import { useAuth } from '../context/AuthContext';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { authApi } from '../services/api';
 import { Wallet, ArrowLeft } from 'lucide-react-native';
@@ -127,7 +129,7 @@ const styles = StyleSheet.create({
         left: 20,
         width: 40,
         height: 40,
-        borderRadius: 20,
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
@@ -136,87 +138,87 @@ const styles = StyleSheet.create({
     content: {
         flex: 1,
         justifyContent: 'center',
-        paddingHorizontal: 24,
+        paddingHorizontal: scale(24),
     },
     header: {
         alignItems: 'center',
-        marginBottom: 40,
+        marginBottom: vs(40),
     },
     logoContainer: {
         width: 64,
         height: 64,
-        borderRadius: 20,
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 20,
+        marginBottom: vs(20),
         borderWidth: 1,
     },
     title: {
-        fontSize: 32,
+        fontSize: ms(32),
         fontWeight: '900',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     subtitle: {
-        fontSize: 16,
+        fontSize: ms(16),
     },
     form: {
-        padding: 24,
-        borderRadius: 24,
+        padding: scale(24),
+        borderRadius: ms(24),
         borderWidth: 1,
     },
     label: {
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: '600',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     input: {
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        fontSize: 16,
-        marginBottom: 20,
+        borderRadius: ms(12),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(14),
+        fontSize: ms(16),
+        marginBottom: vs(20),
     },
     button: {
-        borderRadius: 28,
-        paddingVertical: 16,
+        borderRadius: ms(28),
+        paddingVertical: vs(16),
         alignItems: 'center',
-        marginTop: 8,
+        marginTop: vs(8),
     },
     buttonDisabled: { opacity: 0.7 },
     buttonText: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '700',
     },
     forgotRow: {
         alignItems: 'flex-end',
         marginTop: -12,
-        marginBottom: 16,
+        marginBottom: vs(16),
     },
     forgotText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
     },
     errorBox: {
         borderWidth: 1,
-        borderRadius: 12,
-        padding: 16,
-        marginBottom: 20,
+        borderRadius: ms(12),
+        padding: scale(16),
+        marginBottom: vs(20),
     },
     errorText: {
-        fontSize: 14,
+        fontSize: ms(14),
         textAlign: 'center',
     },
     footer: {
         flexDirection: 'row',
         justifyContent: 'center',
-        marginTop: 32,
+        marginTop: vs(32),
     },
     footerText: {
-        fontSize: 14,
+        fontSize: ms(14),
     },
     footerLink: {
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: 'bold',
     },
 });

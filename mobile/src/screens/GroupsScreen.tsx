@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, TouchableOpacity,
     ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -79,7 +80,7 @@ export default function GroupsScreen({ navigation }: any) {
                 </View>
             ) : (
                 <ScrollView
-                    contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
+                    contentContainerStyle={[styles.list, { paddingBottom: vs(120) }]}
                     showsVerticalScrollIndicator={false}
                     refreshControl={
                         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
@@ -121,25 +122,25 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 16,
+        paddingHorizontal: scale(16),
+        paddingTop: vs(8),
+        paddingBottom: vs(16),
     },
-    title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+    title: { fontSize: ms(24), fontWeight: '800', letterSpacing: -0.5 },
     newButton: {
-        borderRadius: 13,
-        paddingHorizontal: 16,
-        paddingVertical: 10,
+        borderRadius: ms(13),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(10),
     },
-    newButtonText: { fontSize: 14, fontWeight: '700' },
+    newButtonText: { fontSize: ms(14), fontWeight: '700' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    list: { paddingHorizontal: 16 },
+    list: { paddingHorizontal: scale(16) },
     empty: {
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 14,
-        paddingVertical: 80,
+        gap: vs(14),
+        paddingVertical: vs(80),
     },
-    emptyTitle: { fontSize: 18, fontWeight: '600' },
-    emptyAction: { fontSize: 15, fontWeight: '700' },
+    emptyTitle: { fontSize: ms(18), fontWeight: '600' },
+    emptyAction: { fontSize: ms(15), fontWeight: '700' },
 });

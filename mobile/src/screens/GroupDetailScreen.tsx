@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
+import { scale, vs, ms } from '../utils/responsive';
 import {
   View,
   Text,
@@ -46,18 +47,28 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
+    // Extract a plain array from either a raw array or a paginated { items: [] } / { expenses: [] } envelope
+    function toArray<T>(raw: any): T[] {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.items)) return raw.items;
+        if (Array.isArray(raw?.expenses)) return raw.expenses;
+        if (Array.isArray(raw?.balances)) return raw.balances;
+        if (Array.isArray(raw?.settlements)) return raw.settlements;
+        return [];
+    }
+
     const loadData = useCallback(async () => {
         try {
-            const [groupData, expensesData, balancesData, settlementsData] = await Promise.all([
+            const [groupData, expensesRaw, balancesRaw, settlementsRaw] = await Promise.all([
                 groupsApi.get(groupId),
                 expensesApi.list(groupId),
                 balancesApi.getBalances(groupId),
-                balancesApi.getSettlements(groupId)
+                balancesApi.getSettlements(groupId),
             ]);
             setGroup(groupData);
-            setExpenses(expensesData.reverse()); // Show newest first
-            setBalances(balancesData);
-            setSettlements(settlementsData);
+            setExpenses(toArray<Expense>(expensesRaw).slice().reverse()); // Show newest first
+            setBalances(toArray<UserBalance>(balancesRaw));
+            setSettlements(toArray<Settlement>(settlementsRaw));
         } catch (err) {
             console.error('Failed to load group details', err);
         } finally {
@@ -302,7 +313,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 {activeTab === 'expenses' && (
                     expenses.length === 0 ? (
                         <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: 12 }} />
+                            <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: vs(12) }} />
                             <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
                         </View>
                     ) : expenses.map(expense => {
@@ -412,8 +423,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         </View>
 
                         {/* Current members with remove buttons */}
-                        <View style={{ marginBottom: 16 }}>
-                            <Text style={{ color: colors.secondaryText, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+                        <View style={{ marginBottom: vs(16) }}>
+                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: vs(10) }}>
                                 Current Members
                             </Text>
                             {(group?.members || []).map(m => {
@@ -425,10 +436,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                             <Text style={styles.friendAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>
+                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>
                                                 {m.name}{isCreator ? ' 👑' : ''}
                                             </Text>
-                                            <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{m.email}</Text>
+                                            <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{m.email}</Text>
                                         </View>
                                         {canRemove && (
                                             <TouchableOpacity
@@ -453,27 +464,27 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 style={[styles.tabSwitchBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('friends')}
                             >
-                                <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
+                                <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
                                 <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.tabSwitchBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('invite')}
                             >
-                                <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
+                                <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
                                 <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
                             </TouchableOpacity>
                         </View>
 
                         {membersTab === 'friends' ? (
-                            <ScrollView style={{ marginTop: 16 }}>
+                            <ScrollView style={{ marginTop: vs(16) }}>
                                 {friendsLoading ? (
-                                    <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+                                    <ActivityIndicator color={colors.accent} style={{ marginTop: vs(24) }} />
                                 ) : friends.length === 0 ? (
-                                    <View style={{ alignItems: 'center', padding: 32 }}>
-                                        <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: 12 }} />
-                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>All friends added!</Text>
-                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: 13 }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
+                                    <View style={{ alignItems: 'center', padding: scale(32) }}>
+                                        <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: vs(12) }} />
+                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: ms(16), marginBottom: vs(6) }}>All friends added!</Text>
+                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: ms(13) }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
                                     </View>
                                 ) : (
                                     friends.map(friend => (
@@ -482,8 +493,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                                 <Text style={styles.friendAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>{friend.name}</Text>
-                                                <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{friend.email}</Text>
+                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>{friend.name}</Text>
+                                                <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{friend.email}</Text>
                                             </View>
                                             <TouchableOpacity
                                                 style={[styles.addBtn, { backgroundColor: addingFriendId === friend.id ? colors.border : colors.accent }]}
@@ -500,10 +511,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 )}
                             </ScrollView>
                         ) : (
-                            <View style={{ marginTop: 20 }}>
-                                <Text style={{ color: colors.secondaryText, fontSize: 13, marginBottom: 12 }}>Enter their email address. They must have a TandemPay account.</Text>
+                            <View style={{ marginTop: vs(20) }}>
+                                <Text style={{ color: colors.secondaryText, fontSize: ms(13), marginBottom: vs(12) }}>Enter their email address. They must have a TandemPay account.</Text>
                                 <View style={[styles.emailInputRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                                    <Mail size={18} color={colors.secondaryText} style={{ marginRight: 10 }} />
+                                    <Mail size={18} color={colors.secondaryText} style={{ marginRight: scale(10) }} />
                                     <TextInput
                                         style={[styles.emailInput, { color: colors.text }]}
                                         placeholder="friend@example.com"
@@ -521,7 +532,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 >
                                     {inviteLoading
                                         ? <ActivityIndicator color="#fff" />
-                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Add to Group</Text>
+                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: ms(15) }}>Add to Group</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
@@ -539,202 +550,201 @@ const styles = StyleSheet.create({
 
     // Sticky header
     headerGradient: {
-        paddingHorizontal: 20,
-        paddingTop: 4,
+        paddingHorizontal: scale(20),
+        paddingTop: vs(4),
         borderBottomWidth: 1,
     },
     backRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
-        paddingBottom: 12,
+        gap: scale(5),
+        paddingBottom: vs(12),
         alignSelf: 'flex-start',
     },
-    backText: { fontSize: 14, fontWeight: '700' },
+    backText: { fontSize: ms(14), fontWeight: '700' },
     headerTopRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
-        gap: 12,
-        marginBottom: 14,
+        gap: scale(12),
+        marginBottom: vs(14),
     },
-    groupName: { fontSize: 24, fontWeight: '800', letterSpacing: -0.4 },
+    groupName: { fontSize: ms(22), fontWeight: '800', letterSpacing: -0.4 },
     clusterRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        marginTop: 8,
+        marginTop: vs(8),
     },
     clusterAvatar: {
         transform: [{ translateY: 2 }],
     },
-    memberSummary: { fontSize: 13, fontWeight: '600', marginLeft: 10 },
+    memberSummary: { fontSize: ms(12), fontWeight: '600', marginLeft: scale(10) },
     balanceChip: {
-        borderRadius: 14,
-        paddingHorizontal: 12,
-        paddingVertical: 8,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(8),
         alignItems: 'flex-end',
     },
-    balanceChipLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
-    balanceChipValue: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3 },
+    balanceChipLabel: { fontSize: ms(10), fontWeight: '800', letterSpacing: 0.6 },
+    balanceChipValue: { fontSize: ms(18), fontWeight: '800', letterSpacing: -0.3 },
 
     actionRow: {
         flexDirection: 'row',
-        gap: 8,
-        marginBottom: 12,
+        gap: scale(8),
+        marginBottom: vs(12),
     },
     primaryBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
-        borderRadius: 13,
-        paddingVertical: 12,
+        gap: scale(7),
+        borderRadius: ms(13),
+        paddingVertical: vs(12),
     },
-    primaryBtnText: { fontSize: 14, fontWeight: '700' },
+    primaryBtnText: { fontSize: ms(14), fontWeight: '700' },
     ghostBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 7,
-        borderRadius: 13,
+        gap: scale(7),
+        borderRadius: ms(13),
         borderWidth: 1.5,
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(12),
     },
-    ghostBtnText: { fontSize: 14, fontWeight: '700' },
+    ghostBtnText: { fontSize: ms(14), fontWeight: '700' },
 
     tabRow: { flexDirection: 'row' },
     tabBtn: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: vs(12),
         borderBottomWidth: 3,
     },
-    tabBtnText: { fontSize: 13.5, fontWeight: '600' },
+    tabBtnText: { fontSize: ms(13), fontWeight: '600' },
 
-    scrollContent: { padding: 16, paddingBottom: 100, gap: 10 },
+    scrollContent: { padding: scale(16), paddingBottom: vs(100), gap: vs(10) },
 
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
-        borderRadius: 16,
+        gap: scale(12),
+        padding: scale(14),
+        borderRadius: ms(16),
         borderWidth: 1,
     },
     rowInfo: { flex: 1, minWidth: 0 },
-    rowTitle: { fontSize: 15, fontWeight: '600' },
-    rowMeta: { fontSize: 12, marginTop: 2 },
+    rowTitle: { fontSize: ms(15), fontWeight: '600' },
+    rowMeta: { fontSize: ms(12), marginTop: vs(2) },
     rowEnd: { alignItems: 'flex-end' },
-    rowAmount: { fontSize: 16, fontWeight: '700' },
-    rowDate: { fontSize: 11, marginTop: 2 },
-    rowEach: { fontSize: 12, fontWeight: '600', marginTop: 2 },
+    rowAmount: { fontSize: ms(16), fontWeight: '700' },
+    rowDate: { fontSize: ms(11), marginTop: vs(2) },
+    rowEach: { fontSize: ms(12), fontWeight: '600', marginTop: vs(2) },
 
-    balanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: 10 },
-    balanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-    progressTrack: { height: 6, borderRadius: 3, overflow: 'hidden' },
-    progressFill: { height: '100%', borderRadius: 3 },
+    balanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: vs(10) },
+    balanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },
+    progressTrack: { height: vs(6), borderRadius: ms(3), overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: ms(3) },
     settleLinkBtn: {
         alignSelf: 'flex-start',
-        borderRadius: 11,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
+        borderRadius: ms(11),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
     },
-    settleLinkText: { fontSize: 13, fontWeight: '700' },
+    settleLinkText: { fontSize: ms(13), fontWeight: '700' },
 
     settleBtn: {
-        borderRadius: 11,
-        paddingHorizontal: 14,
-        paddingVertical: 9,
+        borderRadius: ms(11),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
     },
-    settleBtnText: { fontSize: 13, fontWeight: '700' },
+    settleBtnText: { fontSize: ms(13), fontWeight: '700' },
 
     settledEmpty: {
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingVertical: 60,
+        gap: vs(8),
+        paddingVertical: vs(60),
     },
-    settledTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },
+    settledTitle: { fontSize: ms(17), fontWeight: '700', marginTop: vs(8) },
 
     emptyState: {
-        padding: 40,
-        borderRadius: 20,
+        padding: scale(40),
+        borderRadius: ms(20),
         borderWidth: 1,
         alignItems: 'center',
     },
-    emptyText: { fontSize: 14 },
+    emptyText: { fontSize: ms(14) },
 
-    // Members modal (unchanged)
+    // Members modal
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalContent: {
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        padding: 24,
+        borderTopLeftRadius: ms(32),
+        borderTopRightRadius: ms(32),
+        padding: scale(24),
         minHeight: '40%',
-        maxHeight: '80%',
+        maxHeight: '85%',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
     modalTitle: {
-        fontSize: 24,
+        fontSize: ms(22),
         fontWeight: '900',
     },
     closeModalBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    // Members modal
     tabSwitchRow: {
         flexDirection: 'row',
-        borderRadius: 12,
+        borderRadius: ms(12),
         borderWidth: 1,
-        padding: 4,
-        gap: 4,
+        padding: scale(4),
+        gap: scale(4),
     },
     tabSwitchBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 9,
-        borderRadius: 8,
+        paddingVertical: vs(9),
+        borderRadius: ms(8),
     },
     tabSwitchBtnText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
     },
     friendRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: vs(12),
         borderBottomWidth: 1,
-        gap: 12,
+        gap: scale(12),
     },
     friendAvatar: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: scale(42),
+        height: scale(42),
+        borderRadius: scale(21),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: ms(15) },
     addBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -742,18 +752,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderRadius: 14,
-        paddingHorizontal: 14,
-        height: 52,
-        marginBottom: 16,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(14),
+        height: vs(52),
+        marginBottom: vs(16),
     },
     emailInput: {
         flex: 1,
-        fontSize: 15,
+        fontSize: ms(15),
     },
     inviteBtn: {
-        height: 52,
-        borderRadius: 26,
+        height: vs(52),
+        borderRadius: ms(26),
         alignItems: 'center',
         justifyContent: 'center',
     },

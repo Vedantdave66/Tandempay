@@ -8,6 +8,7 @@ import { Home, Users, Wallet, Bell, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
+import { scale, vs, ms } from '../utils/responsive';
 
 const TABS = [
   { key: 'Home',     icon: Home,  label: 'Home'     },
@@ -17,7 +18,7 @@ const TABS = [
   { key: 'Me',       icon: User,  label: 'Me'       },
 ];
 
-const LIMELIGHT_W = 44;
+const LIMELIGHT_W = scale(44);
 
 export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
@@ -135,28 +136,28 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: 0,
     width: LIMELIGHT_W,
-    height: 4,
+    height: vs(4),
     borderRadius: 999,
     zIndex: 10,
   },
   limelightCone: {
     position: 'absolute',
-    top: 4,
-    left: -20,
-    width: LIMELIGHT_W + 40,
-    height: 52,
-    borderRadius: 4,
+    top: vs(4),
+    left: -scale(20),
+    width: LIMELIGHT_W + scale(40),
+    height: vs(52),
+    borderRadius: ms(4),
   },
   tabRow: {
     flexDirection: 'row',
-    paddingTop: 10,
-    paddingBottom: 4,
+    paddingTop: vs(10),
+    paddingBottom: vs(4),
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 3,
+    gap: vs(3),
   },
   iconWrap: {
     position: 'relative',
@@ -165,13 +166,13 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -4,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
     backgroundColor: '#E05252',
   },
   label: {
-    fontSize: 10,
+    fontSize: ms(10),
     fontWeight: '600',
   },
 });

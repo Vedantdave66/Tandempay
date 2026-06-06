@@ -3,6 +3,7 @@ import {
     View, Text, StyleSheet, FlatList, TouchableOpacity,
     SafeAreaView, RefreshControl, ActivityIndicator
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { friendsApi, Friend, PendingRequests } from '../services/api';
 import { UserPlus, Check, X, Clock, Users, ChevronRight, Mail } from 'lucide-react-native';
@@ -183,31 +184,31 @@ const styles = StyleSheet.create({
     safe: { flex: 1 },
     header: {
         flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-        paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16,
+        paddingHorizontal: scale(24), paddingTop: vs(24), paddingBottom: vs(16),
     },
-    title: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-    addBtn: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center' },
+    title: { fontSize: ms(28), fontWeight: '900', letterSpacing: -0.5 },
+    addBtn: { width: 40, height: 40, borderRadius: ms(20), alignItems: 'center', justifyContent: 'center' },
     tabBar: {
-        flexDirection: 'row', marginHorizontal: 24, marginBottom: 16,
-        borderRadius: 16, padding: 4, borderWidth: 1,
+        flexDirection: 'row', marginHorizontal: scale(24), marginBottom: vs(16),
+        borderRadius: ms(16), padding: scale(4), borderWidth: 1,
     },
-    tab: { flex: 1, paddingVertical: 10, borderRadius: 12, alignItems: 'center' },
-    tabText: { fontSize: 14 },
+    tab: { flex: 1, paddingVertical: vs(10), borderRadius: ms(12), alignItems: 'center' },
+    tabText: { fontSize: ms(14) },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    list: { paddingHorizontal: 24, paddingBottom: 100 },
+    list: { paddingHorizontal: scale(24), paddingBottom: vs(100) },
     card: {
-        flexDirection: 'row', alignItems: 'center', borderRadius: 20,
-        padding: 14, marginBottom: 10, borderWidth: 1, gap: 12,
+        flexDirection: 'row', alignItems: 'center', borderRadius: ms(20),
+        padding: scale(14), marginBottom: vs(10), borderWidth: 1, gap: vs(12),
     },
     cardInfo: { flex: 1 },
-    cardName: { fontSize: 15, fontWeight: '700', marginBottom: 2 },
-    cardSub: { fontSize: 12 },
-    badge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10, borderWidth: 1 },
-    badgeText: { fontSize: 11, fontWeight: '700' },
-    actions: { flexDirection: 'row', gap: 8 },
-    actionBtn: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
-    sectionLabel: { fontSize: 11, fontWeight: '700', letterSpacing: 0.8, marginBottom: 8 },
-    empty: { padding: 40, borderRadius: 24, borderWidth: 1, alignItems: 'center', gap: 10, marginTop: 12 },
-    emptyTitle: { fontSize: 17, fontWeight: '700' },
-    emptyText: { fontSize: 14, textAlign: 'center' },
+    cardName: { fontSize: ms(15), fontWeight: '700', marginBottom: vs(2) },
+    cardSub: { fontSize: ms(12) },
+    badge: { paddingHorizontal: scale(10), paddingVertical: vs(4), borderRadius: ms(10), borderWidth: 1 },
+    badgeText: { fontSize: ms(11), fontWeight: '700' },
+    actions: { flexDirection: 'row', gap: vs(8) },
+    actionBtn: { width: 36, height: 36, borderRadius: ms(18), alignItems: 'center', justifyContent: 'center' },
+    sectionLabel: { fontSize: ms(11), fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(8) },
+    empty: { padding: scale(40), borderRadius: ms(24), borderWidth: 1, alignItems: 'center', gap: vs(10), marginTop: vs(12) },
+    emptyTitle: { fontSize: ms(17), fontWeight: '700' },
+    emptyText: { fontSize: ms(14), textAlign: 'center' },
 });

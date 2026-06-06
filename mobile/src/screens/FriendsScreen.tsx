@@ -9,6 +9,7 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
@@ -141,12 +142,12 @@ export default function FriendsScreen() {
 
             <ScrollView contentContainerStyle={styles.container} showsVerticalScrollIndicator={false}>
                 {loading ? (
-                    <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: 40 }} />
+                    <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
                 ) : activeTab === 'activity' ? (
                     /* Activity Tab */
                     activity.length === 0 ? (
                         <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Bell size={40} color={colors.secondaryText} style={{ marginBottom: 16 }} />
+                            <Bell size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
                             <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
                             <Text style={[styles.emptyDesc, { color: colors.secondaryText }]}>
                                 Activity from your friends and squads will show up here.
@@ -205,8 +206,8 @@ export default function FriendsScreen() {
                         </View>
 
                         {friends.length === 0 ? (
-                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: 24 }]}>
-                                <Users size={40} color={colors.secondaryText} style={{ marginBottom: 16 }} />
+                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: vs(24) }]}>
+                                <Users size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
                                 <Text style={[styles.emptyTitle, { color: colors.text }]}>No friends yet</Text>
                                 <Text style={[styles.emptyDesc, { color: colors.secondaryText }]}>Add friends using their email to make splitting easier.</Text>
                             </View>
@@ -215,7 +216,7 @@ export default function FriendsScreen() {
                                 <View key={friend.id} style={[styles.friendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                     <View style={styles.friendTop}>
                                         <CharacterShape shape="rect" color={friend.avatar_color} variant="mini" />
-                                        <View style={{ marginLeft: 12 }}>
+                                        <View style={{ marginLeft: scale(12) }}>
                                             <Text style={[styles.friendName, { color: colors.text }]}>{friend.name}</Text>
                                             <Text style={[styles.friendEmail, { color: colors.faintText }]}>{friend.email}</Text>
                                         </View>
@@ -238,13 +239,13 @@ export default function FriendsScreen() {
                     /* Pending Tab */
                     <>
                         {requests.received.length > 0 && (
-                            <View style={{ marginBottom: 28 }}>
+                            <View style={{ marginBottom: vs(28) }}>
                                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Received</Text>
                                 {requests.received.map(req => (
                                     <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                                         <View style={styles.friendTop}>
                                             <CharacterShape shape="rect" color={req.sender_avatar} variant="mini" />
-                                            <View style={{ marginLeft: 12, flex: 1 }}>
+                                            <View style={{ marginLeft: scale(12), flex: 1 }}>
                                                 <Text style={[styles.friendName, { color: colors.text }]}>{req.sender_name}</Text>
                                                 <Text style={[styles.friendEmail, { color: colors.faintText }]}>{req.sender_email}</Text>
                                             </View>
@@ -252,7 +253,7 @@ export default function FriendsScreen() {
                                                 <TouchableOpacity onPress={() => handleAccept(req.id)} style={[styles.iconBtn, { backgroundColor: colors.accentBg }]}>
                                                     <UserCheck size={18} color={colors.accent} />
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { backgroundColor: colors.warningBg, marginLeft: 8 }]}>
+                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { backgroundColor: colors.warningBg, marginLeft: scale(8) }]}>
                                                     <UserX size={18} color={colors.danger} />
                                                 </TouchableOpacity>
                                             </View>
@@ -271,7 +272,7 @@ export default function FriendsScreen() {
                                             <View style={[styles.clockAvatar, { backgroundColor: colors.accentBg }]}>
                                                 <Clock size={20} color={colors.secondaryText} />
                                             </View>
-                                            <View style={{ marginLeft: 12 }}>
+                                            <View style={{ marginLeft: scale(12) }}>
                                                 <Text style={[styles.friendName, { color: colors.text }]}>{req.receiver_email}</Text>
                                                 <Text style={[styles.friendEmail, { color: colors.faintText }]}>Pending acceptance...</Text>
                                             </View>
@@ -300,21 +301,21 @@ export default function FriendsScreen() {
 const styles = StyleSheet.create({
     safeArea: { flex: 1 },
     header: {
-        paddingHorizontal: 20,
-        paddingTop: 8,
-        paddingBottom: 16,
+        paddingHorizontal: scale(20),
+        paddingTop: vs(8),
+        paddingBottom: vs(16),
     },
     title: {
-        fontSize: 26,
+        fontSize: ms(26),
         fontWeight: '800',
         letterSpacing: -0.5,
-        marginBottom: 16,
+        marginBottom: vs(16),
     },
     segmentContainer: {
         flexDirection: 'row',
-        gap: 4,
-        padding: 4,
-        borderRadius: 12,
+        gap: vs(4),
+        padding: scale(4),
+        borderRadius: ms(12),
         borderWidth: 1,
     },
     segment: {
@@ -322,94 +323,94 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 6,
-        paddingVertical: 9,
-        borderRadius: 8,
+        gap: vs(6),
+        paddingVertical: vs(9),
+        borderRadius: ms(8),
     },
     segmentText: {
-        fontSize: 14,
+        fontSize: ms(14),
     },
     container: {
-        paddingHorizontal: 16,
-        paddingTop: 8,
-        paddingBottom: 140,
+        paddingHorizontal: scale(16),
+        paddingTop: vs(8),
+        paddingBottom: vs(140),
     },
     sectionTitle: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '700',
-        marginBottom: 12,
+        marginBottom: vs(12),
     },
 
     // Activity
     activityCard: {
-        borderRadius: 16,
+        borderRadius: ms(16),
         borderWidth: 1,
         overflow: 'hidden',
     },
     activityRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
+        gap: vs(12),
+        padding: scale(14),
     },
     activityIcon: {
         width: 44,
         height: 44,
-        borderRadius: 10,
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
     },
     activityText: {
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: '500',
         lineHeight: 19,
     },
     activityTime: {
-        fontSize: 12,
-        marginTop: 3,
+        fontSize: ms(12),
+        marginTop: vs(3),
     },
 
     // Friends
     addFriendSection: {
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
     inputRow: {
         flexDirection: 'row',
-        gap: 12,
+        gap: vs(12),
     },
     input: {
         flex: 1,
         borderWidth: 1,
-        borderRadius: 12,
-        paddingHorizontal: 16,
+        borderRadius: ms(12),
+        paddingHorizontal: scale(16),
         height: 52,
-        fontSize: 16,
+        fontSize: ms(16),
     },
     sendBtn: {
         width: 52,
         height: 52,
-        borderRadius: 12,
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
     },
     friendCard: {
-        padding: 16,
-        borderRadius: 20,
+        padding: scale(16),
+        borderRadius: ms(20),
         borderWidth: 1,
-        marginBottom: 12,
+        marginBottom: vs(12),
     },
     friendTop: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 14,
+        marginBottom: vs(14),
     },
     friendName: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '600',
     },
     friendEmail: {
-        fontSize: 12,
-        marginTop: 2,
+        fontSize: ms(12),
+        marginTop: vs(2),
     },
     friendBottom: {
         flexDirection: 'row',
@@ -418,21 +419,21 @@ const styles = StyleSheet.create({
     },
     sharedChip: {
         borderRadius: 999,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
+        paddingHorizontal: scale(10),
+        paddingVertical: vs(5),
     },
     sharedChipText: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '700',
     },
     settleBtn: {
         borderWidth: 1,
-        borderRadius: 10,
-        paddingHorizontal: 13,
-        paddingVertical: 7,
+        borderRadius: ms(10),
+        paddingHorizontal: scale(13),
+        paddingVertical: vs(7),
     },
     settleBtnText: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '700',
     },
 
@@ -443,48 +444,48 @@ const styles = StyleSheet.create({
     iconBtn: {
         width: 36,
         height: 36,
-        borderRadius: 18,
+        borderRadius: ms(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
     clockAvatar: {
         width: 32,
         height: 52,
-        borderRadius: 6,
+        borderRadius: ms(6),
         alignItems: 'center',
         justifyContent: 'center',
     },
     pendingEmpty: {
         alignItems: 'center',
         justifyContent: 'center',
-        gap: 8,
-        paddingTop: 40,
-        paddingHorizontal: 20,
+        gap: vs(8),
+        paddingTop: vs(40),
+        paddingHorizontal: scale(20),
     },
     pendingEmptyTitle: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '500',
-        marginTop: 8,
+        marginTop: vs(8),
     },
     pendingEmptyDesc: {
-        fontSize: 14,
+        fontSize: ms(14),
         textAlign: 'center',
     },
 
     // Shared empty state
     emptyState: {
-        padding: 32,
-        borderRadius: 20,
+        padding: scale(32),
+        borderRadius: ms(20),
         borderWidth: 1,
         alignItems: 'center',
     },
     emptyTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: '700',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     emptyDesc: {
-        fontSize: 14,
+        fontSize: ms(14),
         textAlign: 'center',
         lineHeight: 20,
     },
