@@ -121,8 +121,8 @@ export default function PaymentsScreen() {
     };
 
     // Filter payments
-    const pendingPayments = payments.filter(p => p.status === 'pending' || p.status === 'sent');
-    const historyPayments = payments.filter(p => p.status === 'settled' || p.status === 'declined');
+    const pendingPayments = (payments ?? []).filter(p => p.status === 'pending' || p.status === 'sent');
+    const historyPayments = (payments ?? []).filter(p => p.status === 'settled' || p.status === 'declined');
 
     const renderPaymentCard = (payment: SettlementRecordOut) => {
         const isPayer = payment.payer_id === user?.id;
@@ -336,13 +336,13 @@ export default function PaymentsScreen() {
                         </Text>
                         
                         <View style={[styles.ledgerContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            {walletTransactions.length === 0 ? (
+                            {(walletTransactions ?? []).length === 0 ? (
                                 <View style={styles.ledgerEmpty}>
                                     <RotateCcw size={32} color={colors.secondaryText} />
                                     <Text style={[styles.ledgerEmptyText, { color: colors.secondaryText }]}>No transactions yet.</Text>
                                 </View>
                             ) : (
-                                walletTransactions.map(renderWalletTransaction)
+                                (walletTransactions ?? []).map(renderWalletTransaction)
                             )}
                         </View>
                     </>
