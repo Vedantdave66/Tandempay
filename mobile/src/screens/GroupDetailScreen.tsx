@@ -168,31 +168,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const handleInitiateSettlement = async (payeeId: string, amount: number) => {
-        Alert.alert(
-            "Confirm Payment",
-            `Do you want to record a $${formatCurrency(amount)} payment to this user? They will receive a notification.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Record Payment",
-                    style: "default",
-                    onPress: async () => {
-                        try {
-                            await settlementsApi.create(groupId, payeeId, amount, 'in_app');
-                            Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
-                                { text: "OK", onPress: () => navigation.navigate("Payments") }
-                            ]);
-                            loadData();
-                        } catch (err: any) {
-                            Alert.alert("Error", err.message);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
     // Look up a member's character appearance from the already-fetched balances list
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
@@ -394,14 +369,33 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 <ArrowRight size={16} color={colors.faintText} />
                                 <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
                                 <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
-                                        Pay ${formatCurrency(s.amount)} via Interac e-Transfer
+                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>
+                                        Pay ${formatCurrency(s.amount)}
+                                    </Text>
+                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }]} numberOfLines={1}>
+                                        via Interac e-Transfer
                                     </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
                                     disabled={!isMine}
-                                    onPress={() => handleInitiateSettlement(s.to_user_id, s.amount)}
+                                    onPress={() => {
+                                        if (!isMine) return;
+                                        const toMember = group?.members?.find((m: any) => m.id === s.to_user_id || m.user_id === s.to_user_id);
+                                        navigation.navigate('SettleUp', {
+                                            payment: {
+                                                payee_id:           s.to_user_id,
+                                                payee_name:         toMember?.name ?? toMember?.display_name ?? 'User',
+                                                payee_email:        toMember?.email ?? '',
+                                                payee_avatar_color: to?.character_color ?? s.to_avatar_color ?? '#6B7280',
+                                                amount:             s.amount,
+                                                group_id:           groupId,
+                                                payer_id:           user?.id,
+                                                id:                 s.id ?? null,
+                                                description:        group?.name ?? 'Expense',
+                                            }
+                                        });
+                                    }}
                                 >
                                     <Text style={[styles.settleBtnText, { color: colors.warningBright }]}>Settle up</Text>
                                 </TouchableOpacity>
