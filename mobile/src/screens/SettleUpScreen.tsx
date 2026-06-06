@@ -13,310 +13,400 @@ import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { usePaymentSheet } from '@stripe/stripe-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import {
-    ChevronLeft,
-    Landmark,
-    CreditCard,
-    Sparkles,
-    Copy,
-    CheckCircle2,
-    ArrowRight,
-    Send,
+    ChevronLeft, Landmark, Zap, CreditCard, Copy,
+    Check, ChevronRight,
 } from 'lucide-react-native';
 import { meApi, settlementsApi, paymentsApi } from '../services/api';
 import { formatCurrency } from '../utils/formatCurrency';
 import CharacterShape from '../components/CharacterShape';
 
+// ─── Theme tokens ────────────────────────────────────────────────────────────
+
+type T = {
+    bg: string; card: string; inset: string;
+    green: string; greenInk: string; gold: string;
+    ink: string; sub: string; chip: string; chipInk: string;
+    cardBorder: string; insetBorder: string; overlay: string;
+};
+
+function tok(isDark: boolean): T {
+    return isDark ? {
+        bg: '#0A0D0B', card: '#141815', inset: '#0C0F0D',
+        green: '#27E06A', greenInk: '#062B16', gold: '#F2C200',
+        ink: '#FFFFFF', sub: '#8C958E', chip: '#1E231F', chipInk: '#CFD6CF',
+        cardBorder: 'rgba(255,255,255,0.07)', insetBorder: 'rgba(255,255,255,0.06)',
+        overlay: 'rgba(255,255,255,0.05)',
+    } : {
+        bg: '#E9F2EB', card: '#FFFFFF', inset: '#F4F8F4',
+        green: '#0E9F4F', greenInk: '#FFFFFF', gold: '#B07E00',
+        ink: '#0E140F', sub: '#5C665E', chip: '#E6EDE7', chipInk: '#46504A',
+        cardBorder: 'rgba(0,0,0,0.05)', insetBorder: 'rgba(0,0,0,0.05)',
+        overlay: 'rgba(0,0,0,0.03)',
+    };
+}
+
+// ─── CopyRow ──────────────────────────────────────────────────────────────────
+
+function CopyRow({ label, value, onCopy, isCopied, t }: {
+    label: string; value: string; onCopy: () => void; isCopied: boolean; t: T;
+}) {
+    return (
+        <View style={{
+            flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+            backgroundColor: t.inset, borderWidth: 1, borderColor: t.insetBorder,
+            borderRadius: ms(14), padding: scale(12), paddingLeft: scale(14),
+        }}>
+            <View style={{ flex: 1, minWidth: 0, marginRight: scale(10) }}>
+                <Text style={{ fontSize: ms(11), fontWeight: '800', letterSpacing: 0.6,
+                    textTransform: 'uppercase', color: t.sub }}>{label}</Text>
+                <Text style={{ fontSize: ms(16), fontWeight: '700', color: t.ink, marginTop: vs(2) }}
+                    numberOfLines={1}>{value}</Text>
+            </View>
+            <TouchableOpacity
+                onPress={onCopy}
+                activeOpacity={0.75}
+                style={{
+                    flexDirection: 'row', alignItems: 'center', gap: scale(6),
+                    backgroundColor: isCopied ? t.green : t.chip,
+                    borderRadius: ms(10), paddingHorizontal: scale(12), paddingVertical: vs(8),
+                    minHeight: 44,
+                }}
+            >
+                {isCopied
+                    ? <Check size={scale(16)} color={t.greenInk} strokeWidth={2.4} />
+                    : <Copy size={scale(16)} color={t.chipInk} />}
+                <Text style={{ fontSize: ms(13), fontWeight: '800',
+                    color: isCopied ? t.greenInk : t.chipInk }}>
+                    {isCopied ? 'Copied' : 'Copy'}
+                </Text>
+            </TouchableOpacity>
+        </View>
+    );
+}
+
+// ─── Screen ───────────────────────────────────────────────────────────────────
+
 export default function SettleUpScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { payment } = route.params;
-    const { colors } = useTheme();
+    const { isDark } = useTheme();
+    const t = tok(isDark);
 
-    const [step, setStep] = useState<'method' | 'etransfer' | 'sent'>('method');
+    const [view, setView] = useState<'choose' | 'sent'>('choose');
+    const [method, setMethod] = useState<'interac' | 'card' | 'manual'>('interac');
+    const [copied, setCopied] = useState<string | null>(null);
+    const [cardOpen, setCardOpen] = useState(false);
+    const [autoOn, setAutoOn] = useState(false);
     const [loading, setLoading] = useState(false);
-    const [copied, setCopied] = useState(false);
-    const [stripePaying, setStripePaying] = useState(false);
 
     const { initPaymentSheet, presentPaymentSheet } = usePaymentSheet();
 
-    const fee = (Number(payment.amount) * 0.029 + 0.30).toFixed(2);
-    const cardTotal = (Number(payment.amount) + Number(fee)).toFixed(2);
+    const amount = Number(payment.amount);
+    const expenseName: string = payment.description ?? 'Expense';
+    const payeeName: string = payment.payee_name;
+    const fee = (amount * 0.029 + 0.30).toFixed(2);
+    const cardTotal = (amount + Number(fee)).toFixed(2);
 
-    const handleChooseInterac = async () => {
+    const handleCopy = (key: string, value: string) => {
+        Clipboard.setStringAsync(value);
+        setCopied(key);
+        setTimeout(() => setCopied(c => c === key ? null : c), 1300);
+    };
+
+    const handleSend = async (m: 'interac' | 'card' | 'manual') => {
+        if (loading) return;
         setLoading(true);
         try {
-            await settlementsApi.create(
-                payment.group_id,
-                payment.payee_id,
-                Number(payment.amount),
-                'etransfer'
-            );
-            setStep('etransfer');
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Could not initiate transfer');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleCopyEmail = () => {
-        Clipboard.setString(payment.payee_email);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-    };
-
-    const handleMarkSent = async () => {
-        setLoading(true);
-        try {
-            const all = await meApi.getPayments();
-            const rec = all.find(
-                (r: any) =>
-                    r.payer_id === payment.payer_id &&
-                    r.payee_id === payment.payee_id &&
-                    r.status === 'pending'
-            );
-            if (rec) {
-                await settlementsApi.updateStatus(payment.group_id, rec.id, 'sent');
-            }
-            setStep('sent');
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to mark as sent');
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const handleStripePayment = async () => {
-        if (stripePaying) return;
-        setStripePaying(true);
-        try {
-            const { client_secret } = await paymentsApi.createPaymentIntent({
-                payee_id: payment.payee_id,
-                amount: Math.round(Number(payment.amount) * 100),
-                settlement_id: payment.id,
-            });
-
-            const { error: initError } = await initPaymentSheet({
-                paymentIntentClientSecret: client_secret,
-                merchantDisplayName: 'TandemPay',
-                applePay: { merchantCountryCode: 'CA' },
-                googlePay: { merchantCountryCode: 'CA', testEnv: true },
-            });
-            if (initError) {
-                Alert.alert('Payment Error', initError.message);
-                return;
-            }
-
-            const { error: presentError } = await presentPaymentSheet();
-            if (!presentError) {
-                Alert.alert('✅ Payment Successful', `$${formatCurrency(payment.amount)} sent to ${payment.payee_name}.`);
-                navigation.goBack();
-            } else if (presentError.code === 'Canceled') {
-                // user dismissed — do nothing
+            if (m === 'interac') {
+                await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
+                const all = await meApi.getPayments();
+                const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
+                    .find(r => r.payer_id === payment.payer_id && r.payee_id === payment.payee_id && r.status === 'pending');
+                if (rec) await settlementsApi.updateStatus(payment.group_id, rec.id, 'sent');
+                setMethod('interac');
+                setView('sent');
+            } else if (m === 'card') {
+                const { client_secret } = await paymentsApi.createPaymentIntent({
+                    payee_id: payment.payee_id,
+                    amount: Math.round(amount * 100),
+                    settlement_id: payment.id,
+                });
+                const { error: initError } = await initPaymentSheet({
+                    paymentIntentClientSecret: client_secret,
+                    merchantDisplayName: 'TandemPay',
+                    applePay: { merchantCountryCode: 'CA' },
+                    googlePay: { merchantCountryCode: 'CA', testEnv: true },
+                });
+                if (initError) { Alert.alert('Payment Error', initError.message); return; }
+                const { error: presentError } = await presentPaymentSheet();
+                if (!presentError) {
+                    setMethod('card');
+                    setView('sent');
+                } else if (presentError.code !== 'Canceled') {
+                    Alert.alert('Payment Failed', presentError.message);
+                }
             } else {
-                Alert.alert('Payment Failed', presentError.message);
+                await settlementsApi.updateStatus(payment.group_id, payment.id, 'settled');
+                navigation.goBack();
             }
         } catch (err: any) {
-            Alert.alert('Payment Error', err.message || 'Something went wrong. Please try again.');
+            Alert.alert('Error', err.message || 'Something went wrong.');
         } finally {
-            setStripePaying(false);
+            setLoading(false);
         }
     };
 
-    const handleAlreadySettled = async () => {
-        try {
-            await settlementsApi.updateStatus(payment.group_id, payment.id, 'settled');
-            navigation.goBack();
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Failed to update status');
-        }
-    };
+    const heroColors = isDark
+        ? ['#11833F', '#0A4C29', '#0A0D0B'] as const
+        : ['#BDEECB', '#DBF3E2', '#E9F2EB'] as const;
+    const heroLocations = isDark
+        ? [0, 0.30, 0.62] as const
+        : [0, 0.32, 0.64] as const;
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-            {/* Top bar */}
-            <View style={styles.topBar}>
+        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
+            {/* Header */}
+            <View style={styles.header}>
                 <TouchableOpacity
                     onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                    activeOpacity={0.85}
+                    style={styles.headerBtn}
+                    activeOpacity={0.8}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <ChevronLeft size={26} color={colors.text} />
+                    <ChevronLeft size={scale(26)} color={t.ink} />
                 </TouchableOpacity>
-                <Text style={[styles.topTitle, { color: colors.text }]}>Settle up</Text>
-                <View style={styles.backBtn} />
+                <Text style={[styles.headerTitle, { color: t.ink }]}>Settle up</Text>
+                <View style={styles.headerBtn} />
             </View>
 
             <ScrollView
-                contentContainerStyle={styles.scrollContent}
+                style={{ flex: 1, backgroundColor: t.bg }}
+                contentContainerStyle={{ flexGrow: 1, paddingHorizontal: scale(20), paddingBottom: vs(40) }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Context header — shown on all steps */}
-                <View style={styles.contextHeader}>
-                    <View style={[styles.glowCircle, { backgroundColor: colors.accent + '22' }]}>
-                        <CharacterShape
-                            shape="rect"
-                            color={payment.payee_avatar_color}
-                            variant="hero"
-                        />
+                {/* Hero glow — bleeds to screen edges */}
+                <LinearGradient
+                    colors={heroColors}
+                    locations={heroLocations}
+                    style={[styles.heroGrad, { marginHorizontal: -scale(20) }]}
+                >
+                    <View style={styles.heroAvatarWrap}>
+                        <CharacterShape shape="rect" color={payment.payee_avatar_color} variant="card" />
+                        {view === 'sent' && (
+                            <View style={[styles.checkBadge, { backgroundColor: t.green, borderColor: t.bg }]}>
+                                <Check size={scale(14)} color={t.greenInk} strokeWidth={2.8} />
+                            </View>
+                        )}
                     </View>
-                    <Text style={[styles.owesLabel, { color: colors.secondaryText }]}>
-                        You owe {payment.payee_name}
-                    </Text>
-                    <Text style={[styles.bigAmount, { color: colors.gold }]}>
-                        ${formatCurrency(payment.amount)}
-                    </Text>
-                </View>
+                    <Text style={[styles.heroOwes, { color: t.sub }]}>You owe {payeeName}</Text>
+                    <Text style={[styles.heroAmount, { color: t.gold }]}>${formatCurrency(amount)}</Text>
+                    <View style={[styles.heroChip, { backgroundColor: t.overlay }]}>
+                        <Text style={[styles.heroChipText, { color: t.sub }]}>for {expenseName}</Text>
+                    </View>
+                </LinearGradient>
 
-                {/* ── METHOD STEP ── */}
-                {step === 'method' && (
-                    <View style={styles.stepContent}>
+                {/* ── Choose view ─────────────────────────────────────────── */}
+                {view === 'choose' && (
+                    <View style={{ gap: vs(16), marginTop: vs(8) }}>
                         {/* Interac hero card */}
-                        <View style={[styles.interacCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <View style={styles.interacCardTop}>
-                                <View style={[styles.iconTile, { backgroundColor: colors.accent + '22' }]}>
-                                    <Landmark size={22} color={colors.accent} />
+                        <View style={[styles.card, {
+                            backgroundColor: t.card, borderColor: t.cardBorder,
+                            shadowColor: isDark ? '#000' : '#1A1A1A',
+                            shadowOpacity: isDark ? 0.4 : 0.08,
+                        }]}>
+                            <View style={styles.cardRow}>
+                                <View style={[styles.iconTile, { backgroundColor: t.overlay }]}>
+                                    <Landmark size={scale(20)} color={t.green} />
                                 </View>
                                 <View style={{ flex: 1, marginLeft: scale(12) }}>
-                                    <Text style={[styles.interacTitle, { color: colors.text }]}>
-                                        Interac e-Transfer
-                                    </Text>
-                                    <Text style={[styles.interacSub, { color: colors.accent }]}>
-                                        Free · Arrives in ~30 seconds
-                                    </Text>
+                                    <Text style={[styles.cardTitle, { color: t.ink }]}>Interac e-Transfer</Text>
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(4), marginTop: vs(2) }}>
+                                        <Zap size={scale(12)} color={t.sub} fill={t.sub} />
+                                        <Text style={[styles.cardSub, { color: t.sub }]}>Arrives in ~30 seconds</Text>
+                                    </View>
                                 </View>
-                                <View style={[styles.freePill, { backgroundColor: colors.accent }]}>
-                                    <Text style={styles.freePillText}>FREE</Text>
+                                <View style={[styles.freePill, { backgroundColor: t.green }]}>
+                                    <Text style={[styles.freePillText, { color: t.greenInk }]}>FREE</Text>
                                 </View>
                             </View>
-                            <View style={styles.autoConfirmRow}>
-                                <Sparkles size={13} color={colors.secondaryText} style={{ marginTop: vs(1) }} />
-                                <Text style={[styles.autoConfirmText, { color: colors.secondaryText }]}>
-                                    We'll auto-confirm once your bank sends you a confirmation email.
-                                </Text>
-                            </View>
+
+                            <CopyRow
+                                label="Send to"
+                                value={payment.payee_email}
+                                onCopy={() => handleCopy('email', payment.payee_email)}
+                                isCopied={copied === 'email'}
+                                t={t}
+                            />
+                            <CopyRow
+                                label="Amount"
+                                value={`$${formatCurrency(amount)}`}
+                                onCopy={() => handleCopy('amount', formatCurrency(amount))}
+                                isCopied={copied === 'amount'}
+                                t={t}
+                            />
+                            <CopyRow
+                                label="Message"
+                                value={`TandemPay · ${expenseName}`}
+                                onCopy={() => handleCopy('message', `TandemPay · ${expenseName}`)}
+                                isCopied={copied === 'message'}
+                                t={t}
+                            />
+
                             <TouchableOpacity
-                                style={[styles.primaryBtn, { backgroundColor: colors.accent, opacity: loading ? 0.7 : 1 }]}
-                                onPress={handleChooseInterac}
+                                style={[styles.primaryBtn, { backgroundColor: t.green, opacity: loading ? 0.7 : 1 }]}
+                                onPress={() => handleSend('interac')}
                                 disabled={loading}
                                 activeOpacity={0.85}
                             >
                                 {loading
-                                    ? <ActivityIndicator color="white" />
-                                    : <Text style={styles.primaryBtnText}>Send via Interac</Text>
-                                }
+                                    ? <ActivityIndicator color={t.greenInk} />
+                                    : <Text style={[styles.primaryBtnText, { color: t.greenInk }]}>
+                                        I've sent it · ${formatCurrency(amount)}
+                                    </Text>}
                             </TouchableOpacity>
+                            <Text style={[styles.hint, { color: t.sub }]}>
+                                Send the transfer from your bank, then tap to confirm
+                            </Text>
                         </View>
 
                         {/* OR divider */}
                         <View style={styles.orRow}>
-                            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
-                            <Text style={[styles.orText, { color: colors.secondaryText }]}>OR</Text>
-                            <View style={[styles.orLine, { backgroundColor: colors.border }]} />
+                            <View style={[styles.orLine, { backgroundColor: t.cardBorder }]} />
+                            <Text style={[styles.orText, { color: t.sub }]}>OR</Text>
+                            <View style={[styles.orLine, { backgroundColor: t.cardBorder }]} />
                         </View>
 
-                        {/* Card option (muted) */}
-                        <TouchableOpacity
-                            style={[styles.cardOptionRow, { backgroundColor: colors.background, borderColor: colors.border }]}
-                            onPress={handleStripePayment}
-                            disabled={stripePaying}
-                            activeOpacity={0.85}
-                        >
-                            <CreditCard size={18} color={colors.secondaryText} />
-                            <View style={{ flex: 1, marginLeft: scale(12) }}>
-                                <Text style={[styles.cardOptionLabel, { color: colors.text }]}>
-                                    Pay with card instead
-                                </Text>
-                                <Text style={[styles.cardOptionSub, { color: colors.secondaryText }]}>
-                                    ${fee} fee · you'll pay ${cardTotal}
-                                </Text>
-                            </View>
-                            {stripePaying
-                                ? <ActivityIndicator size="small" color={colors.secondaryText} />
-                                : <ArrowRight size={16} color={colors.secondaryText} />
-                            }
-                        </TouchableOpacity>
+                        {/* Collapsible card option */}
+                        <View style={[styles.card, {
+                            backgroundColor: t.card, borderColor: t.cardBorder,
+                            shadowColor: isDark ? '#000' : '#1A1A1A',
+                            shadowOpacity: isDark ? 0.4 : 0.08,
+                            gap: 0,
+                        }]}>
+                            <TouchableOpacity
+                                style={[styles.cardRow, { minHeight: 44 }]}
+                                onPress={() => setCardOpen(o => !o)}
+                                activeOpacity={0.8}
+                            >
+                                <View style={[styles.iconTile, { backgroundColor: t.overlay }]}>
+                                    <CreditCard size={scale(20)} color={t.sub} />
+                                </View>
+                                <View style={{ flex: 1, marginLeft: scale(12) }}>
+                                    <Text style={[styles.cardTitle, { color: t.ink }]}>Pay by card instead</Text>
+                                    <Text style={[styles.cardSub, { color: t.sub }]}>2.9% + 30¢ fee applies</Text>
+                                </View>
+                                <ChevronRight
+                                    size={scale(20)}
+                                    color={t.sub}
+                                    style={{ transform: [{ rotate: cardOpen ? '90deg' : '0deg' }] }}
+                                />
+                            </TouchableOpacity>
+
+                            {cardOpen && (
+                                <View style={{ paddingTop: vs(16), gap: vs(10) }}>
+                                    {([
+                                        { label: 'Amount',    value: `$${formatCurrency(amount)}`, bold: false },
+                                        { label: 'Card fee',  value: `$${fee}`,                    bold: false },
+                                        { label: "You'll pay", value: `$${cardTotal}`,              bold: true  },
+                                    ] as const).map(({ label, value, bold }, i) => (
+                                        <View
+                                            key={label}
+                                            style={[
+                                                styles.feeRow,
+                                                i === 2 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.insetBorder, paddingTop: vs(10) },
+                                            ]}
+                                        >
+                                            <Text style={[styles.feeLabel, { color: t.sub }]}>{label}</Text>
+                                            <Text style={[styles.feeValue, { color: bold ? t.ink : t.sub, fontWeight: bold ? '800' : '600' }]}>
+                                                {value}
+                                            </Text>
+                                        </View>
+                                    ))}
+                                    <TouchableOpacity
+                                        style={[styles.ghostBtn, { borderColor: t.green, marginTop: vs(4) }]}
+                                        onPress={() => handleSend('card')}
+                                        disabled={loading}
+                                        activeOpacity={0.85}
+                                    >
+                                        {loading
+                                            ? <ActivityIndicator color={t.green} />
+                                            : <Text style={[styles.ghostBtnText, { color: t.green }]}>
+                                                Pay ${cardTotal} by card
+                                            </Text>}
+                                    </TouchableOpacity>
+                                </View>
+                            )}
+                        </View>
 
                         {/* Already settled link */}
-                        <TouchableOpacity onPress={handleAlreadySettled} activeOpacity={0.7} style={styles.alreadySettledBtn}>
-                            <Text style={[styles.alreadySettledText, { color: colors.secondaryText }]}>
+                        <TouchableOpacity
+                            style={styles.manualLink}
+                            onPress={() => handleSend('manual')}
+                            disabled={loading}
+                            activeOpacity={0.7}
+                        >
+                            <Text style={[styles.manualLinkText, { color: t.sub }]}>
                                 I already settled this another way
                             </Text>
                         </TouchableOpacity>
                     </View>
                 )}
 
-                {/* ── ETRANSFER STEP ── */}
-                {step === 'etransfer' && (
-                    <View style={styles.stepContent}>
-                        {/* Email row */}
-                        <View style={[styles.emailBox, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                            <View style={{ flex: 1 }}>
-                                <Text style={[styles.emailLabel, { color: colors.secondaryText }]}>
-                                    RECIPIENT EMAIL
-                                </Text>
-                                <Text style={[styles.emailValue, { color: colors.text }]}>
-                                    {payment.payee_email}
-                                </Text>
-                            </View>
-                            <TouchableOpacity
-                                style={[styles.copyBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                onPress={handleCopyEmail}
-                                activeOpacity={0.85}
-                            >
-                                {copied
-                                    ? <CheckCircle2 size={14} color={colors.accent} />
-                                    : <Copy size={14} color={colors.secondaryText} />
-                                }
-                                <Text style={[styles.copyBtnText, { color: copied ? colors.accent : colors.secondaryText }]}>
-                                    {copied ? 'Copied' : 'Copy'}
-                                </Text>
-                            </TouchableOpacity>
-                        </View>
-
-                        {/* Amount row */}
-                        <View style={[styles.amountRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
-                            <Text style={[styles.amountRowLabel, { color: colors.secondaryText }]}>AMOUNT</Text>
-                            <Text style={[styles.amountRowValue, { color: colors.gold }]}>
-                                ${formatCurrency(payment.amount)}
+                {/* ── Sent view ───────────────────────────────────────────── */}
+                {view === 'sent' && (
+                    <View style={{ flex: 1, minHeight: vs(480), gap: vs(16), marginTop: vs(8) }}>
+                        <View style={{ alignItems: 'center', gap: vs(6) }}>
+                            <Text style={[styles.sentTitle, { color: t.ink }]}>
+                                {method === 'interac' ? `Sent $${formatCurrency(amount)}`
+                                    : method === 'card' ? `Paid $${formatCurrency(amount)}`
+                                    : 'All settled'}
+                            </Text>
+                            <Text style={[styles.sentSub, { color: t.sub }]}>
+                                {method === 'interac' ? `to ${payeeName} · waiting for them to confirm`
+                                    : method === 'card' ? `to ${payeeName} · payment confirmed`
+                                    : `You're squared up with ${payeeName}`}
                             </Text>
                         </View>
 
-                        <TouchableOpacity
-                            style={[styles.primaryBtn, { backgroundColor: colors.accent, opacity: loading ? 0.7 : 1 }]}
-                            onPress={handleMarkSent}
-                            disabled={loading}
-                            activeOpacity={0.85}
-                        >
-                            {loading
-                                ? <ActivityIndicator color="white" />
-                                : <Text style={styles.primaryBtnText}>I sent it on my banking app</Text>
-                            }
-                        </TouchableOpacity>
-                    </View>
-                )}
+                        {method === 'interac' && (
+                            <View style={[styles.card, {
+                                backgroundColor: t.card, borderColor: t.cardBorder,
+                                shadowColor: isDark ? '#000' : '#1A1A1A',
+                                shadowOpacity: isDark ? 0.4 : 0.08,
+                            }]}>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(10) }}>
+                                    <Zap size={scale(18)} color={t.green} fill={t.green} />
+                                    <Text style={[styles.cardTitle, { color: t.ink }]}>Auto-confirm</Text>
+                                </View>
+                                <Text style={[styles.hint, { color: t.sub }]}>
+                                    Forward your bank confirmation email to{' '}
+                                    <Text style={{ color: t.green, fontWeight: '700' }}>confirm@tandempay.ca</Text>
+                                    {' '}and we'll auto-confirm your payment.
+                                </Text>
+                                <TouchableOpacity
+                                    style={[styles.toggleBtn, { backgroundColor: autoOn ? t.green : t.chip }]}
+                                    onPress={() => setAutoOn(o => !o)}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[styles.toggleBtnText, { color: autoOn ? t.greenInk : t.chipInk }]}>
+                                        {autoOn ? 'Auto-confirm enabled ✓' : 'Enable auto-confirm'}
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        )}
 
-                {/* ── SENT STEP ── */}
-                {step === 'sent' && (
-                    <View style={[styles.stepContent, styles.sentContent]}>
-                        <View style={[styles.successCircle, { backgroundColor: colors.accent + '18', borderColor: colors.accent + '44' }]}>
-                            <Send size={34} color={colors.accent} />
-                        </View>
-                        <Text style={[styles.successTitle, { color: colors.text }]}>
-                            Payment marked as sent
-                        </Text>
-                        <Text style={[styles.successBody, { color: colors.secondaryText }]}>
-                            We'll auto-confirm once your bank sends you a confirmation email.
-                        </Text>
+                        <View style={{ flex: 1 }} />
+
                         <TouchableOpacity
-                            style={[styles.primaryBtn, { backgroundColor: colors.accent, marginTop: vs(8) }]}
+                            style={[styles.primaryBtn, { backgroundColor: t.green }]}
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.85}
                         >
-                            <Text style={styles.primaryBtnText}>Done</Text>
+                            <Text style={[styles.primaryBtnText, { color: t.greenInk }]}>Done</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -325,131 +415,139 @@ export default function SettleUpScreen() {
     );
 }
 
+// ─── Styles ───────────────────────────────────────────────────────────────────
+
 const styles = StyleSheet.create({
-    safeArea: { flex: 1 },
-    topBar: {
+    header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(16),
-        paddingVertical: vs(12),
+        height: vs(52),
     },
-    backBtn: {
-        width: 44,
-        height: 44,
+    headerBtn: {
+        width: scale(44),
+        height: scale(44),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    topTitle: {
+    headerTitle: {
         fontSize: ms(18),
         fontWeight: '700',
     },
-    scrollContent: {
-        paddingHorizontal: scale(24),
-        paddingBottom: vs(48),
-    },
 
-    // Context header
-    contextHeader: {
+    heroGrad: {
         alignItems: 'center',
-        paddingVertical: vs(24),
-        gap: vs(8),
+        paddingTop: vs(32),
+        paddingBottom: vs(28),
+        paddingHorizontal: scale(20),
+        gap: vs(6),
     },
-    glowCircle: {
-        width: 140,
-        height: 140,
-        borderRadius: 999,
+    heroAvatarWrap: {
+        position: 'relative',
+        marginBottom: vs(10),
+    },
+    checkBadge: {
+        position: 'absolute',
+        right: -6,
+        bottom: -4,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: vs(8),
+        borderWidth: 3,
     },
-    owesLabel: {
+    heroOwes: {
         fontSize: ms(16),
+        fontWeight: '700',
     },
-    bigAmount: {
-        fontSize: ms(48),
+    heroAmount: {
+        fontSize: ms(52),
         fontWeight: '800',
-        letterSpacing: -1,
+        letterSpacing: -2,
+    },
+    heroChip: {
+        borderRadius: 999,
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(5),
+        marginTop: vs(2),
+    },
+    heroChipText: {
+        fontSize: ms(13),
+        fontWeight: '600',
     },
 
-    // Shared step wrapper
-    stepContent: {
-        gap: vs(16),
-    },
-
-    // Interac hero card
-    interacCard: {
+    card: {
         borderRadius: ms(24),
         borderWidth: 1,
         padding: scale(18),
-        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.06,
-        shadowRadius: 8,
-        elevation: 2,
+        shadowRadius: 12,
+        elevation: 3,
         gap: vs(14),
     },
-    interacCardTop: {
+    cardRow: {
         flexDirection: 'row',
         alignItems: 'center',
     },
     iconTile: {
-        width: 44,
-        height: 44,
+        width: scale(44),
+        height: scale(44),
         borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    interacTitle: {
-        fontSize: ms(18),
+    cardTitle: {
+        fontSize: ms(16),
         fontWeight: '700',
     },
-    interacSub: {
+    cardSub: {
         fontSize: ms(13),
-        fontWeight: '700',
-        marginTop: vs(2),
+        fontWeight: '500',
     },
     freePill: {
-        paddingHorizontal: scale(12),
-        paddingVertical: vs(5),
         borderRadius: 999,
+        paddingHorizontal: scale(10),
+        paddingVertical: vs(4),
     },
     freePillText: {
-        color: 'white',
         fontSize: ms(11),
         fontWeight: '800',
         letterSpacing: 0.5,
     },
-    autoConfirmRow: {
-        flexDirection: 'row',
-        gap: vs(6),
-        alignItems: 'flex-start',
-    },
-    autoConfirmText: {
+    hint: {
         fontSize: ms(13),
-        lineHeight: 18,
-        flex: 1,
+        lineHeight: 19,
     },
 
-    // Primary button (full-width)
     primaryBtn: {
-        height: 54,
+        height: vs(54),
         borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: vs(15),
     },
     primaryBtnText: {
-        color: 'white',
         fontSize: ms(16),
+        fontWeight: '800',
+    },
+
+    ghostBtn: {
+        height: vs(52),
+        borderRadius: ms(14),
+        borderWidth: 1.5,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    ghostBtnText: {
+        fontSize: ms(15),
         fontWeight: '700',
     },
 
-    // OR divider
     orRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: vs(12),
+        gap: scale(12),
     },
     orLine: {
         flex: 1,
@@ -457,115 +555,54 @@ const styles = StyleSheet.create({
     },
     orText: {
         fontSize: ms(12),
-        fontWeight: '600',
+        fontWeight: '700',
         letterSpacing: 1,
     },
 
-    // Card option row (muted)
-    cardOptionRow: {
+    feeRow: {
         flexDirection: 'row',
+        justifyContent: 'space-between',
         alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: ms(16),
-        paddingHorizontal: scale(16),
-        paddingVertical: vs(14),
-        minHeight: 44,
     },
-    cardOptionLabel: {
-        fontSize: ms(15),
+    feeLabel: {
+        fontSize: ms(14),
         fontWeight: '500',
     },
-    cardOptionSub: {
-        fontSize: ms(12),
-        marginTop: vs(2),
+    feeValue: {
+        fontSize: ms(14),
     },
 
-    // Already settled link
-    alreadySettledBtn: {
+    manualLink: {
         alignItems: 'center',
-        paddingVertical: vs(8),
+        minHeight: 44,
+        justifyContent: 'center',
     },
-    alreadySettledText: {
+    manualLinkText: {
         fontSize: ms(14),
         textDecorationLine: 'underline',
     },
 
-    // e-Transfer step
-    emailBox: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: ms(14),
-        paddingHorizontal: scale(16),
-        paddingVertical: vs(14),
-        gap: vs(12),
-        minHeight: 44,
-    },
-    emailLabel: {
-        fontSize: ms(10),
-        fontWeight: '700',
-        letterSpacing: 1.2,
-        marginBottom: vs(4),
-    },
-    emailValue: {
-        fontSize: ms(15),
-        fontWeight: '700',
-    },
-    copyBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: vs(4),
-        paddingHorizontal: scale(10),
-        paddingVertical: vs(8),
-        borderRadius: ms(8),
-        borderWidth: 1,
-    },
-    copyBtnText: {
-        fontSize: ms(12),
-        fontWeight: '600',
-    },
-    amountRow: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: ms(14),
-        paddingHorizontal: scale(16),
-        paddingVertical: vs(14),
-        minHeight: 44,
-    },
-    amountRowLabel: {
-        fontSize: ms(10),
-        fontWeight: '700',
-        letterSpacing: 1.2,
-    },
-    amountRowValue: {
-        fontSize: ms(20),
+    sentTitle: {
+        fontSize: ms(24),
         fontWeight: '800',
+        letterSpacing: -0.5,
+        textAlign: 'center',
+    },
+    sentSub: {
+        fontSize: ms(14),
+        fontWeight: '500',
+        textAlign: 'center',
     },
 
-    // Sent step
-    sentContent: {
-        alignItems: 'center',
-        paddingTop: vs(16),
-    },
-    successCircle: {
-        width: 88,
-        height: 88,
-        borderRadius: ms(44),
-        borderWidth: 2,
+    toggleBtn: {
+        height: vs(44),
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: vs(8),
+        paddingHorizontal: scale(16),
     },
-    successTitle: {
-        fontSize: ms(20),
-        fontWeight: '800',
-        textAlign: 'center',
-    },
-    successBody: {
+    toggleBtnText: {
         fontSize: ms(14),
-        textAlign: 'center',
-        lineHeight: 21,
+        fontWeight: '700',
     },
 });
