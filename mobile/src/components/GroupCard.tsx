@@ -60,13 +60,16 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
             {/* Green glow — full-bleed vertical ramp, brightest band vertically centered.
                 (expo-linear-gradient can't do radial; this 5-stop vertical reproduces the
                  mock's centered-glow falloff. For a true radial, swap in react-native-svg's
-                 <RadialGradient> — see handoff note.) */}
-            <LinearGradient
-                colors={colors.groupGlow}
-                locations={[0, 0.3, 0.46, 0.62, 1]}
-                style={StyleSheet.absoluteFill}
-                pointerEvents="none"
-            />
+                 <RadialGradient> — see handoff note.)
+                 Wrapped so only the gradient clips to the rounded corners — the card itself
+                 stays overflow: 'visible' so peeking characters aren't cut off at the edges. */}
+            <View style={styles.gradientClip} pointerEvents="none">
+                <LinearGradient
+                    colors={colors.groupGlow}
+                    locations={[0, 0.3, 0.46, 0.62, 1]}
+                    style={StyleSheet.absoluteFill}
+                />
+            </View>
 
             {/* Characters row — zIndex 1 so the title pill can overlap them */}
             <View style={[styles.clusterRow, compact && styles.clusterRowCompact]}>
@@ -89,11 +92,13 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                                     {m.character_nickname ?? m.name.split(' ')[0]}
                                 </Text>
                                 <View style={{ transform: [{ rotate: `${tilt.body}deg` }] }}>
-                                    <CharacterShape
-                                        shape={m.character_shape ?? 'rect'}
-                                        color={m.character_color ?? '#6B7280'}
-                                        variant={compact ? 'mini' : 'card'}
-                                    />
+                                    <View style={{ justifyContent: 'flex-end', alignItems: 'center' }}>
+                                        <CharacterShape
+                                            shape={m.character_shape ?? 'rect'}
+                                            color={m.character_color ?? '#6B7280'}
+                                            variant={compact ? 'mini' : 'card'}
+                                        />
+                                    </View>
                                 </View>
                             </View>
                         );
@@ -165,7 +170,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
 const styles = StyleSheet.create({
     card: {
         borderRadius: 28,
-        overflow: 'hidden',
+        overflow: 'visible',
         marginBottom: 16,
         paddingBottom: 4,
     },
@@ -173,6 +178,11 @@ const styles = StyleSheet.create({
         width: 222,
         marginBottom: 0,
         marginRight: 0,
+    },
+    gradientClip: {
+        ...StyleSheet.absoluteFillObject,
+        borderRadius: 28,
+        overflow: 'hidden',
     },
     clusterRow: {
         position: 'relative',
@@ -182,7 +192,8 @@ const styles = StyleSheet.create({
         alignItems: 'flex-end',
         gap: 2,
         paddingTop: 22,
-        paddingHorizontal: 18,
+        paddingHorizontal: 20,
+        overflow: 'visible',
     },
     clusterRowCompact: {
         paddingTop: 16,
