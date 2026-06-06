@@ -269,7 +269,7 @@ export default function DashboardScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    safe: { flex: 1 },
+    screen: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
