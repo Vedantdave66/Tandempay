@@ -4,7 +4,6 @@ import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
   SafeAreaView,
   ActivityIndicator,
@@ -14,10 +13,14 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Users, Receipt, Send, ChevronRight, X, CheckCircle2, Mail, UserPlus } from 'lucide-react-native';
+import { ArrowLeft, Plus, Users, Receipt, Send, ArrowRight, X, CheckCircle2, Mail, UserPlus } from 'lucide-react-native';
+import CharacterShape from '../components/CharacterShape';
+
+type DetailTab = 'expenses' | 'balances' | 'settle';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
@@ -28,11 +31,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [balances, setBalances] = useState<UserBalance[]>([]);
     const [settlements, setSettlements] = useState<Settlement[]>([]);
-    
+    const [tab, setTab] = useState<DetailTab>('expenses');
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    const [settleModalVisible, setSettleModalVisible] = useState(false);
 
     // Members modal
     const [membersModalVisible, setMembersModalVisible] = useState(false);
@@ -161,63 +163,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             `Do you want to record a $${formatCurrency(amount)} payment to this user? They will receive a notification.`,
             [
                 { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Record Payment", 
+                {
+                    text: "Record Payment",
                     style: "default",
                     onPress: async () => {
                         try {
                             await settlementsApi.create(groupId, payeeId, amount, 'in_app');
-                            setSettleModalVisible(false);
                             Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
                                 { text: "OK", onPress: () => navigation.navigate("Payments") }
                             ]);
+                            loadData();
                         } catch (err: any) {
                             Alert.alert("Error", err.message);
                         }
                     }
                 }
             ]
-        );
-    };
-
-    const renderBalanceBubble = ({ item }: { item: UserBalance }) => {
-        const isNegative = item.net_balance < 0;
-        const bubbleColor = isNegative ? colors.danger : colors.accent;
-        const bgColor = isNegative ? 'rgba(239, 68, 68, 0.1)' : 'rgba(74, 222, 128, 0.1)';
-
-        return (
-            <View style={[styles.balanceBubble, { backgroundColor: bgColor, borderColor: bubbleColor }]}>
-                <View style={[styles.avatarSmall, { backgroundColor: item.avatar_color || colors.primary }]}>
-                    <Text style={styles.avatarTextSmall}>{item.name.charAt(0).toUpperCase()}</Text>
-                </View>
-                <View>
-                    <Text style={[styles.balanceName, { color: colors.text }]} numberOfLines={1}>
-                        {item.name.split(' ')[0]}
-                    </Text>
-                    <Text style={[styles.balanceAmount, { color: bubbleColor }]}>
-                        {isNegative ? '-' : '+'}${formatCurrency(Math.abs(item.net_balance))}
-                    </Text>
-                </View>
-            </View>
-        );
-    };
-
-    const renderExpenseItem = ({ item }: { item: Expense }) => {
-        return (
-            <TouchableOpacity style={[styles.expenseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[styles.expenseIcon, { backgroundColor: item.payer_avatar_color || colors.indigo }]}>
-                    <Receipt size={20} color="white" />
-                </View>
-                <View style={styles.expenseInfo}>
-                    <Text style={[styles.expenseTitle, { color: colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.expenseMeta, { color: colors.secondaryText }]}>
-                        Paid by {item.payer_name} • {new Date(item.created_at).toLocaleDateString()}
-                    </Text>
-                </View>
-                <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                    ${formatCurrency(item.amount)}
-                </Text>
-            </TouchableOpacity>
         );
     };
 
@@ -231,134 +192,211 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         );
     }
 
-    const myDebts = settlements.filter(s => s.from_user_id === user?.id);
+    const myBalance = balances.find(b => b.user_id === user?.id);
+    const myNet = myBalance?.net_balance ?? 0;
+    const isOwe = myNet < -0.01;
+    const isOwed = myNet > 0.01;
+    const maxBalance = Math.max(...balances.map(b => Math.abs(b.net_balance)), 1);
+
+    const renderTabBtn = (id: DetailTab, label: string) => (
+        <TouchableOpacity
+            key={id}
+            onPress={() => setTab(id)}
+            style={[styles.tabBtn, tab === id && { borderBottomColor: colors.accent, borderBottomWidth: 3 }]}
+            activeOpacity={0.7}
+        >
+            <Text style={[styles.tabBtnText, { color: tab === id ? colors.accent : colors.faintText }]}>{label}</Text>
+        </TouchableOpacity>
+    );
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Custom Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-                        {group?.name || 'Group Details'}
-                    </Text>
-                </View>
-                <TouchableOpacity style={styles.iconButton} onPress={openMembersModal}>
-                    <Users size={22} color={colors.accent} />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-                contentContainerStyle={styles.scrollContent}
+            {/* Sticky gradient header */}
+            <LinearGradient
+                colors={isDark ? ['#0A1F12', '#081509', '#0D1210'] : ['#E9F7EF', '#F2FBF6', '#FFFFFF']}
+                style={[styles.headerGradient, { borderBottomColor: colors.border }]}
             >
-                {/* Stats Overview */}
-                <View style={[styles.statRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={styles.statItem}>
-                        <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Group Spending</Text>
-                        <Text style={[styles.statValue, { color: colors.text }]}>${formatCurrency(group?.total_expenses)}</Text>
-                    </View>
-                    <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
-                    <View style={styles.statItem}>
-                        <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Members</Text>
-                        <Text style={[styles.statValue, { color: colors.text }]}>{group?.members.length}</Text>
-                    </View>
-                </View>
-
-                {/* Balance Bubbles Section */}
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Balances</Text>
-                    <TouchableOpacity style={styles.settleButton} onPress={() => setSettleModalVisible(true)}>
-                        <Send size={14} color={colors.accent} />
-                        <Text style={[styles.settleButtonText, { color: colors.accent }]}>Settle Up</Text>
+                <View style={styles.headerTopRow}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.7}>
+                        <ArrowLeft size={17} color={colors.accentDark} />
+                        <Text style={[styles.backText, { color: colors.accentDark }]}>Back</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        onPress={openMembersModal}
+                        style={[styles.membersBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    >
+                        <Users size={17} color={colors.accent} />
                     </TouchableOpacity>
                 </View>
 
-                <FlatList
-                    horizontal
-                    data={balances}
-                    renderItem={renderBalanceBubble}
-                    keyExtractor={(item) => item.user_id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.balanceList}
-                />
-
-                {/* Expenses History */}
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Expenses</Text>
-                </View>
-
-                {expenses.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: 12 }} />
-                        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
+                <View style={styles.headerMainRow}>
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                            {group?.name || 'Group Details'}
+                        </Text>
+                        <View style={styles.clusterRow}>
+                            {(group?.members || []).slice(0, 4).map((m, i) => (
+                                <View key={m.user_id} style={{ marginLeft: i === 0 ? 0 : -10, zIndex: 4 - i }}>
+                                    <CharacterShape shape="rect" color={m.avatar_color} variant="cluster" />
+                                </View>
+                            ))}
+                            <Text style={[styles.memberCountText, { color: colors.secondaryText }]} numberOfLines={1}>
+                                {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
+                            </Text>
+                        </View>
                     </View>
-                ) : (
-                    expenses.map((expense) => (
-                        <View key={expense.id}>
-                            {renderExpenseItem({ item: expense })}
-                        </View>
-                    ))
-                )}
-            </ScrollView>
 
-            {/* Combined Add FAB */}
-            <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
-                onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
-                activeOpacity={0.8}
-            >
-                <Plus size={28} color={isDark ? '#064E3B' : 'white'} />
-            </TouchableOpacity>
-
-            {/* SETTLE UP MODAL */}
-            <Modal visible={settleModalVisible} animationType="slide" transparent={true}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Settle Up</Text>
-                            <TouchableOpacity onPress={() => setSettleModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
-                                <X size={20} color={colors.text} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {myDebts.length === 0 ? (
-                            <View style={{ alignItems: 'center', padding: 20 }}>
-                                <CheckCircle2 size={48} color={colors.accent} style={{ marginBottom: 16 }} />
-                                <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center' }]}>You're all settled up!</Text>
-                                <Text style={{ color: colors.secondaryText, textAlign: 'center', marginTop: 8 }}>You don't owe any money in this group.</Text>
-                            </View>
-                        ) : (
+                    <View style={[styles.balanceChip, { backgroundColor: isOwe ? colors.warningBg : colors.accentBg }]}>
+                        {isOwe || isOwed ? (
                             <>
-                                <Text style={{ color: colors.secondaryText, marginBottom: 16 }}>Select a balance to pay:</Text>
-                                <ScrollView>
-                                    {myDebts.map((debt, idx) => (
-                                        <TouchableOpacity 
-                                            key={idx} 
-                                            style={[styles.debtCard, { backgroundColor: colors.background, borderColor: colors.border }]}
-                                            onPress={() => handleInitiateSettlement(debt.to_user_id, debt.amount)}
-                                        >
-                                            <View style={[styles.debtAvatar, { backgroundColor: debt.to_avatar_color }]}>
-                                                <Text style={{ color: 'white', fontWeight: 'bold' }}>{debt.to_user_name.charAt(0).toUpperCase()}</Text>
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{ color: colors.secondaryText, fontSize: 13 }}>Pay</Text>
-                                                <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}>{debt.to_user_name}</Text>
-                                            </View>
-                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
-                                                <Text style={{ color: colors.danger, fontSize: 18, fontWeight: '900' }}>${formatCurrency(debt.amount)}</Text>
-                                                <ChevronRight size={20} color={colors.secondaryText} />
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                                <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                    {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
+                                </Text>
+                                <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                    ${formatCurrency(Math.abs(myNet))}
+                                </Text>
                             </>
+                        ) : (
+                            <Text style={[styles.balanceChipSettled, { color: colors.accent }]}>✓ All settled</Text>
                         )}
                     </View>
                 </View>
-            </Modal>
+
+                <View style={styles.actionRow}>
+                    <TouchableOpacity
+                        style={[styles.addExpenseBtn, { backgroundColor: colors.accent }]}
+                        onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
+                        activeOpacity={0.85}
+                    >
+                        <Plus size={16} color={isDark ? '#064E3B' : '#fff'} />
+                        <Text style={[styles.addExpenseBtnText, { color: isDark ? '#064E3B' : '#fff' }]}>Add expense</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.settleGhostBtn, { borderColor: colors.warningBright, backgroundColor: colors.surface }]}
+                        onPress={() => setTab('settle')}
+                        activeOpacity={0.85}
+                    >
+                        <Send size={15} color={colors.warningBright} />
+                        <Text style={[styles.settleGhostBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.tabBar}>
+                    {renderTabBtn('expenses', `Expenses (${expenses.length})`)}
+                    {renderTabBtn('balances', 'Balances')}
+                    {renderTabBtn('settle', `Settle (${settlements.length})`)}
+                </View>
+            </LinearGradient>
+
+            <ScrollView
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {tab === 'expenses' && (
+                    expenses.length === 0 ? (
+                        <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: 12 }} />
+                            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
+                        </View>
+                    ) : (
+                        expenses.map(expense => {
+                            const each = expense.amount / Math.max(expense.participants.length, 1);
+                            return (
+                                <View key={expense.id} style={[styles.expenseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <CharacterShape shape="rect" color={expense.payer_avatar_color} variant="mini" />
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={[styles.expenseTitle, { color: colors.text }]} numberOfLines={1}>{expense.title}</Text>
+                                        <Text style={[styles.expenseMeta, { color: colors.secondaryText }]} numberOfLines={1}>
+                                            {expense.payer_name} paid · split {expense.participants.length} ways
+                                        </Text>
+                                    </View>
+                                    <View style={{ alignItems: 'flex-end' }}>
+                                        <Text style={[styles.expenseAmount, { color: colors.text }]}>${formatCurrency(expense.amount)}</Text>
+                                        <View style={styles.expenseSubRow}>
+                                            <Text style={[styles.expenseDate, { color: colors.faintText }]}>
+                                                {new Date(expense.created_at).toLocaleDateString()}
+                                            </Text>
+                                            <Text style={[styles.expenseEach, { color: colors.accent }]}> · ${formatCurrency(each)} each</Text>
+                                        </View>
+                                    </View>
+                                </View>
+                            );
+                        })
+                    )
+                )}
+
+                {tab === 'balances' && (
+                    balances.slice().sort((a, b) => b.net_balance - a.net_balance).map(b => {
+                        const owesAmt = b.net_balance < -0.01;
+                        const isMe = b.user_id === user?.id;
+                        return (
+                            <View
+                                key={b.user_id}
+                                style={[styles.balanceRow, { backgroundColor: colors.surface, borderColor: owesAmt ? colors.warning : colors.border }]}
+                            >
+                                <View style={styles.balanceRowTop}>
+                                    <CharacterShape shape="rect" color={b.avatar_color} variant="mini" />
+                                    <View style={{ flex: 1, marginLeft: 12 }}>
+                                        <Text style={[styles.balanceRowName, { color: colors.text }]}>{isMe ? 'You' : b.name}</Text>
+                                        <Text style={[styles.balanceRowSub, { color: owesAmt ? colors.warningBright : colors.accent }]}>
+                                            {owesAmt ? `owes $${formatCurrency(Math.abs(b.net_balance))}` : `gets back $${formatCurrency(b.net_balance)}`}
+                                        </Text>
+                                    </View>
+                                </View>
+                                <View style={[styles.progressTrack, { backgroundColor: owesAmt ? colors.warningBg : colors.accentBgFaint }]}>
+                                    <View style={[styles.progressFill, {
+                                        width: `${(Math.abs(b.net_balance) / maxBalance) * 100}%`,
+                                        backgroundColor: owesAmt ? colors.warningBright : colors.accent,
+                                    }]} />
+                                </View>
+                                {owesAmt && isMe && (
+                                    <TouchableOpacity
+                                        style={[styles.settleUpInline, { backgroundColor: colors.warningBg }]}
+                                        onPress={() => setTab('settle')}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.settleUpInlineText, { color: colors.warningBright }]}>Settle up →</Text>
+                                    </TouchableOpacity>
+                                )}
+                            </View>
+                        );
+                    })
+                )}
+
+                {tab === 'settle' && (
+                    settlements.length === 0 ? (
+                        <View style={styles.settleEmpty}>
+                            <CharacterShape shape="semi" color="#27B49E" variant="hero" />
+                            <Text style={[styles.settleEmptyTitle, { color: colors.text }]}>You're all settled up 🎉</Text>
+                        </View>
+                    ) : (
+                        settlements.map((s, idx) => {
+                            const isMine = s.from_user_id === user?.id;
+                            return (
+                                <View key={idx} style={[styles.settleRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <CharacterShape shape="rect" color={s.from_avatar_color} variant="mini" />
+                                    <ArrowRight size={16} color={colors.faintText} style={{ marginHorizontal: 8 }} />
+                                    <CharacterShape shape="rect" color={s.to_avatar_color} variant="mini" />
+                                    <View style={{ flex: 1, marginLeft: 10 }}>
+                                        <Text style={[styles.settleText, { color: colors.text }]} numberOfLines={1}>
+                                            Pay ${formatCurrency(s.amount)} via Interac e-Transfer
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.4 }]}
+                                        onPress={() => isMine && handleInitiateSettlement(s.to_user_id, s.amount)}
+                                        disabled={!isMine}
+                                        activeOpacity={0.8}
+                                    >
+                                        <Text style={[styles.settleBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                                    </TouchableOpacity>
+                                </View>
+                            );
+                        })
+                    )
+                )}
+            </ScrollView>
+
             {/* MEMBERS MODAL */}
             <Modal visible={membersModalVisible} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
@@ -409,18 +447,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         {/* Tab switcher */}
                         <View style={[styles.tabRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                             <TouchableOpacity
-                                style={[styles.tabBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
+                                style={[styles.modalTabBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('friends')}
                             >
                                 <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
-                                <Text style={[styles.tabBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
+                                <Text style={[styles.modalTabBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.tabBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
+                                style={[styles.modalTabBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('invite')}
                             >
                                 <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
-                                <Text style={[styles.tabBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
+                                <Text style={[styles.modalTabBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -495,115 +533,182 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
+    scrollContent: { padding: 16, paddingBottom: 100, gap: 10 },
+
+    // Sticky header
+    headerGradient: {
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingTop: 8,
         borderBottomWidth: 1,
     },
-    backButton: { padding: 4 },
-    headerTitleContainer: { flex: 1, marginHorizontal: 12 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold' },
-    iconButton: { padding: 4 },
-    scrollContent: { paddingBottom: 100 },
-    statRow: {
+    headerTopRow: {
         flexDirection: 'row',
-        margin: 20,
-        padding: 20,
-        borderRadius: 24,
-        borderWidth: 1,
         alignItems: 'center',
-    },
-    statItem: { flex: 1, alignItems: 'center' },
-    verticalDivider: { width: 1, height: 40 },
-    statLabel: { fontSize: 12, marginBottom: 4, fontWeight: '500' },
-    statValue: { fontSize: 24, fontWeight: '900' },
-    sectionHeader: {
-        flexDirection: 'row',
         justifyContent: 'space-between',
+        marginBottom: 8,
+    },
+    backRow: {
+        flexDirection: 'row',
         alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 16,
+        gap: 5,
+        paddingVertical: 4,
+    },
+    backText: { fontSize: 14, fontWeight: '700' },
+    membersBtn: {
+        width: 34,
+        height: 34,
+        borderRadius: 17,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    headerMainRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        justifyContent: 'space-between',
+        marginBottom: 14,
+        gap: 12,
+    },
+    groupName: {
+        fontSize: 24,
+        fontWeight: '800',
+        letterSpacing: -0.3,
+    },
+    clusterRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
         marginTop: 8,
     },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold' },
-    settleButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingVertical: 6,
+    memberCountText: {
+        fontSize: 13,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    balanceChip: {
+        borderRadius: 14,
         paddingHorizontal: 12,
-        borderRadius: 12,
-        backgroundColor: 'rgba(74, 222, 128, 0.05)',
+        paddingVertical: 8,
+        alignItems: 'flex-end',
     },
-    settleButtonText: { fontSize: 13, fontWeight: '600' },
-    balanceList: { paddingHorizontal: 20, gap: 12, marginBottom: 24 },
-    balanceBubble: {
+    balanceChipLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 0.6 },
+    balanceChipValue: { fontSize: 19, fontWeight: '800', letterSpacing: -0.3, marginTop: 2 },
+    balanceChipSettled: { fontSize: 14, fontWeight: '800' },
+
+    actionRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 20,
-        borderWidth: 1.5,
-        gap: 10,
-        minWidth: 120,
+        gap: 8,
+        marginBottom: 14,
     },
-    avatarSmall: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    addExpenseBtn: {
+        flex: 1,
+        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
+        gap: 7,
+        borderRadius: 13,
+        paddingVertical: 12,
     },
-    avatarTextSmall: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-    balanceName: { fontSize: 13, fontWeight: 'bold', maxWidth: 80 },
-    balanceAmount: { fontSize: 12, fontWeight: '800' },
-    expenseCard: {
+    addExpenseBtnText: { fontSize: 14, fontWeight: '700' },
+    settleGhostBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginHorizontal: 20,
-        marginBottom: 12,
-        padding: 16,
-        borderRadius: 20,
+        justifyContent: 'center',
+        gap: 7,
+        borderRadius: 13,
+        borderWidth: 1.5,
+        paddingHorizontal: 16,
+        paddingVertical: 12,
+    },
+    settleGhostBtnText: { fontSize: 14, fontWeight: '700' },
+
+    tabBar: {
+        flexDirection: 'row',
+    },
+    tabBtn: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 3,
+        borderBottomColor: 'transparent',
+    },
+    tabBtnText: { fontSize: 13.5, fontWeight: '600' },
+
+    // Expenses tab
+    expenseRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 16,
         borderWidth: 1,
     },
-    expenseIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
+    expenseTitle: { fontSize: 15, fontWeight: '600' },
+    expenseMeta: { fontSize: 12, marginTop: 2 },
+    expenseAmount: { fontSize: 16, fontWeight: '700' },
+    expenseSubRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2 },
+    expenseDate: { fontSize: 11 },
+    expenseEach: { fontSize: 11, fontWeight: '700' },
+
+    // Balances tab
+    balanceRow: {
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        gap: 10,
     },
-    expenseInfo: { flex: 1 },
-    expenseTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-    expenseMeta: { fontSize: 12 },
-    expenseAmount: { fontSize: 16, fontWeight: 'bold' },
+    balanceRowTop: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    balanceRowName: { fontSize: 15, fontWeight: '700' },
+    balanceRowSub: { fontSize: 13, fontWeight: '600', marginTop: 2 },
+    progressTrack: {
+        height: 6,
+        borderRadius: 3,
+        overflow: 'hidden',
+    },
+    progressFill: {
+        height: '100%',
+        borderRadius: 3,
+    },
+    settleUpInline: {
+        alignSelf: 'flex-start',
+        borderRadius: 11,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+    },
+    settleUpInlineText: { fontSize: 13, fontWeight: '700' },
+
+    // Settle tab
+    settleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        padding: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+    },
+    settleText: { fontSize: 14, fontWeight: '600' },
+    settleBtn: {
+        borderRadius: 11,
+        paddingHorizontal: 14,
+        paddingVertical: 9,
+    },
+    settleBtnText: { fontSize: 13, fontWeight: '700' },
+    settleEmpty: {
+        alignItems: 'center',
+        paddingVertical: 50,
+        gap: 8,
+    },
+    settleEmptyTitle: { fontSize: 17, fontWeight: '700', marginTop: 8 },
+
     emptyState: {
-        marginHorizontal: 20,
         padding: 40,
-        borderRadius: 24,
+        borderRadius: 20,
         borderWidth: 1,
         alignItems: 'center',
     },
     emptyText: { fontSize: 14 },
-    fab: {
-        position: 'absolute',
-        bottom: 32,
-        right: 24,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 10,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-    },
 
-    // Modal Styles
+    // Members modal (unchanged)
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -633,23 +738,6 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    debtCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderRadius: 16,
-        borderWidth: 1,
-        marginBottom: 12,
-    },
-    debtAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    // Members modal
     tabRow: {
         flexDirection: 'row',
         borderRadius: 12,
@@ -657,7 +745,7 @@ const styles = StyleSheet.create({
         padding: 4,
         gap: 4,
     },
-    tabBtn: {
+    modalTabBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
@@ -665,7 +753,7 @@ const styles = StyleSheet.create({
         paddingVertical: 9,
         borderRadius: 8,
     },
-    tabBtnText: {
+    modalTabBtnText: {
         fontSize: 13,
         fontWeight: '600',
     },
