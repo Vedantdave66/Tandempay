@@ -43,16 +43,30 @@ export default function PaymentsScreen() {
     const loadData = useCallback(async () => {
         try {
             if (masterTab === 'settle') {
-                const data = await meApi.getPayments();
-                setPayments(data);
+                const raw = await meApi.getPayments();
+                const payments = Array.isArray(raw)
+                    ? raw
+                    : Array.isArray((raw as any)?.items)
+                        ? (raw as any).items
+                        : Array.isArray((raw as any)?.payments)
+                            ? (raw as any).payments
+                            : [];
+                setPayments(payments);
             } else {
-                const [balanceData, txData] = await Promise.all([
+                const [balanceData, rawTx] = await Promise.all([
                     walletApi.getBalance(),
                     walletApi.getTransactions()
                 ]);
                 console.log('[Wallet] Raw balance response:', JSON.stringify(balanceData));
                 setWalletBalance(Number(balanceData?.wallet_balance) || 0);
-                setWalletTransactions(txData);
+                const walletTransactions = Array.isArray(rawTx)
+                    ? rawTx
+                    : Array.isArray((rawTx as any)?.items)
+                        ? (rawTx as any).items
+                        : Array.isArray((rawTx as any)?.transactions)
+                            ? (rawTx as any).transactions
+                            : [];
+                setWalletTransactions(walletTransactions);
             }
         } catch (err) {
             console.error('Failed to load data', err);
