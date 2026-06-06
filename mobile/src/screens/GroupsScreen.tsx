@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
 import {
-    View, Text, StyleSheet, FlatList, TouchableOpacity,
-    SafeAreaView, RefreshControl, ActivityIndicator
+    View, Text, StyleSheet, TouchableOpacity,
+    ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
-import { Users, Plus } from 'lucide-react-native';
 import GroupCard from '../components/GroupCard';
+import CharacterShape from '../components/CharacterShape';
 
 export default function GroupsScreen({ navigation }: any) {
-    const { colors, isDark } = useTheme();
+    const { colors } = useTheme();
     const { user } = useAuth();
     const [groups, setGroups] = useState<GroupListItem[]>([]);
     const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
@@ -53,29 +54,23 @@ export default function GroupsScreen({ navigation }: any) {
         return unsub;
     }, [navigation]);
 
-    const renderGroup = ({ item }: { item: GroupListItem }) => {
-        const members = balanceMap[item.id];
-        const myNetBalance = members?.find(m => m.user_id === user?.id)?.net_balance;
-        return (
-            <GroupCard
-                group={item}
-                members={members}
-                myNetBalance={myNetBalance}
-                onPress={() => navigation.navigate('Group', { groupId: item.id })}
-            />
-        );
+    const onRefresh = () => {
+        setRefreshing(true);
+        load();
     };
 
     return (
-        <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
+        <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
             {/* Header */}
             <View style={styles.header}>
-                <View>
-                    <Text style={[styles.title, { color: colors.text }]}>Your Groups</Text>
-                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-                        {groups.length} active {groups.length === 1 ? 'group' : 'groups'}
-                    </Text>
-                </View>
+                <Text style={[styles.title, { color: colors.text }]}>Your squads</Text>
+                <TouchableOpacity
+                    onPress={() => navigation.navigate('CreateGroup')}
+                    style={[styles.newButton, { backgroundColor: colors.accent }]}
+                    activeOpacity={0.85}
+                >
+                    <Text style={[styles.newButtonText, { color: '#0A5F30' }]}>+ New</Text>
+                </TouchableOpacity>
             </View>
 
             {loading && !refreshing ? (
@@ -83,56 +78,68 @@ export default function GroupsScreen({ navigation }: any) {
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
             ) : (
-                <FlatList
-                    data={groups}
-                    keyExtractor={i => i.id}
-                    renderItem={renderGroup}
-                    contentContainerStyle={styles.list}
+                <ScrollView
+                    contentContainerStyle={[styles.list, { paddingBottom: 120 }]}
+                    showsVerticalScrollIndicator={false}
                     refreshControl={
-                        <RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />
+                        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                     }
-                    ListEmptyComponent={
-                        <View style={[styles.empty, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Users color={colors.secondaryText} size={44} />
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
-                            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-                                Tap the + button to create your first group.
-                            </Text>
+                >
+                    {groups.length === 0 ? (
+                        <View style={styles.empty}>
+                            <CharacterShape shape="round" color={colors.accent} variant="hero" />
+                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No squads yet</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.8}>
+                                <Text style={[styles.emptyAction, { color: colors.accentDark }]}>Create one →</Text>
+                            </TouchableOpacity>
                         </View>
-                    }
-                />
+                    ) : (
+                        groups.map(item => {
+                            const members = balanceMap[item.id];
+                            const myNetBalance = members?.find(m => m.user_id === user?.id)?.net_balance;
+                            return (
+                                <GroupCard
+                                    key={item.id}
+                                    group={item}
+                                    members={members}
+                                    myNetBalance={myNetBalance}
+                                    compact={false}
+                                    onPress={() => navigation.navigate('Group', { groupId: item.id })}
+                                />
+                            );
+                        })
+                    )}
+                </ScrollView>
             )}
-
-            {/* FAB */}
-            <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
-                onPress={() => navigation.navigate('CreateGroup')}
-                activeOpacity={0.8}
-            >
-                <Plus color={isDark ? '#064E3B' : 'white'} size={28} />
-            </TouchableOpacity>
         </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
     safe: { flex: 1 },
-    header: { paddingHorizontal: 24, paddingTop: 24, paddingBottom: 16 },
-    title: { fontSize: 28, fontWeight: '900', letterSpacing: -0.5 },
-    subtitle: { fontSize: 14, marginTop: 4 },
+    header: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: 16,
+        paddingTop: 8,
+        paddingBottom: 16,
+    },
+    title: { fontSize: 26, fontWeight: '800', letterSpacing: -0.5 },
+    newButton: {
+        borderRadius: 13,
+        paddingHorizontal: 16,
+        paddingVertical: 10,
+    },
+    newButtonText: { fontSize: 14, fontWeight: '700' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    list: { paddingHorizontal: 24, paddingBottom: 140 },
+    list: { paddingHorizontal: 16 },
     empty: {
-        padding: 40, borderRadius: 24, borderWidth: 1,
-        alignItems: 'center', gap: 12, marginTop: 12,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: 14,
+        paddingVertical: 80,
     },
-    emptyTitle: { fontSize: 18, fontWeight: '700' },
-    emptyText: { fontSize: 14, textAlign: 'center' },
-    fab: {
-        position: 'absolute', bottom: 100, right: 24,
-        width: 60, height: 60, borderRadius: 30,
-        alignItems: 'center', justifyContent: 'center',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3, shadowRadius: 16, elevation: 10,
-    },
+    emptyTitle: { fontSize: 18, fontWeight: '600' },
+    emptyAction: { fontSize: 15, fontWeight: '700' },
 });
