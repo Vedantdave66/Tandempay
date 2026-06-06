@@ -1,0 +1,392 @@
+Prompt A — Foundation
+Load graphify-out/GRAPH_REPORT.md. Relevant communities: 16 (UI Primitive Components), 37 (Mobile Theme System), 26 (Expense UI Components).
+Reference files (read before starting):
+
+mobile/design/TandemPay Mobile.html — light mode prototype
+mobile/design/TandemPay Mobile Dark.html — dark mode prototype
+
+Files to touch:
+
+mobile/src/constants/Colors.ts
+mobile/src/components/CharacterShape.tsx — one addition only
+mobile/src/components/GroupCard.tsx — full rewrite
+mobile/src/components/Logo.tsx — create new
+
+Do not touch: RootNavigator.tsx, MainTabNavigator.tsx, PaymentsScreen.tsx, ThemeContext.tsx, any screen files, any API files, any auth files.
+
+Step 1 — mobile/src/constants/Colors.ts
+Replace the full contents:
+tsconst Colors = {
+  light: {
+    text: '#020617',
+    secondaryText: '#475569',
+    faintText: '#94A3B8',
+    background: '#F1F5F9',
+    surface: '#FFFFFF',
+    surfaceHover: '#F8FAFC',
+    border: '#E2E8F0',
+    accent: '#16A34A',
+    accentDark: '#15803D',
+    accentBright: '#22C55E',
+    accentPale: '#4ADE80',
+    tint: '#16A34A',
+    accentBg: '#DCFCE7',
+    accentBgFaint: '#F0FDF4',
+    tabIconDefault: '#94A3B8',
+    tabIconSelected: '#16A34A',
+    primary: '#020617',
+    danger: '#DC2626',
+    dangerBg: '#FEE2E2',
+    warning: '#B45309',
+    warningBg: '#FEF3C7',
+    warningBright: '#F59E0B',
+    indigo: '#6366F1',
+    gold: '#F59E0B',
+    groupCardBg: ['#3BE57F', '#8FE9B0', '#D8F4E1', '#F3FBF4'] as string[],
+    groupPillBg: '#FFFFFF',
+    groupPillText: '#0E140F',
+    groupStatBg: '#FFFFFF',
+    groupStatText: '#0E140F',
+    groupLabelText: '#0A5F30',
+  },
+  dark: {
+    text: '#F0F4F1',
+    secondaryText: '#8A918E',
+    faintText: '#454D4A',
+    background: '#0D1210',
+    surface: '#1C1E1C',
+    surfaceHover: '#252826',
+    border: 'rgba(255,255,255,0.09)',
+    accent: '#22C55E',
+    accentDark: '#4ADE80',
+    accentBright: '#4ADE80',
+    accentPale: '#86EFAC',
+    tint: '#22C55E',
+    accentBg: 'rgba(34,197,94,0.16)',
+    accentBgFaint: 'rgba(34,197,94,0.09)',
+    tabIconDefault: '#454D4A',
+    tabIconSelected: '#22C55E',
+    primary: '#F0F4F1',
+    danger: '#F87171',
+    dangerBg: 'rgba(248,113,113,0.18)',
+    warning: '#FBBF24',
+    warningBg: 'rgba(245,158,11,0.18)',
+    warningBright: '#F59E0B',
+    indigo: '#818CF8',
+    gold: '#FBBF24',
+    groupCardBg: ['#1E6A3A', '#0D3019', '#060F08', '#030806'] as string[],
+    groupPillBg: '#111A13',
+    groupPillText: '#E8F5EC',
+    groupStatBg: 'rgba(0,0,0,0.45)',
+    groupStatText: '#E8F5EC',
+    groupLabelText: 'rgba(100,220,130,0.7)',
+  },
+};
+
+export type ColorScheme = typeof Colors.light;
+export default Colors;
+If ThemeContext.tsx imports a named type from Colors, update only that type to match — no other changes to ThemeContext.
+
+Step 2 — mobile/src/components/CharacterShape.tsx (one addition only)
+Open the file. Find MINI_CONFIGS (the record of variant → shape configs). Add these two variants immediately after the existing entries. Do not change anything else:
+tscluster: {
+  rect:  { w: 20, h: 32,  tl: 4,  tr: 4,  eyeTop: 6,  eyeLeft: 5,  eyeSize: 3, eyeGap: 4 },
+  tall:  { w: 14, h: 40,  tl: 3,  tr: 3,  eyeTop: 8,  eyeLeft: 3,  eyeSize: 3, eyeGap: 3 },
+  semi:  { w: 36, h: 20,  tl: 18, tr: 18, eyeTop: 5,  eyeLeft: 12, eyeSize: 3, eyeGap: 5 },
+  round: { w: 26, h: 32,  tl: 13, tr: 13, eyeTop: 8,  eyeLeft: 8,  eyeSize: 3, eyeGap: 4 },
+},
+hero: {
+  rect:  { w: 56,  h: 96,  tl: 8,  tr: 8,  eyeTop: 18, eyeLeft: 14, eyeSize: 9, eyeGap: 10 },
+  tall:  { w: 40,  h: 116, tl: 6,  tr: 6,  eyeTop: 22, eyeLeft: 7,  eyeSize: 9, eyeGap: 8  },
+  semi:  { w: 100, h: 54,  tl: 50, tr: 50, eyeTop: 14, eyeLeft: 34, eyeSize: 9, eyeGap: 14 },
+  round: { w: 72,  h: 96,  tl: 36, tr: 36, eyeTop: 22, eyeLeft: 22, eyeSize: 9, eyeGap: 10 },
+},
+Find wherever the variant type is declared for CharacterShape and add 'hero' and 'cluster' to the union.
+
+Step 3 — mobile/src/components/GroupCard.tsx (full rewrite)
+tsximport React from 'react';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
+import { Crown, ArrowRight } from 'lucide-react-native';
+import { GroupListItem, UserBalance } from '../services/api';
+import { useTheme } from '../context/ThemeContext';
+import { formatCurrency } from '../utils/formatCurrency';
+import CharacterShape from './CharacterShape';
+
+interface GroupCardProps {
+  group: GroupListItem;
+  members?: UserBalance[];
+  myNetBalance?: number;
+  onPress: () => void;
+  compact?: boolean;
+}
+
+const ROTATIONS = [-8, 4, 6, -10];
+const SETTLED_THRESHOLD = 0.01;
+
+export default function GroupCard({
+  group, members = [], myNetBalance = 0, onPress, compact = false,
+}: GroupCardProps) {
+  const { colors } = useTheme();
+  const visibleMembers = members.slice(0, 4);
+  const balance = myNetBalance ?? 0;
+  const isOwe  = balance < -SETTLED_THRESHOLD;
+  const isOwed = balance >  SETTLED_THRESHOLD;
+  const balanceColor = isOwe ? colors.warningBright : colors.accent;
+  const cardW = compact ? 222 : ('100%' as any);
+
+  return (
+    <TouchableOpacity onPress={onPress} activeOpacity={0.88}
+      style={[styles.card, { width: cardW }]}>
+      <LinearGradient
+        colors={colors.groupCardBg as [string, string, string, string]}
+        locations={[0, 0.30, 0.56, 1]}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        style={StyleSheet.absoluteFillObject}
+      />
+
+      {/* Characters */}
+      <View style={[styles.facesRow, compact && styles.facesRowCompact]}>
+        {visibleMembers.map((m, i) => (
+          <View key={m.user_id} style={{ alignItems: 'center' }}>
+            {m.user_id === group.created_by
+              ? <Crown size={11} color="#F4B400" style={{ marginBottom: 2 }} />
+              : <View style={{ height: 12 }} />}
+            <Text style={[styles.nick, { transform: [{ rotate: `${ROTATIONS[i] ?? 0}deg` }] }]}>
+              {(m.character_nickname ?? m.name.split(' ')[0]).slice(0, 7)}
+            </Text>
+            <View style={{ transform: [{ rotate: `${(ROTATIONS[i] ?? 0) * 0.5}deg` }] }}>
+              <CharacterShape
+                shape={m.character_shape ?? 'rect'}
+                color={m.character_color ?? '#6B7280'}
+                variant={compact ? 'mini' : 'card'}
+              />
+            </View>
+          </View>
+        ))}
+      </View>
+
+      {/* Name pill */}
+      <View style={styles.pillWrap}>
+        <View style={[styles.pill, { backgroundColor: colors.groupPillBg }]}>
+          <Text style={[styles.pillText, { color: colors.groupPillText }]} numberOfLines={1}>
+            {group.name}
+          </Text>
+        </View>
+      </View>
+
+      {/* Stats */}
+      <View style={[styles.stats, compact && styles.statsCompact]}>
+        <View style={styles.statBlock}>
+          <Text style={[styles.statLabel, { color: colors.groupLabelText }]}>TOTAL EXPENSES</Text>
+          <View style={[styles.statBox, { backgroundColor: colors.groupStatBg }]}>
+            <Text style={[styles.statVal, { color: colors.groupStatText, fontSize: compact ? 21 : 26 }]}>
+              ${formatCurrency(group.total_expenses)}
+            </Text>
+          </View>
+        </View>
+
+        {members.length > 0 && (
+          <View style={styles.statBlock}>
+            <Text style={[styles.statLabel, {
+              color: isOwe ? colors.warningBright : colors.groupLabelText
+            }]}>
+              {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
+            </Text>
+            <View style={[styles.balanceBox, { backgroundColor: colors.groupStatBg }]}>
+              <Text style={[styles.balanceVal, { color: balanceColor, fontSize: compact ? 21 : 26 }]}>
+                {!isOwe && !isOwed ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
+              </Text>
+              <View style={[styles.arrowCircle, { borderColor: balanceColor }]}>
+                <ArrowRight size={compact ? 14 : 17} color={balanceColor} />
+              </View>
+            </View>
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+}
+
+const styles = StyleSheet.create({
+  card: { borderRadius: 28, overflow: 'hidden' },
+  facesRow: { flexDirection: 'row', justifyContent: 'center', alignItems: 'flex-end',
+    gap: 2, paddingTop: 20, paddingHorizontal: 16, zIndex: 1 },
+  facesRowCompact: { paddingTop: 16, paddingHorizontal: 12 },
+  nick: { fontSize: 10, fontWeight: '700', color: '#0E140F', marginBottom: 3,
+    textShadowColor: 'rgba(255,255,255,0.55)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2 },
+  pillWrap: { alignItems: 'center', marginTop: -17, paddingHorizontal: 14, zIndex: 2 },
+  pill: { borderRadius: 999, paddingHorizontal: 24, paddingVertical: 11, maxWidth: '92%',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.25, shadowRadius: 8, elevation: 6 },
+  pillText: { fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
+  stats: { padding: 14, paddingHorizontal: 18, paddingBottom: 18, gap: 10 },
+  statsCompact: { padding: 12, paddingHorizontal: 14, paddingBottom: 14 },
+  statBlock: { gap: 6 },
+  statLabel: { fontSize: 10, fontWeight: '800', letterSpacing: 1.3, textTransform: 'uppercase', textAlign: 'center' },
+  statBox: { borderRadius: 20, paddingVertical: 12, paddingHorizontal: 20,
+    alignItems: 'center', justifyContent: 'center',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3 },
+  statVal: { fontWeight: '800', letterSpacing: -0.4 },
+  balanceBox: { borderRadius: 20, paddingLeft: 20, paddingRight: 10, paddingVertical: 10,
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
+    shadowColor: '#000', shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.12, shadowRadius: 10, elevation: 3 },
+  balanceVal: { fontWeight: '800', letterSpacing: -0.4 },
+  arrowCircle: { width: 42, height: 42, borderRadius: 21, borderWidth: 1.5,
+    alignItems: 'center', justifyContent: 'center' },
+});
+
+Step 4 — mobile/src/components/Logo.tsx (create)
+tsximport React from 'react';
+import { View, Text } from 'react-native';
+import { useTheme } from '../context/ThemeContext';
+
+export default function Logo({ size = 18 }: { size?: number }) {
+  const { colors } = useTheme();
+  const fs = size + 1;
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+      <Text style={{ fontWeight: '800', fontSize: fs, color: colors.text, letterSpacing: -0.5 }}>
+        Tandem
+      </Text>
+      <View style={{
+        width: 1.5,
+        height: fs * 1.1,
+        backgroundColor: colors.accent,
+        borderRadius: 1,
+        transform: [{ rotate: '18deg' }],
+        opacity: 0.85,
+        marginHorizontal: fs * 0.18,
+      }} />
+      <Text style={{ fontWeight: '800', fontSize: fs, color: colors.accent, letterSpacing: -0.5 }}>
+        Pay
+      </Text>
+    </View>
+  );
+}
+After all steps: Run npx tsc --noEmit from mobile/. Fix all type errors. Commit as feat: color tokens, CharacterShape hero/cluster variants, GroupCard revamp, Logo component.
+
+Prompt B — Core Screens (run after A is green)
+Load graphify-out/GRAPH_REPORT.md. Relevant communities: 5 (Mobile Social Screens), 25 (Mobile Navigation & Notifications), 30 (Mobile Group Navigation).
+Reference files (open and read the relevant screen before writing each component):
+
+mobile/design/TandemPay Mobile.html
+mobile/design/TandemPay Mobile Dark.html
+
+Files to touch:
+
+mobile/src/screens/DashboardScreen.tsx — revamp existing file
+mobile/src/screens/GroupsScreen.tsx — revamp existing file
+mobile/src/screens/GroupDetailScreen.tsx — revamp existing file
+
+Do not touch: CharacterShape.tsx, RootNavigator.tsx, MainTabNavigator.tsx, PaymentsScreen.tsx, ThemeContext.tsx, api.ts, any auth screens.
+Before writing any screen: Read mobile/src/services/api.ts and check what methods exist on meApi, groupsApi, and balancesApi. Use only methods that actually exist — do not invent method names. If a needed data fetch has no API method, use the closest existing one and leave a // TODO comment. These screens already exist — replace only the JSX and styles, keep all existing API calls, hooks, and navigation params.
+
+Step 1 — Revamp DashboardScreen.tsx
+Open the Home tab in mobile/design/TandemPay Mobile.html and match it exactly. Keep all existing API calls and hooks — replace only the JSX and styles.
+Layout:
+
+SafeAreaView edges={['top']} + ScrollView contentContainerStyle={{ paddingBottom: 120 }}
+Header row — <Logo size={18} /> left + Bell icon right (lucide-react-native). Show 8×8 red dot badge on bell if unread notifications > 0. Use existing useNotifications() hook already in the file.
+Hero card — borderRadius: 24, padding: 20. LinearGradient light: ['#FBEDE8', '#F4EFF7', '#E9F6EE'] / dark: ['#1A1015', '#141019', '#0D1410']. Inside: left column with "Good morning" 13px colors.secondaryText + user first name 28px/800 colors.text + "👋". Right: user's <CharacterShape shape={...} color={...} variant="hero" /> from auth context. Below both: two stat pills side by side (flex: 1, gap: 10). Pill style: borderRadius: 16, padding: 14, backgroundColor: colors.accentBgFaint. Left = "YOU'RE OWED" label + amount in colors.accent. Right = "YOU OWE" label + amount in colors.warningBright. Use balance data already fetched in the screen.
+"Your squads" section header — "Your squads" 18px/700 + green count badge + "+ New" ghost button navigating to CreateGroup. Horizontal ScrollView horizontal showsHorizontalScrollIndicator={false} with paddingHorizontal: 20, gap: 12. Render <GroupCard compact={true} onPress={...} /> per group.
+"Recent activity" section — "Recent activity" 18px/700. Surface card borderRadius: 16. Use payments/activity data already in the screen. Each row: 44×44 borderRadius: 12 icon square in colors.accentBg + text column + timestamp right-aligned in colors.faintText.
+
+
+Step 2 — Revamp GroupsScreen.tsx
+Open the Groups tab in the reference HTML and match it. Keep existing API calls. Replace JSX and styles only.
+Layout:
+
+SafeAreaView edges={['top']} + ScrollView contentContainerStyle={{ paddingBottom: 120 }}
+Header row: "Your squads" 26px/800 colors.text + green "+ New" button navigating to CreateGroup
+paddingHorizontal: 16, gap: 16 list of <GroupCard compact={false} onPress={() => navigation.navigate('Group', { groupId: group.id })} />
+Empty state: centered <CharacterShape shape="round" color={colors.accent} variant="hero" /> + "No squads yet" 18px/600 + "Create one →" green button
+
+
+Step 3 — Revamp GroupDetailScreen.tsx
+Open the Group Detail screen in the reference HTML and match it. Keep all existing API calls, tab state, and navigation params. Replace JSX and styles only.
+Layout:
+
+Sticky header — LinearGradient light: ['#E9F7EF', '#F2FBF6', '#FFFFFF'] / dark: ['#0A1F12', '#081509', '#0D1210']. Back button "← Back" in colors.accentDark. Group name 24px/800 + row of up to 4 <CharacterShape variant="cluster" /> + "{N} members · ${total}" in colors.secondaryText. Balance chip: owe → backgroundColor: colors.warningBg, amber text / owed → backgroundColor: colors.accentBg, green text / settled → green "✓ All settled". Two buttons: green filled "+ Add expense" + ghost amber "Settle up". Tab bar: "Expenses (N)" | "Balances" | "Settle (N)" — active = green bottom border + colors.accent text, inactive = colors.faintText.
+Expenses tab — each row: <CharacterShape variant="mini" /> of payer + title 15px/600 + "paid · split N ways" 12px colors.secondaryText. Right: amount 16px/700 + date 11px faint + "$X each" in colors.accent.
+Balances tab — each member: <CharacterShape variant="mini" /> + name + "gets back $X" green or "owes $X" amber. Progress bar height: 6, borderRadius: 3 filled proportionally in the appropriate color. Current user row with negative balance gets amber "Settle up →" button.
+Settle tab — each pair: from <CharacterShape variant="mini" /> + "→" + to <CharacterShape variant="mini" /> + "Pay $X via Interac e-Transfer" + amber "Settle up" button. Empty state: <CharacterShape shape="semi" color="#27B49E" variant="hero" /> centered + "You're all settled up 🎉".
+
+After all 3 steps: Run npx tsc --noEmit. Fix all errors. Commit as feat: revamp Dashboard, Groups, GroupDetail screens.
+
+Prompt C — Remaining Screens (run after B is green)
+Load graphify-out/GRAPH_REPORT.md. Relevant communities: 6 (Theme & Styling System), 25 (Mobile Navigation & Notifications), 59 (Mobile Pro Hub).
+Reference files (open and read the relevant screen before writing each component):
+
+mobile/design/TandemPay Mobile.html
+mobile/design/TandemPay Mobile Dark.html
+
+Files to touch:
+
+mobile/src/screens/FriendsScreen.tsx — revamp existing
+mobile/src/screens/ProHubScreen.tsx — revamp into Profile/Me
+mobile/src/components/CustomTabBar.tsx — revamp existing
+mobile/src/screens/AddExpenseScreen.tsx — revamp existing
+mobile/src/navigation/MainTabNavigator.tsx — tab label update only
+
+Do not touch: RootNavigator.tsx, CharacterShape.tsx, PaymentsScreen.tsx, ThemeContext.tsx, api.ts, any auth screens.
+These screens already exist — keep all API calls, navigation params, and business logic. Replace only JSX and styles.
+
+Step 1 — Revamp FriendsScreen.tsx
+Open the Friends tab in the reference HTML and match it.
+Layout:
+
+SafeAreaView edges={['top']} + "Your people 👋" 26px/800
+Segmented control: Activity | Friends | Pending. Container: backgroundColor: colors.surface, borderRadius: 12, padding: 4. Active segment: backgroundColor: colors.accent, borderRadius: 8. Active label: #fff 14px/700. Inactive: colors.secondaryText.
+Activity tab — surface card borderRadius: 16. Each row: 44×44 borderRadius: 10 icon square colors.accentBg + activity text 14px/500 colors.text + timestamp 12px colors.faintText right-aligned + optional amount colors.accent.
+Friends tab — each friend: <CharacterShape variant="mini" /> + name 15px/600 + email 12px colors.faintText + "X shared squads" chip (backgroundColor: colors.accentBg, color: colors.accent, borderRadius: 999, paddingHorizontal: 10) + "Settle up" ghost button right-aligned.
+Pending tab — empty state: <CharacterShape shape="semi" color={colors.indigo} variant="hero" /> centered + "No pending requests" 16px/500 colors.faintText.
+
+
+Step 2 — Revamp ProHubScreen.tsx into Profile/Me
+Open the Me tab in the reference HTML and match it. Keep the existing sign-out logic intact.
+Layout:
+
+SafeAreaView edges={['top']} + ScrollView contentContainerStyle={{ paddingBottom: 120 }}
+Hero — LinearGradient light: ['#FBEDE8', '#F4EFF7', '#E9F6EE'] / dark: ['#1A1015', '#141019', '#0D1410'], padding: 32, alignItems: 'center'. User's <CharacterShape variant="hero" /> + name 22px/800 + email 14px colors.faintText + "✏ Customise character" chip (backgroundColor: colors.accentBg, color: colors.accent, borderRadius: 999, paddingHorizontal: 16, paddingVertical: 8).
+Pro card — borderRadius: 20, overflow: 'hidden'. Header: LinearGradient ['#15803D', '#16A34A'], padding: 20: Crown icon + "TandemPay Pro" 18px/800 white + "$4.99/mo" chip (white bg, colors.accent text, borderRadius: 999). Body: colors.surface, padding: 20: 4 feature rows (Check icon colors.accent + text) + full-width green "Upgrade to Pro →" button. If user subscription_tier === 'pro', show "Manage subscription →" instead.
+Settings list — colors.surface, borderRadius: 16. Rows: 36×36 borderRadius: 10 icon square colors.accentBg + label 15px/500 colors.text + ChevronRight colors.faintText. Items: ShieldCheck Privacy & Security, Bell Notifications, UserPlus Invite a friend, Sun Appearance.
+Sign out — full-width backgroundColor: colors.surface, borderRadius: 16, padding: 18. "Sign out" colors.danger 16px/600. Use existing sign-out logic.
+
+
+Step 3 — Revamp CustomTabBar.tsx
+Keep all navigation logic and props. Replace visual layer only.
+
+Container: backgroundColor = dark ? 'rgba(14,17,14,0.94)' : 'rgba(255,255,255,0.94)'. borderTopWidth: 1, borderTopColor: colors.border. Height = 64 + bottom inset from useSafeAreaInsets().
+Each tab: flex: 1, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 10.
+Icon container: width: 44, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center'. Active: backgroundColor: colors.accentBg. Inactive: transparent.
+Icon size 22. Active: colors.accent. Inactive: colors.tabIconDefault.
+Label 10px/600. Active: colors.accent. Inactive: colors.tabIconDefault.
+Tab icons (lucide-react-native): Home → Home, Groups → Users, Payments → Wallet, Friends → Bell, Me → User.
+Notification badge on Friends/Bell tab: 8×8 red dot borderRadius: 4, absolute top-right of icon, only when unreadCount > 0 from useNotifications().
+
+
+Step 4 — Revamp AddExpenseScreen.tsx
+Open the Add Expense sheet in the reference HTML and match it. Keep all existing API calls, submit logic, and navigation params. Use local step state (1 | 2).
+Step 1 UI:
+
+Handle bar: width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, centered, marginBottom: 16
+Header: first selected payer's <CharacterShape variant="mini" /> + "New expense" 18px/700 + group name 13px colors.faintText + X close button
+"What was it for?" 13px colors.faintText label → TextInput 15px colors.text, borderBottomWidth: 1, borderColor: colors.border, paddingVertical: 10
+"How much?" label → row: "$" 17px/700 colors.accent + number TextInput 17px/700 colors.text
+"Who paid?" label → horizontal row of member chips: <CharacterShape variant="mini" /> + name 13px/600. Selected: borderColor: colors.accent, borderWidth: 2, borderRadius: 12, backgroundColor: colors.accentBgFaint. Unselected: borderColor: colors.border, borderRadius: 12.
+CTA: full-width green "Next: who's splitting? →" button. opacity: 0.4 + disabled if description or amount empty.
+
+Step 2 UI:
+
+"← Back" colors.accentDark 14px/600
+"Splitting {description}" 16px/600 colors.secondaryText
+Member list: each row <CharacterShape variant="mini" /> + name 15px/500 + per-person amount right-aligned colors.accent 15px/700 + 24×24 circular checkbox borderRadius: 12. Checked: backgroundColor: colors.accent + white Check icon 14px. Unchecked: borderWidth: 2, borderColor: colors.border.
+Summary bar: "Total: $X" colors.secondaryText + "· $Y each" colors.accent.
+CTA: full-width green "Add expense ✓" button using existing submit handler.
+
+
+Step 5 — MainTabNavigator.tsx (label only)
+Find the tab screen for ProHubScreen. Change its name to "Me" and its tab bar label to "Me". No other changes.
+
+After all steps: Run npx tsc --noEmit from mobile/. Fix all type errors. Run the app on simulator, verify all 5 tabs render without crashing. Commit as feat: revamp Friends, Profile, TabBar, AddExpense screens.

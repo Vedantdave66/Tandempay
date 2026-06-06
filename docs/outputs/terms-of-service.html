@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service — TandemPay</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --green:      #16A34A;
+      --green-light:#DCFCE7;
+      --near-black: #020617;
+      --ink:        #0f172a;
+      --muted:      #64748b;
+      --border:     #e2e8f0;
+      --bg:         #f8fafc;
+      --warn:       #fef9c3;
+      --warn-border:#ca8a04;
+    }
+
+    body {
+      font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.75;
+    }
+
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 18px 48px;
+      background: #fff;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      font-weight: 800;
+      font-size: 19px;
+      letter-spacing: -0.025em;
+      text-decoration: none;
+    }
+    .wm-tandem { color: var(--near-black); }
+    .wm-slash  {
+      display: inline-block;
+      width: 1.5px;
+      height: calc(1.1 * 19px);
+      background: var(--green);
+      transform: rotate(18deg);
+      margin: 0.05em 0.18em 0;
+      opacity: 0.85;
+    }
+    .wm-pay { color: var(--green); }
+
+    nav a.back {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    nav a.back:hover { color: var(--green); }
+
+    .page {
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 64px 32px 120px;
+    }
+
+    .page-label {
+      display: inline-block;
+      background: var(--green-light);
+      color: var(--green);
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      padding: 4px 12px;
+      border-radius: 99px;
+      margin-bottom: 20px;
+    }
+
+    h1 {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      color: var(--near-black);
+      line-height: 1.2;
+      margin-bottom: 12px;
+    }
+
+    .meta {
+      font-size: 13.5px;
+      color: var(--muted);
+      margin-bottom: 48px;
+      padding-bottom: 32px;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .toc {
+      background: #fff;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px 28px;
+      margin-bottom: 56px;
+    }
+
+    .toc-title {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .toc ol { padding-left: 20px; }
+    .toc li { margin-bottom: 6px; }
+    .toc a {
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--green);
+      text-decoration: none;
+    }
+    .toc a:hover { text-decoration: underline; }
+
+    section { margin-bottom: 52px; }
+
+    h2 {
+      font-size: 21px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: var(--near-black);
+      margin-bottom: 16px;
+      padding-top: 8px;
+      scroll-margin-top: 80px;
+    }
+
+    p { margin-bottom: 14px; font-size: 15.5px; }
+
+    ul, ol {
+      padding-left: 22px;
+      margin-bottom: 14px;
+    }
+
+    li { margin-bottom: 6px; font-size: 15.5px; }
+    strong { font-weight: 600; }
+    a { color: var(--green); }
+
+    .callout {
+      background: var(--green-light);
+      border-left: 3px solid var(--green);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 14.5px;
+    }
+
+    .warn {
+      background: var(--warn);
+      border-left: 3px solid var(--warn-border);
+      border-radius: 0 8px 8px 0;
+      padding: 16px 20px;
+      margin: 20px 0;
+      font-size: 14.5px;
+    }
+
+    .caps {
+      font-size: 13.5px;
+      line-height: 1.7;
+    }
+
+    footer {
+      text-align: center;
+      padding: 40px 24px;
+      color: var(--muted);
+      font-size: 13px;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--green); text-decoration: none; }
+
+    @media (max-width: 600px) {
+      nav { padding: 16px 20px; }
+      .page { padding: 40px 20px 80px; }
+      h1 { font-size: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+  <nav>
+    <a class="wordmark" href="https://tandempay.ca">
+      <span class="wm-tandem">Tandem</span>
+      <span class="wm-slash"></span>
+      <span class="wm-pay">Pay</span>
+    </a>
+    <a class="back" href="https://tandempay.ca">← Back to TandemPay</a>
+  </nav>
+
+  <div class="page">
+
+    <span class="page-label">Legal</span>
+    <h1>Terms of Service</h1>
+    <p class="meta">Effective date: June 4, 2026 &nbsp;·&nbsp; Applies to tandempay.ca and the TandemPay mobile app</p>
+
+    <div class="toc">
+      <div class="toc-title">Contents</div>
+      <ol>
+        <li><a href="#acceptance">Acceptance of terms</a></li>
+        <li><a href="#description">Description of service</a></li>
+        <li><a href="#accounts">Accounts and eligibility</a></li>
+        <li><a href="#free-pro">Free and Pro plans</a></li>
+        <li><a href="#payments">Payments and billing</a></li>
+        <li><a href="#interac">Interac e-Transfer and settlements</a></li>
+        <li><a href="#stripe">Stripe card payments</a></li>
+        <li><a href="#acceptable-use">Acceptable use</a></li>
+        <li><a href="#intellectual-property">Intellectual property</a></li>
+        <li><a href="#privacy">Privacy</a></li>
+        <li><a href="#disclaimers">Disclaimers</a></li>
+        <li><a href="#limitation">Limitation of liability</a></li>
+        <li><a href="#termination">Termination</a></li>
+        <li><a href="#governing-law">Governing law</a></li>
+        <li><a href="#changes">Changes to these terms</a></li>
+        <li><a href="#contact">Contact</a></li>
+      </ol>
+    </div>
+
+    <section id="acceptance">
+      <h2>1. Acceptance of terms</h2>
+      <p>By creating an account or using TandemPay in any way, you agree to be bound by these Terms of Service ("Terms"). If you do not agree, do not use the Service. These Terms form a binding legal agreement between you and TandemPay ("we", "us", "our").</p>
+    </section>
+
+    <section id="description">
+      <h2>2. Description of service</h2>
+      <p>TandemPay is an expense-splitting and debt-settlement coordination tool designed for Canadian users. The Service allows you to:</p>
+      <ul>
+        <li>Create groups and track shared household expenses.</li>
+        <li>Calculate balances and simplify debts among group members.</li>
+        <li>Record and coordinate Interac e-Transfer settlements between users.</li>
+        <li>Process card payments via Stripe as a backup settlement method.</li>
+        <li>Optionally auto-confirm Interac settlements via bank email parsing.</li>
+        <li>Access Pro features under a paid subscription (see Section 4).</li>
+      </ul>
+      <div class="warn">
+        <strong>Important:</strong> TandemPay is an expense-tracking and coordination tool. We do not hold, transfer, or custody funds on your behalf. Interac e-Transfers occur directly between users through their own banks. We record whether a settlement has been confirmed, but we are not a money services business, payment processor, or financial institution for Interac transactions.
+      </div>
+    </section>
+
+    <section id="accounts">
+      <h2>3. Accounts and eligibility</h2>
+      <p>To use TandemPay you must:</p>
+      <ul>
+        <li>Be at least 18 years of age.</li>
+        <li>Be a resident of Canada or otherwise able to lawfully use Interac e-Transfer.</li>
+        <li>Provide accurate registration information.</li>
+        <li>Maintain the security of your password and not share account credentials.</li>
+      </ul>
+      <p>You are responsible for all activity that occurs under your account. Notify us immediately at <a href="mailto:support@tandempay.ca">support@tandempay.ca</a> if you suspect unauthorized access.</p>
+      <p>We reserve the right to suspend or terminate accounts that violate these Terms or that we believe are being used fraudulently.</p>
+    </section>
+
+    <section id="free-pro">
+      <h2>4. Free and Pro plans</h2>
+      <p><strong>Free plan</strong> includes: unlimited groups and members, equal-split expense tracking, debt simplification, Settle Up via Interac (with optional auto-confirm) or Stripe, friend system, notifications, activity feed, 30-day history, CAD only, dark/light mode, web and mobile access.</p>
+      <p><strong>TandemPay Pro</strong> ($3.99/month or $29.99/year, CAD) adds: recurring expenses, itemized split and receipt OCR, advanced split types, multi-currency, cross-group dashboard, push notifications, unlimited history, expense categories and summaries, CSV/PDF export, and priority support.</p>
+      <p>Feature availability may change. We will provide reasonable notice before removing features from an active paid plan. If we remove a Pro feature you actively use, you may request a prorated refund for the unused subscription period.</p>
+    </section>
+
+    <section id="payments">
+      <h2>5. Payments and billing</h2>
+      <p><strong>Pro subscription billing</strong> is handled by Stripe. By subscribing to Pro you authorize us to charge your payment method on a recurring basis (monthly or annual, as selected). Subscriptions automatically renew until cancelled.</p>
+      <p><strong>Cancellation:</strong> You may cancel your Pro subscription at any time through your account settings or by contacting support. Cancellation takes effect at the end of the current billing period. We do not issue prorated refunds for partial subscription periods, except where required by applicable law or at our discretion.</p>
+      <p><strong>Refunds:</strong> If you believe you were charged in error, contact <a href="mailto:billing@tandempay.ca">billing@tandempay.ca</a> within 30 days of the charge. We will review and, where appropriate, issue a refund.</p>
+      <p><strong>Price changes:</strong> We may change Pro pricing with 30 days' notice. If you disagree with a price change, you may cancel before the new pricing takes effect.</p>
+      <p>All prices are in Canadian dollars (CAD) and are inclusive of applicable taxes where required by law.</p>
+    </section>
+
+    <section id="interac">
+      <h2>6. Interac e-Transfer and settlements</h2>
+      <p>TandemPay allows users to record and coordinate Interac e-Transfer payments. When you mark a settlement as "Settled via Interac" or the system auto-confirms a settlement via email parsing:</p>
+      <ul>
+        <li>TandemPay is recording a mutual acknowledgment that a transfer occurred — it is not processing or guaranteeing any payment.</li>
+        <li>You are solely responsible for initiating and completing the actual Interac e-Transfer through your bank.</li>
+        <li>If the Interac transfer fails, is cancelled, or is not completed, TandemPay has no liability. Settlement status in the app reflects user-reported or email-parsed confirmation only.</li>
+        <li>The optional email-parsing feature requires you to forward bank confirmation emails to our inbound address. You do this voluntarily and at your own discretion.</li>
+      </ul>
+      <p>Interac e-Transfer is a registered trademark of Interac Corp. TandemPay is not affiliated with, endorsed by, or a partner of Interac Corp.</p>
+    </section>
+
+    <section id="stripe">
+      <h2>7. Stripe card payments</h2>
+      <p>Card payments between users are processed by Stripe via Stripe Connect. By using the card payment feature you also agree to <a href="https://stripe.com/legal/connect-account" target="_blank" rel="noopener">Stripe's Connected Account Agreement</a>. TandemPay is not responsible for payment failures, chargebacks, or disputes arising from Stripe transactions.</p>
+    </section>
+
+    <section id="acceptable-use">
+      <h2>8. Acceptable use</h2>
+      <p>You agree not to use TandemPay to:</p>
+      <ul>
+        <li>Engage in fraud, money laundering, or any illegal activity.</li>
+        <li>Harass, threaten, or harm other users.</li>
+        <li>Attempt to gain unauthorized access to any part of the Service or other users' accounts.</li>
+        <li>Scrape, copy, or reproduce the Service for a competing product.</li>
+        <li>Reverse engineer, decompile, or disassemble any part of the Service.</li>
+        <li>Introduce malicious code, viruses, or any harmful components.</li>
+        <li>Circumvent rate limits, access controls, or other security measures.</li>
+        <li>Create fake expenses or settlements to deceive other users.</li>
+      </ul>
+      <p>We reserve the right to suspend or terminate your account immediately for any violation of this section without refund.</p>
+    </section>
+
+    <section id="intellectual-property">
+      <h2>9. Intellectual property</h2>
+      <p>The TandemPay name, wordmark, logo, and all software, design, and content on the Service are owned by or licensed to TandemPay. You may not use our trademarks or branding without prior written consent.</p>
+      <p>You retain ownership of the data you enter (expense descriptions, group names, etc.). By using the Service you grant us a limited, non-exclusive licence to store and process that data solely to provide the Service to you.</p>
+    </section>
+
+    <section id="privacy">
+      <h2>10. Privacy</h2>
+      <p>Your use of TandemPay is also governed by our <a href="/privacy">Privacy Policy</a>, which is incorporated into these Terms by reference. Please review it carefully.</p>
+    </section>
+
+    <section id="disclaimers">
+      <h2>11. Disclaimers</h2>
+      <p class="caps">THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT. WE DO NOT WARRANT THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR FREE OF HARMFUL COMPONENTS.</p>
+      <p>TandemPay does not provide financial, legal, or tax advice. Nothing in the Service constitutes a recommendation regarding financial decisions. You are responsible for your own financial obligations and transactions with other users.</p>
+    </section>
+
+    <section id="limitation">
+      <h2>12. Limitation of liability</h2>
+      <p class="caps">TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, TANDEMPAY AND ITS DIRECTORS, EMPLOYEES, AND AGENTS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING LOST PROFITS, DATA, OR GOODWILL, ARISING OUT OF OR RELATED TO YOUR USE OF THE SERVICE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGES.</p>
+      <p class="caps">IN NO EVENT SHALL OUR TOTAL LIABILITY TO YOU EXCEED THE GREATER OF (A) THE AMOUNT YOU PAID US IN THE 12 MONTHS BEFORE THE EVENT GIVING RISE TO LIABILITY, OR (B) CAD $50.</p>
+      <p>Some jurisdictions do not allow the exclusion of certain warranties or limitation of liability, so some of the above limitations may not apply to you.</p>
+    </section>
+
+    <section id="termination">
+      <h2>13. Termination</h2>
+      <p>You may delete your account at any time through account settings, which will terminate these Terms with respect to future use (subject to provisions that survive termination).</p>
+      <p>We may suspend or terminate your access to the Service at any time for violation of these Terms, prolonged inactivity, or for any other reason with reasonable notice, except where immediate termination is required to protect TandemPay or other users.</p>
+      <p>Upon termination, your right to access the Service ceases immediately. Sections 8 (Acceptable Use), 9 (Intellectual Property), 11 (Disclaimers), 12 (Limitation of Liability), and 14 (Governing Law) survive termination.</p>
+    </section>
+
+    <section id="governing-law">
+      <h2>14. Governing law</h2>
+      <p>These Terms are governed by the laws of the Province of Ontario and the federal laws of Canada applicable therein, without regard to conflict-of-law principles. Any disputes arising from these Terms or your use of the Service will be resolved in the courts of Ontario, and you consent to personal jurisdiction in those courts.</p>
+    </section>
+
+    <section id="changes">
+      <h2>15. Changes to these terms</h2>
+      <p>We may update these Terms from time to time. When we make material changes, we will update the effective date and, where appropriate, notify you by email or in-app notification. Your continued use of the Service after changes take effect constitutes acceptance of the revised Terms.</p>
+    </section>
+
+    <section id="contact">
+      <h2>16. Contact</h2>
+      <p>Questions about these Terms?</p>
+      <ul>
+        <li><strong>General:</strong> <a href="mailto:support@tandempay.ca">support@tandempay.ca</a></li>
+        <li><strong>Legal / privacy:</strong> <a href="mailto:privacy@tandempay.ca">privacy@tandempay.ca</a></li>
+        <li><strong>Billing:</strong> <a href="mailto:billing@tandempay.ca">billing@tandempay.ca</a></li>
+        <li><strong>Website:</strong> <a href="https://tandempay.ca">tandempay.ca</a></li>
+      </ul>
+    </section>
+
+  </div>
+
+  <footer>
+    <p>© 2026 TandemPay &nbsp;·&nbsp; <a href="/privacy">Privacy Policy</a> &nbsp;·&nbsp; <a href="/terms">Terms of Service</a></p>
+  </footer>
+
+</body>
+</html>
