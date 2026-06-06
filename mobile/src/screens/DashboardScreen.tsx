@@ -15,6 +15,7 @@ import {
     Bell, Plus, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
 } from 'lucide-react-native';
 import { useNotifications } from '../context/NotificationContext';
+import ThemeToggle from '../components/ThemeToggle';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -134,15 +135,18 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={styles.topBar}>
                     {/* TODO: swap for a shared <Logo size={18} /> once a mobile wordmark component exists */}
                     <Text style={[styles.wordmark, { color: colors.text }]}>TandemPay</Text>
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('Notifications')}
-                        style={[styles.bellBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                    >
-                        <Bell color={colors.secondaryText} size={18} />
-                        {unreadCount > 0 && (
-                            <View style={[styles.bellDot, { borderColor: colors.background }]} />
-                        )}
-                    </TouchableOpacity>
+                    <View style={styles.headerRightRow}>
+                        <ThemeToggle />
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={[styles.bellBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        >
+                            <Bell color={colors.secondaryText} size={18} />
+                            {unreadCount > 0 && (
+                                <View style={[styles.bellDot, { borderColor: colors.background }]} />
+                            )}
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {/* Hero card */}
@@ -276,6 +280,11 @@ const styles = StyleSheet.create({
         fontSize: 18,
         fontWeight: '800',
         letterSpacing: -0.3,
+    },
+    headerRightRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
     },
     bellBtn: {
         width: 38,

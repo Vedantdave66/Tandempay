@@ -67,7 +67,7 @@ export default function ProHubScreen() {
                     <Text style={[styles.heroEmail, { color: colors.faintText }]}>{user?.email}</Text>
                     <TouchableOpacity
                         style={[styles.customiseChip, { backgroundColor: colors.accentBg }]}
-                        onPress={() => Alert.alert('Customise character', 'Re-open the character setup prompt to change your look — coming soon as a standalone screen.')}
+                        onPress={() => Alert.alert('Customise character', 'Character customisation coming soon.')}
                         activeOpacity={0.8}
                     >
                         <Text style={[styles.customiseChipText, { color: colors.accent }]}>✏ Customise character</Text>
