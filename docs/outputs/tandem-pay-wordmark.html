@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TandemPay — Wordmark</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@800&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #f1f5f9;
+      padding: 52px 56px 72px;
+      font-family: system-ui, -apple-system, sans-serif;
+      min-width: 640px;
+    }
+
+    /* ── Sheet header ── */
+    .sheet-title {
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 44px;
+    }
+
+    /* ── Variant blocks ── */
+    .variant + .variant { margin-top: 12px; }
+
+    .variant-label {
+      font-size: 10.5px;
+      font-weight: 600;
+      letter-spacing: 0.09em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 14px;
+      padding-left: 2px;
+    }
+
+    .swatch {
+      border-radius: 16px;
+      padding: 44px 52px 44px;
+      display: flex;
+      flex-direction: column;
+      gap: 30px;
+      margin-bottom: 36px;
+    }
+
+    .swatch-light { background: #ffffff; box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.05); }
+    .swatch-dark  { background: #020617; }
+    .swatch-green { background: #16A34A; }
+
+    /* ── Wordmark ── */
+    .wordmark {
+      display: inline-flex;
+      align-items: center;
+      font-family: 'Plus Jakarta Sans', 'Helvetica Neue', sans-serif;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1;
+      /* prevent clipping of rotated slash */
+      overflow: visible;
+    }
+
+    /* Sizes */
+    .wm-48 { font-size: 48px; }
+    .wm-32 { font-size: 32px; }
+    .wm-19 { font-size: 19px; }
+
+    /* Text pieces */
+    .wm-tandem { color: #020617; }
+    .wm-pay    { color: #16A34A; }
+
+    /* Slash — all geometry in em so it scales */
+    .wm-slash {
+      display: inline-block;
+      flex-shrink: 0;
+      align-self: center;
+      width: 1.5px;
+      height: 1.1em;
+      background: #16A34A;
+      opacity: 0.85;
+      transform: rotate(18deg);
+      margin: 0 0.18em;
+      /* shift down ~half the cap-height offset so it centres on cap mid */
+      margin-top: 0.05em;
+      border-radius: 0.75px;
+    }
+
+    /* Dark overrides */
+    .swatch-dark .wm-tandem { color: #ffffff; }
+    .swatch-dark .wm-slash  { background: #4ADE80; }
+    .swatch-dark .wm-pay    { color: #4ADE80; }
+
+    /* Green overrides */
+    .swatch-green .wm-tandem { color: #ffffff; }
+    .swatch-green .wm-slash  { background: rgba(255,255,255,0.5); opacity: 1; }
+    .swatch-green .wm-pay    { color: rgba(255,255,255,0.70); }
+
+    /* Size row */
+    .wm-row {
+      display: flex;
+      align-items: center;
+      gap: 20px;
+    }
+
+    .wm-tag {
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+      color: #cbd5e1;
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      white-space: nowrap;
+    }
+    .swatch-dark .wm-tag  { color: #1e3a5f; }
+    .swatch-green .wm-tag { color: rgba(255,255,255,0.28); }
+
+    /* ── Favicon / small-use section ── */
+    .favicon-section {
+      margin-top: 8px;
+    }
+
+    .favicon-wrap {
+      display: flex;
+      align-items: center;
+      gap: 24px;
+      padding: 36px 52px;
+      background: #ffffff;
+      border-radius: 16px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.08), 0 0 0 1px rgba(0,0,0,.05);
+    }
+
+    .favicon {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: #16A34A;
+      border-radius: 22%;
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      font-weight: 800;
+      color: #ffffff;
+      letter-spacing: -0.02em;
+    }
+
+    .fav-64 { width: 64px; height: 64px; font-size: 22px; border-radius: 14px; }
+    .fav-32 { width: 32px; height: 32px; font-size: 11px; border-radius: 7px; }
+    .fav-16 { width: 16px; height: 16px; font-size: 6.5px; border-radius: 3.5px; }
+
+    .favicon-note {
+      font-size: 11.5px;
+      color: #64748b;
+      line-height: 1.6;
+      max-width: 280px;
+    }
+
+    .favicon-note strong {
+      color: #334155;
+      display: block;
+      font-size: 12px;
+      margin-bottom: 4px;
+    }
+
+    /* ── Spec strip ── */
+    .spec-strip {
+      margin-top: 36px;
+      background: #ffffff;
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: 0 1px 3px rgba(0,0,0,.06), 0 0 0 1px rgba(0,0,0,.04);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 20px 32px;
+    }
+
+    .spec-item {}
+    .spec-key {
+      font-size: 9.5px;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #94a3b8;
+      margin-bottom: 5px;
+    }
+    .spec-val {
+      font-size: 12px;
+      color: #1e293b;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-weight: 500;
+    }
+    .spec-swatch {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      vertical-align: middle;
+      margin-right: 5px;
+    }
+  </style>
+</head>
+<body>
+
+  <p class="sheet-title">TandemPay — Wordmark</p>
+
+  <!-- Light -->
+  <p class="variant-label">Light background</p>
+  <div class="swatch swatch-light">
+    <div class="wm-row">
+      <div class="wordmark wm-48">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">48px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-32">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">32px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-19">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">19px · Nav / UI</span>
+    </div>
+  </div>
+
+  <!-- Dark -->
+  <p class="variant-label">Dark background</p>
+  <div class="swatch swatch-dark">
+    <div class="wm-row">
+      <div class="wordmark wm-48">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">48px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-32">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">32px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-19">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">19px · Nav / UI</span>
+    </div>
+  </div>
+
+  <!-- Green -->
+  <p class="variant-label">Green background</p>
+  <div class="swatch swatch-green">
+    <div class="wm-row">
+      <div class="wordmark wm-48">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">48px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-32">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">32px</span>
+    </div>
+    <div class="wm-row">
+      <div class="wordmark wm-19">
+        <span class="wm-tandem">Tandem</span>
+        <span class="wm-slash"></span>
+        <span class="wm-pay">Pay</span>
+      </div>
+      <span class="wm-tag">19px · Nav / UI</span>
+    </div>
+  </div>
+
+  <!-- Favicon / small -->
+  <p class="variant-label favicon-section">Favicon / small use — "T/P" initials</p>
+  <div class="favicon-wrap">
+    <div class="favicon fav-64">T/P</div>
+    <div class="favicon fav-32">T/P</div>
+    <div class="favicon fav-16">T/P</div>
+    <div class="favicon-note">
+      <strong>Small-use rule</strong>
+      Drop the slash wordmark below ~24px or in favicon contexts.
+      Use the "T/P" monogram in brand green on a white or transparent background.
+    </div>
+  </div>
+
+  <!-- Spec strip -->
+  <div class="spec-strip">
+    <div class="spec-item">
+      <div class="spec-key">Typeface</div>
+      <div class="spec-val">Plus Jakarta Sans 800</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Tracking</div>
+      <div class="spec-val">−0.025em</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Slash angle</div>
+      <div class="spec-val">18° clockwise</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Tandem (light)</div>
+      <div class="spec-val">
+        <span class="spec-swatch" style="background:#020617;"></span>#020617
+      </div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Pay / Slash (light)</div>
+      <div class="spec-val">
+        <span class="spec-swatch" style="background:#16A34A;"></span>#16A34A
+      </div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Slash opacity</div>
+      <div class="spec-val">85%</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Slash height</div>
+      <div class="spec-val">1.1× font-size</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Slash margin</div>
+      <div class="spec-val">0.18em each side</div>
+    </div>
+    <div class="spec-item">
+      <div class="spec-key">Slash width</div>
+      <div class="spec-val">1.5px hairline</div>
+    </div>
+  </div>
+
+</body>
+</html>

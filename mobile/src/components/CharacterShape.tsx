@@ -23,7 +23,7 @@ export const MINI_CONFIGS = {
     card: {
         rect:  { w: 38, h: 64,  tl: 7,  tr: 7,  eyeTop: 12, eyeLeft: 9,  eyeSize: 6, eyeGap: 7  },
         tall:  { w: 28, h: 80,  tl: 4,  tr: 4,  eyeTop: 15, eyeLeft: 5,  eyeSize: 6, eyeGap: 5  },
-        semi:  { w: 66, h: 38,  tl: 33, tr: 33, eyeTop: 10, eyeLeft: 22, eyeSize: 6, eyeGap: 9  },
+        semi:  { w: 66, h: 54,  tl: 33, tr: 33, eyeTop: 16, eyeLeft: 22, eyeSize: 6, eyeGap: 9  },
         round: { w: 50, h: 64,  tl: 25, tr: 25, eyeTop: 14, eyeLeft: 14, eyeSize: 6, eyeGap: 7, mouthLeft: 11, mouthTop: 36 },
     },
 } as const;

@@ -9,6 +9,7 @@ import {
     Alert,
     Clipboard,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { usePaymentSheet } from '@stripe/stripe-react-native';
@@ -179,7 +180,7 @@ export default function SettleUpScreen() {
                                 <View style={[styles.iconTile, { backgroundColor: colors.accent + '22' }]}>
                                     <Landmark size={22} color={colors.accent} />
                                 </View>
-                                <View style={{ flex: 1, marginLeft: 12 }}>
+                                <View style={{ flex: 1, marginLeft: scale(12) }}>
                                     <Text style={[styles.interacTitle, { color: colors.text }]}>
                                         Interac e-Transfer
                                     </Text>
@@ -192,7 +193,7 @@ export default function SettleUpScreen() {
                                 </View>
                             </View>
                             <View style={styles.autoConfirmRow}>
-                                <Sparkles size={13} color={colors.secondaryText} style={{ marginTop: 1 }} />
+                                <Sparkles size={13} color={colors.secondaryText} style={{ marginTop: vs(1) }} />
                                 <Text style={[styles.autoConfirmText, { color: colors.secondaryText }]}>
                                     We'll auto-confirm once your bank sends you a confirmation email.
                                 </Text>
@@ -225,7 +226,7 @@ export default function SettleUpScreen() {
                             activeOpacity={0.85}
                         >
                             <CreditCard size={18} color={colors.secondaryText} />
-                            <View style={{ flex: 1, marginLeft: 12 }}>
+                            <View style={{ flex: 1, marginLeft: scale(12) }}>
                                 <Text style={[styles.cardOptionLabel, { color: colors.text }]}>
                                     Pay with card instead
                                 </Text>
@@ -311,7 +312,7 @@ export default function SettleUpScreen() {
                             We'll auto-confirm once your bank sends you a confirmation email.
                         </Text>
                         <TouchableOpacity
-                            style={[styles.primaryBtn, { backgroundColor: colors.accent, marginTop: 8 }]}
+                            style={[styles.primaryBtn, { backgroundColor: colors.accent, marginTop: vs(8) }]}
                             onPress={() => navigation.goBack()}
                             activeOpacity={0.85}
                         >
@@ -330,8 +331,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 16,
-        paddingVertical: 12,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(12),
     },
     backBtn: {
         width: 44,
@@ -340,19 +341,19 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     topTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: '700',
     },
     scrollContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 48,
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(48),
     },
 
     // Context header
     contextHeader: {
         alignItems: 'center',
-        paddingVertical: 24,
-        gap: 8,
+        paddingVertical: vs(24),
+        gap: vs(8),
     },
     glowCircle: {
         width: 140,
@@ -360,33 +361,33 @@ const styles = StyleSheet.create({
         borderRadius: 999,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     owesLabel: {
-        fontSize: 16,
+        fontSize: ms(16),
     },
     bigAmount: {
-        fontSize: 48,
+        fontSize: ms(48),
         fontWeight: '800',
         letterSpacing: -1,
     },
 
     // Shared step wrapper
     stepContent: {
-        gap: 16,
+        gap: vs(16),
     },
 
     // Interac hero card
     interacCard: {
-        borderRadius: 24,
+        borderRadius: ms(24),
         borderWidth: 1,
-        padding: 18,
+        padding: scale(18),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.06,
         shadowRadius: 8,
         elevation: 2,
-        gap: 14,
+        gap: vs(14),
     },
     interacCardTop: {
         flexDirection: 'row',
@@ -395,37 +396,37 @@ const styles = StyleSheet.create({
     iconTile: {
         width: 44,
         height: 44,
-        borderRadius: 12,
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
     },
     interacTitle: {
-        fontSize: 18,
+        fontSize: ms(18),
         fontWeight: '700',
     },
     interacSub: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '700',
-        marginTop: 2,
+        marginTop: vs(2),
     },
     freePill: {
-        paddingHorizontal: 12,
-        paddingVertical: 5,
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(5),
         borderRadius: 999,
     },
     freePillText: {
         color: 'white',
-        fontSize: 11,
+        fontSize: ms(11),
         fontWeight: '800',
         letterSpacing: 0.5,
     },
     autoConfirmRow: {
         flexDirection: 'row',
-        gap: 6,
+        gap: vs(6),
         alignItems: 'flex-start',
     },
     autoConfirmText: {
-        fontSize: 13,
+        fontSize: ms(13),
         lineHeight: 18,
         flex: 1,
     },
@@ -433,14 +434,14 @@ const styles = StyleSheet.create({
     // Primary button (full-width)
     primaryBtn: {
         height: 54,
-        borderRadius: 16,
+        borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 15,
+        paddingVertical: vs(15),
     },
     primaryBtnText: {
         color: 'white',
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '700',
     },
 
@@ -448,14 +449,14 @@ const styles = StyleSheet.create({
     orRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: vs(12),
     },
     orLine: {
         flex: 1,
         height: StyleSheet.hairlineWidth,
     },
     orText: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '600',
         letterSpacing: 1,
     },
@@ -465,27 +466,27 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderRadius: 16,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        borderRadius: ms(16),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(14),
         minHeight: 44,
     },
     cardOptionLabel: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '500',
     },
     cardOptionSub: {
-        fontSize: 12,
-        marginTop: 2,
+        fontSize: ms(12),
+        marginTop: vs(2),
     },
 
     // Already settled link
     alreadySettledBtn: {
         alignItems: 'center',
-        paddingVertical: 8,
+        paddingVertical: vs(8),
     },
     alreadySettledText: {
-        fontSize: 14,
+        fontSize: ms(14),
         textDecorationLine: 'underline',
     },
 
@@ -494,33 +495,33 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        gap: 12,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(14),
+        gap: vs(12),
         minHeight: 44,
     },
     emailLabel: {
-        fontSize: 10,
+        fontSize: ms(10),
         fontWeight: '700',
         letterSpacing: 1.2,
-        marginBottom: 4,
+        marginBottom: vs(4),
     },
     emailValue: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '700',
     },
     copyBtn: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 4,
-        paddingHorizontal: 10,
-        paddingVertical: 8,
-        borderRadius: 8,
+        gap: vs(4),
+        paddingHorizontal: scale(10),
+        paddingVertical: vs(8),
+        borderRadius: ms(8),
         borderWidth: 1,
     },
     copyBtnText: {
-        fontSize: 12,
+        fontSize: ms(12),
         fontWeight: '600',
     },
     amountRow: {
@@ -528,42 +529,42 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         borderWidth: 1,
-        borderRadius: 14,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(14),
         minHeight: 44,
     },
     amountRowLabel: {
-        fontSize: 10,
+        fontSize: ms(10),
         fontWeight: '700',
         letterSpacing: 1.2,
     },
     amountRowValue: {
-        fontSize: 20,
+        fontSize: ms(20),
         fontWeight: '800',
     },
 
     // Sent step
     sentContent: {
         alignItems: 'center',
-        paddingTop: 16,
+        paddingTop: vs(16),
     },
     successCircle: {
         width: 88,
         height: 88,
-        borderRadius: 44,
+        borderRadius: ms(44),
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'center',
-        marginBottom: 8,
+        marginBottom: vs(8),
     },
     successTitle: {
-        fontSize: 20,
+        fontSize: ms(20),
         fontWeight: '800',
         textAlign: 'center',
     },
     successBody: {
-        fontSize: 14,
+        fontSize: ms(14),
         textAlign: 'center',
         lineHeight: 21,
     },

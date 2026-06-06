@@ -1,12 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
+import { scale, vs, ms } from '../utils/responsive';
 import {
   View,
   Text,
   StyleSheet,
-  FlatList,
   TouchableOpacity,
-  SafeAreaView,
   ActivityIndicator,
   RefreshControl,
   ScrollView,
@@ -14,10 +13,15 @@ import {
   Alert,
   TextInput,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Users, Receipt, Send, ChevronRight, X, CheckCircle2, Mail, UserPlus } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2 } from 'lucide-react-native';
+import CharacterShape from '../components/CharacterShape';
+
+type DetailTab = 'expenses' | 'balances' | 'settle';
 
 export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
@@ -28,11 +32,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [expenses, setExpenses] = useState<Expense[]>([]);
     const [balances, setBalances] = useState<UserBalance[]>([]);
     const [settlements, setSettlements] = useState<Settlement[]>([]);
-    
+    const [activeTab, setActiveTab] = useState<DetailTab>('expenses');
+
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-
-    const [settleModalVisible, setSettleModalVisible] = useState(false);
 
     // Members modal
     const [membersModalVisible, setMembersModalVisible] = useState(false);
@@ -44,18 +47,28 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
+    // Extract a plain array from either a raw array or a paginated { items: [] } / { expenses: [] } envelope
+    function toArray<T>(raw: any): T[] {
+        if (Array.isArray(raw)) return raw;
+        if (Array.isArray(raw?.items)) return raw.items;
+        if (Array.isArray(raw?.expenses)) return raw.expenses;
+        if (Array.isArray(raw?.balances)) return raw.balances;
+        if (Array.isArray(raw?.settlements)) return raw.settlements;
+        return [];
+    }
+
     const loadData = useCallback(async () => {
         try {
-            const [groupData, expensesData, balancesData, settlementsData] = await Promise.all([
+            const [groupData, expensesRaw, balancesRaw, settlementsRaw] = await Promise.all([
                 groupsApi.get(groupId),
                 expensesApi.list(groupId),
                 balancesApi.getBalances(groupId),
-                balancesApi.getSettlements(groupId)
+                balancesApi.getSettlements(groupId),
             ]);
             setGroup(groupData);
-            setExpenses(expensesData.reverse()); // Show newest first
-            setBalances(balancesData);
-            setSettlements(settlementsData);
+            setExpenses(toArray<Expense>(expensesRaw).slice().reverse()); // Show newest first
+            setBalances(toArray<UserBalance>(balancesRaw));
+            setSettlements(toArray<Settlement>(settlementsRaw));
         } catch (err) {
             console.error('Failed to load group details', err);
         } finally {
@@ -78,10 +91,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         setMembersTab('friends');
         setFriendsLoading(true);
         try {
-            const data = await friendsApi.getMyFriends();
-            // Filter out people already in the group
+            const raw = await friendsApi.getMyFriends();
+            const allFriends: Friend[] = toArray<Friend>(raw);
             const memberIds = new Set(group?.members.map(m => m.user_id) || []);
-            setFriends((data || []).filter(f => !memberIds.has(f.id)));
+            setFriends(allFriends.filter(f => !memberIds.has(f.id)));
         } catch (e) {
             console.error('Failed to load friends', e);
         } finally {
@@ -161,16 +174,16 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             `Do you want to record a $${formatCurrency(amount)} payment to this user? They will receive a notification.`,
             [
                 { text: "Cancel", style: "cancel" },
-                { 
-                    text: "Record Payment", 
+                {
+                    text: "Record Payment",
                     style: "default",
                     onPress: async () => {
                         try {
                             await settlementsApi.create(groupId, payeeId, amount, 'in_app');
-                            setSettleModalVisible(false);
                             Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
                                 { text: "OK", onPress: () => navigation.navigate("Payments") }
                             ]);
+                            loadData();
                         } catch (err: any) {
                             Alert.alert("Error", err.message);
                         }
@@ -180,50 +193,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         );
     };
 
-    const renderBalanceBubble = ({ item }: { item: UserBalance }) => {
-        const isNegative = item.net_balance < 0;
-        const bubbleColor = isNegative ? colors.danger : colors.accent;
-        const bgColor = isNegative ? 'rgba(239, 68, 68, 0.1)' : 'rgba(74, 222, 128, 0.1)';
-
-        return (
-            <View style={[styles.balanceBubble, { backgroundColor: bgColor, borderColor: bubbleColor }]}>
-                <View style={[styles.avatarSmall, { backgroundColor: item.avatar_color || colors.primary }]}>
-                    <Text style={styles.avatarTextSmall}>{item.name.charAt(0).toUpperCase()}</Text>
-                </View>
-                <View>
-                    <Text style={[styles.balanceName, { color: colors.text }]} numberOfLines={1}>
-                        {item.name.split(' ')[0]}
-                    </Text>
-                    <Text style={[styles.balanceAmount, { color: bubbleColor }]}>
-                        {isNegative ? '-' : '+'}${formatCurrency(Math.abs(item.net_balance))}
-                    </Text>
-                </View>
-            </View>
-        );
-    };
-
-    const renderExpenseItem = ({ item }: { item: Expense }) => {
-        return (
-            <TouchableOpacity style={[styles.expenseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                <View style={[styles.expenseIcon, { backgroundColor: item.payer_avatar_color || colors.indigo }]}>
-                    <Receipt size={20} color="white" />
-                </View>
-                <View style={styles.expenseInfo}>
-                    <Text style={[styles.expenseTitle, { color: colors.text }]}>{item.title}</Text>
-                    <Text style={[styles.expenseMeta, { color: colors.secondaryText }]}>
-                        Paid by {item.payer_name} • {new Date(item.created_at).toLocaleDateString()}
-                    </Text>
-                </View>
-                <Text style={[styles.expenseAmount, { color: colors.text }]}>
-                    ${formatCurrency(item.amount)}
-                </Text>
-            </TouchableOpacity>
-        );
-    };
+    // Look up a member's character appearance from the already-fetched balances list
+    const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
     if (loading && !refreshing) {
         return (
-            <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+            <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
@@ -231,134 +206,211 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         );
     }
 
-    const myDebts = settlements.filter(s => s.from_user_id === user?.id);
+    const myBalance = balances.find(b => b.user_id === user?.id);
+    const myNet = Number(myBalance?.net_balance ?? 0);
+    const isOwe = myNet < -0.01;
+    const isOwed = myNet > 0.01;
+    const maxBalance = Math.max(...balances.map(b => Math.abs(Number(b.net_balance))), 1);
 
     return (
-        <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Custom Header */}
-            <View style={[styles.header, { borderBottomColor: colors.border }]}>
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <ArrowLeft size={24} color={colors.text} />
-                </TouchableOpacity>
-                <View style={styles.headerTitleContainer}>
-                    <Text style={[styles.headerTitle, { color: colors.text }]} numberOfLines={1}>
-                        {group?.name || 'Group Details'}
-                    </Text>
-                </View>
-                <TouchableOpacity style={styles.iconButton} onPress={openMembersModal}>
-                    <Users size={22} color={colors.accent} />
-                </TouchableOpacity>
-            </View>
-
-            <ScrollView 
-                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
-                contentContainerStyle={styles.scrollContent}
+        <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
+            {/* Sticky header */}
+            <LinearGradient
+                colors={isDark ? ['#0A1F12', '#081509', '#0D1210'] : ['#E9F7EF', '#F2FBF6', '#FFFFFF']}
+                style={[styles.headerGradient, { borderBottomColor: colors.border }]}
             >
-                {/* Stats Overview */}
-                <View style={[styles.statRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={styles.statItem}>
-                        <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Group Spending</Text>
-                        <Text style={[styles.statValue, { color: colors.text }]}>${formatCurrency(group?.total_expenses)}</Text>
-                    </View>
-                    <View style={[styles.verticalDivider, { backgroundColor: colors.border }]} />
-                    <View style={styles.statItem}>
-                        <Text style={[styles.statLabel, { color: colors.secondaryText }]}>Members</Text>
-                        <Text style={[styles.statValue, { color: colors.text }]}>{group?.members.length}</Text>
-                    </View>
-                </View>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.7}>
+                    <ArrowLeft size={17} color={colors.accentDark} />
+                    <Text style={[styles.backText, { color: colors.accentDark }]}>Back</Text>
+                </TouchableOpacity>
 
-                {/* Balance Bubbles Section */}
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Balances</Text>
-                    <TouchableOpacity style={styles.settleButton} onPress={() => setSettleModalVisible(true)}>
-                        <Send size={14} color={colors.accent} />
-                        <Text style={[styles.settleButtonText, { color: colors.accent }]}>Settle Up</Text>
+                <View style={styles.headerTopRow}>
+                    <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={openMembersModal}>
+                        <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                            {group?.name || 'Group'}
+                        </Text>
+                        <View style={styles.clusterRow}>
+                            {(group?.members ?? []).slice(0, 4).map((m, i) => {
+                                const c = charFor(m.user_id);
+                                return (
+                                    <View key={m.user_id} style={[styles.clusterAvatar, i > 0 && { marginLeft: -8 }]}>
+                                        <CharacterShape
+                                            shape={c?.character_shape ?? 'rect'}
+                                            color={c?.character_color ?? m.avatar_color ?? '#6B7280'}
+                                            variant="cluster"
+                                        />
+                                    </View>
+                                );
+                            })}
+                            <Text style={[styles.memberSummary, { color: colors.secondaryText }]}>
+                                {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
-                </View>
 
-                <FlatList
-                    horizontal
-                    data={balances}
-                    renderItem={renderBalanceBubble}
-                    keyExtractor={(item) => item.user_id}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={styles.balanceList}
-                />
-
-                {/* Expenses History */}
-                <View style={styles.sectionHeader}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>Recent Expenses</Text>
-                </View>
-
-                {expenses.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: 12 }} />
-                        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
-                    </View>
-                ) : (
-                    expenses.map((expense) => (
-                        <View key={expense.id}>
-                            {renderExpenseItem({ item: expense })}
-                        </View>
-                    ))
-                )}
-            </ScrollView>
-
-            {/* Combined Add FAB */}
-            <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.accent, shadowColor: colors.accent }]}
-                onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
-                activeOpacity={0.8}
-            >
-                <Plus size={28} color={isDark ? '#064E3B' : 'white'} />
-            </TouchableOpacity>
-
-            {/* SETTLE UP MODAL */}
-            <Modal visible={settleModalVisible} animationType="slide" transparent={true}>
-                <View style={styles.modalOverlay}>
-                    <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
-                        <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Settle Up</Text>
-                            <TouchableOpacity onPress={() => setSettleModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
-                                <X size={20} color={colors.text} />
-                            </TouchableOpacity>
-                        </View>
-
-                        {myDebts.length === 0 ? (
-                            <View style={{ alignItems: 'center', padding: 20 }}>
-                                <CheckCircle2 size={48} color={colors.accent} style={{ marginBottom: 16 }} />
-                                <Text style={[styles.modalTitle, { color: colors.text, textAlign: 'center' }]}>You're all settled up!</Text>
-                                <Text style={{ color: colors.secondaryText, textAlign: 'center', marginTop: 8 }}>You don't owe any money in this group.</Text>
-                            </View>
-                        ) : (
+                    <View style={[styles.balanceChip, { backgroundColor: isOwe ? colors.warningBg : colors.accentBg }]}>
+                        {isOwe || isOwed ? (
                             <>
-                                <Text style={{ color: colors.secondaryText, marginBottom: 16 }}>Select a balance to pay:</Text>
-                                <ScrollView>
-                                    {myDebts.map((debt, idx) => (
-                                        <TouchableOpacity 
-                                            key={idx} 
-                                            style={[styles.debtCard, { backgroundColor: colors.background, borderColor: colors.border }]}
-                                            onPress={() => handleInitiateSettlement(debt.to_user_id, debt.amount)}
-                                        >
-                                            <View style={[styles.debtAvatar, { backgroundColor: debt.to_avatar_color }]}>
-                                                <Text style={{ color: 'white', fontWeight: 'bold' }}>{debt.to_user_name.charAt(0).toUpperCase()}</Text>
-                                            </View>
-                                            <View style={{ flex: 1 }}>
-                                                <Text style={{ color: colors.secondaryText, fontSize: 13 }}>Pay</Text>
-                                                <Text style={{ color: colors.text, fontSize: 16, fontWeight: 'bold' }}>{debt.to_user_name}</Text>
-                                            </View>
-                                            <View style={{ alignItems: 'flex-end', flexDirection: 'row', gap: 12 }}>
-                                                <Text style={{ color: colors.danger, fontSize: 18, fontWeight: '900' }}>${formatCurrency(debt.amount)}</Text>
-                                                <ChevronRight size={20} color={colors.secondaryText} />
-                                            </View>
-                                        </TouchableOpacity>
-                                    ))}
-                                </ScrollView>
+                                <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                    {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
+                                </Text>
+                                <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                    ${formatCurrency(Math.abs(myNet))}
+                                </Text>
                             </>
+                        ) : (
+                            <Text style={[styles.balanceChipValue, { color: colors.accent }]}>✓ All settled</Text>
                         )}
                     </View>
                 </View>
-            </Modal>
+
+                <View style={styles.actionRow}>
+                    <TouchableOpacity
+                        style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
+                        onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
+                        activeOpacity={0.85}
+                    >
+                        <Plus size={16} color={isDark ? '#06371E' : '#0A5F30'} />
+                        <Text style={[styles.primaryBtnText, { color: isDark ? '#06371E' : '#0A5F30' }]}>Add expense</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                        style={[styles.ghostBtn, { borderColor: colors.warningBright }]}
+                        onPress={() => setActiveTab('settle')}
+                        activeOpacity={0.85}
+                    >
+                        <Send size={15} color={colors.warningBright} />
+                        <Text style={[styles.ghostBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                    </TouchableOpacity>
+                </View>
+
+                <View style={styles.tabRow}>
+                    {([
+                        { id: 'expenses' as const, label: `Expenses (${expenses.length})` },
+                        { id: 'balances' as const, label: 'Balances' },
+                        { id: 'settle' as const, label: `Settle (${settlements.length})` },
+                    ]).map(t => {
+                        const active = activeTab === t.id;
+                        return (
+                            <TouchableOpacity
+                                key={t.id}
+                                onPress={() => setActiveTab(t.id)}
+                                style={[styles.tabBtn, { borderBottomColor: active ? colors.accent : 'transparent' }]}
+                            >
+                                <Text style={[styles.tabBtnText, { color: active ? colors.accent : colors.faintText }]}>
+                                    {t.label}
+                                </Text>
+                            </TouchableOpacity>
+                        );
+                    })}
+                </View>
+            </LinearGradient>
+
+            <ScrollView
+                refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {/* Expenses tab */}
+                {activeTab === 'expenses' && (
+                    expenses.length === 0 ? (
+                        <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: vs(12) }} />
+                            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
+                        </View>
+                    ) : expenses.map(expense => {
+                        const c = charFor(expense.paid_by);
+                        const each = expense.amount / Math.max(expense.participants.length, 1);
+                        return (
+                            <View key={expense.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <CharacterShape
+                                    shape={c?.character_shape ?? 'rect'}
+                                    color={c?.character_color ?? expense.payer_avatar_color ?? '#6B7280'}
+                                    variant="mini"
+                                />
+                                <View style={styles.rowInfo}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>{expense.title}</Text>
+                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
+                                        {expense.payer_name} paid · split {expense.participants.length} ways
+                                    </Text>
+                                </View>
+                                <View style={styles.rowEnd}>
+                                    <Text style={[styles.rowAmount, { color: colors.text }]}>${formatCurrency(expense.amount)}</Text>
+                                    <Text style={[styles.rowDate, { color: colors.faintText }]}>
+                                        {new Date(expense.created_at).toLocaleDateString()}
+                                    </Text>
+                                    <Text style={[styles.rowEach, { color: colors.accent }]}>${formatCurrency(each)} each</Text>
+                                </View>
+                            </View>
+                        );
+                    })
+                )}
+
+                {/* Balances tab */}
+                {activeTab === 'balances' && balances.map(b => {
+                    const net = Number(b.net_balance);
+                    const owesB = net < -0.01;
+                    const fillColor = owesB ? colors.warningBright : colors.accent;
+                    return (
+                        <View key={b.user_id} style={[styles.row, styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={styles.balanceTopRow}>
+                                <CharacterShape shape={b.character_shape ?? 'rect'} color={b.character_color ?? '#6B7280'} variant="mini" />
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }]}>
+                                        {b.user_id === user?.id ? 'You' : b.name}
+                                    </Text>
+                                    <Text style={[styles.rowMeta, { color: owesB ? colors.warningBright : colors.accent }]}>
+                                        {owesB ? `owes $${formatCurrency(Math.abs(net))}` : `gets back $${formatCurrency(Math.abs(net))}`}
+                                    </Text>
+                                </View>
+                            </View>
+                            <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
+                                <View style={[styles.progressFill, { backgroundColor: fillColor, width: `${Math.min(Math.abs(net) / maxBalance * 100, 100)}%` }]} />
+                            </View>
+                            {owesB && b.user_id === user?.id && (
+                                <TouchableOpacity
+                                    style={[styles.settleLinkBtn, { backgroundColor: colors.warningBg }]}
+                                    onPress={() => setActiveTab('settle')}
+                                >
+                                    <Text style={[styles.settleLinkText, { color: colors.warningBright }]}>Settle up →</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    );
+                })}
+
+                {/* Settle tab */}
+                {activeTab === 'settle' && (
+                    settlements.length === 0 ? (
+                        <View style={styles.settledEmpty}>
+                            <CharacterShape shape="semi" color="#27B49E" variant="hero" />
+                            <Text style={[styles.settledTitle, { color: colors.text }]}>You're all settled up 🎉</Text>
+                        </View>
+                    ) : settlements.map((s, idx) => {
+                        const fr = charFor(s.from_user_id);
+                        const to = charFor(s.to_user_id);
+                        const isMine = s.from_user_id === user?.id;
+                        return (
+                            <View key={idx} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
+                                <ArrowRight size={16} color={colors.faintText} />
+                                <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
+                                <View style={styles.rowInfo}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
+                                        Pay ${formatCurrency(s.amount)} via Interac e-Transfer
+                                    </Text>
+                                </View>
+                                <TouchableOpacity
+                                    style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
+                                    disabled={!isMine}
+                                    onPress={() => handleInitiateSettlement(s.to_user_id, s.amount)}
+                                >
+                                    <Text style={[styles.settleBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                                </TouchableOpacity>
+                            </View>
+                        );
+                    })
+                )}
+            </ScrollView>
+
             {/* MEMBERS MODAL */}
             <Modal visible={membersModalVisible} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
@@ -371,8 +423,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         </View>
 
                         {/* Current members with remove buttons */}
-                        <View style={{ marginBottom: 16 }}>
-                            <Text style={{ color: colors.secondaryText, fontSize: 11, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: 10 }}>
+                        <View style={{ marginBottom: vs(16) }}>
+                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: vs(10) }}>
                                 Current Members
                             </Text>
                             {(group?.members || []).map(m => {
@@ -384,10 +436,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                             <Text style={styles.friendAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>
+                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>
                                                 {m.name}{isCreator ? ' 👑' : ''}
                                             </Text>
-                                            <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{m.email}</Text>
+                                            <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{m.email}</Text>
                                         </View>
                                         {canRemove && (
                                             <TouchableOpacity
@@ -407,32 +459,32 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         </View>
 
                         {/* Tab switcher */}
-                        <View style={[styles.tabRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                        <View style={[styles.tabSwitchRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                             <TouchableOpacity
-                                style={[styles.tabBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
+                                style={[styles.tabSwitchBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('friends')}
                             >
-                                <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
-                                <Text style={[styles.tabBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
+                                <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
+                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
-                                style={[styles.tabBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
+                                style={[styles.tabSwitchBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('invite')}
                             >
-                                <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: 6 }} />
-                                <Text style={[styles.tabBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
+                                <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
+                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
                             </TouchableOpacity>
                         </View>
 
                         {membersTab === 'friends' ? (
-                            <ScrollView style={{ marginTop: 16 }}>
+                            <ScrollView style={{ marginTop: vs(16) }}>
                                 {friendsLoading ? (
-                                    <ActivityIndicator color={colors.accent} style={{ marginTop: 24 }} />
+                                    <ActivityIndicator color={colors.accent} style={{ marginTop: vs(24) }} />
                                 ) : friends.length === 0 ? (
-                                    <View style={{ alignItems: 'center', padding: 32 }}>
-                                        <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: 12 }} />
-                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: 16, marginBottom: 6 }}>All friends added!</Text>
-                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: 13 }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
+                                    <View style={{ alignItems: 'center', padding: scale(32) }}>
+                                        <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: vs(12) }} />
+                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: ms(16), marginBottom: vs(6) }}>All friends added!</Text>
+                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: ms(13) }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
                                     </View>
                                 ) : (
                                     friends.map(friend => (
@@ -441,8 +493,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                                 <Text style={styles.friendAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: 15 }}>{friend.name}</Text>
-                                                <Text style={{ color: colors.secondaryText, fontSize: 12 }}>{friend.email}</Text>
+                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>{friend.name}</Text>
+                                                <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{friend.email}</Text>
                                             </View>
                                             <TouchableOpacity
                                                 style={[styles.addBtn, { backgroundColor: addingFriendId === friend.id ? colors.border : colors.accent }]}
@@ -459,10 +511,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 )}
                             </ScrollView>
                         ) : (
-                            <View style={{ marginTop: 20 }}>
-                                <Text style={{ color: colors.secondaryText, fontSize: 13, marginBottom: 12 }}>Enter their email address. They must have a TandemPay account.</Text>
+                            <View style={{ marginTop: vs(20) }}>
+                                <Text style={{ color: colors.secondaryText, fontSize: ms(13), marginBottom: vs(12) }}>Enter their email address. They must have a TandemPay account.</Text>
                                 <View style={[styles.emailInputRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
-                                    <Mail size={18} color={colors.secondaryText} style={{ marginRight: 10 }} />
+                                    <Mail size={18} color={colors.secondaryText} style={{ marginRight: scale(10) }} />
                                     <TextInput
                                         style={[styles.emailInput, { color: colors.text }]}
                                         placeholder="friend@example.com"
@@ -480,7 +532,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 >
                                     {inviteLoading
                                         ? <ActivityIndicator color="#fff" />
-                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: 15 }}>Add to Group</Text>
+                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: ms(15) }}>Add to Group</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
@@ -495,199 +547,204 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 const styles = StyleSheet.create({
     container: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-    header: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        paddingVertical: 12,
+
+    // Sticky header
+    headerGradient: {
+        paddingHorizontal: scale(20),
+        paddingTop: vs(4),
         borderBottomWidth: 1,
     },
-    backButton: { padding: 4 },
-    headerTitleContainer: { flex: 1, marginHorizontal: 12 },
-    headerTitle: { fontSize: 20, fontWeight: 'bold' },
-    iconButton: { padding: 4 },
-    scrollContent: { paddingBottom: 100 },
-    statRow: {
+    backRow: {
         flexDirection: 'row',
-        margin: 20,
-        padding: 20,
-        borderRadius: 24,
-        borderWidth: 1,
         alignItems: 'center',
+        gap: scale(5),
+        paddingBottom: vs(12),
+        alignSelf: 'flex-start',
     },
-    statItem: { flex: 1, alignItems: 'center' },
-    verticalDivider: { width: 1, height: 40 },
-    statLabel: { fontSize: 12, marginBottom: 4, fontWeight: '500' },
-    statValue: { fontSize: 24, fontWeight: '900' },
-    sectionHeader: {
+    backText: { fontSize: ms(14), fontWeight: '700' },
+    headerTopRow: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: 20,
-        marginBottom: 16,
-        marginTop: 8,
+        gap: scale(12),
+        marginBottom: vs(14),
     },
-    sectionTitle: { fontSize: 18, fontWeight: 'bold' },
-    settleButton: {
+    groupName: { fontSize: ms(22), fontWeight: '800', letterSpacing: -0.4 },
+    clusterRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        gap: 6,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-        borderRadius: 12,
-        backgroundColor: 'rgba(74, 222, 128, 0.05)',
+        alignItems: 'flex-end',
+        marginTop: vs(8),
     },
-    settleButtonText: { fontSize: 13, fontWeight: '600' },
-    balanceList: { paddingHorizontal: 20, gap: 12, marginBottom: 24 },
-    balanceBubble: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 14,
-        paddingVertical: 10,
-        borderRadius: 20,
-        borderWidth: 1.5,
-        gap: 10,
-        minWidth: 120,
+    clusterAvatar: {
+        transform: [{ translateY: 2 }],
     },
-    avatarSmall: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
-        alignItems: 'center',
-        justifyContent: 'center',
+    memberSummary: { fontSize: ms(12), fontWeight: '600', marginLeft: scale(10) },
+    balanceChip: {
+        borderRadius: ms(14),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(8),
+        alignItems: 'flex-end',
     },
-    avatarTextSmall: { color: 'white', fontSize: 12, fontWeight: 'bold' },
-    balanceName: { fontSize: 13, fontWeight: 'bold', maxWidth: 80 },
-    balanceAmount: { fontSize: 12, fontWeight: '800' },
-    expenseCard: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginHorizontal: 20,
-        marginBottom: 12,
-        padding: 16,
-        borderRadius: 20,
-        borderWidth: 1,
-    },
-    expenseIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: 14,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 16,
-    },
-    expenseInfo: { flex: 1 },
-    expenseTitle: { fontSize: 16, fontWeight: 'bold', marginBottom: 4 },
-    expenseMeta: { fontSize: 12 },
-    expenseAmount: { fontSize: 16, fontWeight: 'bold' },
-    emptyState: {
-        marginHorizontal: 20,
-        padding: 40,
-        borderRadius: 24,
-        borderWidth: 1,
-        alignItems: 'center',
-    },
-    emptyText: { fontSize: 14 },
-    fab: {
-        position: 'absolute',
-        bottom: 32,
-        right: 24,
-        width: 60,
-        height: 60,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        elevation: 10,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.3,
-        shadowRadius: 16,
-    },
+    balanceChipLabel: { fontSize: ms(10), fontWeight: '800', letterSpacing: 0.6 },
+    balanceChipValue: { fontSize: ms(18), fontWeight: '800', letterSpacing: -0.3 },
 
-    // Modal Styles
+    actionRow: {
+        flexDirection: 'row',
+        gap: scale(8),
+        marginBottom: vs(12),
+    },
+    primaryBtn: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(7),
+        borderRadius: ms(13),
+        paddingVertical: vs(12),
+    },
+    primaryBtnText: { fontSize: ms(14), fontWeight: '700' },
+    ghostBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(7),
+        borderRadius: ms(13),
+        borderWidth: 1.5,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(12),
+    },
+    ghostBtnText: { fontSize: ms(14), fontWeight: '700' },
+
+    tabRow: { flexDirection: 'row' },
+    tabBtn: {
+        flex: 1,
+        alignItems: 'center',
+        paddingVertical: vs(12),
+        borderBottomWidth: 3,
+    },
+    tabBtnText: { fontSize: ms(13), fontWeight: '600' },
+
+    scrollContent: { padding: scale(16), paddingBottom: vs(100), gap: vs(10) },
+
+    row: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(12),
+        padding: scale(14),
+        borderRadius: ms(16),
+        borderWidth: 1,
+    },
+    rowInfo: { flex: 1, minWidth: 0 },
+    rowTitle: { fontSize: ms(15), fontWeight: '600' },
+    rowMeta: { fontSize: ms(12), marginTop: vs(2) },
+    rowEnd: { alignItems: 'flex-end' },
+    rowAmount: { fontSize: ms(16), fontWeight: '700' },
+    rowDate: { fontSize: ms(11), marginTop: vs(2) },
+    rowEach: { fontSize: ms(12), fontWeight: '600', marginTop: vs(2) },
+
+    balanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: vs(10) },
+    balanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },
+    progressTrack: { height: vs(6), borderRadius: ms(3), overflow: 'hidden' },
+    progressFill: { height: '100%', borderRadius: ms(3) },
+    settleLinkBtn: {
+        alignSelf: 'flex-start',
+        borderRadius: ms(11),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
+    },
+    settleLinkText: { fontSize: ms(13), fontWeight: '700' },
+
+    settleBtn: {
+        borderRadius: ms(11),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
+    },
+    settleBtnText: { fontSize: ms(13), fontWeight: '700' },
+
+    settledEmpty: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: vs(8),
+        paddingVertical: vs(60),
+    },
+    settledTitle: { fontSize: ms(17), fontWeight: '700', marginTop: vs(8) },
+
+    emptyState: {
+        padding: scale(40),
+        borderRadius: ms(20),
+        borderWidth: 1,
+        alignItems: 'center',
+    },
+    emptyText: { fontSize: ms(14) },
+
+    // Members modal
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
         justifyContent: 'flex-end',
     },
     modalContent: {
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
-        padding: 24,
+        borderTopLeftRadius: ms(32),
+        borderTopRightRadius: ms(32),
+        padding: scale(24),
         minHeight: '40%',
-        maxHeight: '80%',
+        maxHeight: '85%',
     },
     modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 24,
+        marginBottom: vs(24),
     },
     modalTitle: {
-        fontSize: 24,
+        fontSize: ms(22),
         fontWeight: '900',
     },
     closeModalBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    debtCard: {
+    tabSwitchRow: {
         flexDirection: 'row',
-        alignItems: 'center',
-        padding: 16,
-        borderRadius: 16,
+        borderRadius: ms(12),
         borderWidth: 1,
-        marginBottom: 12,
+        padding: scale(4),
+        gap: scale(4),
     },
-    debtAvatar: {
-        width: 44,
-        height: 44,
-        borderRadius: 22,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginRight: 12,
-    },
-    // Members modal
-    tabRow: {
-        flexDirection: 'row',
-        borderRadius: 12,
-        borderWidth: 1,
-        padding: 4,
-        gap: 4,
-    },
-    tabBtn: {
+    tabSwitchBtn: {
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingVertical: 9,
-        borderRadius: 8,
+        paddingVertical: vs(9),
+        borderRadius: ms(8),
     },
-    tabBtnText: {
-        fontSize: 13,
+    tabSwitchBtnText: {
+        fontSize: ms(13),
         fontWeight: '600',
     },
     friendRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: 12,
+        paddingVertical: vs(12),
         borderBottomWidth: 1,
-        gap: 12,
+        gap: scale(12),
     },
     friendAvatar: {
-        width: 42,
-        height: 42,
-        borderRadius: 21,
+        width: scale(42),
+        height: scale(42),
+        borderRadius: scale(21),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: 16 },
+    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: ms(15) },
     addBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -695,18 +752,18 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1.5,
-        borderRadius: 14,
-        paddingHorizontal: 14,
-        height: 52,
-        marginBottom: 16,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(14),
+        height: vs(52),
+        marginBottom: vs(16),
     },
     emailInput: {
         flex: 1,
-        fontSize: 15,
+        fontSize: ms(15),
     },
     inviteBtn: {
-        height: 52,
-        borderRadius: 26,
+        height: vs(52),
+        borderRadius: ms(26),
         alignItems: 'center',
         justifyContent: 'center',
     },

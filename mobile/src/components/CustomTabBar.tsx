@@ -1,134 +1,178 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
-import { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { Home, Send, Users, Crown, LayoutGrid } from 'lucide-react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import {
+  View, TouchableOpacity, Text, StyleSheet,
+  Animated, LayoutChangeEvent,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Home, Users, Wallet, Bell, User } from 'lucide-react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scale, vs, ms } from '../utils/responsive';
 
-export default function CustomTabBar({ state, descriptors, navigation }: BottomTabBarProps) {
-    const { colors, isDark } = useTheme();
-    const { unreadCount } = useNotifications();
-    const insets = useSafeAreaInsets();
+const TABS = [
+  { key: 'Home',     icon: Home,  label: 'Home'     },
+  { key: 'Groups',   icon: Users, label: 'Groups'   },
+  { key: 'Payments', icon: Wallet,label: 'Payments' },
+  { key: 'Friends',  icon: Bell,  label: 'Friends'  },
+  { key: 'Me',       icon: User,  label: 'Me'       },
+];
 
-    const getIcon = (routeName: string, isFocused: boolean, color: string) => {
-        const size = 22;
-        const sw = isFocused ? 2.5 : 1.8;
-        switch (routeName) {
-            case 'Home':     return <Home size={size} color={color} strokeWidth={sw} />;
-            case 'Groups':   return <LayoutGrid size={size} color={color} strokeWidth={sw} />;
-            case 'Payments': return <Send size={size} color={color} strokeWidth={sw} />;
-            case 'Friends':  return <Users size={size} color={color} strokeWidth={sw} />;
-            case 'Pro':      return <Crown size={size} color={color} strokeWidth={sw} />;
-            default:         return <Home size={size} color={color} strokeWidth={sw} />;
-        }
-    };
+const LIMELIGHT_W = scale(44);
 
-    return (
-        <View style={[styles.wrapper, { bottom: insets.bottom + (Platform.OS === 'ios' ? 8 : 18) }]}>
-            <View style={[styles.bar, { backgroundColor: isDark ? '#1E1E1E' : '#FFFFFF' }]}>
-                {state.routes.map((route, index) => {
-                    const { options } = descriptors[route.key];
-                    const isFocused = state.index === index;
+export default function CustomTabBar({ state, descriptors, navigation }: any) {
+  const { colors, isDark } = useTheme();
+  const { unreadCount } = useNotifications();
+  const insets = useSafeAreaInsets();
 
-                    const onPress = () => {
-                        const event = navigation.emit({
-                            type: 'tabPress',
-                            target: route.key,
-                            canPreventDefault: true,
-                        });
-                        if (!isFocused && !event.defaultPrevented) {
-                            navigation.navigate(route.name, route.params);
-                        }
-                    };
+  // Store each tab's measured center X
+  const tabCenters = useRef<number[]>([]);
+  const limelightX = useRef(new Animated.Value(-999)).current;
+  const [ready, setReady] = useState(false);
 
-                    const onLongPress = () => {
-                        navigation.emit({ type: 'tabLongPress', target: route.key });
-                    };
+  const moveLimelight = useCallback((index: number) => {
+    const cx = tabCenters.current[index];
+    if (cx === undefined) return;
+    const targetX = cx - LIMELIGHT_W / 2;
+    Animated.spring(limelightX, {
+      toValue: targetX,
+      useNativeDriver: true,
+      tension: 180,
+      friction: 20,
+    }).start();
+    if (!ready) setReady(true);
+  }, [limelightX, ready]);
 
-                    const iconColor = isFocused ? '#1A1A1A' : colors.tabIconDefault;
-                    const showBadge = false; // notification badge moved to DashboardScreen header
+  const handleLayout = (e: LayoutChangeEvent, index: number) => {
+    const { x, width } = e.nativeEvent.layout;
+    tabCenters.current[index] = x + width / 2;
+    // Move limelight to active tab once we have its position
+    if (index === state.index) moveLimelight(index);
+  };
 
-                    return (
-                        <TouchableOpacity
-                            key={route.key}
-                            accessibilityRole="button"
-                            accessibilityState={isFocused ? { selected: true } : {}}
-                            accessibilityLabel={options.tabBarAccessibilityLabel}
-                            testID={(options as any).tabBarTestID}
-                            onPress={onPress}
-                            onLongPress={onLongPress}
-                            style={styles.tabItem}
-                            activeOpacity={0.75}
-                        >
-                            <View style={[styles.iconWrap, isFocused && styles.iconWrapActive]}>
-                                {getIcon(route.name, isFocused, iconColor)}
-                                {showBadge && (
-                                    <View style={styles.badge}>
-                                        <Text style={styles.badgeText}>
-                                            {unreadCount > 9 ? '9+' : unreadCount}
-                                        </Text>
-                                    </View>
-                                )}
-                            </View>
-                        </TouchableOpacity>
-                    );
-                })}
-            </View>
-        </View>
-    );
+  return (
+    <View style={[
+      styles.container,
+      {
+        backgroundColor: isDark ? 'rgba(14,17,14,0.97)' : 'rgba(255,255,255,0.97)',
+        borderTopColor: colors.border,
+        paddingBottom: insets.bottom,
+      }
+    ]}>
+      {/* Limelight indicator */}
+      <Animated.View
+        style={[
+          styles.limelightBar,
+          { backgroundColor: colors.accent },
+          { transform: [{ translateX: limelightX }] },
+          !ready && { opacity: 0 },
+        ]}
+      >
+        {/* Cone glow below the bar */}
+        <LinearGradient
+          colors={[
+            isDark ? 'rgba(34,197,94,0.35)' : 'rgba(22,163,74,0.22)',
+            'transparent',
+          ]}
+          style={styles.limelightCone}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+        />
+      </Animated.View>
+
+      {/* Tab buttons */}
+      <View style={styles.tabRow}>
+        {TABS.map((tab, index) => {
+          const isFocused = state.index === index;
+          const IconComp = tab.icon;
+          const showBadge = tab.key === 'Friends' && unreadCount > 0;
+
+          return (
+            <TouchableOpacity
+              key={tab.key}
+              style={styles.tabBtn}
+              activeOpacity={0.7}
+              onLayout={e => handleLayout(e, index)}
+              onPress={() => {
+                moveLimelight(index);
+                const event = navigation.emit({
+                  type: 'tabPress',
+                  target: state.routes[index].key,
+                  canPreventDefault: true,
+                });
+                if (!isFocused && !event.defaultPrevented) {
+                  navigation.navigate(state.routes[index].name);
+                }
+              }}
+            >
+              <View style={styles.iconWrap}>
+                <IconComp
+                  size={22}
+                  color={isFocused ? colors.accent : colors.tabIconDefault}
+                  strokeWidth={isFocused ? 2.2 : 1.8}
+                />
+                {showBadge && <View style={styles.badge} />}
+              </View>
+              <Text style={[
+                styles.label,
+                { color: isFocused ? colors.accent : colors.tabIconDefault }
+              ]}>
+                {tab.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
 }
 
 const styles = StyleSheet.create({
-    wrapper: {
-        position: 'absolute',
-        left: 24,
-        right: 24,
-    },
-    bar: {
-        flexDirection: 'row',
-        height: 68,
-        borderRadius: 40,
-        alignItems: 'center',
-        justifyContent: 'space-around',
-        paddingHorizontal: 8,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.1,
-        shadowRadius: 24,
-        elevation: 12,
-    },
-    tabItem: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-        height: '100%',
-    },
-    iconWrap: {
-        width: 48,
-        height: 48,
-        borderRadius: 24,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    iconWrapActive: {
-        backgroundColor: '#A8D5A2',
-    },
-    badge: {
-        position: 'absolute',
-        top: 6,
-        right: 6,
-        minWidth: 16,
-        height: 16,
-        borderRadius: 8,
-        backgroundColor: '#E05252',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 3,
-    },
-    badgeText: {
-        color: '#fff',
-        fontSize: 9,
-        fontWeight: '800',
-    },
+  container: {
+    borderTopWidth: 1,
+    position: 'relative',
+  },
+  limelightBar: {
+    position: 'absolute',
+    top: 0,
+    width: LIMELIGHT_W,
+    height: vs(4),
+    borderRadius: 999,
+    zIndex: 10,
+  },
+  limelightCone: {
+    position: 'absolute',
+    top: vs(4),
+    left: -scale(20),
+    width: LIMELIGHT_W + scale(40),
+    height: vs(52),
+    borderRadius: ms(4),
+  },
+  tabRow: {
+    flexDirection: 'row',
+    paddingTop: vs(10),
+    paddingBottom: vs(4),
+  },
+  tabBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: vs(3),
+  },
+  iconWrap: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -2,
+    right: -4,
+    width: scale(8),
+    height: scale(8),
+    borderRadius: scale(4),
+    backgroundColor: '#E05252',
+  },
+  label: {
+    fontSize: ms(10),
+    fontWeight: '600',
+  },
 });

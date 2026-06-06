@@ -1,9 +1,11 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ActivityIndicator, RefreshControl, Animated,
+    ActivityIndicator, RefreshControl, ScrollView,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { scale, vs, ms } from '../utils/responsive';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -11,14 +13,13 @@ import {
     GroupListItem, UserBalance, NotificationOut,
 } from '../services/api';
 import {
-    LogOut, Plus, Users, ArrowRight, Bell, ArrowDownLeft, ArrowUpRight, Palette,
-    Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
+    Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake,
 } from 'lucide-react-native';
-import ThemeToggle from '../components/ThemeToggle';
 import { useNotifications } from '../context/NotificationContext';
+import ThemeToggle from '../components/ThemeToggle';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
-import CharacterSetupModal from '../components/CharacterSetupModal';
+import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 
 // ── Notification helpers (mirrored from ActivityScreen) ───────────────────────
@@ -41,10 +42,9 @@ function timeAgo(d: string) {
 }
 
 export default function DashboardScreen({ navigation }: any) {
-    const { user, logout } = useAuth();
+    const { user } = useAuth();
     const { colors, isDark } = useTheme();
     const { unreadCount } = useNotifications();
-    const insets = useSafeAreaInsets();
 
     const [groups, setGroups] = useState<GroupListItem[]>([]);
     const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
@@ -53,26 +53,6 @@ export default function DashboardScreen({ navigation }: any) {
     const [recentActivity, setRecentActivity] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
-    const [showCharacterPicker, setShowCharacterPicker] = useState(false);
-
-    // ── Scroll-driven animation ──────────────────────────────────────────────
-    const scrollY = useRef(new Animated.Value(0)).current;
-
-    const heroOpacity = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [1, 0],
-        extrapolate: 'clamp',
-    });
-    const heroTranslate = scrollY.interpolate({
-        inputRange: [0, 100],
-        outputRange: [0, -20],
-        extrapolate: 'clamp',
-    });
-    const compactOpacity = scrollY.interpolate({
-        inputRange: [60, 110],
-        outputRange: [0, 1],
-        extrapolate: 'clamp',
-    });
 
     const loadGroups = async () => {
         try {
@@ -134,308 +114,158 @@ export default function DashboardScreen({ navigation }: any) {
 
     const firstName = user?.name?.split(' ')[0] ?? '';
 
-    const renderGroup = ({ item }: { item: GroupListItem }) => {
-        const members = balanceMap[item.id] ?? [];
-        const myBalance = members.find(m => m.user_id === user?.id);
-        return (
-            <GroupCard
-                group={item}
-                members={members}
-                myNetBalance={myBalance?.net_balance ?? 0}
-                onPress={() => navigation.navigate('Group', { groupId: item.id })}
-            />
-        );
-    };
-
     if (loading && !refreshing) {
         return (
-            <View style={[styles.screen, { backgroundColor: colors.background, paddingTop: insets.top }]}>
+            <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
-            </View>
+            </SafeAreaView>
         );
     }
 
     return (
-        <View style={[styles.screen, { backgroundColor: colors.background }]}>
-
-            {/* ── Groups list (full-screen scroll container) ── */}
-            <Animated.FlatList
-                data={groups}
-                keyExtractor={(item) => item.id}
-                renderItem={renderGroup}
-                onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                    { useNativeDriver: true }
-                )}
-                scrollEventThrottle={16}
-                contentContainerStyle={[styles.listContent, { paddingBottom: insets.bottom + 68 + 8 + 24 }]}
+        <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
+            <ScrollView
+                contentContainerStyle={{ paddingBottom: vs(120) }}
+                showsVerticalScrollIndicator={false}
                 refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />
                 }
-                ListHeaderComponent={
-                    <View>
-                        {/* ── Hero block — fades + slides up as user scrolls ── */}
-                        <Animated.View style={{
-                            opacity: heroOpacity,
-                            transform: [{ translateY: heroTranslate }],
-                        }}>
-                            {/* Header */}
-                            <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-                                {/* Character + greeting */}
-                                <View style={styles.headerLeft}>
-                                    <CharacterShape
-                                        shape={user?.character_shape ?? 'rect'}
-                                        color={user?.character_color ?? '#34D399'}
-                                        variant="hero"
-                                    />
-                                    <View style={styles.greetingBlock}>
-                                        <View style={styles.greetingRow}>
-                                            <Text style={[styles.greeting, { color: colors.text }]}>
-                                                Hey, {firstName} 👋
-                                            </Text>
-                                            {user?.subscription_tier === 'pro' && (
-                                                <View style={styles.proBadge}>
-                                                    <Text style={styles.proBadgeText}>PRO</Text>
-                                                </View>
-                                            )}
-                                        </View>
-                                        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-                                            Here's where things stand with your squads.
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                {/* Action buttons */}
-                                <View style={[styles.headerActions, { alignSelf: 'flex-start' }]}>
-                                    <TouchableOpacity
-                                        onPress={() => navigation.navigate('Notifications')}
-                                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                    >
-                                        <Bell color={colors.secondaryText} size={20} />
-                                        {unreadCount > 0 && (
-                                            <View style={styles.bellBadge}>
-                                                <Text style={styles.bellBadgeText}>
-                                                    {unreadCount > 9 ? '9+' : unreadCount}
-                                                </Text>
-                                            </View>
-                                        )}
-                                    </TouchableOpacity>
-                                    <ThemeToggle />
-                                    <TouchableOpacity
-                                        onPress={logout}
-                                        style={[styles.iconButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                    >
-                                        <LogOut color={colors.danger} size={20} />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
-
-                            {/* Balance stat cards */}
-                            <View style={styles.statsRow}>
-                                {/* You're owed */}
-                                <View style={[styles.statCard, {
-                                    backgroundColor: 'rgba(34,197,94,0.08)',
-                                    borderColor: 'rgba(34,197,94,0.2)',
-                                }]}>
-                                    <View style={styles.statCardTop}>
-                                        <View style={[styles.statIcon, {
-                                            backgroundColor: 'rgba(34,197,94,0.15)',
-                                            borderColor: 'rgba(34,197,94,0.2)',
-                                        }]}>
-                                            <ArrowDownLeft color="#22C55E" size={18} />
-                                        </View>
-                                        <View style={[styles.badge, { backgroundColor: 'rgba(34,197,94,0.1)', borderColor: 'rgba(34,197,94,0.2)' }]}>
-                                            <Text style={[styles.badgeText, { color: '#22C55E' }]}>INCOMING</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You're owed</Text>
-                                    <Text style={[styles.statValue, { color: '#22C55E' }]}>${formatCurrency(owedToMe)}</Text>
-                                </View>
-
-                                {/* You owe */}
-                                <View style={[styles.statCard, {
-                                    backgroundColor: 'rgba(245,158,11,0.08)',
-                                    borderColor: 'rgba(245,158,11,0.2)',
-                                }]}>
-                                    <View style={styles.statCardTop}>
-                                        <View style={[styles.statIcon, {
-                                            backgroundColor: 'rgba(245,158,11,0.15)',
-                                            borderColor: 'rgba(245,158,11,0.2)',
-                                        }]}>
-                                            <ArrowUpRight color="#F59E0B" size={18} />
-                                        </View>
-                                        <View style={[styles.badge, { backgroundColor: 'rgba(245,158,11,0.1)', borderColor: 'rgba(245,158,11,0.2)' }]}>
-                                            <Text style={[styles.badgeText, { color: '#F59E0B' }]}>OUTGOING</Text>
-                                        </View>
-                                    </View>
-                                    <Text style={[styles.statLabel, { color: colors.secondaryText }]}>You owe</Text>
-                                    <Text style={[styles.statValue, { color: '#F59E0B' }]}>${formatCurrency(iOwe)}</Text>
-                                </View>
-                            </View>
-
-                            {/* Pro upsell banner */}
-                            {user?.subscription_tier !== 'pro' && (
-                                <TouchableOpacity
-                                    style={[styles.upsellBanner, {
-                                        backgroundColor: isDark ? 'rgba(74,222,128,0.08)' : 'rgba(22,163,74,0.06)',
-                                        borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.2)',
-                                    }]}
-                                    onPress={() => navigation.navigate('ProUpgrade')}
-                                    activeOpacity={0.85}
-                                >
-                                    <Text style={styles.upsellEmoji}>👑</Text>
-                                    <View style={styles.upsellTextBlock}>
-                                        <Text style={[styles.upsellTitle, { color: colors.text }]}>Unlock Pro features</Text>
-                                        <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
-                                            Recurring splits, CSV export & more — from $4.99/mo
-                                        </Text>
-                                    </View>
-                                    <ArrowRight color={colors.accent} size={18} />
-                                </TouchableOpacity>
-                            )}
-
-                            {/* Character customise row */}
-                            <TouchableOpacity
-                                onPress={() => setShowCharacterPicker(true)}
-                                style={[styles.customiseRow, {
-                                    backgroundColor: colors.surface,
-                                    borderColor: colors.border,
-                                }]}
-                                activeOpacity={0.8}
-                            >
-                                <View style={[styles.customiseIcon, {
-                                    backgroundColor: `${colors.accent}1A`,
-                                    borderColor: `${colors.accent}33`,
-                                }]}>
-                                    <Palette color={colors.accent} size={20} />
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                    <Text style={[styles.customiseTitle, { color: colors.text }]}>
-                                        Customise your character
-                                    </Text>
-                                    <Text style={[styles.customiseSub, { color: colors.secondaryText }]}>
-                                        Pick your colour, shape, and nickname
-                                    </Text>
-                                </View>
-                                <ArrowRight color={colors.secondaryText} size={16} />
-                            </TouchableOpacity>
-                        </Animated.View>
-
-                        {/* Section header — outside hero so it stays visible */}
-                        <Text style={[styles.listTitle, { color: colors.text }]}>Your Groups</Text>
-                    </View>
-                }
-                ListFooterComponent={() => (
-                    <View style={{ marginTop: 24 }}>
-                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                            <Text style={[styles.listTitle, { color: colors.text }]}>Recent Activity</Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('Notifications')}>
-                                <Text style={{ fontSize: 13, color: colors.accent, fontWeight: '600' }}>See all</Text>
-                            </TouchableOpacity>
-                        </View>
-                        {recentActivity.length === 0 ? (
-                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                                <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>No activity yet</Text>
-                            </View>
-                        ) : (
-                            recentActivity.map(n => {
-                                const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
-                                const IconComp = cfg.icon;
-                                return (
-                                    <TouchableOpacity
-                                        key={n.id}
-                                        style={[styles.activityRow, {
-                                            backgroundColor: n.read ? colors.surface : `${cfg.color}12`,
-                                            borderLeftColor: n.read ? 'transparent' : cfg.color,
-                                            borderColor: colors.border,
-                                        }]}
-                                        onPress={() => n.group_id && navigation.navigate('Group', { groupId: n.group_id })}
-                                        activeOpacity={0.7}
-                                    >
-                                        <View style={[styles.activityDot, { backgroundColor: cfg.color, opacity: n.read ? 0.3 : 1 }]} />
-                                        <View style={{ flex: 1 }}>
-                                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 2 }}>
-                                                <Text style={[styles.activityTitle, { color: n.read ? colors.secondaryText : colors.text }]} numberOfLines={1}>
-                                                    {n.title}
-                                                </Text>
-                                                <Text style={{ fontSize: 11, color: colors.secondaryText }}>{timeAgo(n.created_at)}</Text>
-                                            </View>
-                                            <Text style={{ fontSize: 12, color: colors.secondaryText }} numberOfLines={1}>{n.message}</Text>
-                                        </View>
-                                        <IconComp size={15} color={cfg.color} style={{ opacity: n.read ? 0.4 : 1, marginLeft: 8 }} />
-                                    </TouchableOpacity>
-                                );
-                            })
-                        )}
-                    </View>
-                )}
-                ListEmptyComponent={
-                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Users color={colors.secondaryText} size={48} />
-                        <Text style={[styles.emptyTitle, { color: colors.text }]}>No groups yet</Text>
-                        <Text style={[styles.emptySubtitle, { color: colors.secondaryText }]}>
-                            Create a group to start tracking expenses.
-                        </Text>
-                    </View>
-                }
-            />
-
-            {/* ── Compact sticky balance bar — fades in as hero fades out ── */}
-            <Animated.View style={{
-                position: 'absolute',
-                top: insets.top,
-                left: 0,
-                right: 0,
-                zIndex: 10,
-                opacity: compactOpacity,
-                paddingHorizontal: 16,
-                paddingVertical: 8,
-            }}
-                pointerEvents="none"
             >
-                <View style={{
-                    flexDirection: 'row',
-                    gap: 8,
-                    backgroundColor: colors.surface,
-                    borderRadius: 999,
-                    paddingHorizontal: 16,
-                    paddingVertical: 8,
-                    borderWidth: 0.5,
-                    borderColor: colors.border,
-                }}>
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                        <ArrowDownLeft size={14} color="#22C55E" />
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#22C55E' }}>
-                            ${formatCurrency(owedToMe)}
-                        </Text>
-                    </View>
-                    <View style={{ width: 0.5, backgroundColor: colors.border }} />
-                    <View style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
-                        <Text style={{ fontSize: 13, fontWeight: '700', color: '#F59E0B' }}>
-                            ${formatCurrency(iOwe)}
-                        </Text>
-                        <ArrowUpRight size={14} color="#F59E0B" />
+                {/* Header row */}
+                <View style={styles.headerRow}>
+                    <Logo size={18} />
+                    <View style={styles.headerRightRow}>
+                        <ThemeToggle />
+                        <TouchableOpacity
+                            onPress={() => navigation.navigate('Notifications')}
+                            style={[styles.bellButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                        >
+                            <Bell color={colors.secondaryText} size={20} />
+                            {unreadCount > 0 && (
+                                <View style={[styles.bellDot, { borderColor: colors.background }]} />
+                            )}
+                        </TouchableOpacity>
                     </View>
                 </View>
-            </Animated.View>
 
-            {/* FAB */}
-            <TouchableOpacity
-                style={[styles.fab, { backgroundColor: colors.accent }]}
-                onPress={() => navigation.navigate('CreateGroup')}
-                activeOpacity={0.8}
-            >
-                <Plus color={isDark ? '#064E3B' : '#1A1A1A'} size={24} />
-            </TouchableOpacity>
+                {/* Hero card */}
+                <LinearGradient
+                    colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
+                    style={styles.heroCard}
+                >
+                    <View style={styles.heroTop}>
+                        <View style={styles.heroLeft}>
+                            <Text style={[styles.heroGreeting, { color: colors.secondaryText }]}>Good morning</Text>
+                            <Text style={[styles.heroName, { color: colors.text }]}>{firstName} 👋</Text>
+                        </View>
+                        <CharacterShape
+                            shape={user?.character_shape ?? 'rect'}
+                            color={user?.character_color ?? '#34D399'}
+                            variant="hero"
+                        />
+                    </View>
 
-            {/* Character picker modal */}
-            <CharacterSetupModal
-                visible={showCharacterPicker}
-                onClose={() => setShowCharacterPicker(false)}
-            />
-        </View>
+                    <View style={styles.statsRow}>
+                        <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
+                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU'RE OWED</Text>
+                            <Text style={[styles.statPillValue, { color: colors.accent }]}>${formatCurrency(owedToMe)}</Text>
+                        </View>
+                        <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
+                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU OWE</Text>
+                            <Text style={[styles.statPillValue, { color: colors.warningBright }]}>${formatCurrency(iOwe)}</Text>
+                        </View>
+                    </View>
+                </LinearGradient>
+
+                {/* Your squads */}
+                <View style={styles.sectionHeader}>
+                    <View style={styles.sectionTitleRow}>
+                        <Text style={[styles.sectionTitle, { color: colors.text }]}>Your squads</Text>
+                        <View style={[styles.countBadge, { backgroundColor: colors.accent }]}>
+                            <Text style={[styles.countBadgeText, { color: isDark ? '#0D2B12' : '#0A5F30' }]}>{groups.length}</Text>
+                        </View>
+                    </View>
+                    <TouchableOpacity
+                        onPress={() => navigation.navigate('CreateGroup')}
+                        style={[styles.ghostButton, { borderColor: colors.border }]}
+                    >
+                        <Text style={[styles.ghostButtonText, { color: colors.accentDark }]}>+ New</Text>
+                    </TouchableOpacity>
+                </View>
+
+                {groups.length === 0 ? (
+                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+                            No squads yet — create one to get started.
+                        </Text>
+                    </View>
+                ) : (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.squadsRow}
+                    >
+                        {groups.map(item => {
+                            const members = balanceMap[item.id] ?? [];
+                            const myBalance = members.find(m => m.user_id === user?.id);
+                            return (
+                                <GroupCard
+                                    key={item.id}
+                                    group={item}
+                                    members={members}
+                                    myNetBalance={myBalance?.net_balance ?? 0}
+                                    compact
+                                    onPress={() => navigation.navigate('Group', { groupId: item.id })}
+                                />
+                            );
+                        })}
+                    </ScrollView>
+                )}
+
+                {/* Recent activity */}
+                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(28), marginBottom: vs(14) }]}>
+                    Recent activity
+                </Text>
+                <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    {recentActivity.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }]}>
+                            No activity yet
+                        </Text>
+                    ) : (
+                        recentActivity.map((n, i) => {
+                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
+                            const IconComp = cfg.icon;
+                            return (
+                                <TouchableOpacity
+                                    key={n.id}
+                                    style={[
+                                        styles.activityRow,
+                                        i < recentActivity.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                                    ]}
+                                    onPress={() => n.group_id && navigation.navigate('Group', { groupId: n.group_id })}
+                                    activeOpacity={0.7}
+                                >
+                                    <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
+                                        <IconComp size={18} color={cfg.color} />
+                                    </View>
+                                    <View style={{ flex: 1 }}>
+                                        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
+                                            {n.title}
+                                        </Text>
+                                        <Text style={[styles.activityMessage, { color: colors.secondaryText }]} numberOfLines={1}>
+                                            {n.message}
+                                        </Text>
+                                    </View>
+                                    <Text style={[styles.activityTime, { color: colors.faintText }]}>{timeAgo(n.created_at)}</Text>
+                                </TouchableOpacity>
+                            );
+                        })
+                    )}
+                </View>
+            </ScrollView>
+        </SafeAreaView>
     );
 }
 
@@ -444,203 +274,172 @@ const styles = StyleSheet.create({
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
     // Header
-    header: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
-        paddingHorizontal: 24,
-        paddingBottom: 16,
-    },
-    headerLeft: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        gap: 12,
-        flex: 1,
-    },
-    greetingBlock: {
-        flex: 1,
-        paddingBottom: 4,
-    },
-    greetingRow: {
+    headerRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        marginBottom: 3,
+        justifyContent: 'space-between',
+        paddingHorizontal: scale(20),
+        paddingTop: vs(8),
+        paddingBottom: vs(16),
     },
-    greeting: {
-        fontSize: 22,
-        fontWeight: '800',
-        letterSpacing: -0.3,
-    },
-    proBadge: {
-        backgroundColor: '#16a34a',
-        borderRadius: 4,
-        paddingHorizontal: 5,
-        paddingVertical: 2,
-    },
-    proBadgeText: {
-        color: '#fff',
-        fontSize: 10,
-        fontWeight: '700',
-        letterSpacing: 0.5,
-    },
-    subtitle: {
-        fontSize: 12,
-        lineHeight: 17,
-    },
-    headerActions: {
+    headerRightRow: {
         flexDirection: 'row',
-        gap: 8,
-        paddingTop: 4,
+        alignItems: 'center',
+        gap: scale(8),
     },
-    iconButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+    bellButton: {
+        width: scale(38),
+        height: scale(38),
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
     },
-    bellBadge: {
+    bellDot: {
         position: 'absolute',
-        top: 6,
-        right: 6,
-        minWidth: 14,
-        height: 14,
-        borderRadius: 7,
+        top: 7,
+        right: 8,
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
         backgroundColor: '#E05252',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingHorizontal: 2,
+        borderWidth: 1.5,
     },
-    bellBadgeText: { color: '#fff', fontSize: 8, fontWeight: '800' },
 
-    // Stats
-    statsRow: {
-        flexDirection: 'row',
-        gap: 12,
-        paddingHorizontal: 24,
-        marginBottom: 20,
+    // Hero
+    heroCard: {
+        marginHorizontal: scale(16),
+        borderRadius: ms(24),
+        padding: scale(20),
     },
-    statCard: {
-        flex: 1,
-        borderRadius: 20,
-        borderWidth: 1,
-        padding: 16,
-    },
-    statCardTop: {
+    heroTop: {
         flexDirection: 'row',
+        alignItems: 'flex-start',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 12,
+        gap: scale(12),
+        marginBottom: vs(16),
     },
-    statIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
+    heroLeft: { flexShrink: 1 },
+    heroGreeting: {
+        fontSize: ms(13),
+        fontWeight: '600',
+        marginBottom: vs(2),
     },
-    badge: {
-        borderRadius: 6,
-        borderWidth: 1,
-        paddingHorizontal: 6,
-        paddingVertical: 3,
-    },
-    badgeText: {
-        fontSize: 9,
-        fontWeight: '700',
-        letterSpacing: 0.8,
-    },
-    statLabel: {
-        fontSize: 12,
-        fontWeight: '500',
-        marginBottom: 4,
-    },
-    statValue: {
-        fontSize: 26,
+    heroName: {
+        fontSize: ms(26),
         fontWeight: '800',
         letterSpacing: -0.5,
     },
+    statsRow: {
+        flexDirection: 'row',
+        gap: scale(10),
+    },
+    statPill: {
+        flex: 1,
+        borderRadius: ms(16),
+        padding: scale(14),
+    },
+    statPillLabel: {
+        fontSize: ms(11),
+        fontWeight: '700',
+        letterSpacing: 0.7,
+        marginBottom: vs(4),
+    },
+    statPillValue: {
+        fontSize: ms(20),
+        fontWeight: '800',
+        letterSpacing: -0.4,
+    },
 
-    // List
-    listContent: {
-        paddingHorizontal: 24,
-    },
-    upsellBanner: {
+    // Squads section
+    sectionHeader: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 16,
-        borderWidth: 1,
-        padding: 14,
-        marginBottom: 12,
+        justifyContent: 'space-between',
+        paddingHorizontal: scale(20),
+        paddingTop: vs(26),
+        paddingBottom: vs(12),
     },
-    upsellEmoji: { fontSize: 24, marginRight: 12 },
-    upsellTextBlock: { flex: 1 },
-    upsellTitle: { fontSize: 14, fontWeight: '700', marginBottom: 2 },
-    upsellSub: { fontSize: 12, lineHeight: 17 },
-    customiseRow: {
+    sectionTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
-        padding: 14,
-        borderRadius: 16,
-        borderWidth: 1,
-        marginBottom: 16,
+        gap: scale(8),
     },
-    customiseIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: 12,
-        borderWidth: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    customiseTitle: { fontSize: 14, fontWeight: '600', marginBottom: 2 },
-    customiseSub: { fontSize: 12 },
-    listTitle: {
-        fontSize: 18,
+    sectionTitle: {
+        fontSize: ms(18),
         fontWeight: '700',
         letterSpacing: -0.2,
-        marginBottom: 14,
+    },
+    countBadge: {
+        minWidth: scale(24),
+        height: scale(24),
+        borderRadius: scale(12),
+        paddingHorizontal: scale(7),
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+    },
+    countBadgeText: {
+        fontSize: ms(12),
+        fontWeight: '700',
+    },
+    ghostButton: {
+        borderWidth: 1,
+        borderRadius: ms(11),
+        paddingHorizontal: scale(13),
+        paddingVertical: vs(8),
+    },
+    ghostButtonText: {
+        fontSize: ms(13),
+        fontWeight: '700',
+    },
+    squadsRow: {
+        paddingHorizontal: scale(20),
+        gap: scale(12),
     },
     emptyState: {
-        padding: 40,
-        alignItems: 'center',
-        gap: 12,
-        borderRadius: 20,
+        marginHorizontal: scale(20),
+        padding: scale(32),
+        borderRadius: ms(20),
         borderWidth: 1,
-        marginTop: 12,
+        alignItems: 'center',
     },
-    emptyTitle: { fontSize: 17, fontWeight: '700' },
-    emptySubtitle: { fontSize: 13, textAlign: 'center', lineHeight: 20 },
+    emptyText: {
+        fontSize: ms(13),
+        textAlign: 'center',
+        lineHeight: ms(20),
+    },
+
+    // Activity
+    activityCard: {
+        marginHorizontal: scale(16),
+        borderRadius: ms(16),
+        borderWidth: 1,
+        overflow: 'hidden',
+    },
     activityRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        padding: 14,
-        borderRadius: 14,
-        marginBottom: 8,
-        borderLeftWidth: 3,
-        borderWidth: 0.5,
-        gap: 10,
+        gap: scale(12),
+        padding: scale(14),
     },
-    activityDot: { width: 8, height: 8, borderRadius: 4, flexShrink: 0 },
-    activityTitle: { fontSize: 13, fontWeight: '600', flex: 1, marginRight: 6 },
-
-    // FAB
-    fab: {
-        position: 'absolute',
-        bottom: 110,
-        right: 24,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
+    activityIcon: {
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(12),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.2,
-        shadowRadius: 12,
-        elevation: 8,
+    },
+    activityTitle: {
+        fontSize: ms(14),
+        fontWeight: '600',
+        marginBottom: vs(2),
+    },
+    activityMessage: {
+        fontSize: ms(12),
+    },
+    activityTime: {
+        fontSize: ms(11),
+        marginLeft: scale(8),
     },
 });

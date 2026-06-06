@@ -9,6 +9,7 @@ import {
     Alert,
     Linking,
 } from 'react-native';
+import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { RefreshCw, Plus, Crown } from 'lucide-react-native';
@@ -92,7 +93,7 @@ export default function RecurringScreen({ navigation }: any) {
 
                 {isPro && (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <RefreshCw size={40} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: 12 }} />
+                        <RefreshCw size={40} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(12) }} />
                         <Text style={[styles.emptyTitle, { color: colors.text }]}>No recurring expenses yet</Text>
                         <Text style={[styles.emptySub, { color: colors.secondaryText }]}>
                             Tap Add to set up your first recurring bill.
@@ -110,44 +111,44 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 24,
-        paddingTop: 28,
-        paddingBottom: 20,
+        paddingHorizontal: scale(24),
+        paddingTop: vs(28),
+        paddingBottom: vs(20),
     },
     pageTitle: {
-        fontSize: 22,
+        fontSize: ms(22),
         fontWeight: '800',
         letterSpacing: -0.3,
-        marginBottom: 3,
+        marginBottom: vs(3),
     },
     pageSubtitle: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '400',
     },
     addButton: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 6,
-        paddingHorizontal: 14,
-        paddingVertical: 8,
-        borderRadius: 14,
+        gap: vs(6),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(8),
+        borderRadius: ms(14),
     },
     addButtonText: {
         color: '#1A1A1A',
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: '700',
     },
     scrollContent: {
-        paddingHorizontal: 24,
-        paddingBottom: 48,
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(48),
     },
     expenseRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: 18,
+        borderRadius: ms(18),
         borderWidth: 1,
-        padding: 16,
-        marginBottom: 10,
+        padding: scale(16),
+        marginBottom: vs(10),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
@@ -157,59 +158,59 @@ const styles = StyleSheet.create({
     rowIcon: {
         width: 42,
         height: 42,
-        borderRadius: 13,
+        borderRadius: ms(13),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: 12,
+        marginRight: scale(12),
     },
     rowInfo: { flex: 1 },
     rowTitle: {
-        fontSize: 15,
+        fontSize: ms(15),
         fontWeight: '700',
-        marginBottom: 3,
+        marginBottom: vs(3),
     },
     rowMeta: {
-        fontSize: 12,
+        fontSize: ms(12),
         lineHeight: 17,
     },
     upsellCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        gap: 12,
-        borderRadius: 16,
+        gap: vs(12),
+        borderRadius: ms(16),
         borderWidth: 1,
-        padding: 16,
-        marginTop: 8,
+        padding: scale(16),
+        marginTop: vs(8),
     },
     upsellText: { flex: 1 },
     upsellTitle: {
-        fontSize: 14,
+        fontSize: ms(14),
         fontWeight: '700',
-        marginBottom: 3,
+        marginBottom: vs(3),
     },
     upsellSub: {
-        fontSize: 12,
+        fontSize: ms(12),
         lineHeight: 17,
-        marginBottom: 6,
+        marginBottom: vs(6),
     },
     learnMore: {
-        fontSize: 13,
+        fontSize: ms(13),
         fontWeight: '600',
     },
     emptyState: {
-        marginTop: 16,
-        padding: 36,
+        marginTop: vs(16),
+        padding: scale(36),
         alignItems: 'center',
-        borderRadius: 20,
+        borderRadius: ms(20),
         borderWidth: 1,
     },
     emptyTitle: {
-        fontSize: 16,
+        fontSize: ms(16),
         fontWeight: '700',
-        marginBottom: 6,
+        marginBottom: vs(6),
     },
     emptySub: {
-        fontSize: 13,
+        fontSize: ms(13),
         textAlign: 'center',
         lineHeight: 19,
     },
