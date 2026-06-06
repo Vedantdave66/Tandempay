@@ -266,20 +266,27 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
                 <View style={styles.actionRow}>
                     <TouchableOpacity
-                        style={[styles.primaryBtn, { backgroundColor: colors.accent }]}
+                        style={[styles.primaryBtn, {
+                            backgroundColor: colors.accent,
+                            shadowColor: colors.accent,
+                            shadowOpacity: 0.45,
+                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 4 },
+                            elevation: 5,
+                        }]}
                         onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
                         activeOpacity={0.85}
                     >
-                        <Plus size={16} color={isDark ? '#06371E' : '#0A5F30'} />
-                        <Text style={[styles.primaryBtnText, { color: isDark ? '#06371E' : '#0A5F30' }]}>Add expense</Text>
+                        <Plus size={16} color="#fff" />
+                        <Text style={[styles.primaryBtnText, { color: '#fff' }]}>Add expense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
-                        style={[styles.ghostBtn, { borderColor: colors.warningBright }]}
+                        style={[styles.ghostBtn, { borderColor: colors.gold }]}
                         onPress={() => setActiveTab('settle')}
                         activeOpacity={0.85}
                     >
-                        <Send size={15} color={colors.warningBright} />
-                        <Text style={[styles.ghostBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                        <Send size={15} color={colors.gold} />
+                        <Text style={[styles.ghostBtnText, { color: colors.gold }]}>Settle up</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -319,8 +326,17 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     ) : expenses.map(expense => {
                         const c = charFor(expense.paid_by);
                         const each = expense.amount / Math.max(expense.participants.length, 1);
+                        const paidByMe = expense.paid_by === user?.id;
                         return (
-                            <View key={expense.id} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View key={expense.id} style={[styles.row, {
+                                backgroundColor: colors.surface,
+                                borderColor: colors.border,
+                                shadowColor: colors.cardShadow,
+                                shadowOpacity: 1,
+                                shadowRadius: 6,
+                                shadowOffset: { width: 0, height: 2 },
+                                elevation: 2,
+                            }]}>
                                 <CharacterShape
                                     shape={c?.character_shape ?? 'rect'}
                                     color={c?.character_color ?? expense.payer_avatar_color ?? '#6B7280'}
@@ -333,7 +349,9 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     </Text>
                                 </View>
                                 <View style={styles.rowEnd}>
-                                    <Text style={[styles.rowAmount, { color: colors.text }]}>${formatCurrency(expense.amount)}</Text>
+                                    <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontWeight: '700', fontSize: ms(16), letterSpacing: -0.3 }]}>
+                                        ${formatCurrency(expense.amount)}
+                                    </Text>
                                     <Text style={[styles.rowDate, { color: colors.faintText }]}>
                                         {new Date(expense.created_at).toLocaleDateString()}
                                     </Text>
@@ -389,7 +407,15 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const to = charFor(s.to_user_id);
                         const isMine = s.from_user_id === user?.id;
                         return (
-                            <View key={idx} style={[styles.row, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View key={idx} style={[styles.row, {
+                                backgroundColor: colors.surface,
+                                borderColor: colors.border,
+                                shadowColor: colors.cardShadow,
+                                shadowOpacity: 1,
+                                shadowRadius: 6,
+                                shadowOffset: { width: 0, height: 2 },
+                                elevation: 2,
+                            }]}>
                                 <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
                                 <ArrowRight size={16} color={colors.faintText} />
                                 <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
@@ -622,7 +648,7 @@ const styles = StyleSheet.create({
         paddingVertical: vs(12),
         borderBottomWidth: 3,
     },
-    tabBtnText: { fontSize: ms(13), fontWeight: '600' },
+    tabBtnText: { fontSize: ms(13.5), fontWeight: '600' },
 
     scrollContent: { padding: scale(16), paddingBottom: vs(100), gap: vs(10) },
 
@@ -631,7 +657,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(12),
         padding: scale(14),
-        borderRadius: ms(16),
+        borderRadius: ms(18),
         borderWidth: 1,
     },
     rowInfo: { flex: 1, minWidth: 0 },

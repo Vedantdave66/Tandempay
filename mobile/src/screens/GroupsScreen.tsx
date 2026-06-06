@@ -67,10 +67,17 @@ export default function GroupsScreen({ navigation }: any) {
                 <Text style={[styles.title, { color: colors.text }]}>Your squads</Text>
                 <TouchableOpacity
                     onPress={() => navigation.navigate('CreateGroup')}
-                    style={[styles.newButton, { backgroundColor: colors.accent }]}
+                    style={[styles.newButton, {
+                        backgroundColor: colors.accent,
+                        shadowColor: colors.accent,
+                        shadowOpacity: 0.5,
+                        shadowRadius: 10,
+                        shadowOffset: { width: 0, height: 5 },
+                        elevation: 6,
+                    }]}
                     activeOpacity={0.85}
                 >
-                    <Text style={[styles.newButtonText, { color: '#0A5F30' }]}>+ New</Text>
+                    <Text style={styles.newButtonText}>+ New</Text>
                 </TouchableOpacity>
             </View>
 
@@ -126,13 +133,13 @@ const styles = StyleSheet.create({
         paddingTop: vs(8),
         paddingBottom: vs(16),
     },
-    title: { fontSize: ms(24), fontWeight: '800', letterSpacing: -0.5 },
+    title: { fontSize: ms(26), fontWeight: '800', letterSpacing: -0.6 },
     newButton: {
-        borderRadius: ms(13),
-        paddingHorizontal: scale(16),
-        paddingVertical: vs(10),
+        borderRadius: ms(12),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
     },
-    newButtonText: { fontSize: ms(14), fontWeight: '700' },
+    newButtonText: { fontSize: ms(13), fontWeight: '700', color: '#fff' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingHorizontal: scale(16) },
     empty: {

@@ -56,7 +56,16 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
         <TouchableOpacity
             onPress={onPress}
             activeOpacity={0.9}
-            style={[styles.card, { backgroundColor: colors.groupGlow[0] }, compact && styles.cardCompact]}
+            style={[styles.card, {
+            backgroundColor: 'transparent',
+            borderWidth: 1,
+            borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
+            shadowColor: isDark ? '#000' : 'rgba(20,60,35,0.15)',
+            shadowOpacity: isDark ? 0.3 : 1,
+            shadowRadius: 18,
+            shadowOffset: { width: 0, height: 8 },
+            elevation: isDark ? 0 : 5,
+        }, compact && styles.cardCompact]}
         >
             {/* Green glow — full-bleed vertical ramp, brightest band vertically centered.
                 (expo-linear-gradient can't do radial; this 5-stop vertical reproduces the
@@ -67,7 +76,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
             <View style={styles.gradientClip} pointerEvents="none">
                 <LinearGradient
                     colors={colors.groupGlow}
-                    locations={[0, 0.3, 0.46, 0.62, 1]}
+                    locations={[0, 0.15, 0.30, 0.50, 0.70, 0.85, 1]}
                     style={StyleSheet.absoluteFill}
                 />
             </View>
@@ -112,7 +121,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
             {/* Title pill — overlaps the characters (zIndex 2, pulled up) */}
             <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: scale(16) }}>
                 <View style={[styles.titlePill, boxStyle, compact && styles.titlePillCompact, { width: '100%' }]}>
-                    <Text style={{ color: colors.text, fontSize: compact ? ms(18) : ms(24, 0.3), fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
+                    <Text style={{ color: colors.text, fontSize: compact ? ms(18) : ms(22, 0.3), fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
                         {group.name}
                     </Text>
                 </View>
@@ -153,7 +162,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                             <TouchableOpacity
                                 onPress={onPress}
                                 style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
-                                    backgroundColor: colors.groupArrowBg,
+                                    backgroundColor: colors.accentBgFaint,
                                     borderWidth: 1.5,
                                     borderColor: isSettled ? colors.groupOwed : accent,
                                 }]}
@@ -248,9 +257,9 @@ const styles = StyleSheet.create({
         gap: vs(8),
     },
     statLabel: {
-        fontSize: ms(11),
+        fontSize: ms(10),
         fontWeight: '800',
-        letterSpacing: 1.5,
+        letterSpacing: 1.8,
         textAlign: 'center',
     },
     statPill: {
@@ -267,8 +276,8 @@ const styles = StyleSheet.create({
     },
     statValue: {
         fontSize: ms(26, 0.3),
-        fontWeight: '700',
-        letterSpacing: -0.5,
+        fontWeight: '800',
+        letterSpacing: -0.8,
     },
     balancePill: {
         flexDirection: 'row',
@@ -287,8 +296,8 @@ const styles = StyleSheet.create({
     },
     balanceValue: {
         fontSize: ms(26, 0.3),
-        fontWeight: '700',
-        letterSpacing: -0.5,
+        fontWeight: '800',
+        letterSpacing: -0.8,
     },
     arrowBtn: {
         width: scale(44),
@@ -298,8 +307,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     arrowBtnCompact: {
-        width: scale(34),
-        height: scale(34),
-        borderRadius: scale(17),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
     },
 });

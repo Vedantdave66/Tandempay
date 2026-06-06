@@ -168,13 +168,21 @@ export default function DashboardScreen({ navigation }: any) {
                     </View>
 
                     <View style={styles.statsRow}>
-                        <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
-                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU'RE OWED</Text>
+                        <View style={[styles.statPill, {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.82)',
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.9)',
+                        }]}>
+                            <Text style={[styles.statPillLabel, { color: colors.accentDark }]}>YOU'RE OWED</Text>
                             <Text style={[styles.statPillValue, { color: colors.accent }]}>${formatCurrency(owedToMe)}</Text>
                         </View>
-                        <View style={[styles.statPill, { backgroundColor: colors.accentBgFaint }]}>
-                            <Text style={[styles.statPillLabel, { color: colors.secondaryText }]}>YOU OWE</Text>
-                            <Text style={[styles.statPillValue, { color: colors.warningBright }]}>${formatCurrency(iOwe)}</Text>
+                        <View style={[styles.statPill, {
+                            backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.82)',
+                            borderWidth: 1,
+                            borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.9)',
+                        }]}>
+                            <Text style={[styles.statPillLabel, { color: colors.gold }]}>YOU OWE</Text>
+                            <Text style={[styles.statPillValue, { color: colors.gold }]}>${formatCurrency(iOwe)}</Text>
                         </View>
                     </View>
                 </LinearGradient>
@@ -183,15 +191,23 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
                         <Text style={[styles.sectionTitle, { color: colors.text }]}>Your squads</Text>
-                        <View style={[styles.countBadge, { backgroundColor: colors.accent }]}>
-                            <Text style={[styles.countBadgeText, { color: isDark ? '#0D2B12' : '#0A5F30' }]}>{groups.length}</Text>
+                        <View style={[styles.countBadge, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Text style={[styles.countBadgeText, { color: colors.secondaryText }]}>{groups.length}</Text>
                         </View>
                     </View>
                     <TouchableOpacity
                         onPress={() => navigation.navigate('CreateGroup')}
-                        style={[styles.ghostButton, { borderColor: colors.border }]}
+                        style={[styles.newButton, {
+                            backgroundColor: colors.accent,
+                            shadowColor: colors.accent,
+                            shadowOpacity: 0.5,
+                            shadowRadius: 10,
+                            shadowOffset: { width: 0, height: 5 },
+                            elevation: 6,
+                        }]}
+                        activeOpacity={0.85}
                     >
-                        <Text style={[styles.ghostButtonText, { color: colors.accentDark }]}>+ New</Text>
+                        <Text style={styles.newButtonText}>+ New</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -228,7 +244,13 @@ export default function DashboardScreen({ navigation }: any) {
                 <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(28), marginBottom: vs(14) }]}>
                     Recent activity
                 </Text>
-                <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={{
+                    backgroundColor: colors.surface, borderRadius: ms(20),
+                    marginHorizontal: scale(16), overflow: 'hidden',
+                    borderWidth: 1, borderColor: colors.border,
+                    shadowColor: colors.shadow, shadowOpacity: 1, shadowRadius: 4,
+                    shadowOffset: { width: 0, height: 1 }, elevation: 2,
+                }}>
                     {recentActivity.length === 0 ? (
                         <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }]}>
                             No activity yet
@@ -240,25 +262,28 @@ export default function DashboardScreen({ navigation }: any) {
                             return (
                                 <TouchableOpacity
                                     key={n.id}
-                                    style={[
-                                        styles.activityRow,
-                                        i < recentActivity.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
-                                    ]}
+                                    style={{
+                                        flexDirection: 'row', alignItems: 'center', gap: scale(12),
+                                        padding: scale(14), paddingHorizontal: scale(16),
+                                        borderBottomWidth: i < recentActivity.length - 1 ? 1 : 0,
+                                        borderBottomColor: colors.border,
+                                    }}
                                     onPress={() => n.group_id && navigation.navigate('Group', { groupId: n.group_id })}
                                     activeOpacity={0.7}
                                 >
-                                    <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
-                                        <IconComp size={18} color={cfg.color} />
+                                    <View style={{
+                                        width: scale(40), height: scale(40), borderRadius: ms(12),
+                                        backgroundColor: colors.accentBg, alignItems: 'center', justifyContent: 'center',
+                                    }}>
+                                        <IconComp size={scale(18)} color={colors.accent} />
                                     </View>
-                                    <View style={{ flex: 1 }}>
-                                        <Text style={[styles.activityTitle, { color: colors.text }]} numberOfLines={1}>
-                                            {n.title}
-                                        </Text>
-                                        <Text style={[styles.activityMessage, { color: colors.secondaryText }]} numberOfLines={1}>
-                                            {n.message}
+                                    <View style={{ flex: 1, minWidth: 0 }}>
+                                        <Text style={{ fontSize: ms(13.5), fontWeight: '500', color: colors.secondaryText, lineHeight: 19 }}
+                                            numberOfLines={2}>{n.message}</Text>
+                                        <Text style={{ fontSize: ms(12), color: colors.faintText, marginTop: vs(2) }}>
+                                            {timeAgo(n.created_at)}
                                         </Text>
                                     </View>
-                                    <Text style={[styles.activityTime, { color: colors.faintText }]}>{timeAgo(n.created_at)}</Text>
                                 </TouchableOpacity>
                             );
                         })
@@ -366,14 +391,14 @@ const styles = StyleSheet.create({
         gap: scale(8),
     },
     sectionTitle: {
-        fontSize: ms(18),
-        fontWeight: '700',
-        letterSpacing: -0.2,
+        fontSize: ms(20),
+        fontWeight: '800',
+        letterSpacing: -0.5,
     },
     countBadge: {
         minWidth: scale(24),
         height: scale(24),
-        borderRadius: scale(12),
+        borderRadius: 99,
         paddingHorizontal: scale(7),
         alignItems: 'center',
         justifyContent: 'center',
@@ -383,15 +408,15 @@ const styles = StyleSheet.create({
         fontSize: ms(12),
         fontWeight: '700',
     },
-    ghostButton: {
-        borderWidth: 1,
-        borderRadius: ms(11),
-        paddingHorizontal: scale(13),
-        paddingVertical: vs(8),
+    newButton: {
+        borderRadius: ms(12),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(9),
     },
-    ghostButtonText: {
+    newButtonText: {
         fontSize: ms(13),
         fontWeight: '700',
+        color: '#fff',
     },
     squadsRow: {
         paddingHorizontal: scale(20),

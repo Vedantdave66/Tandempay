@@ -1,96 +1,100 @@
-// ─── TandemPay Design System ───────────────────────────────────────────────
-// Light: soft green-white bg, pure white cards, #A8D5A2 primary, #1A1A1A text
-// Dark:  #121212 bg, #1E1E1E cards, #F5F5F5 text, same green accent
-
 export const Colors = {
   light: {
     // Text
-    text: '#1A1A1A',
-    secondaryText: '#888888',
+    text: '#020617',
+    secondaryText: '#475569',
+    tertiaryText: '#94A3B8',
     // Backgrounds
-    background: '#F0F7F0',
+    background: '#F1F5F9',
     surface: '#FFFFFF',
-    surfaceHover: '#F7FBF7',
-    // Borders & dividers
-    border: 'rgba(0,0,0,0.07)',
-    // Accent / brand
-    accent: '#A8D5A2',
-    accentDark: '#6BBF67',      // for text on green buttons
-    tint: '#A8D5A2',
-    accentHover: '#8FCA8A',
-    tabIconDefault: '#BBBBBB',
-    tabIconSelected: '#A8D5A2',
-    primary: '#1A1A1A',
+    surfaceHover: '#F8FAFC',
+    // Borders
+    border: '#E2E8F0',
+    // Accent
+    accent: '#16A34A',
+    accentDark: '#15803D',
+    accentLight: '#DCFCE7',
+    tint: '#16A34A',
+    accentHover: '#15803D',
+    tabIconDefault: '#94A3B8',
+    tabIconSelected: '#16A34A',
+    primary: '#020617',
     // Semantic
-    danger: '#E05252',
+    danger: '#DC2626',
+    dangerBg: '#FEE2E2',
     warning: '#F59E0B',
-    indigo: '#6366F1',
-    gold: '#D4A853',
-    // Faint variants used for chips, pills, icon tiles
-    accentBg: '#DCEFDA',
-    accentBgFaint: '#EAF5E8',
+    gold: '#B45309',
+    // Faint variants
+    accentBg: '#DCFCE7',
+    accentBgFaint: 'rgba(22,163,74,0.08)',
     warningBg: '#FEF3C7',
     warningBright: '#B45309',
     faintText: '#94A3B8',
     // Shadows
-    shadow: 'rgba(0,0,0,0.05)',
-    cardShadow: 'rgba(0,0,0,0.06)',
+    shadow: 'rgba(15,40,30,0.06)',
+    cardShadow: 'rgba(15,40,30,0.10)',
     // GroupCard
-    groupGlow:       ['#F3FBF4', '#D8F4E1', '#8FE9B0', '#D8F4E1', '#F3FBF4'] as [string, string, string, string, string],
+    groupGlow:       ['#F3FBF4','#CEFADE','#86EFAC','#3BE57F','#86EFAC','#CEFADE','#F3FBF4'] as [string,string,string,string,string,string,string],
     groupBoxFill:    '#FFFFFF',
     groupBoxBorder:  'rgba(0,0,0,0.05)',
-    groupBoxShadow:  'rgba(20,60,35,0.10)',
-    groupLabel:      '#0A5F30',
-    groupOwe:        '#C28A00',
-    groupOwed:       '#0E9F4F',
-    groupOthersFill: '#E6EAE5',
-    groupOthersInk:  '#46504A',
-    groupNameInk:    '#0E140F',
-    groupArrowBg:    'rgba(0,0,0,0.03)',
+    groupBoxShadow:  'rgba(20,60,35,0.14)',
+    groupLabel:      '#15803D',
+    groupOwe:        '#B45309',
+    groupOwed:       '#16A34A',
+    groupOthersFill: '#E2E8F0',
+    groupOthersInk:  '#475569',
+    groupNameInk:    '#020617',
+    groupArrowBg:    'transparent',
+    // Misc
+    indigo: '#6366F1',
   },
   dark: {
     // Text
-    text: '#F5F5F5',
-    secondaryText: '#999999',
+    text: '#F8FAFC',
+    secondaryText: '#94A3B8',
+    tertiaryText: '#64748B',
     // Backgrounds
-    background: '#121212',
-    surface: '#1E1E1E',
-    surfaceHover: '#252525',
+    background: '#0A0D0B',
+    surface: '#141815',
+    surfaceHover: '#1A1E1B',
     // Borders
     border: 'rgba(255,255,255,0.08)',
-    // Accent / brand — green stays
-    accent: '#A8D5A2',
-    accentDark: '#1A1A1A',
-    tint: '#A8D5A2',
-    accentHover: '#8FCA8A',
-    tabIconDefault: '#555555',
-    tabIconSelected: '#A8D5A2',
-    primary: '#F5F5F5',
+    // Accent
+    accent: '#27E06A',
+    accentDark: '#062B16',
+    accentLight: 'rgba(39,224,106,0.12)',
+    tint: '#27E06A',
+    accentHover: '#22C55E',
+    tabIconDefault: '#4B5563',
+    tabIconSelected: '#27E06A',
+    primary: '#F8FAFC',
     // Semantic
     danger: '#EF4444',
+    dangerBg: 'rgba(239,68,68,0.14)',
     warning: '#F59E0B',
-    indigo: '#818CF8',
-    gold: '#D4A853',
-    // Faint variants used for chips, pills, icon tiles
-    accentBg: 'rgba(168,213,162,0.16)',
-    accentBgFaint: 'rgba(168,213,162,0.10)',
-    warningBg: 'rgba(245,158,11,0.16)',
-    warningBright: '#FBBF24',
+    gold: '#F2C200',
+    // Faint variants
+    accentBg: 'rgba(39,224,106,0.12)',
+    accentBgFaint: 'rgba(39,224,106,0.07)',
+    warningBg: 'rgba(242,194,0,0.14)',
+    warningBright: '#F2C200',
     faintText: '#6B7280',
     // Shadows
-    shadow: 'rgba(0,0,0,0.3)',
-    cardShadow: 'rgba(0,0,0,0.4)',
+    shadow: 'rgba(0,0,0,0.4)',
+    cardShadow: 'rgba(0,0,0,0.5)',
     // GroupCard
-    groupGlow:       ['#070A08', '#0A4A26', '#1AA94E', '#0A4A26', '#070A08'] as [string, string, string, string, string],
-    groupBoxFill:    '#0A0B0A',
-    groupBoxBorder:  'transparent',
+    groupGlow:       ['#070A08','#0A3A1E','#0F6B30','#1AA94E','#0F6B30','#0A3A1E','#070A08'] as [string,string,string,string,string,string,string],
+    groupBoxFill:    '#0C0F0D',
+    groupBoxBorder:  'rgba(255,255,255,0.06)',
     groupBoxShadow:  'transparent',
-    groupLabel:      '#0B6B38',
+    groupLabel:      '#22C55E',
     groupOwe:        '#F2C200',
     groupOwed:       '#27E06A',
-    groupOthersFill: '#2A2C2A',
-    groupOthersInk:  '#D7DAD6',
+    groupOthersFill: '#1E231F',
+    groupOthersInk:  '#CBD5E1',
     groupNameInk:    '#FFFFFF',
-    groupArrowBg:    'rgba(255,255,255,0.04)',
+    groupArrowBg:    'transparent',
+    // Misc
+    indigo: '#818CF8',
   },
-};
+} as const;
