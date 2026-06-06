@@ -7,6 +7,7 @@ export const Colors = {
     // Text
     text: '#1A1A1A',
     secondaryText: '#888888',
+    faintText: '#AAAAAA',
     // Backgrounds
     background: '#F0F7F0',
     surface: '#FFFFFF',
@@ -16,6 +17,8 @@ export const Colors = {
     // Accent / brand
     accent: '#A8D5A2',
     accentDark: '#6BBF67',      // for text on green buttons
+    accentBg: 'rgba(168,213,162,0.18)',
+    accentBgFaint: 'rgba(168,213,162,0.10)',
     tint: '#A8D5A2',
     accentHover: '#8FCA8A',
     tabIconDefault: '#BBBBBB',
@@ -24,6 +27,8 @@ export const Colors = {
     // Semantic
     danger: '#E05252',
     warning: '#F59E0B',
+    warningBg: 'rgba(245,158,11,0.12)',
+    warningBright: '#D97706',
     indigo: '#6366F1',
     gold: '#D4A853',
     // Faint variants used for chips, pills, icon tiles
@@ -52,6 +57,7 @@ export const Colors = {
     // Text
     text: '#F5F5F5',
     secondaryText: '#999999',
+    faintText: '#777777',
     // Backgrounds
     background: '#121212',
     surface: '#1E1E1E',
@@ -61,6 +67,8 @@ export const Colors = {
     // Accent / brand — green stays
     accent: '#A8D5A2',
     accentDark: '#1A1A1A',
+    accentBg: 'rgba(168,213,162,0.16)',
+    accentBgFaint: 'rgba(168,213,162,0.09)',
     tint: '#A8D5A2',
     accentHover: '#8FCA8A',
     tabIconDefault: '#555555',
@@ -69,6 +77,8 @@ export const Colors = {
     // Semantic
     danger: '#EF4444',
     warning: '#F59E0B',
+    warningBg: 'rgba(245,158,11,0.15)',
+    warningBright: '#FBBF24',
     indigo: '#818CF8',
     gold: '#D4A853',
     // Faint variants used for chips, pills, icon tiles
