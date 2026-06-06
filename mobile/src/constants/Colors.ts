@@ -31,6 +31,12 @@ export const Colors = {
     warningBright: '#D97706',
     indigo: '#6366F1',
     gold: '#D4A853',
+    // Faint variants used for chips, pills, icon tiles
+    accentBg: '#DCEFDA',
+    accentBgFaint: '#EAF5E8',
+    warningBg: '#FEF3C7',
+    warningBright: '#B45309',
+    faintText: '#94A3B8',
     // Shadows
     shadow: 'rgba(0,0,0,0.05)',
     cardShadow: 'rgba(0,0,0,0.06)',
@@ -75,6 +81,12 @@ export const Colors = {
     warningBright: '#FBBF24',
     indigo: '#818CF8',
     gold: '#D4A853',
+    // Faint variants used for chips, pills, icon tiles
+    accentBg: 'rgba(168,213,162,0.16)',
+    accentBgFaint: 'rgba(168,213,162,0.10)',
+    warningBg: 'rgba(245,158,11,0.16)',
+    warningBright: '#FBBF24',
+    faintText: '#6B7280',
     // Shadows
     shadow: 'rgba(0,0,0,0.3)',
     cardShadow: 'rgba(0,0,0,0.4)',

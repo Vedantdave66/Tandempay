@@ -11,6 +11,7 @@ interface GroupCardProps {
     group: GroupListItem;
     members?: UserBalance[];
     myNetBalance?: number;
+    compact?: boolean;
     onPress: () => void;
 }
 
@@ -25,7 +26,7 @@ const TILT = [
     { body: 7,  name: -10 },
 ];
 
-export default function GroupCard({ group, members = [], myNetBalance = 0, onPress }: GroupCardProps) {
+export default function GroupCard({ group, members = [], myNetBalance = 0, compact = false, onPress }: GroupCardProps) {
     const { colors, isDark } = useTheme();
     const safeMembers = members ?? [];
     const visibleMembers = safeMembers.slice(0, 4);
@@ -54,7 +55,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
         <TouchableOpacity
             onPress={onPress}
             activeOpacity={0.9}
-            style={[styles.card, { backgroundColor: colors.groupGlow[0] }]}
+            style={[styles.card, { backgroundColor: colors.groupGlow[0] }, compact && styles.cardCompact]}
         >
             {/* Green glow — full-bleed vertical ramp, brightest band vertically centered.
                 (expo-linear-gradient can't do radial; this 5-stop vertical reproduces the
@@ -68,7 +69,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
             />
 
             {/* Characters row — zIndex 1 so the title pill can overlap them */}
-            <View style={styles.clusterRow}>
+            <View style={[styles.clusterRow, compact && styles.clusterRowCompact]}>
                 {balanceLoaded ? (
                     visibleMembers.map((m, i) => {
                         const isCreator = m.user_id === group.created_by;
@@ -91,7 +92,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
                                     <CharacterShape
                                         shape={m.character_shape ?? 'rect'}
                                         color={m.character_color ?? '#6B7280'}
-                                        variant="card"
+                                        variant={compact ? 'mini' : 'card'}
                                     />
                                 </View>
                             </View>
@@ -104,8 +105,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
 
             {/* Title pill — overlaps the characters (zIndex 2, pulled up) */}
             <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: 16 }}>
-                <View style={[styles.titlePill, boxStyle, { width: '100%' }]}>
-                    <Text style={{ color: colors.text, fontSize: 30, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
+                <View style={[styles.titlePill, boxStyle, compact && styles.titlePillCompact, { width: '100%' }]}>
+                    <Text style={{ color: colors.text, fontSize: compact ? 20 : 30, fontWeight: '700', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
                         {group.name}
                     </Text>
                 </View>
@@ -121,13 +122,13 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
             )}
 
             {/* Stats */}
-            <View style={styles.stats}>
+            <View style={[styles.stats, compact && styles.statsCompact]}>
 
                 {/* Total expenses */}
                 <View style={styles.statBlock}>
                     <Text style={[styles.statLabel, { color: colors.groupLabel }]}>TOTAL EXPENSES</Text>
-                    <View style={[styles.statPill, boxStyle]}>
-                        <Text style={[styles.statValue, { color: colors.text }]}>
+                    <View style={[styles.statPill, boxStyle, compact && styles.statPillCompact]}>
+                        <Text style={[styles.statValue, { color: colors.text, fontSize: compact ? 21 : 30 }]}>
                             ${formatCurrency(group.total_expenses)}
                         </Text>
                     </View>
@@ -139,19 +140,19 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, onPre
                         <Text style={[styles.statLabel, { color: colors.groupLabel }]}>
                             {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
                         </Text>
-                        <View style={[styles.balancePill, boxStyle]}>
-                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent }]}>
+                        <View style={[styles.balancePill, boxStyle, compact && styles.balancePillCompact]}>
+                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? 21 : 30 }]}>
                                 {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
                             </Text>
                             <TouchableOpacity
                                 onPress={onPress}
-                                style={[styles.arrowBtn, {
+                                style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
                                     backgroundColor: colors.groupArrowBg,
                                     borderWidth: 1.5,
                                     borderColor: isSettled ? colors.groupOwed : accent,
                                 }]}
                             >
-                                <ArrowRight size={18} color={isSettled ? colors.groupOwed : accent} />
+                                <ArrowRight size={compact ? 14 : 18} color={isSettled ? colors.groupOwed : accent} />
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -168,6 +169,11 @@ const styles = StyleSheet.create({
         marginBottom: 16,
         paddingBottom: 4,
     },
+    cardCompact: {
+        width: 222,
+        marginBottom: 0,
+        marginRight: 0,
+    },
     clusterRow: {
         position: 'relative',
         zIndex: 1,
@@ -178,6 +184,10 @@ const styles = StyleSheet.create({
         paddingTop: 22,
         paddingHorizontal: 18,
     },
+    clusterRowCompact: {
+        paddingTop: 16,
+        paddingHorizontal: 12,
+    },
     characterPlaceholder: {
         height: 80,
     },
@@ -187,6 +197,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
+    },
+    titlePillCompact: {
+        height: 48,
+        paddingHorizontal: 16,
     },
     extraPillRow: {
         flexDirection: 'row',
@@ -211,6 +225,12 @@ const styles = StyleSheet.create({
         gap: 16,
         zIndex: 1,
     },
+    statsCompact: {
+        paddingHorizontal: 14,
+        paddingTop: 12,
+        paddingBottom: 14,
+        gap: 10,
+    },
     statBlock: {
         alignItems: 'stretch',
         gap: 8,
@@ -228,6 +248,11 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 20,
     },
+    statPillCompact: {
+        minHeight: 44,
+        borderRadius: 18,
+        paddingHorizontal: 16,
+    },
     statValue: {
         fontSize: 30,
         fontWeight: '700',
@@ -242,6 +267,12 @@ const styles = StyleSheet.create({
         paddingLeft: 24,
         paddingRight: 12,
     },
+    balancePillCompact: {
+        minHeight: 44,
+        borderRadius: 18,
+        paddingLeft: 16,
+        paddingRight: 8,
+    },
     balanceValue: {
         fontSize: 30,
         fontWeight: '700',
@@ -253,5 +284,10 @@ const styles = StyleSheet.create({
         borderRadius: 22,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    arrowBtnCompact: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
     },
 });
