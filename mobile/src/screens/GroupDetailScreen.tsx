@@ -91,10 +91,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         setMembersTab('friends');
         setFriendsLoading(true);
         try {
-            const data = await friendsApi.getMyFriends();
-            // Filter out people already in the group
+            const raw = await friendsApi.getMyFriends();
+            const allFriends: Friend[] = toArray<Friend>(raw);
             const memberIds = new Set(group?.members.map(m => m.user_id) || []);
-            setFriends((data || []).filter(f => !memberIds.has(f.id)));
+            setFriends(allFriends.filter(f => !memberIds.has(f.id)));
         } catch (e) {
             console.error('Failed to load friends', e);
         } finally {
