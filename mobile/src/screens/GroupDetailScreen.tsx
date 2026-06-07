@@ -171,33 +171,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const handleInitiateSettlement = async (payeeId: string, amount: number) => {
-        Alert.alert(
-            "Confirm Payment",
-            `Do you want to record a $${formatCurrency(amount)} payment to this user? They will receive a notification.`,
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Record Payment",
-                    style: "default",
-                    onPress: async () => {
-                        try {
-                            await settlementsApi.create(groupId, payeeId, amount, 'in_app');
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                            Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
-                                { text: "OK", onPress: () => navigation.navigate("Payments") }
-                            ]);
-                            loadData();
-                        } catch (err: any) {
-                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-                            Alert.alert("Error", err.message);
-                        }
-                    }
-                }
-            ]
-        );
-    };
-
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
     if (loading && !refreshing) {
@@ -447,8 +420,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
                                     disabled={!isMine}
                                     onPress={() => {
+                                        if (!isMine) return;
                                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        handleInitiateSettlement(s.to_user_id, s.amount);
+                                        const toMember = group?.members?.find((m: any) => m.id === s.to_user_id || m.user_id === s.to_user_id);
+                                        navigation.navigate('SettleUp', {
+                                            payment: {
+                                                payee_id:           s.to_user_id,
+                                                payee_name:         toMember?.name ?? 'User',
+                                                payee_email:        toMember?.email ?? '',
+                                                payee_avatar_color: to?.character_color ?? s.to_avatar_color ?? '#6B7280',
+                                                amount:             s.amount,
+                                                group_id:           groupId,
+                                                payer_id:           user?.id,
+                                                id:                 (s as any).id ?? null,
+                                                description:        group?.name ?? 'Expense',
+                                            }
+                                        });
                                     }}
                                     activeOpacity={0.82}
                                 >

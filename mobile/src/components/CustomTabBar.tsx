@@ -6,7 +6,6 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Users, Wallet, Bell, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
@@ -53,11 +52,11 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
 
   return (
     <View style={[styles.container, { borderTopColor: colors.border, paddingBottom: insets.bottom }]}>
-      {/* Blur fills the bar */}
-      <BlurView
-        intensity={isDark ? 55 : 75}
-        tint={isDark ? 'dark' : 'light'}
-        style={[StyleSheet.absoluteFillObject, { borderRadius: ms(30) }]}
+      {/* Solid semi-transparent pill background */}
+      <View
+        style={[StyleSheet.absoluteFillObject, {
+          backgroundColor: isDark ? 'rgba(12,15,12,0.97)' : 'rgba(255,255,255,0.97)',
+        }]}
       />
 
       {/* Limelight indicator */}
