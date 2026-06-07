@@ -8,9 +8,10 @@ import {
     ActivityIndicator,
     Alert,
     Clipboard,
+    StatusBar,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { usePaymentSheet } from '@stripe/stripe-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -97,6 +98,7 @@ export default function SettleUpScreen() {
     const { payment } = route.params;
     const { isDark } = useTheme();
     const t = tok(isDark);
+    const insets = useSafeAreaInsets();
 
     const [view, setView] = useState<'choose' | 'sent'>('choose');
     const [method, setMethod] = useState<'interac' | 'card' | 'manual'>('interac');
@@ -126,11 +128,20 @@ export default function SettleUpScreen() {
         try {
             if (m === 'interac') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
-                const all = await meApi.getPayments();
-                const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
-                    .find(r => r.payer_id === payment.payer_id && r.payee_id === payment.payee_id && r.status === 'pending');
-                if (rec) await settlementsApi.updateStatus(payment.group_id, rec.id, 'sent');
+                let settlementId: string | null = payment.id ?? null;
+
+                if (!settlementId) {
+                    const created = await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
+                    settlementId = (created as any)?.id ?? null;
+                    if (!settlementId) {
+                        const all = await meApi.getPayments();
+                        const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
+                            .find(r => r.payer_id === payment.payer_id && r.payee_id === payment.payee_id && r.status === 'pending');
+                        settlementId = rec?.id ?? null;
+                    }
+                }
+
+                if (settlementId) await settlementsApi.updateStatus(payment.group_id, settlementId, 'sent');
                 setMethod('interac');
                 setView('sent');
             } else if (m === 'card') {
@@ -170,36 +181,38 @@ export default function SettleUpScreen() {
     const heroLocations = [0, 0.28, 0.62, 1] as const;
 
     return (
-        <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
-            {/* Header */}
-            <View style={styles.header}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.headerBtn}
-                    activeOpacity={0.8}
-                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                >
-                    <ChevronLeft size={scale(26)} color={t.ink} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: t.ink }]}>Settle up</Text>
-                <View style={styles.headerBtn} />
-            </View>
+        <View style={{ flex: 1, backgroundColor: t.bg }}>
+            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
 
             <ScrollView
                 style={{ flex: 1, backgroundColor: t.bg }}
                 contentContainerStyle={{ flexGrow: 1, paddingHorizontal: scale(20), paddingBottom: vs(40) }}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Hero glow — bleeds to screen edges */}
+                {/* Hero glow — bleeds to screen edges and status bar */}
                 <LinearGradient
                     colors={heroColors}
                     locations={heroLocations}
                     start={{ x: 0.5, y: 0 }}
                     end={{ x: 0.5, y: 1 }}
-                    style={[styles.heroGrad, { marginHorizontal: -scale(20) }]}
+                    style={[styles.heroGrad, { marginHorizontal: -scale(20), paddingTop: insets.top + vs(16) }]}
                 >
+                    {/* Header sits inside gradient, clears status bar via paddingTop */}
+                    <View style={[styles.header, { alignSelf: 'stretch' }]}>
+                        <TouchableOpacity
+                            onPress={() => navigation.goBack()}
+                            style={styles.headerBtn}
+                            activeOpacity={0.8}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                        >
+                            <ChevronLeft size={scale(26)} color={t.ink} />
+                        </TouchableOpacity>
+                        <Text style={[styles.headerTitle, { color: t.ink }]}>Settle up</Text>
+                        <View style={styles.headerBtn} />
+                    </View>
+
                     <View style={styles.heroAvatarWrap}>
-                        <CharacterShape shape="rect" color={payment.payee_avatar_color} variant="hero" />
+                        <CharacterShape shape="rect" color={payment.payee_avatar_color} variant="card" />
                         {view === 'sent' && (
                             <View style={[styles.checkBadge, { backgroundColor: t.green, borderColor: t.bg }]}>
                                 <Check size={scale(14)} color={t.greenInk} strokeWidth={2.8} />
@@ -411,17 +424,19 @@ export default function SettleUpScreen() {
 
                         <View style={{ flex: 1 }} />
 
-                        <TouchableOpacity
-                            style={[styles.primaryBtn, { backgroundColor: t.green }]}
-                            onPress={() => navigation.goBack()}
-                            activeOpacity={0.85}
-                        >
-                            <Text style={[styles.primaryBtnText, { color: t.greenInk }]}>Done</Text>
-                        </TouchableOpacity>
+                        <View style={{ paddingBottom: insets.bottom + vs(16) }}>
+                            <TouchableOpacity
+                                style={[styles.primaryBtn, { backgroundColor: t.green }]}
+                                onPress={() => navigation.goBack()}
+                                activeOpacity={0.85}
+                            >
+                                <Text style={[styles.primaryBtnText, { color: t.greenInk }]}>Done</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
                 )}
             </ScrollView>
-        </SafeAreaView>
+        </View>
     );
 }
 
@@ -448,7 +463,6 @@ const styles = StyleSheet.create({
 
     heroGrad: {
         alignItems: 'center',
-        paddingTop: vs(48),
         paddingBottom: vs(72),
         paddingHorizontal: scale(20),
         gap: vs(8),
