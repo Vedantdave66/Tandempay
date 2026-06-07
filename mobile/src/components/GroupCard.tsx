@@ -121,7 +121,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                 )}
             </View>
 
-            <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: scale(16) }}>
+            <View style={{ zIndex: 2, alignItems: 'center', marginTop: -14, paddingHorizontal: scale(16) }}>
                 <View style={[styles.titlePill, boxStyle, compact && styles.titlePillCompact, { width: '100%' }]}>
                     <Text style={{
                         color: colors.text,
@@ -205,12 +205,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'flex-end',
         gap: scale(2),
-        paddingTop: vs(22),
+        paddingTop: vs(20),
+        paddingBottom: vs(10),
         paddingHorizontal: scale(20),
         overflow: 'visible',
     },
     clusterRowCompact: {
         paddingTop: vs(16),
+        paddingBottom: vs(6),
         paddingHorizontal: scale(12),
     },
     characterPlaceholder: {
