@@ -8,7 +8,6 @@ import {
     ActivityIndicator,
     Alert,
     Clipboard,
-    StatusBar,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -182,8 +181,6 @@ export default function SettleUpScreen() {
 
     return (
         <View style={{ flex: 1, backgroundColor: t.bg }}>
-            <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} translucent backgroundColor="transparent" />
-
             <ScrollView
                 style={{ flex: 1, backgroundColor: t.bg }}
                 contentContainerStyle={{ flexGrow: 1, paddingHorizontal: scale(20), paddingBottom: vs(40) }}
