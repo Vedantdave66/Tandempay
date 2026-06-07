@@ -41,7 +41,7 @@ export function useNotifications() {
 
 // ─── Toast Banner ────────────────────────────────────────────────────────────
 function ToastBanner({ message, visible, colors }: { message: string; visible: boolean; colors: any }) {
-    const translateY = useRef(new Animated.Value(-80)).current;
+    const translateY = useRef(new Animated.Value(-200)).current;
 
     useEffect(() => {
         if (visible) {
@@ -53,7 +53,7 @@ function ToastBanner({ message, visible, colors }: { message: string; visible: b
             }).start();
         } else {
             Animated.timing(translateY, {
-                toValue: -80,
+                toValue: -200,
                 duration: 300,
                 useNativeDriver: true,
             }).start();
