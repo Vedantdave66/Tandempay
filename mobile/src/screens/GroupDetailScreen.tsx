@@ -196,8 +196,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 style={[styles.headerGradient, { borderBottomColor: colors.border }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.70}>
-                    <ArrowLeft size={17} color={colors.accentDark} />
-                    <Text style={[styles.backText, { color: colors.accentDark }, T.bold]}>Back</Text>
+                    <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
+                    <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
 
                 <View style={styles.headerTopRow}>
