@@ -192,7 +192,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     return (
         <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
             <LinearGradient
-                colors={isDark ? ['#0A1F12', '#081509', '#0D1210'] : ['#E9F7EF', '#F2FBF6', '#FFFFFF']}
+                colors={isDark ? ['#11833F', '#0A4C29', '#0A0D0B'] : ['#BDEECB', '#DBF3E2', '#FFFFFF']}
+                locations={[0, 0.35, 1]}
+                start={{ x: 0.5, y: 0 }}
+                end={{ x: 0.5, y: 1 }}
                 style={[styles.headerGradient, { borderBottomColor: colors.border }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.70}>
@@ -596,7 +599,8 @@ const styles = StyleSheet.create({
 
     headerGradient: {
         paddingHorizontal: scale(20),
-        paddingTop: vs(4),
+        paddingTop: vs(12),
+        paddingBottom: vs(16),
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
     backRow: {
