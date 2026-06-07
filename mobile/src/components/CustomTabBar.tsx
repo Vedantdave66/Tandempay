@@ -6,9 +6,12 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Home, Users, Wallet, Bell, User } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
+import { BlurView } from 'expo-blur';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { scale, vs, ms } from '../utils/responsive';
+import { T } from '../utils/typography';
 
 const TABS = [
   { key: 'Home',     icon: Home,  label: 'Home'     },
@@ -25,7 +28,6 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const { unreadCount } = useNotifications();
   const insets = useSafeAreaInsets();
 
-  // Store each tab's measured center X
   const tabCenters = useRef<number[]>([]);
   const limelightX = useRef(new Animated.Value(-999)).current;
   const [ready, setReady] = useState(false);
@@ -46,19 +48,18 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const handleLayout = (e: LayoutChangeEvent, index: number) => {
     const { x, width } = e.nativeEvent.layout;
     tabCenters.current[index] = x + width / 2;
-    // Move limelight to active tab once we have its position
     if (index === state.index) moveLimelight(index);
   };
 
   return (
-    <View style={[
-      styles.container,
-      {
-        backgroundColor: isDark ? 'rgba(14,17,14,0.97)' : 'rgba(255,255,255,0.97)',
-        borderTopColor: colors.border,
-        paddingBottom: insets.bottom,
-      }
-    ]}>
+    <View style={[styles.container, { borderTopColor: colors.border, paddingBottom: insets.bottom }]}>
+      {/* Blur fills the bar */}
+      <BlurView
+        intensity={isDark ? 55 : 75}
+        tint={isDark ? 'dark' : 'light'}
+        style={[StyleSheet.absoluteFillObject, { borderRadius: ms(30) }]}
+      />
+
       {/* Limelight indicator */}
       <Animated.View
         style={[
@@ -68,7 +69,6 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
           !ready && { opacity: 0 },
         ]}
       >
-        {/* Cone glow below the bar */}
         <LinearGradient
           colors={[
             isDark ? 'rgba(34,197,94,0.35)' : 'rgba(22,163,74,0.22)',
@@ -91,9 +91,10 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
             <TouchableOpacity
               key={tab.key}
               style={styles.tabBtn}
-              activeOpacity={0.7}
+              activeOpacity={0.88}
               onLayout={e => handleLayout(e, index)}
               onPress={() => {
+                Haptics.selectionAsync();
                 moveLimelight(index);
                 const event = navigation.emit({
                   type: 'tabPress',
@@ -115,7 +116,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
               </View>
               <Text style={[
                 styles.label,
-                { color: isFocused ? colors.accent : colors.tabIconDefault }
+                T.semibold,
+                { color: isFocused ? colors.accent : colors.tabIconDefault },
               ]}>
                 {tab.label}
               </Text>
@@ -129,8 +131,9 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    borderTopWidth: 1,
+    borderTopWidth: StyleSheet.hairlineWidth,
     position: 'relative',
+    overflow: 'hidden',
   },
   limelightBar: {
     position: 'absolute',
@@ -173,6 +176,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: ms(10),
-    fontWeight: '600',
+    letterSpacing: 0,
   },
 });

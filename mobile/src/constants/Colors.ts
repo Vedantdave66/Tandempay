@@ -34,7 +34,7 @@ export const Colors = {
     shadow: 'rgba(15,40,30,0.06)',
     cardShadow: 'rgba(15,40,30,0.10)',
     // GroupCard
-    groupGlow:       ['#F3FBF4','#CEFADE','#86EFAC','#3BE57F','#86EFAC','#CEFADE','#F3FBF4'] as [string,string,string,string,string,string,string],
+    groupGlow:       ['#3BE57F','#8FE9B0','#D8F4E1','#F3FBF4'] as [string,string,string,string],
     groupBoxFill:    '#FFFFFF',
     groupBoxBorder:  'rgba(0,0,0,0.05)',
     groupBoxShadow:  'rgba(20,60,35,0.14)',
@@ -83,7 +83,7 @@ export const Colors = {
     shadow: 'rgba(0,0,0,0.4)',
     cardShadow: 'rgba(0,0,0,0.5)',
     // GroupCard
-    groupGlow:       ['#070A08','#0A3A1E','#0F6B30','#1AA94E','#0F6B30','#0A3A1E','#070A08'] as [string,string,string,string,string,string,string],
+    groupGlow:       ['#1E6A3A','#0D3019','#060F08','#030806'] as [string,string,string,string],
     groupBoxFill:    '#0C0F0D',
     groupBoxBorder:  'rgba(255,255,255,0.06)',
     groupBoxShadow:  'transparent',

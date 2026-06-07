@@ -19,8 +19,10 @@ import {
     ChevronLeft, Landmark, Zap, CreditCard, Copy,
     Check, ChevronRight,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { meApi, settlementsApi, paymentsApi } from '../services/api';
 import { formatCurrency } from '../utils/formatCurrency';
+import { T as Font } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
 // ─── Theme tokens ────────────────────────────────────────────────────────────
@@ -112,7 +114,8 @@ export default function SettleUpScreen() {
     const cardTotal = (amount + Number(fee)).toFixed(2);
 
     const handleCopy = (key: string, value: string) => {
-        Clipboard.setStringAsync(value);
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        Clipboard.setString(value);
         setCopied(key);
         setTimeout(() => setCopied(c => c === key ? null : c), 1300);
     };
@@ -122,6 +125,7 @@ export default function SettleUpScreen() {
         setLoading(true);
         try {
             if (m === 'interac') {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                 await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
                 const all = await meApi.getPayments();
                 const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
@@ -213,8 +217,11 @@ export default function SettleUpScreen() {
                         {/* Interac hero card */}
                         <View style={[styles.card, {
                             backgroundColor: t.card, borderColor: t.cardBorder,
-                            shadowColor: isDark ? '#000' : '#1A1A1A',
-                            shadowOpacity: isDark ? 0.4 : 0.08,
+                            shadowColor: '#000',
+                            shadowOpacity: isDark ? 0.50 : 0.12,
+                            shadowRadius: 20,
+                            shadowOffset: { width: 0, height: 14 },
+                            elevation: isDark ? 18 : 12,
                         }]}>
                             <View style={styles.cardRow}>
                                 <View style={[styles.iconTile, { backgroundColor: t.overlay }]}>
@@ -281,8 +288,11 @@ export default function SettleUpScreen() {
                         {/* Collapsible card option */}
                         <View style={[styles.card, {
                             backgroundColor: t.card, borderColor: t.cardBorder,
-                            shadowColor: isDark ? '#000' : '#1A1A1A',
-                            shadowOpacity: isDark ? 0.4 : 0.08,
+                            shadowColor: '#000',
+                            shadowOpacity: isDark ? 0.50 : 0.12,
+                            shadowRadius: 20,
+                            shadowOffset: { width: 0, height: 14 },
+                            elevation: isDark ? 18 : 12,
                             gap: 0,
                         }]}>
                             <TouchableOpacity
@@ -431,7 +441,7 @@ const styles = StyleSheet.create({
     },
     headerTitle: {
         fontSize: ms(18),
-        fontWeight: '700',
+        ...Font.bold,
     },
 
     heroGrad: {
@@ -458,12 +468,14 @@ const styles = StyleSheet.create({
     },
     heroOwes: {
         fontSize: ms(16),
-        fontWeight: '700',
+        ...Font.bold,
     },
     heroAmount: {
         fontSize: ms(52),
-        fontWeight: '800',
-        letterSpacing: -2,
+        ...Font.extrabold,
+        letterSpacing: -1.5,
+        lineHeight: 56,
+        fontVariant: ['tabular-nums'],
     },
     heroChip: {
         borderRadius: 999,
@@ -473,16 +485,13 @@ const styles = StyleSheet.create({
     },
     heroChipText: {
         fontSize: ms(13),
-        fontWeight: '600',
+        ...Font.semibold,
     },
 
     card: {
         borderRadius: ms(24),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         padding: scale(18),
-        shadowOffset: { width: 0, height: 2 },
-        shadowRadius: 12,
-        elevation: 3,
         gap: vs(14),
     },
     cardRow: {
@@ -497,12 +506,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     cardTitle: {
-        fontSize: ms(16),
-        fontWeight: '700',
+        fontSize: ms(19),
+        ...Font.bold,
+        letterSpacing: -0.3,
     },
     cardSub: {
         fontSize: ms(13),
-        fontWeight: '500',
+        ...Font.regular,
     },
     freePill: {
         borderRadius: 999,
@@ -511,12 +521,13 @@ const styles = StyleSheet.create({
     },
     freePillText: {
         fontSize: ms(11),
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        ...Font.extrabold,
+        letterSpacing: 1.3,
     },
     hint: {
-        fontSize: ms(13),
-        lineHeight: 19,
+        fontSize: ms(15),
+        lineHeight: 22,
+        ...Font.semibold,
     },
 
     primaryBtn: {
@@ -524,10 +535,15 @@ const styles = StyleSheet.create({
         borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
+        shadowColor: '#16A34A',
+        shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.44,
+        shadowRadius: 12,
+        elevation: 8,
     },
     primaryBtnText: {
         fontSize: ms(16),
-        fontWeight: '800',
+        ...Font.extrabold,
     },
 
     ghostBtn: {
@@ -539,7 +555,7 @@ const styles = StyleSheet.create({
     },
     ghostBtnText: {
         fontSize: ms(15),
-        fontWeight: '700',
+        ...Font.bold,
     },
 
     orRow: {
@@ -553,7 +569,7 @@ const styles = StyleSheet.create({
     },
     orText: {
         fontSize: ms(12),
-        fontWeight: '700',
+        ...Font.bold,
         letterSpacing: 1,
     },
 
@@ -563,11 +579,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     feeLabel: {
-        fontSize: ms(14),
-        fontWeight: '500',
+        fontSize: ms(15),
+        ...Font.regular,
+        lineHeight: 22,
     },
     feeValue: {
-        fontSize: ms(14),
+        fontSize: ms(15),
+        fontVariant: ['tabular-nums'],
     },
 
     manualLink: {
@@ -577,18 +595,20 @@ const styles = StyleSheet.create({
     },
     manualLinkText: {
         fontSize: ms(14),
+        ...Font.regular,
         textDecorationLine: 'underline',
     },
 
     sentTitle: {
         fontSize: ms(24),
-        fontWeight: '800',
+        ...Font.extrabold,
         letterSpacing: -0.5,
         textAlign: 'center',
     },
     sentSub: {
-        fontSize: ms(14),
-        fontWeight: '500',
+        fontSize: ms(15),
+        ...Font.semibold,
+        lineHeight: 22,
         textAlign: 'center',
     },
 
@@ -601,6 +621,6 @@ const styles = StyleSheet.create({
     },
     toggleBtnText: {
         fontSize: ms(14),
-        fontWeight: '700',
+        ...Font.bold,
     },
 });

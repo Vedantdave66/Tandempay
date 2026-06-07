@@ -6,6 +6,7 @@ import { GroupListItem, UserBalance } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils/formatCurrency';
 import { scale, vs, ms } from '../utils/responsive';
+import { T } from '../utils/typography';
 import CharacterShape from './CharacterShape';
 
 interface GroupCardProps {
@@ -18,8 +19,6 @@ interface GroupCardProps {
 
 const SETTLED_THRESHOLD = 0.01;
 
-// Per-slot body + name tilt for the lively "peeking" cluster. Heights come from
-// the member's own shape (CharacterShape 'card' variant), so we only inject tilt.
 const TILT = [
     { body: -4, name: -8 },
     { body: 2,  name: 4 },
@@ -38,50 +37,53 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
     const isOwed = balance > SETTLED_THRESHOLD;
     const isSettled = !isOwe && !isOwed;
 
-    // accent = amount color, drives balance text + arrow ring
     const accent = isOwe ? colors.groupOwe : colors.groupOwed;
     const boxStyle = {
         backgroundColor: colors.groupBoxFill,
-        borderWidth: 1,
-        borderColor: colors.groupBoxBorder,
-        // subtle lift only matters in light; transparent shadow color = no-op in dark
-        shadowColor: colors.groupBoxShadow,
-        shadowOpacity: isDark ? 0 : 1,
-        shadowRadius: 12,
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        shadowColor: '#0A3020',
+        shadowOpacity: isDark ? 0 : 0.25,
+        shadowRadius: 8,
         shadowOffset: { width: 0, height: 6 },
-        elevation: isDark ? 0 : 3,
+        elevation: isDark ? 0 : 4,
     };
 
     return (
         <TouchableOpacity
             onPress={onPress}
-            activeOpacity={0.9}
+            activeOpacity={0.88}
             style={[styles.card, {
-            backgroundColor: 'transparent',
-            borderWidth: 1,
-            borderColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
-            shadowColor: isDark ? '#000' : 'rgba(20,60,35,0.15)',
-            shadowOpacity: isDark ? 0.3 : 1,
-            shadowRadius: 18,
-            shadowOffset: { width: 0, height: 8 },
-            elevation: isDark ? 0 : 5,
-        }, compact && styles.cardCompact]}
+                backgroundColor: 'transparent',
+                borderWidth: StyleSheet.hairlineWidth,
+                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                shadowColor: '#0A3020',
+                shadowOpacity: isDark ? 0 : 0.18,
+                shadowRadius: 18,
+                shadowOffset: { width: 0, height: 8 },
+                elevation: isDark ? 0 : 10,
+            }, compact && styles.cardCompact]}
         >
-            {/* Green glow — full-bleed vertical ramp, brightest band vertically centered.
-                (expo-linear-gradient can't do radial; this 5-stop vertical reproduces the
-                 mock's centered-glow falloff. For a true radial, swap in react-native-svg's
-                 <RadialGradient> — see handoff note.)
-                 Wrapped so only the gradient clips to the rounded corners — the card itself
-                 stays overflow: 'visible' so peeking characters aren't cut off at the edges. */}
             <View style={styles.gradientClip} pointerEvents="none">
-                <LinearGradient
-                    colors={colors.groupGlow}
-                    locations={[0, 0.15, 0.30, 0.50, 0.70, 0.85, 1]}
-                    style={StyleSheet.absoluteFill}
-                />
+                {isDark ? (
+                    <LinearGradient
+                        colors={['#1E6A3A', '#0D3019', '#060F08', '#030806']}
+                        locations={[0, 0.35, 0.68, 1]}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                    />
+                ) : (
+                    <LinearGradient
+                        colors={['#3BE57F', '#8FE9B0', '#D8F4E1', '#F3FBF4']}
+                        locations={[0, 0.30, 0.56, 1]}
+                        start={{ x: 0.5, y: 0 }}
+                        end={{ x: 0.5, y: 1 }}
+                        style={StyleSheet.absoluteFillObject}
+                    />
+                )}
             </View>
 
-            {/* Characters row — zIndex 1 so the title pill can overlap them */}
             <View style={[styles.clusterRow, compact && styles.clusterRowCompact]}>
                 {balanceLoaded ? (
                     visibleMembers.map((m, i) => {
@@ -95,7 +97,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                                 }
                                 <Text style={{
                                     fontSize: ms(11), color: colors.groupNameInk, marginBottom: vs(4),
-                                    fontWeight: '700', transform: [{ rotate: `${tilt.name}deg` }],
+                                    ...T.bold,
+                                    transform: [{ rotate: `${tilt.name}deg` }],
                                     textShadowColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.55)',
                                     textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 2,
                                 }}>
@@ -118,49 +121,50 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                 )}
             </View>
 
-            {/* Title pill — overlaps the characters (zIndex 2, pulled up) */}
             <View style={{ zIndex: 2, alignItems: 'center', marginTop: -22, paddingHorizontal: scale(16) }}>
                 <View style={[styles.titlePill, boxStyle, compact && styles.titlePillCompact, { width: '100%' }]}>
-                    <Text style={{ color: colors.text, fontSize: compact ? ms(18) : ms(22, 0.3), fontWeight: '800', letterSpacing: -0.5, textAlign: 'center' }} numberOfLines={1}>
+                    <Text style={{
+                        color: colors.text,
+                        fontSize: compact ? ms(18) : ms(22),
+                        ...T.extrabold,
+                        letterSpacing: -0.4,
+                        textAlign: 'center',
+                    }} numberOfLines={1}>
                         {group.name}
                     </Text>
                 </View>
             </View>
 
-            {/* +N others pill */}
             {extraCount > 0 && (
                 <View style={styles.extraPillRow}>
                     <View style={[styles.extraPill, { backgroundColor: colors.groupOthersFill }]}>
-                        <Text style={[styles.extraPillText, { color: colors.groupOthersInk }]}>+{extraCount} others</Text>
+                        <Text style={[styles.extraPillText, { color: colors.groupOthersInk }, T.bold]}>+{extraCount} others</Text>
                     </View>
                 </View>
             )}
 
-            {/* Stats */}
             <View style={[styles.stats, compact && styles.statsCompact]}>
-
-                {/* Total expenses */}
                 <View style={styles.statBlock}>
-                    <Text style={[styles.statLabel, { color: colors.groupLabel }]}>TOTAL EXPENSES</Text>
+                    <Text style={[styles.statLabel, { color: colors.groupLabel }, T.extrabold]}>TOTAL EXPENSES</Text>
                     <View style={[styles.statPill, boxStyle, compact && styles.statPillCompact]}>
-                        <Text style={[styles.statValue, { color: colors.text, fontSize: compact ? 21 : 30 }]}>
+                        <Text style={[styles.statValue, { color: colors.text, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
                             ${formatCurrency(group.total_expenses)}
                         </Text>
                     </View>
                 </View>
 
-                {/* Balance */}
                 {balanceLoaded && (
                     <View style={styles.statBlock}>
-                        <Text style={[styles.statLabel, { color: colors.groupLabel }]}>
+                        <Text style={[styles.statLabel, { color: colors.groupLabel }, T.extrabold]}>
                             {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
                         </Text>
                         <View style={[styles.balancePill, boxStyle, compact && styles.balancePillCompact]}>
-                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? 21 : 30 }]}>
+                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                 {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
                             </Text>
                             <TouchableOpacity
                                 onPress={onPress}
+                                activeOpacity={0.82}
                                 style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
                                     backgroundColor: colors.accentBgFaint,
                                     borderWidth: 1.5,
@@ -236,7 +240,6 @@ const styles = StyleSheet.create({
     },
     extraPillText: {
         fontSize: ms(13),
-        fontWeight: '700',
     },
     stats: {
         paddingHorizontal: scale(22),
@@ -257,9 +260,8 @@ const styles = StyleSheet.create({
         gap: vs(8),
     },
     statLabel: {
-        fontSize: ms(10),
-        fontWeight: '800',
-        letterSpacing: 1.8,
+        fontSize: ms(11),
+        letterSpacing: 1.3,
         textAlign: 'center',
     },
     statPill: {
@@ -275,8 +277,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(16),
     },
     statValue: {
-        fontSize: ms(26, 0.3),
-        fontWeight: '800',
         letterSpacing: -0.8,
     },
     balancePill: {
@@ -295,8 +295,6 @@ const styles = StyleSheet.create({
         paddingRight: scale(8),
     },
     balanceValue: {
-        fontSize: ms(26, 0.3),
-        fontWeight: '800',
         letterSpacing: -0.8,
     },
     arrowBtn: {
