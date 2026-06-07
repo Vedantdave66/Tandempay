@@ -12,8 +12,10 @@ import {
   Modal,
   Alert,
   TextInput,
+  StatusBar,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
@@ -29,6 +31,16 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
     const { colors, isDark } = useTheme();
     const { user } = useAuth();
+    const insets = useSafeAreaInsets();
+
+    useFocusEffect(useCallback(() => {
+        StatusBar.setTranslucent(true);
+        StatusBar.setBackgroundColor('transparent');
+        return () => {
+            StatusBar.setTranslucent(false);
+            StatusBar.setBackgroundColor('transparent');
+        };
+    }, []));
 
     const [group, setGroup] = useState<Group | null>(null);
     const [expenses, setExpenses] = useState<Expense[]>([]);
@@ -175,11 +187,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     if (loading && !refreshing) {
         return (
-            <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
                 <View style={styles.center}>
                     <ActivityIndicator color={colors.accent} size="large" />
                 </View>
-            </SafeAreaView>
+            </View>
         );
     }
 
@@ -190,13 +202,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const maxBalance = Math.max(...balances.map(b => Math.abs(Number(b.net_balance))), 1);
 
     return (
-        <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
+        <View style={[styles.container, { backgroundColor: colors.background }]}>
             <LinearGradient
                 colors={isDark ? ['#11833F', '#0A4C29', '#0A0D0B'] : ['#BDEECB', '#DBF3E2', '#FFFFFF']}
                 locations={[0, 0.35, 1]}
                 start={{ x: 0.5, y: 0 }}
                 end={{ x: 0.5, y: 1 }}
-                style={[styles.headerGradient, { borderBottomColor: colors.border }]}
+                style={[styles.headerGradient, { borderBottomColor: colors.border, paddingTop: insets.top + vs(8) }]}
             >
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.70}>
                     <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
@@ -589,7 +601,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
-        </SafeAreaView>
+        </View>
     );
 }
 
