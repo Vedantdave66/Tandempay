@@ -14,10 +14,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
 import { friendsApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
+import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
-// Mirrors DashboardScreen's notification → icon mapping; the friend "Activity"
-// feed reuses the same notifications endpoint since there's no dedicated one.
 const TYPE_CONFIG: Record<string, { icon: any; tint: 'green' | 'neutral' }> = {
     expense_added:        { icon: Receipt,     tint: 'green' },
     settlement_requested: { icon: Handshake,   tint: 'neutral' },
@@ -37,7 +36,7 @@ function timeAgo(d: string) {
 }
 
 export default function FriendsScreen() {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
 
     const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'pending'>('activity');
     const [emailInput, setEmailInput] = useState('');
@@ -116,9 +115,8 @@ export default function FriendsScreen() {
     return (
         <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>Your people 👋</Text>
+                <Text style={[styles.title, { color: colors.text }, T.extrabold]}>Your people 👋</Text>
 
-                {/* Segmented Control */}
                 <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                     {segments.map(seg => {
                         const active = activeTab === seg.id;
@@ -128,10 +126,10 @@ export default function FriendsScreen() {
                                 key={seg.id}
                                 style={[styles.segment, active && { backgroundColor: colors.accent }]}
                                 onPress={() => setActiveTab(seg.id)}
-                                activeOpacity={0.8}
+                                activeOpacity={0.88}
                             >
                                 <Icon size={15} color={active ? '#fff' : colors.secondaryText} />
-                                <Text style={[styles.segmentText, { color: active ? '#fff' : colors.secondaryText, fontWeight: active ? '700' : '600' }]}>
+                                <Text style={[styles.segmentText, { color: active ? '#fff' : colors.secondaryText }, active ? T.bold : T.semibold]}>
                                     {seg.label}
                                 </Text>
                             </TouchableOpacity>
@@ -144,36 +142,43 @@ export default function FriendsScreen() {
                 {loading ? (
                     <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
                 ) : activeTab === 'activity' ? (
-                    /* Activity Tab */
                     activity.length === 0 ? (
                         <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Bell size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
-                            <Text style={[styles.emptyDesc, { color: colors.secondaryText }]}>
+                            <Text style={[styles.emptyTitle, { color: colors.text }, T.bold]}>No activity yet</Text>
+                            <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
                                 Activity from your friends and squads will show up here.
                             </Text>
                         </View>
                     ) : (
-                        <View style={[styles.activityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View style={[styles.activityCard, {
+                            backgroundColor: colors.surface, borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                            shadowColor: isDark ? '#000' : '#0A3020',
+                            shadowOpacity: isDark ? 0.50 : 0.10,
+                            shadowRadius: isDark ? 20 : 14,
+                            shadowOffset: { width: 0, height: isDark ? 14 : 6 },
+                            elevation: isDark ? 14 : 4,
+                        }]}>
                             {activity.map((a, i) => {
                                 const cfg = TYPE_CONFIG[a.type] || { icon: Bell, tint: 'neutral' as const };
                                 const Icon = cfg.icon;
+                                const isLast = i === activity.length - 1;
                                 return (
                                     <View
                                         key={a.id}
                                         style={[
                                             styles.activityRow,
-                                            i < activity.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                                            !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
                                         ]}
                                     >
                                         <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
                                             <Icon size={18} color={cfg.tint === 'green' ? colors.accent : colors.secondaryText} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[styles.activityText, { color: colors.text }]} numberOfLines={2}>
+                                            <Text style={[styles.activityText, { color: colors.text }, T.semibold]} numberOfLines={2}>
                                                 {a.message || a.title}
                                             </Text>
-                                            <Text style={[styles.activityTime, { color: colors.faintText }]}>{timeAgo(a.created_at)}</Text>
+                                            <Text style={[styles.activityTime, { color: colors.faintText }, T.regular]}>{timeAgo(a.created_at)}</Text>
                                         </View>
                                     </View>
                                 );
@@ -181,13 +186,12 @@ export default function FriendsScreen() {
                         </View>
                     )
                 ) : activeTab === 'friends' ? (
-                    /* Friends Tab */
                     <>
                         <View style={styles.addFriendSection}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }]}>Add Friend by Email</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Add Friend by Email</Text>
                             <View style={styles.inputRow}>
                                 <TextInput
-                                    style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+                                    style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, ...T.regular }]}
                                     placeholder="friend@example.com"
                                     placeholderTextColor={colors.secondaryText}
                                     value={emailInput}
@@ -196,9 +200,18 @@ export default function FriendsScreen() {
                                     keyboardType="email-address"
                                 />
                                 <TouchableOpacity
-                                    style={[styles.sendBtn, { backgroundColor: colors.accent, opacity: emailInput.length ? 1 : 0.5 }]}
+                                    style={[styles.sendBtn, {
+                                        backgroundColor: colors.accent,
+                                        opacity: emailInput.length ? 1 : 0.5,
+                                        shadowColor: '#16A34A',
+                                        shadowOpacity: emailInput.length ? 0.44 : 0,
+                                        shadowRadius: 12,
+                                        shadowOffset: { width: 0, height: 8 },
+                                        elevation: emailInput.length ? 8 : 0,
+                                    }]}
                                     onPress={handleSendRequest}
                                     disabled={!emailInput.length || submitting}
+                                    activeOpacity={0.82}
                                 >
                                     {submitting ? <ActivityIndicator color="white" /> : <MailPlus color="#fff" size={20} />}
                                 </TouchableOpacity>
@@ -208,27 +221,35 @@ export default function FriendsScreen() {
                         {friends.length === 0 ? (
                             <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: vs(24) }]}>
                                 <Users size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
-                                <Text style={[styles.emptyTitle, { color: colors.text }]}>No friends yet</Text>
-                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }]}>Add friends using their email to make splitting easier.</Text>
+                                <Text style={[styles.emptyTitle, { color: colors.text }, T.bold]}>No friends yet</Text>
+                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add friends using their email to make splitting easier.</Text>
                             </View>
                         ) : (
                             friends.map(friend => (
-                                <View key={friend.id} style={[styles.friendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <View key={friend.id} style={[styles.friendCard, {
+                                    backgroundColor: colors.surface,
+                                    borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                    shadowColor: isDark ? '#000' : '#0A3020',
+                                    shadowOpacity: isDark ? 0.50 : 0.10,
+                                    shadowRadius: isDark ? 20 : 14,
+                                    shadowOffset: { width: 0, height: isDark ? 14 : 6 },
+                                    elevation: isDark ? 14 : 4,
+                                }]}>
                                     <View style={styles.friendTop}>
                                         <CharacterShape shape="rect" color={friend.avatar_color} variant="mini" />
                                         <View style={{ marginLeft: scale(12) }}>
-                                            <Text style={[styles.friendName, { color: colors.text }]}>{friend.name}</Text>
-                                            <Text style={[styles.friendEmail, { color: colors.faintText }]}>{friend.email}</Text>
+                                            <Text style={[styles.friendName, { color: colors.text }, T.semibold]}>{friend.name}</Text>
+                                            <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>{friend.email}</Text>
                                         </View>
                                     </View>
                                     <View style={styles.friendBottom}>
                                         <View style={[styles.sharedChip, { backgroundColor: colors.accentBg }]}>
-                                            <Text style={[styles.sharedChipText, { color: colors.accent }]}>
+                                            <Text style={[styles.sharedChipText, { color: colors.accent }, T.bold]}>
                                                 {friend.shared_groups_count} shared squads
                                             </Text>
                                         </View>
-                                        <TouchableOpacity style={[styles.settleBtn, { borderColor: colors.border, backgroundColor: colors.surface }]} activeOpacity={0.8}>
-                                            <Text style={[styles.settleBtnText, { color: colors.accent }]}>Settle up</Text>
+                                        <TouchableOpacity style={[styles.settleBtn, { borderColor: colors.border, backgroundColor: colors.surface }]} activeOpacity={0.88}>
+                                            <Text style={[styles.settleBtnText, { color: colors.accent }, T.bold]}>Settle up</Text>
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -236,24 +257,31 @@ export default function FriendsScreen() {
                         )}
                     </>
                 ) : (
-                    /* Pending Tab */
                     <>
                         {requests.received.length > 0 && (
                             <View style={{ marginBottom: vs(28) }}>
-                                <Text style={[styles.sectionTitle, { color: colors.text }]}>Received</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Received</Text>
                                 {requests.received.map(req => (
-                                    <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <View key={req.id} style={[styles.friendCard, {
+                                        backgroundColor: colors.surface,
+                                        borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                        shadowColor: isDark ? '#000' : '#0A3020',
+                                        shadowOpacity: isDark ? 0.50 : 0.10,
+                                        shadowRadius: isDark ? 20 : 14,
+                                        shadowOffset: { width: 0, height: isDark ? 14 : 6 },
+                                        elevation: isDark ? 14 : 4,
+                                    }]}>
                                         <View style={styles.friendTop}>
                                             <CharacterShape shape="rect" color={req.sender_avatar} variant="mini" />
                                             <View style={{ marginLeft: scale(12), flex: 1 }}>
-                                                <Text style={[styles.friendName, { color: colors.text }]}>{req.sender_name}</Text>
-                                                <Text style={[styles.friendEmail, { color: colors.faintText }]}>{req.sender_email}</Text>
+                                                <Text style={[styles.friendName, { color: colors.text }, T.semibold]}>{req.sender_name}</Text>
+                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>{req.sender_email}</Text>
                                             </View>
                                             <View style={styles.actionBtns}>
-                                                <TouchableOpacity onPress={() => handleAccept(req.id)} style={[styles.iconBtn, { backgroundColor: colors.accentBg }]}>
+                                                <TouchableOpacity onPress={() => handleAccept(req.id)} style={[styles.iconBtn, { backgroundColor: colors.accentBg }]} activeOpacity={0.82}>
                                                     <UserCheck size={18} color={colors.accent} />
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { backgroundColor: colors.warningBg, marginLeft: scale(8) }]}>
+                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { backgroundColor: colors.warningBg, marginLeft: scale(8) }]} activeOpacity={0.82}>
                                                     <UserX size={18} color={colors.danger} />
                                                 </TouchableOpacity>
                                             </View>
@@ -265,16 +293,19 @@ export default function FriendsScreen() {
 
                         {requests.sent.length > 0 && (
                             <View>
-                                <Text style={[styles.sectionTitle, { color: colors.text }]}>Sent</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Sent</Text>
                                 {requests.sent.map(req => (
-                                    <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <View key={req.id} style={[styles.friendCard, {
+                                        backgroundColor: colors.surface,
+                                        borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                    }]}>
                                         <View style={styles.friendTop}>
                                             <View style={[styles.clockAvatar, { backgroundColor: colors.accentBg }]}>
                                                 <Clock size={20} color={colors.secondaryText} />
                                             </View>
                                             <View style={{ marginLeft: scale(12) }}>
-                                                <Text style={[styles.friendName, { color: colors.text }]}>{req.receiver_email}</Text>
-                                                <Text style={[styles.friendEmail, { color: colors.faintText }]}>Pending acceptance...</Text>
+                                                <Text style={[styles.friendName, { color: colors.text }, T.semibold]}>{req.receiver_email}</Text>
+                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>Pending acceptance...</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -285,8 +316,8 @@ export default function FriendsScreen() {
                         {noPending && (
                             <View style={styles.pendingEmpty}>
                                 <CharacterShape shape="semi" color={colors.indigo} variant="hero" />
-                                <Text style={[styles.pendingEmptyTitle, { color: colors.faintText }]}>No pending requests</Text>
-                                <Text style={[styles.pendingEmptyDesc, { color: colors.secondaryText }]}>
+                                <Text style={[styles.pendingEmptyTitle, { color: colors.faintText }, T.semibold]}>No pending requests</Text>
+                                <Text style={[styles.pendingEmptyDesc, { color: colors.secondaryText }, T.regular]}>
                                     When someone adds you, they'll show up here.
                                 </Text>
                             </View>
@@ -307,8 +338,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: ms(26),
-        fontWeight: '800',
-        letterSpacing: -0.5,
+        letterSpacing: -0.6,
         marginBottom: vs(16),
     },
     segmentContainer: {
@@ -316,7 +346,7 @@ const styles = StyleSheet.create({
         gap: vs(4),
         padding: scale(4),
         borderRadius: ms(12),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     segment: {
         flex: 1,
@@ -337,14 +367,12 @@ const styles = StyleSheet.create({
     },
     sectionTitle: {
         fontSize: ms(16),
-        fontWeight: '700',
         marginBottom: vs(12),
     },
 
-    // Activity
     activityCard: {
         borderRadius: ms(16),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         overflow: 'hidden',
     },
     activityRow: {
@@ -361,16 +389,14 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     activityText: {
-        fontSize: ms(14),
-        fontWeight: '500',
-        lineHeight: 19,
+        fontSize: ms(15),
+        lineHeight: 22,
     },
     activityTime: {
         fontSize: ms(12),
         marginTop: vs(3),
     },
 
-    // Friends
     addFriendSection: {
         marginBottom: vs(24),
     },
@@ -396,7 +422,7 @@ const styles = StyleSheet.create({
     friendCard: {
         padding: scale(16),
         borderRadius: ms(20),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         marginBottom: vs(12),
     },
     friendTop: {
@@ -406,7 +432,6 @@ const styles = StyleSheet.create({
     },
     friendName: {
         fontSize: ms(15),
-        fontWeight: '600',
     },
     friendEmail: {
         fontSize: ms(12),
@@ -424,20 +449,17 @@ const styles = StyleSheet.create({
     },
     sharedChipText: {
         fontSize: ms(12),
-        fontWeight: '700',
     },
     settleBtn: {
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         borderRadius: ms(10),
         paddingHorizontal: scale(13),
         paddingVertical: vs(7),
     },
     settleBtnText: {
         fontSize: ms(13),
-        fontWeight: '700',
     },
 
-    // Pending
     actionBtns: {
         flexDirection: 'row',
     },
@@ -464,7 +486,6 @@ const styles = StyleSheet.create({
     },
     pendingEmptyTitle: {
         fontSize: ms(16),
-        fontWeight: '500',
         marginTop: vs(8),
     },
     pendingEmptyDesc: {
@@ -472,16 +493,14 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // Shared empty state
     emptyState: {
         padding: scale(32),
         borderRadius: ms(20),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
     },
     emptyTitle: {
         fontSize: ms(18),
-        fontWeight: '700',
         marginBottom: vs(8),
     },
     emptyDesc: {

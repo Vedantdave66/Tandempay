@@ -15,10 +15,12 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
+import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
 import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2 } from 'lucide-react-native';
+import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
@@ -37,7 +39,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
-    // Members modal
     const [membersModalVisible, setMembersModalVisible] = useState(false);
     const [membersTab, setMembersTab] = useState<'friends' | 'invite'>('friends');
     const [friends, setFriends] = useState<Friend[]>([]);
@@ -47,7 +48,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
 
-    // Extract a plain array from either a raw array or a paginated { items: [] } / { expenses: [] } envelope
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
         if (Array.isArray(raw?.items)) return raw.items;
@@ -66,7 +66,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 balancesApi.getSettlements(groupId),
             ]);
             setGroup(groupData);
-            setExpenses(toArray<Expense>(expensesRaw).slice().reverse()); // Show newest first
+            setExpenses(toArray<Expense>(expensesRaw).slice().reverse());
             setBalances(toArray<UserBalance>(balancesRaw));
             setSettlements(toArray<Settlement>(settlementsRaw));
         } catch (err) {
@@ -110,6 +110,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             Alert.alert('Added!', `${friend.name} has been added to the group.`);
             loadData();
         } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert('Error', err.message || 'Could not add member.');
         } finally {
             setAddingFriendId(null);
@@ -140,6 +141,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             loadData();
                         }
                     } catch (err: any) {
+                        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                         Alert.alert('Error', err.message || 'Failed to remove member.');
                     } finally {
                         setRemovingMemberId(null);
@@ -162,6 +164,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             Alert.alert('Success', `${email} has been added to the group.`);
             loadData();
         } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert('Error', err.message || 'Could not add member. Make sure they have a TandemPay account.');
         } finally {
             setInviteLoading(false);
@@ -180,11 +183,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     onPress: async () => {
                         try {
                             await settlementsApi.create(groupId, payeeId, amount, 'in_app');
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
                             Alert.alert("Success", "Payment initiated! Check your Payments tab.", [
                                 { text: "OK", onPress: () => navigation.navigate("Payments") }
                             ]);
                             loadData();
                         } catch (err: any) {
+                            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
                             Alert.alert("Error", err.message);
                         }
                     }
@@ -193,7 +198,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         );
     };
 
-    // Look up a member's character appearance from the already-fetched balances list
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
     if (loading && !refreshing) {
@@ -214,19 +218,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Sticky header */}
             <LinearGradient
                 colors={isDark ? ['#0A1F12', '#081509', '#0D1210'] : ['#E9F7EF', '#F2FBF6', '#FFFFFF']}
                 style={[styles.headerGradient, { borderBottomColor: colors.border }]}
             >
-                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.7}>
+                <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.70}>
                     <ArrowLeft size={17} color={colors.accentDark} />
-                    <Text style={[styles.backText, { color: colors.accentDark }]}>Back</Text>
+                    <Text style={[styles.backText, { color: colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
 
                 <View style={styles.headerTopRow}>
-                    <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.8} onPress={openMembersModal}>
-                        <Text style={[styles.groupName, { color: colors.text }]} numberOfLines={1}>
+                    <TouchableOpacity style={{ flex: 1 }} activeOpacity={0.88} onPress={openMembersModal}>
+                        <Text style={[styles.groupName, { color: colors.text }, T.extrabold]} numberOfLines={1}>
                             {group?.name || 'Group'}
                         </Text>
                         <View style={styles.clusterRow}>
@@ -242,24 +245,31 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     </View>
                                 );
                             })}
-                            <Text style={[styles.memberSummary, { color: colors.secondaryText }]}>
+                            <Text style={[styles.memberSummary, { color: colors.secondaryText }, T.semibold]}>
                                 {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
                             </Text>
                         </View>
                     </TouchableOpacity>
 
-                    <View style={[styles.balanceChip, { backgroundColor: isOwe ? colors.warningBg : colors.accentBg }]}>
+                    <View style={[styles.balanceChip, {
+                        backgroundColor: isOwe
+                            ? colors.warningBg
+                            : isOwed
+                                ? colors.accentBg
+                                : colors.accentBg,
+                        borderRadius: 14,
+                    }]}>
                         {isOwe || isOwed ? (
                             <>
-                                <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }, T.extrabold]}>
                                     {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
                                 </Text>
-                                <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent }]}>
+                                <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                     ${formatCurrency(Math.abs(myNet))}
                                 </Text>
                             </>
                         ) : (
-                            <Text style={[styles.balanceChipValue, { color: colors.accent }]}>✓ All settled</Text>
+                            <Text style={[styles.balanceChipValue, { color: colors.accent }, T.extrabold]}>✓ All settled</Text>
                         )}
                     </View>
                 </View>
@@ -268,25 +278,31 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     <TouchableOpacity
                         style={[styles.primaryBtn, {
                             backgroundColor: colors.accent,
-                            shadowColor: colors.accent,
-                            shadowOpacity: 0.45,
-                            shadowRadius: 10,
-                            shadowOffset: { width: 0, height: 4 },
-                            elevation: 5,
+                            shadowColor: '#16A34A',
+                            shadowOpacity: 0.44,
+                            shadowRadius: 12,
+                            shadowOffset: { width: 0, height: 8 },
+                            elevation: 8,
                         }]}
-                        onPress={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
-                        activeOpacity={0.85}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            navigation.navigate('AddExpense', { groupId, members: group?.members || [] });
+                        }}
+                        activeOpacity={0.82}
                     >
                         <Plus size={16} color="#fff" />
-                        <Text style={[styles.primaryBtnText, { color: '#fff' }]}>Add expense</Text>
+                        <Text style={[styles.primaryBtnText, { color: '#fff' }, T.bold]}>Add expense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.ghostBtn, { borderColor: colors.gold }]}
-                        onPress={() => setActiveTab('settle')}
-                        activeOpacity={0.85}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            setActiveTab('settle');
+                        }}
+                        activeOpacity={0.82}
                     >
                         <Send size={15} color={colors.gold} />
-                        <Text style={[styles.ghostBtnText, { color: colors.gold }]}>Settle up</Text>
+                        <Text style={[styles.ghostBtnText, { color: colors.gold }, T.bold]}>Settle up</Text>
                     </TouchableOpacity>
                 </View>
 
@@ -301,11 +317,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             <TouchableOpacity
                                 key={t.id}
                                 onPress={() => setActiveTab(t.id)}
-                                style={[styles.tabBtn, { borderBottomColor: active ? colors.accent : 'transparent' }]}
+                                style={styles.tabBtn}
+                                activeOpacity={0.88}
                             >
-                                <Text style={[styles.tabBtnText, { color: active ? colors.accent : colors.faintText }]}>
+                                <Text style={[styles.tabBtnText, { color: active ? colors.accent : colors.faintText }, active ? T.bold : T.semibold]}>
                                     {t.label}
                                 </Text>
+                                <View style={[styles.tabUnderline, { backgroundColor: active ? colors.accent : 'transparent' }]} />
                             </TouchableOpacity>
                         );
                     })}
@@ -316,12 +334,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
                 contentContainerStyle={styles.scrollContent}
             >
-                {/* Expenses tab */}
                 {activeTab === 'expenses' && (
                     expenses.length === 0 ? (
                         <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: vs(12) }} />
-                            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>No expenses yet.</Text>
+                            <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>No expenses yet.</Text>
                         </View>
                     ) : expenses.map(expense => {
                         const c = charFor(expense.paid_by);
@@ -330,12 +347,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         return (
                             <View key={expense.id} style={[styles.row, {
                                 backgroundColor: colors.surface,
-                                borderColor: colors.border,
-                                shadowColor: colors.cardShadow,
-                                shadowOpacity: 1,
-                                shadowRadius: 6,
-                                shadowOffset: { width: 0, height: 2 },
-                                elevation: 2,
+                                borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                shadowColor: isDark ? '#000' : '#0A3020',
+                                shadowOpacity: isDark ? 0.50 : 0.10,
+                                shadowRadius: isDark ? 20 : 14,
+                                shadowOffset: { width: 0, height: isDark ? 14 : 6 },
+                                elevation: isDark ? 14 : 4,
                             }]}>
                                 <CharacterShape
                                     shape={c?.character_shape ?? 'rect'}
@@ -343,39 +360,41 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     variant="mini"
                                 />
                                 <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={1}>{expense.title}</Text>
-                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={1}>{expense.title}</Text>
+                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }, T.regular]}>
                                         {expense.payer_name} paid · split {expense.participants.length} ways
                                     </Text>
                                 </View>
                                 <View style={styles.rowEnd}>
-                                    <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontWeight: '700', fontSize: ms(16), letterSpacing: -0.3 }]}>
+                                    <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontVariant: ['tabular-nums'] }, T.bold]}>
                                         ${formatCurrency(expense.amount)}
                                     </Text>
-                                    <Text style={[styles.rowDate, { color: colors.faintText }]}>
+                                    <Text style={[styles.rowDate, { color: colors.faintText }, T.regular]}>
                                         {new Date(expense.created_at).toLocaleDateString()}
                                     </Text>
-                                    <Text style={[styles.rowEach, { color: colors.accent }]}>${formatCurrency(each)} each</Text>
+                                    <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>${formatCurrency(each)} each</Text>
                                 </View>
                             </View>
                         );
                     })
                 )}
 
-                {/* Balances tab */}
                 {activeTab === 'balances' && balances.map(b => {
                     const net = Number(b.net_balance);
                     const owesB = net < -0.01;
                     const fillColor = owesB ? colors.warningBright : colors.accent;
                     return (
-                        <View key={b.user_id} style={[styles.row, styles.balanceRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View key={b.user_id} style={[styles.row, styles.balanceRow, {
+                            backgroundColor: colors.surface,
+                            borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                        }]}>
                             <View style={styles.balanceTopRow}>
                                 <CharacterShape shape={b.character_shape ?? 'rect'} color={b.character_color ?? '#6B7280'} variant="mini" />
                                 <View style={{ flex: 1 }}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }]}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]}>
                                         {b.user_id === user?.id ? 'You' : b.name}
                                     </Text>
-                                    <Text style={[styles.rowMeta, { color: owesB ? colors.warningBright : colors.accent }]}>
+                                    <Text style={[styles.rowMeta, { color: owesB ? colors.warningBright : colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>
                                         {owesB ? `owes $${formatCurrency(Math.abs(net))}` : `gets back $${formatCurrency(Math.abs(net))}`}
                                     </Text>
                                 </View>
@@ -387,20 +406,20 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 <TouchableOpacity
                                     style={[styles.settleLinkBtn, { backgroundColor: colors.warningBg }]}
                                     onPress={() => setActiveTab('settle')}
+                                    activeOpacity={0.88}
                                 >
-                                    <Text style={[styles.settleLinkText, { color: colors.warningBright }]}>Settle up →</Text>
+                                    <Text style={[styles.settleLinkText, { color: colors.warningBright }, T.bold]}>Settle up →</Text>
                                 </TouchableOpacity>
                             )}
                         </View>
                     );
                 })}
 
-                {/* Settle tab */}
                 {activeTab === 'settle' && (
                     settlements.length === 0 ? (
                         <View style={styles.settledEmpty}>
                             <CharacterShape shape="semi" color="#27B49E" variant="hero" />
-                            <Text style={[styles.settledTitle, { color: colors.text }]}>You're all settled up 🎉</Text>
+                            <Text style={[styles.settledTitle, { color: colors.text }, T.bold]}>You're all settled up 🎉</Text>
                         </View>
                     ) : settlements.map((s, idx) => {
                         const fr = charFor(s.from_user_id);
@@ -409,27 +428,31 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         return (
                             <View key={idx} style={[styles.row, {
                                 backgroundColor: colors.surface,
-                                borderColor: colors.border,
-                                shadowColor: colors.cardShadow,
-                                shadowOpacity: 1,
-                                shadowRadius: 6,
-                                shadowOffset: { width: 0, height: 2 },
-                                elevation: 2,
+                                borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                shadowColor: isDark ? '#000' : '#0A3020',
+                                shadowOpacity: isDark ? 0.50 : 0.10,
+                                shadowRadius: isDark ? 20 : 14,
+                                shadowOffset: { width: 0, height: isDark ? 14 : 6 },
+                                elevation: isDark ? 14 : 4,
                             }]}>
                                 <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
                                 <ArrowRight size={16} color={colors.faintText} />
                                 <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
                                 <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }]} numberOfLines={2}>
+                                    <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={2}>
                                         Pay ${formatCurrency(s.amount)} via Interac e-Transfer
                                     </Text>
                                 </View>
                                 <TouchableOpacity
                                     style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
                                     disabled={!isMine}
-                                    onPress={() => handleInitiateSettlement(s.to_user_id, s.amount)}
+                                    onPress={() => {
+                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                        handleInitiateSettlement(s.to_user_id, s.amount);
+                                    }}
+                                    activeOpacity={0.82}
                                 >
-                                    <Text style={[styles.settleBtnText, { color: colors.warningBright }]}>Settle up</Text>
+                                    <Text style={[styles.settleBtnText, { color: colors.warningBright }, T.bold]}>Settle up</Text>
                                 </TouchableOpacity>
                             </View>
                         );
@@ -437,20 +460,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 )}
             </ScrollView>
 
-            {/* MEMBERS MODAL */}
             <Modal visible={membersModalVisible} animationType="slide" transparent={true}>
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }]}>Members</Text>
-                            <TouchableOpacity onPress={() => setMembersModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]}>
+                            <Text style={[styles.modalTitle, { color: colors.text }, T.extrabold]}>Members</Text>
+                            <TouchableOpacity onPress={() => setMembersModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]} activeOpacity={0.88}>
                                 <X size={20} color={colors.text} />
                             </TouchableOpacity>
                         </View>
 
-                        {/* Current members with remove buttons */}
                         <View style={{ marginBottom: vs(16) }}>
-                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.8, marginBottom: vs(10) }}>
+                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), ...T.extrabold, textTransform: 'uppercase', letterSpacing: 1.3, marginBottom: vs(10) }}>
                                 Current Members
                             </Text>
                             {(group?.members || []).map(m => {
@@ -459,19 +480,20 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 return (
                                     <View key={m.user_id} style={[styles.friendRow, { borderColor: colors.border }]}>
                                         <View style={[styles.friendAvatar, { backgroundColor: m.avatar_color || colors.accent }]}>
-                                            <Text style={styles.friendAvatarText}>{m.name.charAt(0).toUpperCase()}</Text>
+                                            <Text style={[styles.friendAvatarText, T.bold]}>{m.name.charAt(0).toUpperCase()}</Text>
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>
+                                            <Text style={{ color: colors.text, fontSize: ms(15), ...T.semibold }}>
                                                 {m.name}{isCreator ? ' 👑' : ''}
                                             </Text>
-                                            <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{m.email}</Text>
+                                            <Text style={{ color: colors.secondaryText, fontSize: ms(12), ...T.regular }}>{m.email}</Text>
                                         </View>
                                         {canRemove && (
                                             <TouchableOpacity
                                                 style={[styles.addBtn, { backgroundColor: 'rgba(239,68,68,0.12)' }]}
                                                 onPress={() => handleRemoveMember(m.user_id, m.name)}
                                                 disabled={removingMemberId === m.user_id}
+                                                activeOpacity={0.82}
                                             >
                                                 {removingMemberId === m.user_id
                                                     ? <ActivityIndicator size="small" color="#EF4444" />
@@ -484,21 +506,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             })}
                         </View>
 
-                        {/* Tab switcher */}
                         <View style={[styles.tabSwitchRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
                             <TouchableOpacity
                                 style={[styles.tabSwitchBtn, membersTab === 'friends' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('friends')}
+                                activeOpacity={0.82}
                             >
                                 <Users size={14} color={membersTab === 'friends' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
-                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }]}>Friends</Text>
+                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'friends' ? '#fff' : colors.secondaryText }, T.semibold]}>Friends</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
                                 style={[styles.tabSwitchBtn, membersTab === 'invite' && { backgroundColor: colors.accent }]}
                                 onPress={() => setMembersTab('invite')}
+                                activeOpacity={0.82}
                             >
                                 <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
-                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }]}>Invite by Email</Text>
+                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }, T.semibold]}>Invite by Email</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -509,23 +532,24 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 ) : friends.length === 0 ? (
                                     <View style={{ alignItems: 'center', padding: scale(32) }}>
                                         <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: vs(12) }} />
-                                        <Text style={{ color: colors.text, fontWeight: 'bold', fontSize: ms(16), marginBottom: vs(6) }}>All friends added!</Text>
-                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: ms(13) }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
+                                        <Text style={{ color: colors.text, fontSize: ms(16), marginBottom: vs(6), ...T.bold }}>All friends added!</Text>
+                                        <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: ms(13), ...T.regular }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
                                     </View>
                                 ) : (
                                     friends.map(friend => (
                                         <View key={friend.id} style={[styles.friendRow, { borderColor: colors.border }]}>
                                             <View style={[styles.friendAvatar, { backgroundColor: friend.avatar_color || colors.accent }]}>
-                                                <Text style={styles.friendAvatarText}>{friend.name.charAt(0).toUpperCase()}</Text>
+                                                <Text style={[styles.friendAvatarText, T.bold]}>{friend.name.charAt(0).toUpperCase()}</Text>
                                             </View>
                                             <View style={{ flex: 1 }}>
-                                                <Text style={{ color: colors.text, fontWeight: '600', fontSize: ms(15) }}>{friend.name}</Text>
-                                                <Text style={{ color: colors.secondaryText, fontSize: ms(12) }}>{friend.email}</Text>
+                                                <Text style={{ color: colors.text, fontSize: ms(15), ...T.semibold }}>{friend.name}</Text>
+                                                <Text style={{ color: colors.secondaryText, fontSize: ms(12), ...T.regular }}>{friend.email}</Text>
                                             </View>
                                             <TouchableOpacity
                                                 style={[styles.addBtn, { backgroundColor: addingFriendId === friend.id ? colors.border : colors.accent }]}
                                                 onPress={() => handleAddFriend(friend)}
                                                 disabled={addingFriendId === friend.id}
+                                                activeOpacity={0.82}
                                             >
                                                 {addingFriendId === friend.id
                                                     ? <ActivityIndicator size="small" color="#fff" />
@@ -538,11 +562,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             </ScrollView>
                         ) : (
                             <View style={{ marginTop: vs(20) }}>
-                                <Text style={{ color: colors.secondaryText, fontSize: ms(13), marginBottom: vs(12) }}>Enter their email address. They must have a TandemPay account.</Text>
+                                <Text style={{ color: colors.secondaryText, fontSize: ms(13), ...T.regular, marginBottom: vs(12) }}>Enter their email address. They must have a TandemPay account.</Text>
                                 <View style={[styles.emailInputRow, { borderColor: colors.border, backgroundColor: colors.background }]}>
                                     <Mail size={18} color={colors.secondaryText} style={{ marginRight: scale(10) }} />
                                     <TextInput
-                                        style={[styles.emailInput, { color: colors.text }]}
+                                        style={[styles.emailInput, { color: colors.text, ...T.regular }]}
                                         placeholder="friend@example.com"
                                         placeholderTextColor={colors.secondaryText}
                                         keyboardType="email-address"
@@ -552,13 +576,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     />
                                 </View>
                                 <TouchableOpacity
-                                    style={[styles.inviteBtn, { backgroundColor: colors.accent, opacity: inviteLoading ? 0.7 : 1 }]}
+                                    style={[styles.inviteBtn, {
+                                        backgroundColor: colors.accent,
+                                        opacity: inviteLoading ? 0.7 : 1,
+                                        shadowColor: '#16A34A',
+                                        shadowOpacity: 0.44,
+                                        shadowRadius: 12,
+                                        shadowOffset: { width: 0, height: 8 },
+                                        elevation: 8,
+                                    }]}
                                     onPress={handleInviteByEmail}
                                     disabled={inviteLoading}
+                                    activeOpacity={0.82}
                                 >
                                     {inviteLoading
                                         ? <ActivityIndicator color="#fff" />
-                                        : <Text style={{ color: '#fff', fontWeight: 'bold', fontSize: ms(15) }}>Add to Group</Text>
+                                        : <Text style={{ color: '#fff', fontSize: ms(15), ...T.bold }}>Add to Group</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
@@ -574,11 +607,10 @@ const styles = StyleSheet.create({
     container: { flex: 1 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
 
-    // Sticky header
     headerGradient: {
         paddingHorizontal: scale(20),
         paddingTop: vs(4),
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     backRow: {
         flexDirection: 'row',
@@ -587,7 +619,7 @@ const styles = StyleSheet.create({
         paddingBottom: vs(12),
         alignSelf: 'flex-start',
     },
-    backText: { fontSize: ms(14), fontWeight: '700' },
+    backText: { fontSize: ms(14) },
     headerTopRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -595,7 +627,7 @@ const styles = StyleSheet.create({
         gap: scale(12),
         marginBottom: vs(14),
     },
-    groupName: { fontSize: ms(22), fontWeight: '800', letterSpacing: -0.4 },
+    groupName: { fontSize: ms(22), letterSpacing: -0.4 },
     clusterRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -604,15 +636,14 @@ const styles = StyleSheet.create({
     clusterAvatar: {
         transform: [{ translateY: 2 }],
     },
-    memberSummary: { fontSize: ms(12), fontWeight: '600', marginLeft: scale(10) },
+    memberSummary: { fontSize: ms(12), marginLeft: scale(10) },
     balanceChip: {
-        borderRadius: ms(14),
         paddingHorizontal: scale(12),
         paddingVertical: vs(8),
         alignItems: 'flex-end',
     },
-    balanceChipLabel: { fontSize: ms(10), fontWeight: '800', letterSpacing: 0.6 },
-    balanceChipValue: { fontSize: ms(18), fontWeight: '800', letterSpacing: -0.3 },
+    balanceChipLabel: { fontSize: ms(11), letterSpacing: 1.3 },
+    balanceChipValue: { fontSize: ms(18), letterSpacing: -0.3 },
 
     actionRow: {
         flexDirection: 'row',
@@ -628,7 +659,7 @@ const styles = StyleSheet.create({
         borderRadius: ms(13),
         paddingVertical: vs(12),
     },
-    primaryBtnText: { fontSize: ms(14), fontWeight: '700' },
+    primaryBtnText: { fontSize: ms(14) },
     ghostBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -639,16 +670,24 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(16),
         paddingVertical: vs(12),
     },
-    ghostBtnText: { fontSize: ms(14), fontWeight: '700' },
+    ghostBtnText: { fontSize: ms(14) },
 
     tabRow: { flexDirection: 'row' },
     tabBtn: {
         flex: 1,
         alignItems: 'center',
         paddingVertical: vs(12),
-        borderBottomWidth: 3,
+        position: 'relative',
     },
-    tabBtnText: { fontSize: ms(13.5), fontWeight: '600' },
+    tabBtnText: { fontSize: ms(13.5) },
+    tabUnderline: {
+        position: 'absolute',
+        bottom: 0,
+        left: scale(8),
+        right: scale(8),
+        height: 3,
+        borderRadius: 3,
+    },
 
     scrollContent: { padding: scale(16), paddingBottom: vs(100), gap: vs(10) },
 
@@ -658,15 +697,15 @@ const styles = StyleSheet.create({
         gap: scale(12),
         padding: scale(14),
         borderRadius: ms(18),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     rowInfo: { flex: 1, minWidth: 0 },
-    rowTitle: { fontSize: ms(15), fontWeight: '600' },
+    rowTitle: { fontSize: ms(15) },
     rowMeta: { fontSize: ms(12), marginTop: vs(2) },
     rowEnd: { alignItems: 'flex-end' },
-    rowAmount: { fontSize: ms(16), fontWeight: '700' },
+    rowAmount: { fontSize: ms(17), letterSpacing: -0.3 },
     rowDate: { fontSize: ms(11), marginTop: vs(2) },
-    rowEach: { fontSize: ms(12), fontWeight: '600', marginTop: vs(2) },
+    rowEach: { fontSize: ms(12), marginTop: vs(2) },
 
     balanceRow: { flexDirection: 'column', alignItems: 'stretch', gap: vs(10) },
     balanceTopRow: { flexDirection: 'row', alignItems: 'center', gap: scale(12) },
@@ -678,14 +717,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(14),
         paddingVertical: vs(9),
     },
-    settleLinkText: { fontSize: ms(13), fontWeight: '700' },
+    settleLinkText: { fontSize: ms(13) },
 
     settleBtn: {
         borderRadius: ms(11),
         paddingHorizontal: scale(14),
         paddingVertical: vs(9),
     },
-    settleBtnText: { fontSize: ms(13), fontWeight: '700' },
+    settleBtnText: { fontSize: ms(13) },
 
     settledEmpty: {
         alignItems: 'center',
@@ -693,17 +732,16 @@ const styles = StyleSheet.create({
         gap: vs(8),
         paddingVertical: vs(60),
     },
-    settledTitle: { fontSize: ms(17), fontWeight: '700', marginTop: vs(8) },
+    settledTitle: { fontSize: ms(17), marginTop: vs(8) },
 
     emptyState: {
         padding: scale(40),
         borderRadius: ms(20),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
     },
     emptyText: { fontSize: ms(14) },
 
-    // Members modal
     modalOverlay: {
         flex: 1,
         backgroundColor: 'rgba(0,0,0,0.5)',
@@ -724,7 +762,6 @@ const styles = StyleSheet.create({
     },
     modalTitle: {
         fontSize: ms(22),
-        fontWeight: '900',
     },
     closeModalBtn: {
         width: scale(36),
@@ -736,7 +773,7 @@ const styles = StyleSheet.create({
     tabSwitchRow: {
         flexDirection: 'row',
         borderRadius: ms(12),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         padding: scale(4),
         gap: scale(4),
     },
@@ -750,13 +787,12 @@ const styles = StyleSheet.create({
     },
     tabSwitchBtnText: {
         fontSize: ms(13),
-        fontWeight: '600',
     },
     friendRow: {
         flexDirection: 'row',
         alignItems: 'center',
         paddingVertical: vs(12),
-        borderBottomWidth: 1,
+        borderBottomWidth: StyleSheet.hairlineWidth,
         gap: scale(12),
     },
     friendAvatar: {
@@ -766,7 +802,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
     },
-    friendAvatarText: { color: '#fff', fontWeight: 'bold', fontSize: ms(15) },
+    friendAvatarText: { color: '#fff', fontSize: ms(15) },
     addBtn: {
         width: scale(36),
         height: scale(36),

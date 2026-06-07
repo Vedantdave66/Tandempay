@@ -8,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/api';
+import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
 
@@ -22,7 +23,6 @@ export default function GroupsScreen({ navigation }: any) {
     const load = async () => {
         try {
             const raw = await groupsApi.list();
-            console.log('[Groups] Raw API response:', JSON.stringify(raw));
             const data: GroupListItem[] = Array.isArray(raw)
                 ? raw
                 : Array.isArray((raw as any)?.items)
@@ -62,22 +62,21 @@ export default function GroupsScreen({ navigation }: any) {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
-            {/* Header */}
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }]}>Your squads</Text>
+                <Text style={[styles.title, { color: colors.text }, T.extrabold]}>Your squads</Text>
                 <TouchableOpacity
                     onPress={() => navigation.navigate('CreateGroup')}
                     style={[styles.newButton, {
                         backgroundColor: colors.accent,
-                        shadowColor: colors.accent,
-                        shadowOpacity: 0.5,
-                        shadowRadius: 10,
-                        shadowOffset: { width: 0, height: 5 },
-                        elevation: 6,
+                        shadowColor: '#16A34A',
+                        shadowOpacity: 0.44,
+                        shadowRadius: 12,
+                        shadowOffset: { width: 0, height: 8 },
+                        elevation: 8,
                     }]}
-                    activeOpacity={0.85}
+                    activeOpacity={0.82}
                 >
-                    <Text style={styles.newButtonText}>+ New</Text>
+                    <Text style={[styles.newButtonText, T.bold]}>+ New</Text>
                 </TouchableOpacity>
             </View>
 
@@ -96,9 +95,9 @@ export default function GroupsScreen({ navigation }: any) {
                     {groups.length === 0 ? (
                         <View style={styles.empty}>
                             <CharacterShape shape="round" color={colors.accent} variant="hero" />
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No squads yet</Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.8}>
-                                <Text style={[styles.emptyAction, { color: colors.accentDark }]}>Create one →</Text>
+                            <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>No squads yet</Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.70}>
+                                <Text style={[styles.emptyAction, { color: colors.accentDark }, T.bold]}>Create one →</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -133,13 +132,13 @@ const styles = StyleSheet.create({
         paddingTop: vs(8),
         paddingBottom: vs(16),
     },
-    title: { fontSize: ms(26), fontWeight: '800', letterSpacing: -0.6 },
+    title: { fontSize: ms(26), letterSpacing: -0.6 },
     newButton: {
         borderRadius: ms(12),
         paddingHorizontal: scale(14),
         paddingVertical: vs(9),
     },
-    newButtonText: { fontSize: ms(13), fontWeight: '700', color: '#fff' },
+    newButtonText: { fontSize: ms(13), color: '#fff' },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingHorizontal: scale(16) },
     empty: {
@@ -148,6 +147,6 @@ const styles = StyleSheet.create({
         gap: vs(14),
         paddingVertical: vs(80),
     },
-    emptyTitle: { fontSize: ms(18), fontWeight: '600' },
-    emptyAction: { fontSize: ms(15), fontWeight: '700' },
+    emptyTitle: { fontSize: ms(18) },
+    emptyAction: { fontSize: ms(15) },
 });
