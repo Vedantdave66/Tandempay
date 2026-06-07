@@ -165,9 +165,9 @@ export default function SettleUpScreen() {
     };
 
     const heroColors = isDark
-        ? ['#1AA94E', '#0A4C29', '#0A0D0B', '#0A0D0B'] as const
+        ? ['#16A34A', '#0A4C29', '#0A0D0B', '#0A0D0B'] as const
         : ['#BDEECB', '#DBF3E2', '#E9F2EB', '#E9F2EB'] as const;
-    const heroLocations = [0, 0.35, 0.68, 1] as const;
+    const heroLocations = [0, 0.28, 0.62, 1] as const;
 
     return (
         <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
@@ -194,10 +194,12 @@ export default function SettleUpScreen() {
                 <LinearGradient
                     colors={heroColors}
                     locations={heroLocations}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
                     style={[styles.heroGrad, { marginHorizontal: -scale(20) }]}
                 >
                     <View style={styles.heroAvatarWrap}>
-                        <CharacterShape shape="rect" color={payment.payee_avatar_color} variant="card" />
+                        <CharacterShape shape="rect" color={payment.payee_avatar_color} variant="hero" />
                         {view === 'sent' && (
                             <View style={[styles.checkBadge, { backgroundColor: t.green, borderColor: t.bg }]}>
                                 <Check size={scale(14)} color={t.greenInk} strokeWidth={2.8} />
@@ -446,10 +448,10 @@ const styles = StyleSheet.create({
 
     heroGrad: {
         alignItems: 'center',
-        paddingTop: vs(32),
-        paddingBottom: vs(56),
+        paddingTop: vs(48),
+        paddingBottom: vs(72),
         paddingHorizontal: scale(20),
-        gap: vs(6),
+        gap: vs(8),
     },
     heroAvatarWrap: {
         position: 'relative',
