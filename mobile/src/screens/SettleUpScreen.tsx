@@ -161,11 +161,9 @@ export default function SettleUpScreen() {
     };
 
     const heroColors = isDark
-        ? ['#11833F', '#0A4C29', '#0A0D0B'] as const
-        : ['#BDEECB', '#DBF3E2', '#E9F2EB'] as const;
-    const heroLocations = isDark
-        ? [0, 0.30, 0.62] as const
-        : [0, 0.32, 0.64] as const;
+        ? ['#1AA94E', '#0A4C29', '#0A0D0B', '#0A0D0B'] as const
+        : ['#BDEECB', '#DBF3E2', '#E9F2EB', '#E9F2EB'] as const;
+    const heroLocations = [0, 0.35, 0.68, 1] as const;
 
     return (
         <SafeAreaView edges={['top']} style={{ flex: 1, backgroundColor: t.bg }}>
@@ -439,7 +437,7 @@ const styles = StyleSheet.create({
     heroGrad: {
         alignItems: 'center',
         paddingTop: vs(32),
-        paddingBottom: vs(28),
+        paddingBottom: vs(56),
         paddingHorizontal: scale(20),
         gap: vs(6),
     },
