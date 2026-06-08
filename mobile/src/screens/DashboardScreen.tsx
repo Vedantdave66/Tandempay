@@ -91,7 +91,10 @@ export default function DashboardScreen({ navigation }: any) {
             }
 
             notificationsApi.list()
-                .then(data => setRecentActivity((data || []).slice(0, 3)))
+                .then(raw => {
+                    const data: NotificationOut[] = Array.isArray(raw) ? raw : Array.isArray((raw as any)?.items) ? (raw as any).items : [];
+                    setRecentActivity(data.slice(0, 3));
+                })
                 .catch(() => {});
         } catch (err) {
             console.log('[Dashboard] Failed to load groups:', err);
@@ -174,8 +177,8 @@ export default function DashboardScreen({ navigation }: any) {
                             borderWidth: 1,
                             borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.9)',
                         }]}>
-                            <Text style={[styles.statPillLabel, { color: colors.accentDark }, T.extrabold]}>YOU'RE OWED</Text>
-                            <Text style={[styles.statPillValue, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>${formatCurrency(owedToMe)}</Text>
+                            <Text style={[styles.statPillLabel, { color: isDark ? colors.accent : colors.accentDark }, T.extrabold]}>YOU'RE OWED</Text>
+                            <Text style={[styles.statPillValue, { color: isDark ? colors.accent : colors.accentDark, fontVariant: ['tabular-nums'] }, T.extrabold]}>${formatCurrency(owedToMe)}</Text>
                         </View>
                         <View style={[styles.statPill, {
                             backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.82)',

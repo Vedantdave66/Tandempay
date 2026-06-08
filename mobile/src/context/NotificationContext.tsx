@@ -103,8 +103,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     const refreshNotifications = useCallback(async () => {
         if (!user) return;
         try {
-            const data: NotificationOut[] = await notificationsApi.list();
-            const arr = data || [];
+            const raw = await notificationsApi.list();
+            const arr: NotificationOut[] = Array.isArray(raw)
+                ? raw
+                : Array.isArray((raw as any)?.items)
+                    ? (raw as any).items
+                    : [];
 
             // Detect new notifications since last poll
             const newItems = arr.filter(n => !prevIdsRef.current.has(n.id));

@@ -155,7 +155,7 @@ export default function SettleUpScreen() {
                     applePay: { merchantCountryCode: 'CA' },
                     googlePay: { merchantCountryCode: 'CA', testEnv: true },
                 });
-                if (initError) { Alert.alert('Payment Error', initError.message); return; }
+                if (initError) { setLoading(false); Alert.alert('Payment Error', initError.message); return; }
                 const { error: presentError } = await presentPaymentSheet();
                 if (!presentError) {
                     setMethod('card');
@@ -168,6 +168,7 @@ export default function SettleUpScreen() {
                 navigation.goBack();
             }
         } catch (err: any) {
+            setLoading(false);
             Alert.alert('Error', err.message || 'Something went wrong.');
         } finally {
             setLoading(false);
