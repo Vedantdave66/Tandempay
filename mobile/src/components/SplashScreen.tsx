@@ -1,9 +1,9 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, View, StyleSheet } from 'react-native';
+import { Animated, View, Text, StyleSheet } from 'react-native';
 import { T } from '../utils/typography';
-import { useTheme } from '../context/ThemeContext';
 
 const LOGO_GREEN = '#22C55E';
+const BG = '#080C09';
 
 const TANDEM_LETTERS = ['T', 'a', 'n', 'd', 'e', 'm'];
 
@@ -12,8 +12,6 @@ interface Props {
 }
 
 export default function SplashScreen({ onComplete }: Props) {
-    const { colors } = useTheme();
-    const accentColor = colors.accent;
     // Divider
     const dividerScale = useRef(new Animated.Value(0)).current;
 
@@ -128,38 +126,19 @@ export default function SplashScreen({ onComplete }: Props) {
     }, []);
 
     return (
-        <Animated.View style={[styles.container, { opacity: splashOpacity, backgroundColor: colors.background }]}>
-            {/* Outer soft glow layer */}
+        <Animated.View style={[styles.container, { opacity: splashOpacity }]}>
+            {/* Green radial glow */}
             <Animated.View
-                style={{
-                    position: 'absolute',
-                    width: 500,
-                    height: 500,
-                    borderRadius: 250,
-                    backgroundColor: 'transparent',
-                    shadowColor: accentColor,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 140,
-                    elevation: 0,
-                    opacity: glowOpacity,
-                }}
-            />
-            {/* Inner tighter glow layer */}
-            <Animated.View
-                style={{
-                    position: 'absolute',
-                    width: 320,
-                    height: 320,
-                    borderRadius: 160,
-                    backgroundColor: 'transparent',
-                    shadowColor: accentColor,
-                    shadowOffset: { width: 0, height: 0 },
-                    shadowOpacity: 0.38,
-                    shadowRadius: 90,
-                    elevation: 0,
-                    opacity: glowOpacity,
-                }}
+                style={[
+                    styles.glow,
+                    {
+                        opacity: glowOpacity,
+                        shadowColor: LOGO_GREEN,
+                        shadowRadius: 120,
+                        shadowOpacity: 1,
+                        shadowOffset: { width: 0, height: 0 },
+                    },
+                ]}
             />
 
             <Animated.View style={[styles.logoRow, { transform: [{ scale: heartbeatScale }] }]}>
@@ -186,7 +165,7 @@ export default function SplashScreen({ onComplete }: Props) {
                 <Animated.View
                     style={[
                         styles.divider,
-                        { backgroundColor: accentColor, transform: [{ scaleY: dividerScale }, { rotate: '18deg' }] },
+                        { transform: [{ scaleY: dividerScale }, { rotate: '18deg' }] },
                     ]}
                 />
 
@@ -195,7 +174,7 @@ export default function SplashScreen({ onComplete }: Props) {
                     style={[
                         styles.logoText,
                         {
-                            color: accentColor,
+                            color: LOGO_GREEN,
                             opacity: payOpacity,
                             transform: [{ translateX: payTranslate }],
                         },
@@ -212,8 +191,16 @@ const styles = StyleSheet.create({
     container: {
         ...StyleSheet.absoluteFillObject,
         zIndex: 999,
+        backgroundColor: BG,
         alignItems: 'center',
         justifyContent: 'center',
+    },
+    glow: {
+        position: 'absolute',
+        width: 200,
+        height: 200,
+        borderRadius: 100,
+        backgroundColor: LOGO_GREEN,
     },
     logoRow: {
         flexDirection: 'row',
@@ -231,6 +218,7 @@ const styles = StyleSheet.create({
     divider: {
         width: 2,
         height: 48,
+        backgroundColor: LOGO_GREEN,
         borderRadius: 1,
         marginHorizontal: 4,
     },
