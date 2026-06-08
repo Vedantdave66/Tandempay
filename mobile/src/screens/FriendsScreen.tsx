@@ -203,7 +203,7 @@ export default function FriendsScreen() {
                                     style={[styles.sendBtn, {
                                         backgroundColor: colors.accent,
                                         opacity: emailInput.length ? 1 : 0.5,
-                                        shadowColor: '#16A34A',
+                                        shadowColor: colors.accent,
                                         shadowOpacity: emailInput.length ? 0.44 : 0,
                                         shadowRadius: 12,
                                         shadowOffset: { width: 0, height: 8 },

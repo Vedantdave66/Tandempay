@@ -21,9 +21,10 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2 } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
+import CanvasModeView from '../components/CanvasModeView';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
 
@@ -51,6 +52,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
+    const [canvasMode, setCanvasMode] = useState(false);
     const [membersModalVisible, setMembersModalVisible] = useState(false);
     const [membersTab, setMembersTab] = useState<'friends' | 'invite'>('friends');
     const [friends, setFriends] = useState<Friend[]>([]);
@@ -239,26 +241,47 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         </View>
                     </TouchableOpacity>
 
-                    <View style={[styles.balanceChip, {
-                        backgroundColor: isOwe
-                            ? colors.warningBg
-                            : isOwed
-                                ? colors.accentBg
-                                : colors.accentBg,
-                        borderRadius: 14,
-                    }]}>
-                        {isOwe || isOwed ? (
-                            <>
-                                <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }, T.extrabold]}>
-                                    {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
-                                </Text>
-                                <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>
-                                    ${formatCurrency(Math.abs(myNet))}
-                                </Text>
-                            </>
-                        ) : (
-                            <Text style={[styles.balanceChipValue, { color: colors.accent }, T.extrabold]}>✓ All settled</Text>
-                        )}
+                    <View style={styles.headerRightCol}>
+                        <View style={[styles.balanceChip, {
+                            backgroundColor: isOwe
+                                ? colors.warningBg
+                                : isOwed
+                                    ? colors.accentBg
+                                    : colors.accentBg,
+                            borderRadius: 14,
+                        }]}>
+                            {isOwe || isOwed ? (
+                                <>
+                                    <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }, T.extrabold]}>
+                                        {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
+                                    </Text>
+                                    <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                                        ${formatCurrency(Math.abs(myNet))}
+                                    </Text>
+                                </>
+                            ) : (
+                                <Text style={[styles.balanceChipValue, { color: colors.accent }, T.extrabold]}>✓ All settled</Text>
+                            )}
+                        </View>
+                        <TouchableOpacity
+                            onPress={() => { setCanvasMode(v => !v); Haptics.selectionAsync(); }}
+                            style={[
+                                styles.canvasToggleBtn,
+                                {
+                                    backgroundColor: canvasMode ? colors.accent + '29' : 'rgba(255,255,255,0.07)',
+                                    borderColor: canvasMode ? colors.accent + '52' : 'rgba(255,255,255,0.09)',
+                                },
+                            ]}
+                            activeOpacity={0.8}
+                        >
+                            {canvasMode
+                                ? <Orbit size={13} color={colors.accent} />
+                                : <LayoutList size={13} color='#8A918E' />
+                            }
+                            <Text style={[styles.canvasToggleText, { color: canvasMode ? colors.accent : '#8A918E' }, T.bold]}>
+                                {canvasMode ? 'Canvas' : 'List'}
+                            </Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -266,7 +289,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     <TouchableOpacity
                         style={[styles.primaryBtn, {
                             backgroundColor: colors.accent,
-                            shadowColor: '#16A34A',
+                            shadowColor: colors.accent,
                             shadowOpacity: 0.44,
                             shadowRadius: 12,
                             shadowOffset: { width: 0, height: 8 },
@@ -581,7 +604,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     style={[styles.inviteBtn, {
                                         backgroundColor: colors.accent,
                                         opacity: inviteLoading ? 0.7 : 1,
-                                        shadowColor: '#16A34A',
+                                        shadowColor: colors.accent,
                                         shadowOpacity: 0.44,
                                         shadowRadius: 12,
                                         shadowOffset: { width: 0, height: 8 },
@@ -601,6 +624,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
+
+            {canvasMode && (
+                <CanvasModeView
+                    expenses={expenses}
+                    members={group?.members ?? []}
+                    groupId={groupId}
+                    groupName={group?.name ?? ''}
+                    user={user}
+                    colors={colors}
+                    isDark={isDark}
+                    onAddExpense={() => navigation.navigate('AddExpense', { groupId, members: group?.members || [] })}
+                    onSettle={(payment) => navigation.navigate('SettleUp', { payment })}
+                    onClose={() => setCanvasMode(false)}
+                    style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 100 }}
+                />
+            )}
         </View>
     );
 }
@@ -640,6 +679,22 @@ const styles = StyleSheet.create({
         transform: [{ translateY: 2 }],
     },
     memberSummary: { fontSize: ms(12), marginLeft: scale(10) },
+    headerRightCol: {
+        alignItems: 'flex-end',
+        gap: vs(8),
+    },
+    canvasToggleBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(5),
+        borderWidth: 1,
+        borderRadius: ms(11),
+        paddingHorizontal: scale(12),
+        height: vs(34),
+    },
+    canvasToggleText: {
+        fontSize: ms(12),
+    },
     balanceChip: {
         paddingHorizontal: scale(12),
         paddingVertical: vs(8),

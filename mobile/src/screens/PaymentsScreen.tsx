@@ -184,7 +184,7 @@ export default function PaymentsScreen() {
                             <TouchableOpacity
                                 style={[styles.actionBtn, {
                                     backgroundColor: colors.accent,
-                                    shadowColor: '#16A34A',
+                                    shadowColor: colors.accent,
                                     shadowOffset: { width: 0, height: 8 },
                                     shadowOpacity: 0.44,
                                     shadowRadius: 12,
@@ -213,7 +213,7 @@ export default function PaymentsScreen() {
                                 <TouchableOpacity
                                     style={[styles.actionBtn, {
                                         backgroundColor: colors.accent, flex: 2,
-                                        shadowColor: '#16A34A',
+                                        shadowColor: colors.accent,
                                         shadowOffset: { width: 0, height: 8 },
                                         shadowOpacity: 0.44,
                                         shadowRadius: 12,
@@ -419,7 +419,7 @@ export default function PaymentsScreen() {
                             style={[styles.submitBtn, {
                                 backgroundColor: colors.accent,
                                 opacity: fundLoading ? 0.7 : 1,
-                                shadowColor: '#16A34A',
+                                shadowColor: colors.accent,
                                 shadowOffset: { width: 0, height: 8 },
                                 shadowOpacity: 0.44,
                                 shadowRadius: 12,

@@ -79,7 +79,7 @@ export default function LandingScreen({ navigation }: any) {
     return (
       <View style={[styles.slide, { width }]}>
         <View style={[styles.iconCircle, { backgroundColor: item.bg, borderColor: item.bg.replace('0.1', '0.2') }]}>
-          <Icon size={48} color={item.color} />
+          <Icon size={48} color={item.id === 'hero' ? colors.accent : item.color} />
         </View>
         <Text style={[styles.title, { color: colors.text }]}>
           {item.id === 'hero' ? (
@@ -98,7 +98,7 @@ export default function LandingScreen({ navigation }: any) {
       {/* Header */}
       <View style={styles.nav}>
         <View style={styles.logoRow}>
-          <LinearGradient colors={['#16A34A', '#10B981']} style={styles.logoIcon}>
+          <LinearGradient colors={[colors.accent, '#10B981']} style={styles.logoIcon}>
             <Wallet size={20} color="white" />
           </LinearGradient>
           <Text style={[styles.logoText, { color: colors.text }]}>Tandem</Text>

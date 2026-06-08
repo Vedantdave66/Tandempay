@@ -34,16 +34,16 @@ type T = {
     cardBorder: string; insetBorder: string; overlay: string;
 };
 
-function tok(isDark: boolean): T {
+function tok(isDark: boolean, accent: string): T {
     return isDark ? {
         bg: '#0A0D0B', card: '#141815', inset: '#0C0F0D',
-        green: '#27E06A', greenInk: '#062B16', gold: '#F2C200',
+        green: accent, greenInk: '#062B16', gold: '#F2C200',
         ink: '#FFFFFF', sub: '#8C958E', chip: '#1E231F', chipInk: '#CFD6CF',
         cardBorder: 'rgba(255,255,255,0.07)', insetBorder: 'rgba(255,255,255,0.06)',
         overlay: 'rgba(255,255,255,0.05)',
     } : {
         bg: '#E9F2EB', card: '#FFFFFF', inset: '#F4F8F4',
-        green: '#0E9F4F', greenInk: '#FFFFFF', gold: '#B07E00',
+        green: accent, greenInk: '#FFFFFF', gold: '#B07E00',
         ink: '#0E140F', sub: '#5C665E', chip: '#E6EDE7', chipInk: '#46504A',
         cardBorder: 'rgba(0,0,0,0.05)', insetBorder: 'rgba(0,0,0,0.05)',
         overlay: 'rgba(0,0,0,0.03)',
@@ -272,7 +272,7 @@ export default function SettleUpScreen() {
                             />
 
                             <TouchableOpacity
-                                style={[styles.primaryBtn, { backgroundColor: t.green, opacity: loading ? 0.7 : 1 }]}
+                                style={[styles.primaryBtn, { backgroundColor: t.green, opacity: loading ? 0.7 : 1, shadowColor: colors.accent }]}
                                 onPress={() => handleSend('interac')}
                                 disabled={loading}
                                 activeOpacity={0.85}
@@ -421,7 +421,7 @@ export default function SettleUpScreen() {
 
                         <View style={{ paddingBottom: insets.bottom + vs(16) }}>
                             <TouchableOpacity
-                                style={[styles.primaryBtn, { backgroundColor: t.green }]}
+                                style={[styles.primaryBtn, { backgroundColor: t.green, shadowColor: colors.accent }]}
                                 onPress={() => navigation.goBack()}
                                 activeOpacity={0.85}
                             >
@@ -546,7 +546,6 @@ const styles = StyleSheet.create({
         borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowColor: '#16A34A',
         shadowOffset: { width: 0, height: 8 },
         shadowOpacity: 0.44,
         shadowRadius: 12,

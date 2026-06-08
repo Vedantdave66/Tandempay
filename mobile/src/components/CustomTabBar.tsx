@@ -70,7 +70,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
       >
         <LinearGradient
           colors={[
-            isDark ? 'rgba(34,197,94,0.35)' : 'rgba(22,163,74,0.22)',
+            isDark ? colors.accent + '59' : colors.accent + '38',
             'transparent',
           ]}
           style={styles.limelightCone}
