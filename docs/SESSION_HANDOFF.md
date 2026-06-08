@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-06
+**Last updated:** 2026-06-08
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -13,6 +13,7 @@
 - **All 11 production hardening fixes are merged and deployed** (see below).
 - **R1–R5 of the post-launch roadmap are all merged into `main`** — Settle Up redesign, Interac email auto-confirm, Pro subscription billing, recurring expenses, and CSV/PDF export are live in production. See "Roadmap status" below; the table that previously listed these as remaining is now stale.
 - **Mobile UI revamp (Dashboard/Groups/GroupDetail/Friends/Profile/TabBar/AddExpense + LimelightNav tab bar) shipped 2026-06-06** via PRs #123, #124, #125 — all merged into `main`.
+- **Mobile polish pass (2026-06-07/08) shipped via PRs #132–#141** — PaymentsScreen rewrite, GroupCard/GroupDetail/SettleUp fixes, ToastBanner artifact fix, Dashboard dark-mode label fix, notifications array guard, ProHub character modal + invite + accent theming. See section below.
 - **Latest Alembic head: `a107c01bd8f1`** (`add_auto_confirmed_to_settlement_records`, chained on `7af805ecb0e7` interac_email_logs ← `20d7c91bb5df` revoked_tokens). Confirm these have been run against prod Supabase before relying on the Interac auto-confirm flow in production.
 
 ---
@@ -72,6 +73,61 @@ Twice this session, a PR merged into `main` while follow-up commits kept landing
 ### Pending for next session
 - **PR #125 needs review/merge.** Manual checks still outstanding: limelight indicator animation on device, light/dark palette rendering.
 - After #125 merges, re-check for stranded commits before starting new mobile work — the pattern is likely to repeat if anyone pushes to this branch concurrently.
+
+---
+
+---
+
+## Mobile polish session (2026-06-07/08) — PRs #132–#141
+
+All PRs listed below are **open** (awaiting merge into `main`) unless otherwise noted.
+
+### PR #132 — fix/payments-screen-polish
+- Full rewrite of `PaymentsScreen.tsx`: T.* typography on all Text, colored shadows (green `#16A34A` shadow on CTAs, white-card shadow on content), `activeOpacity` 0.82/0.88/0.70, `StyleSheet.hairlineWidth` borders, `fontVariant: ['tabular-nums']` on money amounts, haptics wired via ambient `expo-haptics.d.ts` declaration.
+- Created `mobile/src/types/expo-haptics.d.ts` ambient type declaration (package was missing from package.json).
+
+### PR #133 — fix/nav-card-fixes (batch of 4)
+- **GroupDetailScreen `handleInitiateSettlement` deleted** — settle button now navigates directly to `'SettleUp'` with `payment` params (no more Alert dialog).
+- **CustomTabBar BlurView removed** — `expo-blur` crashes at runtime ("native view manager not found"); replaced with solid `rgba` View (`rgba(12,15,12,0.97)` dark / `rgba(255,255,255,0.97)` light).
+- **GroupCard character overlap fixed** — `clusterRow paddingTop` reduced, `paddingBottom` added, `marginTop` on pill container pulled back from `-22` to `-14` so names no longer disappear behind the pill.
+- **GroupDetailScreen back button** — `colors.accentDark` (#062B16) invisible in dark mode; changed to `isDark ? colors.accent : colors.accentDark`.
+
+### PR #134 — feat/group-detail-header-gradient (originally settle-up-hero-gradient, rebased)
+- SettleUpScreen hero gradient: taller padding, more vivid dark colors (#16A34A top), `locations [0, 0.28, 0.62, 1]`, `start`/`end` props, `CharacterShape variant` confirmed as `"card"`.
+- GroupDetailScreen header gradient: replaced muddy dark colors with `['#11833F','#0A4C29','#0A0D0B']` dark / `['#BDEECB','#DBF3E2','#FFFFFF']` light, `locations [0, 0.35, 1]`.
+
+### PR #135 — fix/settle-up-fixes
+- **Settlement duplicate guard**: `settlementsApi.create` is now skipped when `payment.id` already exists (was causing 500 MissingGreenlet on repeated Settle Up opens from GroupDetailScreen).
+- **SettleUpScreen status bar bleed**: replaced `SafeAreaView` with `View` + `useSafeAreaInsets`; header moved inside `LinearGradient`; `heroGrad paddingTop = insets.top + vs(16)`.
+- `CharacterShape variant` reverted `"hero"` → `"card"` (hero is not a valid variant).
+
+### PR #136 — fix/settle-up-status-bar
+- Removed `<StatusBar translucent />` from `SettleUpScreen` — it's a global singleton and was making the status bar transparent on every screen in the app.
+
+### PR #137 — feat/group-detail-header-gradient *(merged into main)*
+- GroupDetailScreen header gradient vivid update (see PR #134 description above — this was the PR that shipped it).
+
+### PR #138 — feat/group-detail-status-bar-bleed *(merged into main)*
+- GroupDetailScreen status bar bleed fix: `useFocusEffect` + `StatusBar.setTranslucent(true)` scoped to this screen (cleaned up on blur), `SafeAreaView` → `View`, `paddingTop: insets.top + vs(8)` inline on `LinearGradient`.
+
+### PR #139 — fix/toast-banner-offscreen *(merged into main)*
+- **Root cause found for green border artifact visible on every screen**: `ToastBanner` in `NotificationContext.tsx` was positioned `top: 50` with `translateY: -80` when hidden → effective top = -30px, leaving 14px of green-bordered rounded bottom visible above viewport.
+- Fix: both `new Animated.Value(-80)` and exit `toValue: -80` changed to `-200`, putting the hidden position at `top: 50 + translateY: -200 = -150px` (fully off-screen).
+
+### PR #140 — fix/dashboard-settle-polish *(merged into main)*
+- **DashboardScreen "YOU'RE OWED" label invisible in dark mode**: was `colors.accentDark` (#062B16); changed to `isDark ? colors.accent : colors.accentDark` on both the label and dollar amount.
+- **GroupCard green shadow artifact at horizontal scroll edge**: `shadowColor` changed from green-tinted `#0A3020` to `#000` on the card's outer shadow.
+- **SettleUpScreen spinner stuck on error**: `setLoading(false)` now called explicitly in the `catch` block and before the `initError` early return.
+- **`notifications.some is not a function`**: `notificationsApi.list()` response in `NotificationContext` now coerced to array (`Array.isArray(raw) ? raw : raw?.items ?? []`) before being stored in state.
+- DashboardScreen `notificationsApi.list()` call in recent-activity also coerced to array.
+
+### PR #141 — feat/prohub-appearance (open, includes expo-haptics fix)
+- **ProHubScreen — Customise character**: chip button now opens `CharacterSetupModal` (was showing "coming soon" Alert). `CharacterSetupModal.handleSave` now calls `onClose?.()` after `refreshUser()` so the modal auto-dismisses on save.
+- **ProHubScreen — Invite a friend**: requests Contacts permission via `expo-contacts`, then opens native Share sheet with invite message/link. `expo-contacts` installed.
+- **ProHubScreen — Appearance bottom sheet**: tapping "Appearance" opens a slide-up Modal with 6 accent color swatches (40pt circles, white checkmark on selected) + Light/Dark segmented toggle + Done button.
+- **`Colors.ts` — `ACCENT_PRESETS`**: added `ACCENT_PRESETS` map (Forest/Ocean/Sunset/Candy/Grape/Slate) each with `{ light, dark, glowLight, glowDark }` values. Exported `AccentKey` type.
+- **`ThemeContext` — accent theming**: added `accentKey` state (default `'forest'`, persisted via `AsyncStorage`), `setAccent(key)` exported from `useTheme()`. On accent change, overrides `colors.accent`, `colors.accentDark`, `colors.tint`, `colors.tabIconSelected`, `colors.groupGlow` — flows to all `useTheme()` consumers instantly. `ColorPalette` type defined to relax literal types on overrideable fields.
+- **`expo-haptics` installed**: resolves crash in `GroupDetailScreen` where `import * as Haptics from 'expo-haptics'` could not be resolved.
 
 ---
 
@@ -163,11 +219,14 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap (Settle Up redesign, Interac auto-confirm, Pro billing, recurring expenses, CSV/PDF export) and the mobile UI revamp (PRs #123–#125) are all merged into `main`. Before starting new feature work: (1) confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), (2) do an end-to-end Interac auto-confirm test against the live inbound parse address, (3) decide what the next roadmap phase (R6+) should be — there's no documented next item."
+> "TandemPay's R1–R5 roadmap and the mobile UI revamp (PRs #123–#125) are all merged into `main`. The 2026-06-07/08 polish pass (PRs #132–#141) is partially merged — PRs #138, #139, #140 are confirmed merged; PRs #132–#137, #141 may still be open. Start by checking PR status (`gh pr list`), merging any open polish PRs into `main`, then decide what R6+ should be. Before new feature work: (1) confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), (2) do an end-to-end Interac auto-confirm test."
 
 ## Open items / things to double-check next session
 
-1. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase; the doc previously only confirmed `20d7c91bb5df`.
-2. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-3. **Pre-launch checklist** (below) — still appears to be open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-4. **Define R6+** — the roadmap table that used to list "remaining" items is now fully done; there's no documented next phase.
+1. **Polish PRs still open** — check status of PRs #132–#137, #141 and merge them into `main` if approved. PRs #138, #139, #140 were confirmed merged during the 2026-06-07/08 session.
+2. **`expo-haptics` ambient declaration** — `mobile/src/types/expo-haptics.d.ts` was created as a workaround because the package was missing. PR #141 installs the real package (`expo-haptics`). Once #141 merges, confirm the `.d.ts` shim is no longer needed and remove it if the real types are provided by the package.
+3. **Accent theming completeness** — `accentBg` and `accentBgFaint` in Colors.ts are still hardcoded green regardless of selected accent. Icon tile backgrounds and chip backgrounds will stay green when Ocean/Candy/etc. is selected. Follow-up: override these two fields in ThemeContext alongside `accent`.
+4. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
+5. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+6. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+7. **Define R6+** — the roadmap table is fully done; no documented next phase.
