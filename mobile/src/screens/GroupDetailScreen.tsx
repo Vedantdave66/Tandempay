@@ -204,7 +204,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
             <LinearGradient
-                colors={isDark ? ['#11833F', '#0A4C29', '#0A0D0B'] : ['#BDEECB', '#DBF3E2', '#FFFFFF']}
+                colors={colors.heroGradient}
                 locations={[0, 0.35, 1]}
                 start={{ x: 0.5, y: 0 }}
                 end={{ x: 0.5, y: 1 }}

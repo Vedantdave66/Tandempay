@@ -12,6 +12,8 @@ type ColorPalette = Omit<typeof Colors.light, 'accent' | 'accentDark' | 'tint' |
   tint: string;
   tabIconSelected: string;
   groupGlow: [string, string, string, string];
+  heroGradient: [string, string, string];
+  cardGradient: [string, string, string, string];
 };
 
 interface ThemeContextType {
@@ -83,6 +85,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     tint: accentColor,
     tabIconSelected: accentColor,
     groupGlow: accentGlow,
+    heroGradient: preset[isDark ? 'heroGradDark' : 'heroGradLight'],
+    cardGradient: preset[isDark ? 'cardGradDark' : 'cardGradLight'],
   } as ColorPalette;
 
   return (

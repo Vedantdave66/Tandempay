@@ -65,23 +65,13 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
             }, compact && styles.cardCompact]}
         >
             <View style={styles.gradientClip} pointerEvents="none">
-                {isDark ? (
-                    <LinearGradient
-                        colors={['#1E6A3A', '#0D3019', '#060F08', '#030806']}
-                        locations={[0, 0.35, 0.68, 1]}
-                        start={{ x: 0.5, y: 0 }}
-                        end={{ x: 0.5, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                    />
-                ) : (
-                    <LinearGradient
-                        colors={['#3BE57F', '#8FE9B0', '#D8F4E1', '#F3FBF4']}
-                        locations={[0, 0.30, 0.56, 1]}
-                        start={{ x: 0.5, y: 0 }}
-                        end={{ x: 0.5, y: 1 }}
-                        style={StyleSheet.absoluteFillObject}
-                    />
-                )}
+                <LinearGradient
+                    colors={colors.cardGradient}
+                    locations={isDark ? [0, 0.35, 0.68, 1] : [0, 0.30, 0.56, 1]}
+                    start={{ x: 0.5, y: 0 }}
+                    end={{ x: 0.5, y: 1 }}
+                    style={StyleSheet.absoluteFillObject}
+                />
             </View>
 
             <View style={[styles.clusterRow, compact && styles.clusterRowCompact]}>
