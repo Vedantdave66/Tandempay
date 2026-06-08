@@ -95,7 +95,7 @@ export default function SettleUpScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { payment } = route.params;
-    const { isDark } = useTheme();
+    const { isDark, colors } = useTheme();
     const t = tok(isDark);
     const insets = useSafeAreaInsets();
 
@@ -175,10 +175,7 @@ export default function SettleUpScreen() {
         }
     };
 
-    const heroColors = isDark
-        ? ['#16A34A', '#0A4C29', '#0A0D0B', '#0A0D0B'] as const
-        : ['#BDEECB', '#DBF3E2', '#E9F2EB', '#E9F2EB'] as const;
-    const heroLocations = [0, 0.28, 0.62, 1] as const;
+    const heroLocations = [0, 0.35, 1] as const;
 
     return (
         <View style={{ flex: 1, backgroundColor: t.bg }}>
@@ -189,7 +186,7 @@ export default function SettleUpScreen() {
             >
                 {/* Hero glow — bleeds to screen edges and status bar */}
                 <LinearGradient
-                    colors={heroColors}
+                    colors={colors.heroGradient}
                     locations={heroLocations}
                     start={{ x: 0.5, y: 0 }}
                     end={{ x: 0.5, y: 1 }}
