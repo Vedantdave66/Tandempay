@@ -160,6 +160,7 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                 character_nickname: nickname.trim(),
             });
             await refreshUser();
+            onClose?.();
         } catch {
             setSaving(false);
         }

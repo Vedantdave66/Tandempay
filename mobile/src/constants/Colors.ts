@@ -1,3 +1,38 @@
+export const ACCENT_PRESETS = {
+  forest: {
+    light: '#16A34A', dark: '#27E06A',
+    glowLight: ['#3BE57F','#8FE9B0','#D8F4E1','#F3FBF4'] as [string,string,string,string],
+    glowDark:  ['#1E6A3A','#0D3019','#060F08','#030806'] as [string,string,string,string],
+  },
+  ocean: {
+    light: '#2563EB', dark: '#60A5FA',
+    glowLight: ['#3B82F6','#93C5FD','#DBEAFE','#F0F9FF'] as [string,string,string,string],
+    glowDark:  ['#1E3A6E','#0D1F3C','#060C15','#030810'] as [string,string,string,string],
+  },
+  sunset: {
+    light: '#EA580C', dark: '#FB923C',
+    glowLight: ['#F97316','#FDBA74','#FFEDD5','#FFF7ED'] as [string,string,string,string],
+    glowDark:  ['#7C2D12','#3B1109','#150600','#0A0402'] as [string,string,string,string],
+  },
+  candy: {
+    light: '#DB2777', dark: '#F472B6',
+    glowLight: ['#EC4899','#F9A8D4','#FCE7F3','#FDF2F8'] as [string,string,string,string],
+    glowDark:  ['#831843','#3D0A22','#160409','#0A0206'] as [string,string,string,string],
+  },
+  grape: {
+    light: '#7C3AED', dark: '#A78BFA',
+    glowLight: ['#8B5CF6','#C4B5FD','#EDE9FE','#F5F3FF'] as [string,string,string,string],
+    glowDark:  ['#4C1D95','#1F0A40','#0A0418','#05020E'] as [string,string,string,string],
+  },
+  slate: {
+    light: '#475569', dark: '#94A3B8',
+    glowLight: ['#64748B','#CBD5E1','#E2E8F0','#F8FAFC'] as [string,string,string,string],
+    glowDark:  ['#334155','#1E293B','#0F172A','#070C15'] as [string,string,string,string],
+  },
+} as const;
+
+export type AccentKey = keyof typeof ACCENT_PRESETS;
+
 export const Colors = {
   light: {
     // Text
