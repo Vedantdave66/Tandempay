@@ -204,7 +204,7 @@ export default function DashboardScreen({ navigation }: any) {
                         onPress={() => navigation.navigate('CreateGroup')}
                         style={[styles.newButton, {
                             backgroundColor: colors.accent,
-                            shadowColor: '#16A34A',
+                            shadowColor: colors.accent,
                             shadowOpacity: 0.44,
                             shadowRadius: 12,
                             shadowOffset: { width: 0, height: 8 },

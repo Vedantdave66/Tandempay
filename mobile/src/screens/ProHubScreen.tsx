@@ -101,13 +101,13 @@ export default function ProHubScreen() {
                 <View style={styles.body}>
                     {/* Pro card */}
                     <View style={[styles.proCard, { borderColor: colors.border }]}>
-                        <LinearGradient colors={['#15803D', '#16A34A']} style={styles.proHeader}>
+                        <LinearGradient colors={[colors.accentDark, colors.accent]} style={styles.proHeader}>
                             <View style={styles.proHeaderRow}>
                                 <Crown size={20} color="#fff" />
                                 <Text style={styles.proTitle}>TandemPay Pro</Text>
                             </View>
                             <View style={styles.priceChip}>
-                                <Text style={styles.priceChipText}>$4.99/mo</Text>
+                                <Text style={[styles.priceChipText, { color: colors.accent }]}>$4.99/mo</Text>
                             </View>
                         </LinearGradient>
                         <View style={[styles.proBody, { backgroundColor: colors.surface }]}>

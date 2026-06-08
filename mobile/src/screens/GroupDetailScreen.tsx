@@ -266,7 +266,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     <TouchableOpacity
                         style={[styles.primaryBtn, {
                             backgroundColor: colors.accent,
-                            shadowColor: '#16A34A',
+                            shadowColor: colors.accent,
                             shadowOpacity: 0.44,
                             shadowRadius: 12,
                             shadowOffset: { width: 0, height: 8 },
@@ -581,7 +581,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     style={[styles.inviteBtn, {
                                         backgroundColor: colors.accent,
                                         opacity: inviteLoading ? 0.7 : 1,
-                                        shadowColor: '#16A34A',
+                                        shadowColor: colors.accent,
                                         shadowOpacity: 0.44,
                                         shadowRadius: 12,
                                         shadowOffset: { width: 0, height: 8 },
