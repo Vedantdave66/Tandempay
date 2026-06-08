@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -7,14 +7,19 @@ import {
     TouchableOpacity,
     Alert,
     Linking,
+    Share,
+    Modal,
 } from 'react-native';
+import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { ACCENT_PRESETS, AccentKey } from '../constants/Colors';
 import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
+import CharacterSetupModal from '../components/CharacterSetupModal';
 
 const PRO_FEATURES = [
     'Recurring Expenses — auto-split monthly bills on a schedule',
@@ -32,8 +37,10 @@ const SETTINGS_ROWS = [
 
 export default function ProHubScreen() {
     const { user, logout } = useAuth();
-    const { colors, isDark } = useTheme();
+    const { colors, isDark, toggleTheme, theme, accentKey, setAccent } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
+    const [showCharModal, setShowCharModal] = useState(false);
+    const [showAppearance, setShowAppearance] = useState(false);
 
     const handleSettingsTap = (label: string) => {
         Alert.alert('Coming soon', `${label} is on our roadmap.`);
@@ -42,6 +49,22 @@ export default function ProHubScreen() {
     const handleProAction = () => {
         // TODO: route to a dedicated subscription-management screen once one exists
         Linking.openURL('https://tandempay.ca/pricing');
+    };
+
+    const handleInvite = async () => {
+        const { status } = await Contacts.requestPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission needed', 'Allow contacts access to invite friends.');
+            return;
+        }
+        const { data } = await Contacts.getContactsAsync({
+            fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
+        });
+        if (!data.length) { Alert.alert('No contacts found'); return; }
+        await Share.share({
+            message: `Hey! I'm using TandemPay to split expenses with roommates. Join me: https://tandempay.ca/invite`,
+            title: 'Join me on TandemPay',
+        });
     };
 
     const handleSignOut = () => {
@@ -68,7 +91,7 @@ export default function ProHubScreen() {
                     <Text style={[styles.heroEmail, { color: colors.faintText }]}>{user?.email}</Text>
                     <TouchableOpacity
                         style={[styles.customiseChip, { backgroundColor: colors.accentBg }]}
-                        onPress={() => Alert.alert('Customise character', 'Re-open the character setup prompt to change your look — coming soon as a standalone screen.')}
+                        onPress={() => setShowCharModal(true)}
                         activeOpacity={0.8}
                     >
                         <Text style={[styles.customiseChipText, { color: colors.accent }]}>✏ Customise character</Text>
@@ -113,7 +136,11 @@ export default function ProHubScreen() {
                                         styles.settingsRow,
                                         index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
                                     ]}
-                                    onPress={() => handleSettingsTap(row.label)}
+                                    onPress={() => {
+                                        if (row.label === 'Invite a friend') return handleInvite();
+                                        if (row.label === 'Appearance') return setShowAppearance(true);
+                                        handleSettingsTap(row.label);
+                                    }}
                                     activeOpacity={0.7}
                                 >
                                     <View style={[styles.settingsIconWrap, { backgroundColor: colors.accentBg }]}>
@@ -136,6 +163,86 @@ export default function ProHubScreen() {
                     </TouchableOpacity>
                 </View>
             </ScrollView>
+            <CharacterSetupModal
+                visible={showCharModal}
+                onClose={() => setShowCharModal(false)}
+            />
+
+            {/* Appearance bottom sheet */}
+            <Modal
+                visible={showAppearance}
+                animationType="slide"
+                transparent
+                onRequestClose={() => setShowAppearance(false)}
+            >
+                <TouchableOpacity
+                    style={styles.appearanceBackdrop}
+                    activeOpacity={1}
+                    onPress={() => setShowAppearance(false)}
+                />
+                <View style={[styles.appearanceSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <View style={[styles.appearanceHandle, { backgroundColor: colors.border }]} />
+
+                    <Text style={[styles.appearanceTitle, { color: colors.text }]}>Appearance</Text>
+
+                    {/* Accent swatches */}
+                    <Text style={[styles.appearanceLabel, { color: colors.secondaryText }]}>ACCENT COLOR</Text>
+                    <View style={styles.swatchRow}>
+                        {(Object.keys(ACCENT_PRESETS) as AccentKey[]).map(key => {
+                            const swatch = ACCENT_PRESETS[key][isDark ? 'dark' : 'light'];
+                            const selected = accentKey === key;
+                            return (
+                                <TouchableOpacity
+                                    key={key}
+                                    onPress={() => setAccent(key)}
+                                    activeOpacity={0.8}
+                                    style={[
+                                        styles.swatch,
+                                        { backgroundColor: swatch },
+                                        selected && styles.swatchSelected,
+                                    ]}
+                                >
+                                    {selected && (
+                                        <Text style={styles.swatchCheck}>✓</Text>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    {/* Dark / Light toggle */}
+                    <Text style={[styles.appearanceLabel, { color: colors.secondaryText }]}>COLOR SCHEME</Text>
+                    <View style={[styles.themeToggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', borderRadius: ms(14) }]}>
+                        {(['light', 'dark'] as const).map(t => {
+                            const active = theme === t;
+                            return (
+                                <TouchableOpacity
+                                    key={t}
+                                    onPress={() => { if (!active) toggleTheme(); }}
+                                    activeOpacity={0.8}
+                                    style={[
+                                        styles.themeBtn,
+                                        active && { backgroundColor: colors.accent, borderRadius: ms(12) },
+                                    ]}
+                                >
+                                    <Text style={[styles.themeBtnText, { color: active ? '#fff' : colors.secondaryText }]}>
+                                        {t === 'light' ? '☀ Light' : '🌙 Dark'}
+                                    </Text>
+                                </TouchableOpacity>
+                            );
+                        })}
+                    </View>
+
+                    {/* Done */}
+                    <TouchableOpacity
+                        style={[styles.appearanceDone, { backgroundColor: colors.accent }]}
+                        onPress={() => setShowAppearance(false)}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={[styles.appearanceDoneText, { color: '#fff' }]}>Done</Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -258,6 +365,83 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: ms(15),
         fontWeight: '500',
+    },
+
+    // Appearance sheet
+    appearanceBackdrop: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    appearanceSheet: {
+        paddingHorizontal: scale(20),
+        paddingBottom: vs(40),
+        paddingTop: vs(12),
+        borderTopLeftRadius: ms(24),
+        borderTopRightRadius: ms(24),
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    appearanceHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: 99,
+        alignSelf: 'center',
+        marginBottom: vs(16),
+    },
+    appearanceTitle: {
+        fontSize: ms(18),
+        fontWeight: '700',
+        marginBottom: vs(20),
+        textAlign: 'center',
+    },
+    appearanceLabel: {
+        fontSize: ms(11),
+        fontWeight: '700',
+        letterSpacing: 1.2,
+        marginBottom: vs(12),
+    },
+    swatchRow: {
+        flexDirection: 'row',
+        gap: scale(12),
+        marginBottom: vs(24),
+    },
+    swatch: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: scale(20),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    swatchSelected: {
+        borderWidth: 3,
+        borderColor: '#FFFFFF',
+    },
+    swatchCheck: {
+        color: '#FFFFFF',
+        fontSize: ms(16),
+        fontWeight: '800',
+    },
+    themeToggleRow: {
+        flexDirection: 'row',
+        padding: vs(4),
+        marginBottom: vs(24),
+    },
+    themeBtn: {
+        flex: 1,
+        paddingVertical: vs(10),
+        alignItems: 'center',
+    },
+    themeBtnText: {
+        fontSize: ms(14),
+        fontWeight: '600',
+    },
+    appearanceDone: {
+        borderRadius: ms(14),
+        paddingVertical: vs(14),
+        alignItems: 'center',
+    },
+    appearanceDoneText: {
+        fontSize: ms(15),
+        fontWeight: '700',
     },
 
     // Sign out
