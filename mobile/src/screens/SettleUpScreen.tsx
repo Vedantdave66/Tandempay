@@ -96,7 +96,7 @@ export default function SettleUpScreen() {
     const route = useRoute<any>();
     const { payment } = route.params;
     const { isDark, colors } = useTheme();
-    const t = tok(isDark, colors.accent);
+    const t = tok(isDark);
     const insets = useSafeAreaInsets();
 
     const [view, setView] = useState<'choose' | 'sent'>('choose');
