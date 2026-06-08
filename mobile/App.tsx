@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
@@ -14,6 +14,7 @@ import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import RootNavigator from './src/navigation/RootNavigator';
+import SplashScreen from './src/components/SplashScreen';
 
 // ── Sentry error monitoring ──────────────────────────────────────────────────
 // DSN is read from app.json extra.sentryDsn so it can be swapped per
@@ -60,6 +61,8 @@ export default function App() {
     PlusJakartaSans_700Bold,
     PlusJakartaSans_800ExtraBold,
   });
+  const [splashDone, setSplashDone] = useState(false);
+
   if (!fontsLoaded) return null;
 
   // STRIPE KEY — loaded from app.json extra.stripePublishableKey.
@@ -77,6 +80,7 @@ export default function App() {
           </StripeProvider>
         </NotificationProvider>
       </AuthProvider>
+      {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
     </ThemeProvider>
   );
 }
