@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-08
+**Last updated:** 2026-06-09
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -121,13 +121,41 @@ All PRs listed below are **open** (awaiting merge into `main`) unless otherwise 
 - **`notifications.some is not a function`**: `notificationsApi.list()` response in `NotificationContext` now coerced to array (`Array.isArray(raw) ? raw : raw?.items ?? []`) before being stored in state.
 - DashboardScreen `notificationsApi.list()` call in recent-activity also coerced to array.
 
-### PR #141 — feat/prohub-appearance (open, includes expo-haptics fix)
+### PR #141 — feat/prohub-appearance *(merged into main)*
 - **ProHubScreen — Customise character**: chip button now opens `CharacterSetupModal` (was showing "coming soon" Alert). `CharacterSetupModal.handleSave` now calls `onClose?.()` after `refreshUser()` so the modal auto-dismisses on save.
 - **ProHubScreen — Invite a friend**: requests Contacts permission via `expo-contacts`, then opens native Share sheet with invite message/link. `expo-contacts` installed.
 - **ProHubScreen — Appearance bottom sheet**: tapping "Appearance" opens a slide-up Modal with 6 accent color swatches (40pt circles, white checkmark on selected) + Light/Dark segmented toggle + Done button.
 - **`Colors.ts` — `ACCENT_PRESETS`**: added `ACCENT_PRESETS` map (Forest/Ocean/Sunset/Candy/Grape/Slate) each with `{ light, dark, glowLight, glowDark }` values. Exported `AccentKey` type.
 - **`ThemeContext` — accent theming**: added `accentKey` state (default `'forest'`, persisted via `AsyncStorage`), `setAccent(key)` exported from `useTheme()`. On accent change, overrides `colors.accent`, `colors.accentDark`, `colors.tint`, `colors.tabIconSelected`, `colors.groupGlow` — flows to all `useTheme()` consumers instantly. `ColorPalette` type defined to relax literal types on overrideable fields.
 - **`expo-haptics` installed**: resolves crash in `GroupDetailScreen` where `import * as Haptics from 'expo-haptics'` could not be resolved.
+
+---
+
+## Canvas Mode + appearance session (2026-06-08/09) — PRs #142–#146
+
+All PRs listed below are **merged** unless otherwise noted.
+
+### PR #142 — feat: logo splash screen animation on app launch *(merged)*
+- `SplashAnimationScreen.tsx` — logo lettermark fades and scales in on launch using `Animated` (no reanimated). Replaces the default Expo splash with a branded transition.
+
+### PR #143 — feat: accent-aware splash glow + gradient tokens *(merged)*
+- `GroupCard` / `GroupDetail` / `SettleUp` gradient tokens updated to use `colors.heroGradient` from `ThemeContext` instead of hardcoded greens.
+- Splash glow tint reads `colors.accent` so it adapts when the user changes accent preset.
+
+### PR #144 — fix: replace hardcoded green hex values with colors.accent *(merged)*
+- Audit of all screens and components: every hardcoded `#16A34A`, `#4ADE80`, `#10B981`, `#22C55E`, etc. replaced with `colors.accent` / `colors.accentDark` / `colors.gold` tokens from `useTheme()`.
+- Ensures the Ocean/Sunset/Candy/Grape/Slate accent presets introduced in PR #141 actually propagate everywhere.
+
+### PR #145 — feat: ProHub canvas redesign + auth screen polish *(merged)*
+- **CanvasModeView full visual redesign**: star field (28 golden-ratio dots), nebula glow, glassmorphism hub with breathing `Animated.loop` scale, dynamic HSL bubble colors with emoji prefixes (`expenseEmoji()`), gradient friend dock as absolute canvas overlay with centered avatars, `colors.accent`-tinted orbit rings.
+- **Auth screen branding**: `<Logo />` replaces hardcoded "Tandem" text on LandingScreen, LoginScreen, RegisterScreen, ForgotPasswordScreen.
+- **Password visibility toggle**: Eye/EyeOff icon on password fields in LoginScreen and RegisterScreen (`showPassword` state).
+
+### PR #146 — fix: canvas mode polish pass + diagnostic fixes *(open)*
+- **TypeScript errors cleared**: `tok()` in `SettleUpScreen` called with 1 arg (needs 2 — added `colors.accent`); `AddExpenseScreen` typed `Props` interface clashed with navigator generic (cast to `any`); `handoff/` directory added to `tsconfig.json` exclude to stop stale corrected file from causing compile errors.
+- **CanvasModeView full restore** after remote rebase reverted visual changes: BUBBLE_PALETTES → dynamic HSL + `expenseEmoji()`, `HUB_Y_CENTER` constant → dynamic `hubYCenter` + `hubYCenterRef`, `canvasGrad` → `colors.heroGradient`, hub → `Animated.View` glassmorphism + breathing, star field + nebula glow, accent orbit rings, bubble dismiss button + payer `CharacterShape`, `character_shape` fallback `'semi'` → `'rect'` everywhere.
+- **Dock moved inside canvas** as absolute `LinearGradient` overlay — no more hard-edged bottom strip; avatar row centered.
+- **Drag ghost → member's CharacterShape** — `dragGhostRef` removed; `ghost` state drives a floating `CharacterShape (variant="mini")` under the finger during drag.
 
 ---
 
@@ -219,14 +247,13 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap and the mobile UI revamp (PRs #123–#125) are all merged into `main`. The 2026-06-07/08 polish pass (PRs #132–#141) is partially merged — PRs #138, #139, #140 are confirmed merged; PRs #132–#137, #141 may still be open. Start by checking PR status (`gh pr list`), merging any open polish PRs into `main`, then decide what R6+ should be. Before new feature work: (1) confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), (2) do an end-to-end Interac auto-confirm test."
+> "TandemPay's R1–R5 roadmap and all mobile UI revamp PRs (#123–#145) are merged into `main`. PR #146 (canvas polish + diagnostic fixes, branch `feat/prohub-appearance`) is open — merge it first. Then check whether any other PRs are open (`gh pr list`), confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), and do an end-to-end Interac auto-confirm test before starting new feature work. The accent-theming `accentBg`/`accentBgFaint` gap is a known remaining item."
 
 ## Open items / things to double-check next session
 
-1. **Polish PRs still open** — check status of PRs #132–#137, #141 and merge them into `main` if approved. PRs #138, #139, #140 were confirmed merged during the 2026-06-07/08 session.
-2. **`expo-haptics` ambient declaration** — `mobile/src/types/expo-haptics.d.ts` was created as a workaround because the package was missing. PR #141 installs the real package (`expo-haptics`). Once #141 merges, confirm the `.d.ts` shim is no longer needed and remove it if the real types are provided by the package.
-3. **Accent theming completeness** — `accentBg` and `accentBgFaint` in Colors.ts are still hardcoded green regardless of selected accent. Icon tile backgrounds and chip backgrounds will stay green when Ocean/Candy/etc. is selected. Follow-up: override these two fields in ThemeContext alongside `accent`.
-4. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
-5. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-6. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-7. **Define R6+** — the roadmap table is fully done; no documented next phase.
+1. **PR #146 open** — merge `feat/prohub-appearance` into `main` after review. Contains: TypeScript clean-up, CanvasModeView full restore, dock overlay, CharacterShape drag ghost.
+2. **Accent theming completeness** — `accentBg` and `accentBgFaint` in `Colors.ts` are still hardcoded green regardless of selected accent. Icon tile backgrounds and chip backgrounds will stay green when Ocean/Candy/etc. is selected. Fix: override these two fields in `ThemeContext` alongside `accent`.
+3. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
+4. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+5. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+6. **Define R6+** — the roadmap table is fully done; no documented next phase.
