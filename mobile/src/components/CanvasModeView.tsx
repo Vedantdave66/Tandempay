@@ -19,16 +19,22 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { ArrowLeft, X } from 'lucide-react-native';
 import CharacterShape from './CharacterShape';
 
-// Pre-computed rgba approximations for 6 hue palette entries
-// Columns: [bgDark, bgLight, borderDark, borderLight, textDark, textLight]
-const BUBBLE_PALETTES = [
-    ['rgba(219,105,146,0.12)', 'rgba(219,105,146,0.10)', 'rgba(219,105,146,0.42)', 'rgba(219,105,146,0.35)', 'rgba(255,160,192,1)', 'rgba(180,55,95,1)'],
-    ['rgba(80,122,206,0.12)',  'rgba(80,122,206,0.10)',  'rgba(80,122,206,0.42)',  'rgba(80,122,206,0.35)',  'rgba(150,190,255,1)', 'rgba(50,100,185,1)'],
-    ['rgba(75,192,151,0.12)',  'rgba(75,192,151,0.10)',  'rgba(75,192,151,0.42)',  'rgba(75,192,151,0.35)',  'rgba(150,240,210,1)', 'rgba(35,150,115,1)'],
-    ['rgba(206,164,75,0.12)',  'rgba(206,164,75,0.10)',  'rgba(206,164,75,0.42)',  'rgba(206,164,75,0.35)',  'rgba(255,225,150,1)', 'rgba(175,120,35,1)'],
-    ['rgba(162,80,206,0.12)',  'rgba(162,80,206,0.10)',  'rgba(162,80,206,0.42)',  'rgba(162,80,206,0.35)',  'rgba(215,160,255,1)', 'rgba(130,50,180,1)'],
-    ['rgba(192,192,75,0.12)',  'rgba(192,192,75,0.10)',  'rgba(192,192,75,0.42)',  'rgba(192,192,75,0.35)',  'rgba(245,245,150,1)', 'rgba(155,155,35,1)'],
-];
+const EXPENSE_HUES = [335, 218, 158, 40, 272, 52];
+
+function expenseEmoji(title: string): string {
+    const t = title.toLowerCase();
+    if (/uber|lyft|taxi|ride|car|gas|transit|bus|train/.test(t)) return '🚗';
+    if (/food|dinner|lunch|breakfast|eat|restaurant|pizza|sushi|meal/.test(t)) return '🍽️';
+    if (/drink|beer|wine|alcohol|bar|pub/.test(t)) return '🍻';
+    if (/grocery|groceries|shop|market|costco/.test(t)) return '🛒';
+    if (/rent|mortgage|utility|hydro|electric|water|internet|wifi/.test(t)) return '🏠';
+    if (/movie|film|netflix|cinema/.test(t)) return '🎬';
+    if (/coffee|cafe|tim|starbucks/.test(t)) return '☕';
+    if (/snack|chips|candy/.test(t)) return '🍿';
+    if (/flight|travel|hotel|airbnb/.test(t)) return '✈️';
+    const pool = ['💰','📦','🎉','🧾','💡','🎮','🎵','🏃'];
+    return pool[title.charCodeAt(0) % pool.length];
+}
 
 const HUB_R   = 82;
 const BUBBLE_R = 54; // FIX 5: increased from 50
@@ -62,7 +68,14 @@ export default function CanvasModeView({
 
     // FIX 2: dynamic hub Y center
     const [canvasH, setCanvasH] = useState(0);
-    const hubYCenter = canvasH > 0 ? canvasH * 0.44 : 314;
+    const hubYCenter = canvasH > 0 ? Math.round(canvasH * 0.42) : 314;
+
+    const STARS = React.useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+        key: i,
+        left: `${((i * 137.508) % 100).toFixed(1)}%` as any,
+        top:  `${((i * 241.313) % 100).toFixed(1)}%` as any,
+        size: i % 7 === 0 ? 2 : i % 4 === 0 ? 1.4 : 0.7,
+    })), []);
 
     // Physics refs — updated every frame, no setState
     const posRef          = useRef<{ x: number; y: number }[]>([]);
@@ -89,6 +102,17 @@ export default function CanvasModeView({
     const [highlightBubbleIdx, setHighlightBubbleIdx] = useState(-1);
 
     const sheetAnim = useRef(new Animated.Value(500)).current;
+    const hubScaleAnim = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        const breath = Animated.loop(Animated.sequence([
+            Animated.timing(hubScaleAnim, { toValue: 1.018, duration: 3000, useNativeDriver: true }),
+            Animated.timing(hubScaleAnim, { toValue: 1,     duration: 3000, useNativeDriver: true }),
+        ]));
+        breath.start();
+        return () => breath.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // ─── Physics ────────────────────────────────────────────────────────────────
 
@@ -295,7 +319,7 @@ export default function CanvasModeView({
 
     const selectedBubbleIdx = selectedExpense ? visibleExpenses.findIndex(e => e.id === selectedExpense.id) : -1;
     const sheetTitleColor   = selectedBubbleIdx >= 0
-        ? (isDark ? BUBBLE_PALETTES[selectedBubbleIdx % 6][4] : BUBBLE_PALETTES[selectedBubbleIdx % 6][5])
+        ? (() => { const h = EXPENSE_HUES[selectedBubbleIdx % 6]; return isDark ? `hsla(${h},88%,90%,1)` : `hsla(${h},65%,26%,1)`; })()
         : colors.text;
 
     // ─── Render ──────────────────────────────────────────────────────────────────
@@ -304,7 +328,6 @@ export default function CanvasModeView({
         <View style={[styles.root, style]}>
             {/* ── Canvas (fills above the dock) ── */}
             <View ref={canvasViewRef} style={styles.canvas} onLayout={handleCanvasLayout}>
-                {/* FIX 3: use heroGradient from theme instead of hardcoded canvasGrad */}
                 <LinearGradient
                     colors={colors.heroGradient as [string, string, string]}
                     start={{ x: 0.5, y: 0 }}
@@ -312,9 +335,36 @@ export default function CanvasModeView({
                     style={StyleSheet.absoluteFillObject}
                 />
 
-                {/* FIX 2: orbit rings centered on dynamic hubYCenter */}
-                {/* FIX 3: border color tied to colors.accent with hex opacity */}
-                {[296, 428, 560].map((size, i) => (
+                {/* Star field */}
+                {STARS.map(s => (
+                    <View key={s.key} style={{
+                        position: 'absolute', left: s.left, top: s.top,
+                        width: s.size, height: s.size, borderRadius: s.size / 2,
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,100,200,0.25)',
+                        pointerEvents: 'none',
+                    }} />
+                ))}
+
+                {/* Nebula glow */}
+                <View
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        width: 320, height: 320,
+                        borderRadius: 160,
+                        alignSelf: 'center',
+                        top: hubYCenter - 160,
+                        backgroundColor: 'transparent',
+                        shadowColor: colors.accent,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: isDark ? 0.18 : 0.12,
+                        shadowRadius: 80,
+                        elevation: 0,
+                    }}
+                />
+
+                {/* Orbit rings */}
+                {[296, 428, 560].map((size) => (
                     <View
                         key={size}
                         style={[
@@ -323,22 +373,26 @@ export default function CanvasModeView({
                                 width: size, height: size, borderRadius: size / 2,
                                 top: hubYCenter - size / 2,
                                 borderColor: isDark
-                                    ? `${colors.accent}${['0D', '09', '06'][i]}`
-                                    : `${colors.accent}${['14', '0D', '09'][i]}`,
+                                    ? colors.accent + '0E'
+                                    : colors.accent + '16',
                             },
                         ]}
                     />
                 ))}
 
-                {/* Hub — FIX 2: top uses hubYCenter */}
-                <View
+                {/* Hub */}
+                <Animated.View
                     style={[
                         styles.hub,
                         {
                             top: hubYCenter - HUB_R,
-                            backgroundColor: isDark ? '#0F1D14' : '#E8F5EE',
-                            borderColor: colors.accent + '73',
+                            backgroundColor: isDark ? 'rgba(8,14,26,0.92)' : 'rgba(255,255,255,0.97)',
+                            borderColor: colors.accent + '60',
                             shadowColor: colors.accent,
+                            shadowOffset: { width: 0, height: 0 },
+                            shadowOpacity: 0.22,
+                            shadowRadius: 40,
+                            transform: [{ scale: hubScaleAnim }],
                         },
                     ]}
                 >
@@ -373,22 +427,23 @@ export default function CanvasModeView({
                             <Text style={[styles.hubPillText, { color: colors.gold }, T.bold]}>⟶ Settle</Text>
                         </TouchableOpacity>
                     </View>
-                </View>
+                </Animated.View>
 
                 {/* Expense bubbles */}
                 {visibleExpenses.map((exp, i) => {
-                    const pal    = BUBBLE_PALETTES[i % 6];
-                    const bg     = isDark ? pal[0] : pal[1];
-                    const border = isDark ? pal[2] : pal[3];
-                    const tc     = isDark ? pal[4] : pal[5];
+                    const h = EXPENSE_HUES[i % 6];
+                    const bg        = isDark ? `hsla(${h},58%,60%,0.20)` : `hsla(${h},55%,48%,0.14)`;
+                    const border    = isDark ? `hsla(${h},78%,68%,0.56)` : `hsla(${h},70%,44%,0.48)`;
+                    const tc        = isDark ? `hsla(${h},88%,90%,1)`    : `hsla(${h},65%,26%,1)`;
+                    const shadowCol = isDark ? `hsla(${h},70%,55%,1)`    : `hsla(${h},70%,50%,1)`;
+                    const hovered   = highlightBubbleIdx === i;
                     const assignedUids = assignments[exp.id] ?? [];
                     const pips = assignedUids
                         .map(uid => members.find(m => m.user_id === uid))
                         .filter(Boolean)
                         .slice(0, 3);
-                    const lit = highlightBubbleIdx === i;
 
-                    // FIX 5: resolve payer for character display
+                    // resolve payer for character display
                     const payer = members.find(m => m.user_id === exp.paid_by);
 
                     return (
@@ -399,17 +454,16 @@ export default function CanvasModeView({
                                 styles.bubble,
                                 {
                                     backgroundColor: bg,
-                                    borderColor: lit ? colors.accent : border,
-                                    borderWidth: lit ? 2.5 : 1.5,
-                                    // FIX 5: always soft-glow, brighter when lit
-                                    shadowColor: isDark ? pal[4] : pal[5],
-                                    shadowOpacity: lit ? 0.55 : 0.22,
-                                    shadowRadius: lit ? 18 : 8,
-                                    elevation: lit ? 10 : 5,
+                                    borderColor: hovered ? colors.accent : border,
+                                    borderWidth: hovered ? 2.5 : 1.5,
+                                    shadowColor: shadowCol,
+                                    shadowOpacity: hovered ? 0.55 : 0.32,
+                                    shadowRadius: hovered ? 22 : 10,
+                                    elevation: hovered ? 10 : 5,
                                 },
                             ]}
                         >
-                            {/* FIX 4: dismiss × */}
+                            {/* dismiss × */}
                             <TouchableOpacity
                                 style={styles.bubbleX}
                                 onPress={() => setHiddenIds(prev => new Set([...prev, exp.id]))}
@@ -419,7 +473,7 @@ export default function CanvasModeView({
                             </TouchableOpacity>
 
                             <TouchableOpacity style={styles.bubbleTouchable} onPress={() => openSheet(exp.id)} activeOpacity={0.85}>
-                                {/* FIX 5: payer character at the top of the bubble */}
+                                {/* payer character at the top of the bubble */}
                                 {payer && (
                                     <View style={styles.bubblePayerWrap}>
                                         <CharacterShape
@@ -429,8 +483,8 @@ export default function CanvasModeView({
                                         />
                                     </View>
                                 )}
-                                <Text style={[styles.bubbleTitle, { color: tc }, T.extrabold]} numberOfLines={2}>{exp.title}</Text>
-                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }, T.bold]}>
+                                <Text style={[styles.bubbleTitle, { color: tc, textShadowColor: isDark ? shadowCol : 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: isDark ? 12 : 0 }, T.extrabold]} numberOfLines={2}>{expenseEmoji(exp.title)} {exp.title}</Text>
+                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(26,31,46,0.62)' }, T.bold]}>
                                     ${formatCurrency(exp.amount)}
                                 </Text>
                                 {pips.length > 0 && (
@@ -480,15 +534,14 @@ export default function CanvasModeView({
             </View>
 
             {/* ── Friend dock ── */}
-            <View
-                style={[
-                    styles.dock,
-                    {
-                        backgroundColor: isDark ? 'rgba(8,12,9,0.96)' : 'rgba(245,249,246,0.97)',
-                        borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
-                        paddingBottom: insets.bottom + vs(8),
-                    },
+            <LinearGradient
+                colors={[
+                    'transparent',
+                    isDark ? 'rgba(4,6,14,0.92)' : 'rgba(236,240,250,0.95)',
                 ]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 0, y: 1 }}
+                style={[styles.dock, { paddingBottom: insets.bottom + vs(8) }]}
             >
                 <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
                 <View style={styles.dockAvatarRow}>
@@ -497,7 +550,6 @@ export default function CanvasModeView({
                         if (!pr) return null;
                         return (
                             <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
-                                {/* FIX 1: default shape 'rect' to match GroupCard */}
                                 <View style={styles.dockCharacterWrap}>
                                     <CharacterShape
                                         variant="mini"
@@ -512,7 +564,7 @@ export default function CanvasModeView({
                         );
                     })}
                 </View>
-            </View>
+            </LinearGradient>
 
             {/* ── Detail sheet ── */}
             <Animated.View
@@ -752,7 +804,7 @@ const styles = StyleSheet.create({
         marginBottom: vs(2),
     },
     bubbleTitle: {
-        fontSize: ms(11),
+        fontSize: ms(12),
         textAlign: 'center',
         lineHeight: 14,
     },
@@ -808,7 +860,6 @@ const styles = StyleSheet.create({
 
     // Dock
     dock: {
-        borderTopWidth: 1,
         paddingTop: vs(10),
         paddingHorizontal: scale(16),
         minHeight: 110,
