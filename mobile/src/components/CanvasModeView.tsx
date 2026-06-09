@@ -19,26 +19,21 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { ArrowLeft, X } from 'lucide-react-native';
 import CharacterShape from './CharacterShape';
 
-const EXPENSE_HUES = [335, 218, 158, 40, 272, 52];
+// Pre-computed rgba approximations for 6 hue palette entries
+// Columns: [bgDark, bgLight, borderDark, borderLight, textDark, textLight]
+const BUBBLE_PALETTES = [
+    ['rgba(219,105,146,0.12)', 'rgba(219,105,146,0.10)', 'rgba(219,105,146,0.42)', 'rgba(219,105,146,0.35)', 'rgba(255,160,192,1)', 'rgba(180,55,95,1)'],
+    ['rgba(80,122,206,0.12)',  'rgba(80,122,206,0.10)',  'rgba(80,122,206,0.42)',  'rgba(80,122,206,0.35)',  'rgba(150,190,255,1)', 'rgba(50,100,185,1)'],
+    ['rgba(75,192,151,0.12)',  'rgba(75,192,151,0.10)',  'rgba(75,192,151,0.42)',  'rgba(75,192,151,0.35)',  'rgba(150,240,210,1)', 'rgba(35,150,115,1)'],
+    ['rgba(206,164,75,0.12)',  'rgba(206,164,75,0.10)',  'rgba(206,164,75,0.42)',  'rgba(206,164,75,0.35)',  'rgba(255,225,150,1)', 'rgba(175,120,35,1)'],
+    ['rgba(162,80,206,0.12)',  'rgba(162,80,206,0.10)',  'rgba(162,80,206,0.42)',  'rgba(162,80,206,0.35)',  'rgba(215,160,255,1)', 'rgba(130,50,180,1)'],
+    ['rgba(192,192,75,0.12)',  'rgba(192,192,75,0.10)',  'rgba(192,192,75,0.42)',  'rgba(192,192,75,0.35)',  'rgba(245,245,150,1)', 'rgba(155,155,35,1)'],
+];
 
-function expenseEmoji(title: string): string {
-    const t = title.toLowerCase();
-    if (/uber|lyft|taxi|ride|car|gas|transit|bus|train/.test(t)) return '🚗';
-    if (/food|dinner|lunch|breakfast|eat|restaurant|pizza|sushi|meal/.test(t)) return '🍽️';
-    if (/drink|beer|wine|alcohol|bar|pub/.test(t)) return '🍻';
-    if (/grocery|groceries|shop|market|costco/.test(t)) return '🛒';
-    if (/rent|mortgage|utility|hydro|electric|water|internet|wifi/.test(t)) return '🏠';
-    if (/movie|film|netflix|cinema/.test(t)) return '🎬';
-    if (/coffee|cafe|tim|starbucks/.test(t)) return '☕';
-    if (/snack|chips|candy/.test(t)) return '🍿';
-    if (/flight|travel|hotel|airbnb/.test(t)) return '✈️';
-    const pool = ['💰','📦','🎉','🧾','💡','🎮','🎵','🏃'];
-    return pool[title.charCodeAt(0) % pool.length];
-}
-
-const HUB_R   = 82;
-const BUBBLE_R = 54; // FIX 5: increased from 50
+const HUB_R = 82;
+const BUBBLE_R = 50;
 const WALL_INSET = 56;
+const HUB_Y_CENTER = 314; // canvas-local Y of hub center
 
 interface CanvasModeViewProps {
     expenses: Expense[];
@@ -59,30 +54,13 @@ export default function CanvasModeView({
     onAddExpense, onSettle, onClose, style,
 }: CanvasModeViewProps) {
     const insets = useSafeAreaInsets();
-
-    // FIX 4: hidden bubble ids
-    const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
-
-    // FIX 4: filter first so visibleExpenses is always fresh
-    const visibleExpenses = expenses.filter(e => !hiddenIds.has(e.id)).slice(0, 6);
-
-    // FIX 2: dynamic hub Y center
-    const [canvasH, setCanvasH] = useState(0);
-    const hubYCenter = canvasH > 0 ? Math.round(canvasH * 0.42) : 314;
-
-    const STARS = React.useMemo(() => Array.from({ length: 28 }, (_, i) => ({
-        key: i,
-        left: `${((i * 137.508) % 100).toFixed(1)}%` as any,
-        top:  `${((i * 241.313) % 100).toFixed(1)}%` as any,
-        size: i % 7 === 0 ? 2 : i % 4 === 0 ? 1.4 : 0.7,
-    })), []);
+    const visibleExpenses = expenses.slice(0, 6);
 
     // Physics refs — updated every frame, no setState
     const posRef          = useRef<{ x: number; y: number }[]>([]);
     const velRef          = useRef<{ vx: number; vy: number }[]>([]);
     const bubbleRefs      = useRef<(View | null)[]>([]);
     const rafRef          = useRef<number>(0);
-    const canvasDimRef    = useRef({ w: 0, h: 0 });
     const canvasOriginRef = useRef({ x: 0, y: 0 });
     const canvasViewRef   = useRef<View>(null);
 
@@ -102,22 +80,10 @@ export default function CanvasModeView({
     const [highlightBubbleIdx, setHighlightBubbleIdx] = useState(-1);
 
     const sheetAnim = useRef(new Animated.Value(500)).current;
-    const hubScaleAnim = useRef(new Animated.Value(1)).current;
-
-    useEffect(() => {
-        const breath = Animated.loop(Animated.sequence([
-            Animated.timing(hubScaleAnim, { toValue: 1.018, duration: 3000, useNativeDriver: true }),
-            Animated.timing(hubScaleAnim, { toValue: 1,     duration: 3000, useNativeDriver: true }),
-        ]));
-        breath.start();
-        return () => breath.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
 
     // ─── Physics ────────────────────────────────────────────────────────────────
 
-    // FIX 2: hubY passed as parameter instead of reading module constant
-    const initPositions = useCallback((w: number, h: number, count: number, hubY: number) => {
+    const initPositions = useCallback((w: number, h: number, count: number) => {
         if (count === 0) return;
         const hubX = w / 2;
         const r = Math.min(175, h * 0.36, w * 0.42);
@@ -127,7 +93,7 @@ export default function CanvasModeView({
             const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
             positions.push({
                 x: Math.max(WALL_INSET + BUBBLE_R, Math.min(w - WALL_INSET - BUBBLE_R, hubX + Math.cos(angle) * r)),
-                y: Math.max(WALL_INSET + BUBBLE_R, Math.min(h - WALL_INSET - BUBBLE_R, hubY + Math.sin(angle) * r)),
+                y: Math.max(WALL_INSET + BUBBLE_R, Math.min(h - WALL_INSET - BUBBLE_R, HUB_Y_CENTER + Math.sin(angle) * r)),
             });
             velocities.push({ vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3 });
         }
@@ -140,8 +106,7 @@ export default function CanvasModeView({
         });
     }, []);
 
-    // FIX 2: hubY passed as parameter
-    const startLoop = useCallback((w: number, h: number, hubY: number) => {
+    const startLoop = useCallback((w: number, h: number) => {
         cancelAnimationFrame(rafRef.current);
         const hubX = w / 2;
 
@@ -161,7 +126,7 @@ export default function CanvasModeView({
 
                 // Repel from hub
                 const dx = x - hubX;
-                const dy = y - hubY;
+                const dy = y - HUB_Y_CENTER;
                 const dist = Math.sqrt(dx * dx + dy * dy) || 1;
                 const minHub = HUB_R + BUBBLE_R + 26;
                 if (dist < minHub) {
@@ -204,26 +169,15 @@ export default function CanvasModeView({
 
     useEffect(() => () => cancelAnimationFrame(rafRef.current), []);
 
-    // FIX 2: handleCanvasLayout stores dims and sets canvasH; effect below does the re-init
     const handleCanvasLayout = useCallback((e: LayoutChangeEvent) => {
         const { width, height } = e.nativeEvent.layout;
         if (!width || !height) return;
-        canvasDimRef.current = { w: width, h: height };
         canvasViewRef.current?.measure((_fx, _fy, _w, _h, px, py) => {
             canvasOriginRef.current = { x: px, y: py };
         });
-        setCanvasH(height);
-    }, []);
-
-    // FIX 2: re-init whenever canvas size or visible expense count changes
-    useEffect(() => {
-        if (!canvasH) return;
-        const { w, h } = canvasDimRef.current;
-        const hubY = h * 0.44;
-        initPositions(w, h, visibleExpenses.length, hubY);
-        startLoop(w, h, hubY);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [canvasH, visibleExpenses.length, initPositions, startLoop]);
+        initPositions(width, height, visibleExpenses.length);
+        startLoop(width, height);
+    }, [visibleExpenses.length, initPositions, startLoop]);
 
     // ─── Sheet ──────────────────────────────────────────────────────────────────
 
@@ -319,8 +273,12 @@ export default function CanvasModeView({
 
     const selectedBubbleIdx = selectedExpense ? visibleExpenses.findIndex(e => e.id === selectedExpense.id) : -1;
     const sheetTitleColor   = selectedBubbleIdx >= 0
-        ? (() => { const h = EXPENSE_HUES[selectedBubbleIdx % 6]; return isDark ? `hsla(${h},88%,90%,1)` : `hsla(${h},65%,26%,1)`; })()
+        ? (isDark ? BUBBLE_PALETTES[selectedBubbleIdx % 6][4] : BUBBLE_PALETTES[selectedBubbleIdx % 6][5])
         : colors.text;
+
+    const canvasGrad: [string, string, string] = isDark
+        ? ['rgba(18,42,26,0.98)', '#0B130E', '#070B08']
+        : ['rgba(220,240,228,0.98)', '#F0F7F2', '#EBF4EE'];
 
     // ─── Render ──────────────────────────────────────────────────────────────────
 
@@ -328,72 +286,30 @@ export default function CanvasModeView({
         <View style={[styles.root, style]}>
             {/* ── Canvas (fills above the dock) ── */}
             <View ref={canvasViewRef} style={styles.canvas} onLayout={handleCanvasLayout}>
-                <LinearGradient
-                    colors={colors.heroGradient as [string, string, string]}
-                    start={{ x: 0.5, y: 0 }}
-                    end={{ x: 0.5, y: 1 }}
-                    style={StyleSheet.absoluteFillObject}
-                />
+                <LinearGradient colors={canvasGrad} start={{ x: 0.5, y: 0 }} end={{ x: 0.5, y: 1 }} style={StyleSheet.absoluteFillObject} />
 
-                {/* Star field */}
-                {STARS.map(s => (
-                    <View key={s.key} style={{
-                        position: 'absolute', left: s.left, top: s.top,
-                        width: s.size, height: s.size, borderRadius: s.size / 2,
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,100,200,0.25)',
-                        pointerEvents: 'none',
-                    }} />
-                ))}
-
-                {/* Nebula glow */}
-                <View
-                    pointerEvents="none"
-                    style={{
-                        position: 'absolute',
-                        width: 320, height: 320,
-                        borderRadius: 160,
-                        alignSelf: 'center',
-                        top: hubYCenter - 160,
-                        backgroundColor: 'transparent',
-                        shadowColor: colors.accent,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: isDark ? 0.18 : 0.12,
-                        shadowRadius: 80,
-                        elevation: 0,
-                    }}
-                />
-
-                {/* Orbit rings */}
-                {[296, 428, 560].map((size) => (
+                {/* Orbit rings — each centered on hub */}
+                {[296, 428, 560].map((size, i) => (
                     <View
                         key={size}
                         style={[
                             styles.orbitRing,
                             {
                                 width: size, height: size, borderRadius: size / 2,
-                                top: hubYCenter - size / 2,
+                                top: HUB_Y_CENTER - size / 2,
                                 borderColor: isDark
-                                    ? colors.accent + '0E'
-                                    : colors.accent + '16',
+                                    ? `rgba(34,197,94,${0.05 - i * 0.01})`
+                                    : `rgba(34,197,94,${0.08 - i * 0.015})`,
                             },
                         ]}
                     />
                 ))}
 
                 {/* Hub */}
-                <Animated.View
+                <View
                     style={[
                         styles.hub,
-                        {
-                            top: hubYCenter - HUB_R,
-                            backgroundColor: isDark ? 'rgba(8,14,26,0.92)' : 'rgba(255,255,255,0.97)',
-                            borderColor: colors.accent + '60',
-                            shadowColor: colors.accent,
-                            shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0.22,
-                            shadowRadius: 40,
-                            transform: [{ scale: hubScaleAnim }],
-                        },
+                        { backgroundColor: isDark ? '#0F1D14' : '#E8F5EE', borderColor: colors.accent + '73', shadowColor: colors.accent },
                     ]}
                 >
                     <Text style={[styles.hubName, { color: colors.text }, T.extrabold]} numberOfLines={2}>{groupName}</Text>
@@ -427,24 +343,20 @@ export default function CanvasModeView({
                             <Text style={[styles.hubPillText, { color: colors.gold }, T.bold]}>⟶ Settle</Text>
                         </TouchableOpacity>
                     </View>
-                </Animated.View>
+                </View>
 
                 {/* Expense bubbles */}
                 {visibleExpenses.map((exp, i) => {
-                    const h = EXPENSE_HUES[i % 6];
-                    const bg        = isDark ? `hsla(${h},58%,60%,0.20)` : `hsla(${h},55%,48%,0.14)`;
-                    const border    = isDark ? `hsla(${h},78%,68%,0.56)` : `hsla(${h},70%,44%,0.48)`;
-                    const tc        = isDark ? `hsla(${h},88%,90%,1)`    : `hsla(${h},65%,26%,1)`;
-                    const shadowCol = isDark ? `hsla(${h},70%,55%,1)`    : `hsla(${h},70%,50%,1)`;
-                    const hovered   = highlightBubbleIdx === i;
+                    const pal    = BUBBLE_PALETTES[i % 6];
+                    const bg     = isDark ? pal[0] : pal[1];
+                    const border = isDark ? pal[2] : pal[3];
+                    const tc     = isDark ? pal[4] : pal[5];
                     const assignedUids = assignments[exp.id] ?? [];
                     const pips = assignedUids
                         .map(uid => members.find(m => m.user_id === uid))
                         .filter(Boolean)
                         .slice(0, 3);
-
-                    // resolve payer for character display
-                    const payer = members.find(m => m.user_id === exp.paid_by);
+                    const lit = highlightBubbleIdx === i;
 
                     return (
                         <View
@@ -454,37 +366,17 @@ export default function CanvasModeView({
                                 styles.bubble,
                                 {
                                     backgroundColor: bg,
-                                    borderColor: hovered ? colors.accent : border,
-                                    borderWidth: hovered ? 2.5 : 1.5,
-                                    shadowColor: shadowCol,
-                                    shadowOpacity: hovered ? 0.55 : 0.32,
-                                    shadowRadius: hovered ? 22 : 10,
-                                    elevation: hovered ? 10 : 5,
+                                    borderColor: lit ? colors.accent : border,
+                                    borderWidth: lit ? 2.5 : 1.5,
+                                    shadowColor: lit ? colors.accent : 'transparent',
+                                    shadowOpacity: lit ? 0.5 : 0,
+                                    shadowRadius: lit ? 14 : 0,
                                 },
                             ]}
                         >
-                            {/* dismiss × */}
-                            <TouchableOpacity
-                                style={styles.bubbleX}
-                                onPress={() => setHiddenIds(prev => new Set([...prev, exp.id]))}
-                                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                            >
-                                <X size={10} color={tc} />
-                            </TouchableOpacity>
-
                             <TouchableOpacity style={styles.bubbleTouchable} onPress={() => openSheet(exp.id)} activeOpacity={0.85}>
-                                {/* payer character at the top of the bubble */}
-                                {payer && (
-                                    <View style={styles.bubblePayerWrap}>
-                                        <CharacterShape
-                                            variant="cluster"
-                                            shape={payer.character_shape ?? 'rect'}
-                                            color={payer.character_color ?? payer.avatar_color ?? '#6B7280'}
-                                        />
-                                    </View>
-                                )}
-                                <Text style={[styles.bubbleTitle, { color: tc, textShadowColor: isDark ? shadowCol : 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: isDark ? 12 : 0 }, T.extrabold]} numberOfLines={2}>{expenseEmoji(exp.title)} {exp.title}</Text>
-                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(26,31,46,0.62)' }, T.bold]}>
+                                <Text style={[styles.bubbleTitle, { color: tc }, T.extrabold]} numberOfLines={2}>{exp.title}</Text>
+                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)' }, T.bold]}>
                                     ${formatCurrency(exp.amount)}
                                 </Text>
                                 {pips.length > 0 && (
@@ -496,7 +388,7 @@ export default function CanvasModeView({
                                             >
                                                 <CharacterShape
                                                     variant="cluster"
-                                                    shape={m.character_shape ?? 'rect'}
+                                                    shape={m.character_shape ?? 'semi'}
                                                     color={m.character_color ?? m.avatar_color ?? '#6B7280'}
                                                 />
                                             </View>
@@ -531,43 +423,40 @@ export default function CanvasModeView({
                     <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
                     <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
+            </View>
 
-                {/* ── Friend dock (absolute overlay at bottom of canvas) ── */}
-                <LinearGradient
-                    colors={[
-                        'transparent',
-                        isDark ? 'rgba(4,6,14,0.92)' : 'rgba(236,240,250,0.95)',
-                    ]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 0, y: 1 }}
-                    style={[styles.dock, {
-                        position: 'absolute',
-                        bottom: 0, left: 0, right: 0,
-                        paddingBottom: insets.bottom + vs(12),
-                    }]}
-                >
-                    <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
-                    <View style={styles.dockAvatarRow}>
-                        {members.map((m, i) => {
-                            const pr = panResponders[i];
-                            if (!pr) return null;
-                            return (
-                                <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
-                                    <View style={styles.dockCharacterWrap}>
-                                        <CharacterShape
-                                            variant="mini"
-                                            shape={m.character_shape ?? 'rect'}
-                                            color={m.character_color ?? m.avatar_color ?? '#6B7280'}
-                                        />
-                                    </View>
-                                    <Text style={[styles.dockAvatarName, { color: colors.faintText }, T.regular]} numberOfLines={1}>
-                                        {(m.name || '').split(' ')[0]}
-                                    </Text>
+            {/* ── Friend dock ── */}
+            <View
+                style={[
+                    styles.dock,
+                    {
+                        backgroundColor: isDark ? 'rgba(8,12,9,0.96)' : 'rgba(245,249,246,0.97)',
+                        borderTopColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                        paddingBottom: insets.bottom + vs(8),
+                    },
+                ]}
+            >
+                <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
+                <View style={styles.dockAvatarRow}>
+                    {members.map((m, i) => {
+                        const pr = panResponders[i];
+                        if (!pr) return null;
+                        return (
+                            <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
+                                <View style={styles.dockCharacterWrap}>
+                                    <CharacterShape
+                                        variant="mini"
+                                        shape={m.character_shape ?? 'semi'}
+                                        color={m.character_color ?? m.avatar_color ?? '#6B7280'}
+                                    />
                                 </View>
-                            );
-                        })}
-                    </View>
-                </LinearGradient>
+                                <Text style={[styles.dockAvatarName, { color: colors.faintText }, T.regular]} numberOfLines={1}>
+                                    {(m.name || '').split(' ')[0]}
+                                </Text>
+                            </View>
+                        );
+                    })}
+                </View>
             </View>
 
             {/* ── Detail sheet ── */}
@@ -752,11 +641,12 @@ const styles = StyleSheet.create({
 
     hub: {
         position: 'absolute',
-        width: HUB_R * 2,
-        height: HUB_R * 2,
-        borderRadius: HUB_R,
+        width: 164,
+        height: 164,
+        borderRadius: 82,
         borderWidth: 2,
         alignSelf: 'center',
+        top: HUB_Y_CENTER - 82,
         alignItems: 'center',
         justifyContent: 'center',
         gap: vs(8),
@@ -791,6 +681,7 @@ const styles = StyleSheet.create({
         height: BUBBLE_R * 2,
         borderRadius: BUBBLE_R,
         shadowOffset: { width: 0, height: 0 },
+        elevation: 4,
     },
     bubbleTouchable: {
         flex: 1,
@@ -799,16 +690,8 @@ const styles = StyleSheet.create({
         padding: scale(6),
         gap: vs(2),
     },
-    // FIX 5: payer character container
-    bubblePayerWrap: {
-        width: 22,
-        height: 22,
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        marginBottom: vs(2),
-    },
     bubbleTitle: {
-        fontSize: ms(12),
+        fontSize: ms(11),
         textAlign: 'center',
         lineHeight: 14,
     },
@@ -825,18 +708,6 @@ const styles = StyleSheet.create({
         height: 20,
         alignItems: 'center',
         justifyContent: 'flex-end',
-    },
-    // FIX 4: dismiss button
-    bubbleX: {
-        position: 'absolute',
-        top: scale(6),
-        right: scale(6),
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: 'rgba(0,0,0,0.18)',
-        alignItems: 'center',
-        justifyContent: 'center',
     },
 
     dragGhost: {
@@ -864,9 +735,10 @@ const styles = StyleSheet.create({
 
     // Dock
     dock: {
-        paddingTop: vs(24),
+        borderTopWidth: 1,
+        paddingTop: vs(10),
         paddingHorizontal: scale(16),
-        alignItems: 'center',
+        minHeight: 110,
     },
     dockLabel: {
         fontSize: ms(9),
@@ -878,8 +750,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: scale(16),
         flexWrap: 'nowrap',
-        justifyContent: 'center',
-        width: '100%',
     },
     dockAvatarWrap: {
         alignItems: 'center',
