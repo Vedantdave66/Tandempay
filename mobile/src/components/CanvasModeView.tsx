@@ -64,8 +64,10 @@ export default function CanvasModeView({
     const canvasOriginRef = useRef({ x: 0, y: 0 });
     const canvasViewRef   = useRef<View>(null);
 
-    // Drag refs
-    const dragGhostRef  = useRef<View>(null);
+    // Drag state
+    const [ghost, setGhost] = useState<{
+        x: number; y: number; shape: string; color: string;
+    } | null>(null);
     const dragMemberRef = useRef<any>(null);
 
     // Up-to-date copies accessible inside stable callbacks
@@ -215,23 +217,25 @@ export default function CanvasModeView({
                 onStartShouldSetPanResponder: () => true,
                 onMoveShouldSetPanResponder: () => true,
                 onPanResponderGrant: (evt) => {
-                    dragMemberRef.current = membersRef.current[memberIdx];
+                    const m = membersRef.current[memberIdx];
+                    dragMemberRef.current = m;
                     const { pageX, pageY } = evt.nativeEvent;
                     const { x: ox, y: oy } = canvasOriginRef.current;
-                    dragGhostRef.current?.setNativeProps({
-                        style: { opacity: 1, transform: [{ translateX: pageX - ox - 28 }, { translateY: pageY - oy - 28 }] },
+                    setGhost({
+                        x: pageX - ox,
+                        y: pageY - oy,
+                        shape: m?.character_shape ?? 'rect',
+                        color: m?.character_color ?? m?.avatar_color ?? '#6B7280',
                     });
                 },
                 onPanResponderMove: (evt) => {
                     const { pageX, pageY } = evt.nativeEvent;
                     const { x: ox, y: oy } = canvasOriginRef.current;
-                    dragGhostRef.current?.setNativeProps({
-                        style: { opacity: 1, transform: [{ translateX: pageX - ox - 28 }, { translateY: pageY - oy - 28 }] },
-                    });
+                    setGhost(prev => prev ? { ...prev, x: pageX - ox, y: pageY - oy } : null);
                     setHighlightBubbleIdx(nearestBubble(pageX, pageY));
                 },
                 onPanResponderRelease: (evt) => {
-                    dragGhostRef.current?.setNativeProps({ style: { opacity: 0 } });
+                    setGhost(null);
                     setHighlightBubbleIdx(-1);
                     const nearest = nearestBubble(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
                     if (nearest >= 0 && dragMemberRef.current) {
@@ -247,7 +251,7 @@ export default function CanvasModeView({
                     dragMemberRef.current = null;
                 },
                 onPanResponderTerminate: () => {
-                    dragGhostRef.current?.setNativeProps({ style: { opacity: 0 } });
+                    setGhost(null);
                     setHighlightBubbleIdx(-1);
                     dragMemberRef.current = null;
                 },
@@ -401,11 +405,24 @@ export default function CanvasModeView({
                 })}
 
                 {/* Drag ghost */}
-                <View
-                    ref={dragGhostRef}
-                    pointerEvents="none"
-                    style={[styles.dragGhost, { backgroundColor: colors.accent + '55', borderColor: colors.accent }]}
-                />
+                {ghost && (
+                    <View
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            left: ghost.x - scale(22),
+                            top: ghost.y - vs(30),
+                            zIndex: 200,
+                            opacity: 0.92,
+                        }}
+                    >
+                        <CharacterShape
+                            variant="mini"
+                            shape={ghost.shape as any}
+                            color={ghost.color}
+                        />
+                    </View>
+                )}
 
                 {/* Backdrop inside canvas (sheet dimmer) */}
                 {selectedExpenseId && (
@@ -710,16 +727,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
 
-    dragGhost: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        borderWidth: 2,
-        opacity: 0,
-    },
+
 
     backdrop: { backgroundColor: 'rgba(0,0,0,0.52)' },
 
