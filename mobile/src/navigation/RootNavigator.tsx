@@ -81,7 +81,7 @@ export default function RootNavigator() {
                         />
                         <Stack.Screen
                             name="AddExpense"
-                            component={AddExpenseScreen}
+                            component={AddExpenseScreen as any}
                             options={{ presentation: 'modal' }}
                         />
                         <Stack.Screen
