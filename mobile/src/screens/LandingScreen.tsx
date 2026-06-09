@@ -14,6 +14,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Wallet, Receipt, TrendingUp, Send, ChevronRight } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import ThemeToggle from '../components/ThemeToggle';
+import Logo from '../components/Logo';
 
 const { width } = Dimensions.get('window');
 
@@ -101,7 +102,7 @@ export default function LandingScreen({ navigation }: any) {
           <LinearGradient colors={[colors.accent, '#10B981']} style={styles.logoIcon}>
             <Wallet size={20} color="white" />
           </LinearGradient>
-          <Text style={[styles.logoText, { color: colors.text }]}>Tandem</Text>
+          <Logo size={20} />
         </View>
         <ThemeToggle />
       </View>

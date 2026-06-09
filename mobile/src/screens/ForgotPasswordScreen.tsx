@@ -6,6 +6,7 @@ import {
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { ArrowLeft, Mail } from 'lucide-react-native';
+import Logo from '../components/Logo';
 import { authApi } from '../services/api';
 
 export default function ForgotPasswordScreen({ navigation }: any) {
@@ -51,6 +52,9 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                 <View style={styles.content}>
                     <View style={[styles.iconBox, { backgroundColor: `${colors.accent}20` }]}>
                         <Mail size={28} color={colors.accent} />
+                    </View>
+                    <View style={styles.logoWrap}>
+                        <Logo size={20} />
                     </View>
                     <Text style={[styles.title, { color: colors.text }]}>Forgot Password?</Text>
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
@@ -112,6 +116,7 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center',
         alignSelf: 'center', marginBottom: vs(20),
     },
+    logoWrap: { alignItems: 'center', marginBottom: vs(8) },
     title:    { fontSize: ms(28), fontWeight: '700', textAlign: 'center', marginBottom: vs(10) },
     subtitle: { fontSize: ms(14), textAlign: 'center', lineHeight: 22, marginBottom: vs(32) },
     form:     { padding: scale(24), borderRadius: ms(20), borderWidth: 1, marginBottom: vs(20) },

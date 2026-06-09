@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { authApi } from '../services/api';
-import { Wallet, ArrowLeft } from 'lucide-react-native';
+import { Wallet, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
+import Logo from '../components/Logo';
 
 export default function RegisterScreen({ navigation }: any) {
     const { login } = useAuth();
@@ -15,6 +16,7 @@ export default function RegisterScreen({ navigation }: any) {
     const [password, setPassword] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [showPassword, setShowPassword] = useState(false);
 
     // Password strength
     const getStrength = (pw: string): { label: string; color: string; score: number } => {
@@ -68,7 +70,7 @@ export default function RegisterScreen({ navigation }: any) {
                             <Wallet size={32} color={colors.accent} />
                         </View>
                         <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
-                        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Join Tandem today</Text>
+                        <Logo size={20} />
                     </View>
 
                     {error ? (
@@ -100,14 +102,26 @@ export default function RegisterScreen({ navigation }: any) {
                         />
 
                         <Text style={[styles.label, { color: colors.text }]}>Password</Text>
-                        <TextInput
-                            style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                            placeholder="••••••••"
-                            placeholderTextColor={colors.secondaryText}
-                            value={password}
-                            onChangeText={setPassword}
-                            secureTextEntry
-                        />
+                        <View style={[styles.passwordRow, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                            <TextInput
+                                style={[styles.passwordInput, { color: colors.text }]}
+                                placeholder="••••••••"
+                                placeholderTextColor={colors.secondaryText}
+                                value={password}
+                                onChangeText={setPassword}
+                                secureTextEntry={!showPassword}
+                            />
+                            <TouchableOpacity
+                                onPress={() => setShowPassword(p => !p)}
+                                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                style={styles.eyeBtn}
+                            >
+                                {showPassword
+                                    ? <Eye size={18} color={colors.secondaryText} />
+                                    : <EyeOff size={18} color={colors.secondaryText} />
+                                }
+                            </TouchableOpacity>
+                        </View>
 
                         {/* Password strength indicator */}
                         {password.length > 0 && (
@@ -219,6 +233,23 @@ const styles = StyleSheet.create({
         paddingVertical: vs(14),
         fontSize: ms(16),
         marginBottom: vs(20),
+    },
+    passwordRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderWidth: 1,
+        borderRadius: ms(12),
+        paddingHorizontal: scale(16),
+        marginBottom: vs(20),
+    },
+    passwordInput: {
+        flex: 1,
+        height: vs(14) * 2 + ms(16) * 1.2,
+        fontSize: ms(14),
+    },
+    eyeBtn: {
+        paddingLeft: scale(8),
+        paddingVertical: vs(4),
     },
     button: {
         borderRadius: ms(28),
