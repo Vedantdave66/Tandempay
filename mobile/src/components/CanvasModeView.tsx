@@ -531,40 +531,44 @@ export default function CanvasModeView({
                     <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
                     <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
-            </View>
 
-            {/* ── Friend dock ── */}
-            <LinearGradient
-                colors={[
-                    'transparent',
-                    isDark ? 'rgba(4,6,14,0.92)' : 'rgba(236,240,250,0.95)',
-                ]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 0, y: 1 }}
-                style={[styles.dock, { paddingBottom: insets.bottom + vs(8) }]}
-            >
-                <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
-                <View style={styles.dockAvatarRow}>
-                    {members.map((m, i) => {
-                        const pr = panResponders[i];
-                        if (!pr) return null;
-                        return (
-                            <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
-                                <View style={styles.dockCharacterWrap}>
-                                    <CharacterShape
-                                        variant="mini"
-                                        shape={m.character_shape ?? 'rect'}
-                                        color={m.character_color ?? m.avatar_color ?? '#6B7280'}
-                                    />
+                {/* ── Friend dock (absolute overlay at bottom of canvas) ── */}
+                <LinearGradient
+                    colors={[
+                        'transparent',
+                        isDark ? 'rgba(4,6,14,0.92)' : 'rgba(236,240,250,0.95)',
+                    ]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 0, y: 1 }}
+                    style={[styles.dock, {
+                        position: 'absolute',
+                        bottom: 0, left: 0, right: 0,
+                        paddingBottom: insets.bottom + vs(12),
+                    }]}
+                >
+                    <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
+                    <View style={styles.dockAvatarRow}>
+                        {members.map((m, i) => {
+                            const pr = panResponders[i];
+                            if (!pr) return null;
+                            return (
+                                <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
+                                    <View style={styles.dockCharacterWrap}>
+                                        <CharacterShape
+                                            variant="mini"
+                                            shape={m.character_shape ?? 'rect'}
+                                            color={m.character_color ?? m.avatar_color ?? '#6B7280'}
+                                        />
+                                    </View>
+                                    <Text style={[styles.dockAvatarName, { color: colors.faintText }, T.regular]} numberOfLines={1}>
+                                        {(m.name || '').split(' ')[0]}
+                                    </Text>
                                 </View>
-                                <Text style={[styles.dockAvatarName, { color: colors.faintText }, T.regular]} numberOfLines={1}>
-                                    {(m.name || '').split(' ')[0]}
-                                </Text>
-                            </View>
-                        );
-                    })}
-                </View>
-            </LinearGradient>
+                            );
+                        })}
+                    </View>
+                </LinearGradient>
+            </View>
 
             {/* ── Detail sheet ── */}
             <Animated.View
@@ -860,9 +864,9 @@ const styles = StyleSheet.create({
 
     // Dock
     dock: {
-        paddingTop: vs(10),
+        paddingTop: vs(24),
         paddingHorizontal: scale(16),
-        minHeight: 110,
+        alignItems: 'center',
     },
     dockLabel: {
         fontSize: ms(9),
@@ -874,6 +878,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: scale(16),
         flexWrap: 'nowrap',
+        justifyContent: 'center',
+        width: '100%',
     },
     dockAvatarWrap: {
         alignItems: 'center',
