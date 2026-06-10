@@ -8,7 +8,6 @@ import {
     Alert,
     Linking,
     Share,
-    Modal,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
@@ -16,7 +15,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { ACCENT_PRESETS, AccentKey } from '../constants/Colors';
 import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
@@ -35,12 +33,11 @@ const SETTINGS_ROWS = [
     { icon: Sun,         label: 'Appearance' },
 ];
 
-export default function ProHubScreen() {
+export default function ProHubScreen({ navigation }: any) {
     const { user, logout } = useAuth();
-    const { colors, isDark, toggleTheme, theme, accentKey, setAccent } = useTheme();
+    const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
-    const [showAppearance, setShowAppearance] = useState(false);
 
     const handleSettingsTap = (label: string) => {
         Alert.alert('Coming soon', `${label} is on our roadmap.`);
@@ -79,7 +76,7 @@ export default function ProHubScreen() {
             <ScrollView contentContainerStyle={{ paddingBottom: vs(120) }} showsVerticalScrollIndicator={false}>
                 {/* Hero */}
                 <LinearGradient
-                    colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
+                    colors={colors.heroGradient}
                     style={styles.hero}
                 >
                     <CharacterShape
@@ -138,7 +135,7 @@ export default function ProHubScreen() {
                                     ]}
                                     onPress={() => {
                                         if (row.label === 'Invite a friend') return handleInvite();
-                                        if (row.label === 'Appearance') return setShowAppearance(true);
+                                        if (row.label === 'Appearance') return navigation.navigate('Appearance');
                                         handleSettingsTap(row.label);
                                     }}
                                     activeOpacity={0.7}
@@ -168,81 +165,6 @@ export default function ProHubScreen() {
                 onClose={() => setShowCharModal(false)}
             />
 
-            {/* Appearance bottom sheet */}
-            <Modal
-                visible={showAppearance}
-                animationType="slide"
-                transparent
-                onRequestClose={() => setShowAppearance(false)}
-            >
-                <TouchableOpacity
-                    style={styles.appearanceBackdrop}
-                    activeOpacity={1}
-                    onPress={() => setShowAppearance(false)}
-                />
-                <View style={[styles.appearanceSheet, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={[styles.appearanceHandle, { backgroundColor: colors.border }]} />
-
-                    <Text style={[styles.appearanceTitle, { color: colors.text }]}>Appearance</Text>
-
-                    {/* Accent swatches */}
-                    <Text style={[styles.appearanceLabel, { color: colors.secondaryText }]}>ACCENT COLOR</Text>
-                    <View style={styles.swatchRow}>
-                        {(Object.keys(ACCENT_PRESETS) as AccentKey[]).map(key => {
-                            const swatch = ACCENT_PRESETS[key][isDark ? 'dark' : 'light'];
-                            const selected = accentKey === key;
-                            return (
-                                <TouchableOpacity
-                                    key={key}
-                                    onPress={() => setAccent(key)}
-                                    activeOpacity={0.8}
-                                    style={[
-                                        styles.swatch,
-                                        { backgroundColor: swatch },
-                                        selected && styles.swatchSelected,
-                                    ]}
-                                >
-                                    {selected && (
-                                        <Text style={styles.swatchCheck}>✓</Text>
-                                    )}
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {/* Dark / Light toggle */}
-                    <Text style={[styles.appearanceLabel, { color: colors.secondaryText }]}>COLOR SCHEME</Text>
-                    <View style={[styles.themeToggleRow, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', borderRadius: ms(14) }]}>
-                        {(['light', 'dark'] as const).map(t => {
-                            const active = theme === t;
-                            return (
-                                <TouchableOpacity
-                                    key={t}
-                                    onPress={() => { if (!active) toggleTheme(); }}
-                                    activeOpacity={0.8}
-                                    style={[
-                                        styles.themeBtn,
-                                        active && { backgroundColor: colors.accent, borderRadius: ms(12) },
-                                    ]}
-                                >
-                                    <Text style={[styles.themeBtnText, { color: active ? '#fff' : colors.secondaryText }]}>
-                                        {t === 'light' ? '☀ Light' : '🌙 Dark'}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {/* Done */}
-                    <TouchableOpacity
-                        style={[styles.appearanceDone, { backgroundColor: colors.accent }]}
-                        onPress={() => setShowAppearance(false)}
-                        activeOpacity={0.85}
-                    >
-                        <Text style={[styles.appearanceDoneText, { color: '#fff' }]}>Done</Text>
-                    </TouchableOpacity>
-                </View>
-            </Modal>
         </SafeAreaView>
     );
 }
@@ -365,83 +287,6 @@ const styles = StyleSheet.create({
         flex: 1,
         fontSize: ms(15),
         fontWeight: '500',
-    },
-
-    // Appearance sheet
-    appearanceBackdrop: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.45)',
-    },
-    appearanceSheet: {
-        paddingHorizontal: scale(20),
-        paddingBottom: vs(40),
-        paddingTop: vs(12),
-        borderTopLeftRadius: ms(24),
-        borderTopRightRadius: ms(24),
-        borderWidth: StyleSheet.hairlineWidth,
-    },
-    appearanceHandle: {
-        width: scale(36),
-        height: vs(4),
-        borderRadius: 99,
-        alignSelf: 'center',
-        marginBottom: vs(16),
-    },
-    appearanceTitle: {
-        fontSize: ms(18),
-        fontWeight: '700',
-        marginBottom: vs(20),
-        textAlign: 'center',
-    },
-    appearanceLabel: {
-        fontSize: ms(11),
-        fontWeight: '700',
-        letterSpacing: 0.7,
-        marginBottom: vs(12),
-    },
-    swatchRow: {
-        flexDirection: 'row',
-        gap: scale(12),
-        marginBottom: vs(24),
-    },
-    swatch: {
-        width: scale(40),
-        height: scale(40),
-        borderRadius: scale(20),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    swatchSelected: {
-        borderWidth: 3,
-        borderColor: '#FFFFFF',
-    },
-    swatchCheck: {
-        color: '#FFFFFF',
-        fontSize: ms(16),
-        fontWeight: '800',
-    },
-    themeToggleRow: {
-        flexDirection: 'row',
-        padding: vs(4),
-        marginBottom: vs(24),
-    },
-    themeBtn: {
-        flex: 1,
-        paddingVertical: vs(10),
-        alignItems: 'center',
-    },
-    themeBtnText: {
-        fontSize: ms(14),
-        fontWeight: '600',
-    },
-    appearanceDone: {
-        borderRadius: ms(14),
-        paddingVertical: vs(14),
-        alignItems: 'center',
-    },
-    appearanceDoneText: {
-        fontSize: ms(15),
-        fontWeight: '700',
     },
 
     // Sign out

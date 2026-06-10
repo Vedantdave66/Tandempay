@@ -6,7 +6,7 @@ import { Colors, ACCENT_PRESETS, AccentKey } from '../constants/Colors';
 type Theme = 'light' | 'dark';
 
 // Flexible colors type — accent fields are strings so they can be overridden at runtime
-type ColorPalette = Omit<typeof Colors.light, 'accent' | 'accentDark' | 'tint' | 'tabIconSelected' | 'groupGlow'> & {
+type ColorPalette = Omit<typeof Colors.light, 'accent' | 'accentDark' | 'tint' | 'tabIconSelected' | 'groupGlow' | 'accentBg' | 'accentBgFaint' | 'accentLight'> & {
   accent: string;
   accentDark: string;
   tint: string;
@@ -14,6 +14,9 @@ type ColorPalette = Omit<typeof Colors.light, 'accent' | 'accentDark' | 'tint' |
   groupGlow: [string, string, string, string];
   heroGradient: [string, string, string];
   cardGradient: [string, string, string, string];
+  accentBg: string;
+  accentBgFaint: string;
+  accentLight: string;
 };
 
 interface ThemeContextType {
@@ -87,6 +90,9 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     groupGlow: accentGlow,
     heroGradient: preset[isDark ? 'heroGradDark' : 'heroGradLight'],
     cardGradient: preset[isDark ? 'cardGradDark' : 'cardGradLight'],
+    accentBg:      isDark ? accentColor + '1F' : accentColor + '18',
+    accentBgFaint: accentColor + '0F',
+    accentLight:   isDark ? accentColor + '1F' : accentColor + '26',
   } as ColorPalette;
 
   return (

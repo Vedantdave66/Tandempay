@@ -176,11 +176,11 @@ const styles = StyleSheet.create({
   },
   limelightPill: {
     position: 'absolute',
-    top: vs(4),
-    left: -scale(20),
-    width: LIMELIGHT_W + scale(40),
-    height: vs(48),
-    borderRadius: ms(4),
+    top: vs(9),
+    width: scale(46),
+    height: scale(34),
+    borderRadius: ms(17),
+    zIndex: 1,
   },
   tabRow: {
     flexDirection: 'row',
