@@ -8,6 +8,7 @@ import {
     PanResponder,
     LayoutChangeEvent,
     ViewStyle,
+    Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -39,6 +40,12 @@ function expenseEmoji(title: string): string {
 const HUB_R      = 82;
 const BUBBLE_R   = 54;
 const WALL_INSET = 56;
+
+const SCREEN_W   = Dimensions.get('window').width;
+const CARD_W     = scale(68);
+const CARD_MX    = scale(14);
+const ITEM_W     = CARD_W + CARD_MX * 2;
+const SNAP_INSET = (SCREEN_W - CARD_W) / 2 - CARD_MX;
 
 interface CanvasModeViewProps {
     expenses: Expense[];
@@ -102,6 +109,8 @@ export default function CanvasModeView({
     const [selectedExpenseId, setSelectedExpenseId]   = useState<string | null>(null);
     const [sheetTab, setSheetTab]                     = useState<'balance' | 'settle'>('balance');
     const [highlightBubbleIdx, setHighlightBubbleIdx] = useState(-1);
+    const [focusedMemberIdx, setFocusedMemberIdx]     = useState(0);
+    const carouselScrollX = useRef(new Animated.Value(0)).current;
 
     const sheetAnim    = useRef(new Animated.Value(500)).current;
     const hubScaleAnim = useRef(new Animated.Value(1)).current;
@@ -549,41 +558,167 @@ export default function CanvasModeView({
                     <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
 
-                {/* ── Friend dock (absolute overlay at canvas bottom) ── */}
+                {/* ── Character carousel dock ── */}
                 <LinearGradient
                     colors={[
                         'transparent',
-                        isDark ? 'rgba(4,6,14,0.92)' : 'rgba(236,240,250,0.95)',
+                        isDark ? 'rgba(4,6,14,0.96)' : 'rgba(236,240,250,0.97)',
                     ]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
-                    style={[styles.dock, {
+                    style={{
                         position: 'absolute',
                         bottom: 0, left: 0, right: 0,
-                        paddingBottom: insets.bottom + vs(12),
-                    }]}
+                        paddingBottom: insets.bottom + vs(14),
+                        paddingTop: vs(32),
+                    }}
+                    pointerEvents="box-none"
                 >
-                    <Text style={[styles.dockLabel, T.bold]}>DRAG FRIENDS INTO EXPENSES</Text>
-                    <View style={styles.dockAvatarRow}>
-                        {members.map((m, i) => {
-                            const pr = panResponders[i];
-                            if (!pr) return null;
-                            return (
-                                <View key={m.user_id} style={styles.dockAvatarWrap} {...pr.panHandlers}>
-                                    <View style={styles.dockCharacterWrap}>
-                                        <CharacterShape
-                                            variant="mini"
-                                            shape={m.character_shape ?? 'rect'}
-                                            color={m.character_color ?? m.avatar_color ?? '#6B7280'}
-                                        />
-                                    </View>
-                                    <Text style={[styles.dockAvatarName, { color: colors.faintText }, T.regular]} numberOfLines={1}>
-                                        {(m.name || '').split(' ')[0]}
-                                    </Text>
+                    {/* ── Drag handle: focused member's character ── */}
+                    {(() => {
+                        const fm = members[focusedMemberIdx];
+                        const pr = panResponders[focusedMemberIdx];
+                        if (!fm || !pr) return null;
+                        return (
+                            <View style={{ alignItems: 'center', marginBottom: vs(10) }} pointerEvents="box-none">
+                                <Text style={{
+                                    fontSize: ms(10),
+                                    color: isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)',
+                                    letterSpacing: 1.5,
+                                    marginBottom: vs(4),
+                                }}>
+                                    ↑ DRAG TO ASSIGN ↑
+                                </Text>
+                                <View
+                                    style={{
+                                        padding: scale(10),
+                                        borderRadius: ms(20),
+                                        backgroundColor: isDark
+                                            ? 'rgba(255,255,255,0.07)'
+                                            : 'rgba(255,255,255,0.90)',
+                                        shadowColor: fm.character_color ?? fm.avatar_color ?? colors.accent,
+                                        shadowOffset: { width: 0, height: 6 },
+                                        shadowOpacity: 0.50,
+                                        shadowRadius: 18,
+                                        elevation: 10,
+                                    }}
+                                    {...pr.panHandlers}
+                                >
+                                    <CharacterShape
+                                        variant="mini"
+                                        shape={fm.character_shape ?? 'rect'}
+                                        color={fm.character_color ?? fm.avatar_color ?? '#6B7280'}
+                                    />
                                 </View>
-                            );
-                        })}
-                    </View>
+                                <Text style={{
+                                    fontSize: ms(12),
+                                    color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
+                                    marginTop: vs(6),
+                                    fontWeight: '600',
+                                    letterSpacing: 0.2,
+                                }}>
+                                    {(fm.name || '').split(' ')[0]}
+                                </Text>
+                            </View>
+                        );
+                    })()}
+
+                    {/* ── Carousel ── */}
+                    {members.length > 1 && (
+                        <Animated.ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            snapToInterval={ITEM_W}
+                            snapToAlignment="center"
+                            decelerationRate="fast"
+                            contentContainerStyle={{ paddingHorizontal: SNAP_INSET }}
+                            onScroll={Animated.event(
+                                [{ nativeEvent: { contentOffset: { x: carouselScrollX } } }],
+                                { useNativeDriver: true }
+                            )}
+                            scrollEventThrottle={16}
+                            onMomentumScrollEnd={e => {
+                                const idx = Math.round(e.nativeEvent.contentOffset.x / ITEM_W);
+                                setFocusedMemberIdx(Math.max(0, Math.min(idx, members.length - 1)));
+                                Haptics.selectionAsync();
+                            }}
+                        >
+                            {members.map((m, i) => {
+                                const inputRange = [(i - 1) * ITEM_W, i * ITEM_W, (i + 1) * ITEM_W];
+                                const cardScale = carouselScrollX.interpolate({
+                                    inputRange,
+                                    outputRange: [0.78, 1, 0.78],
+                                    extrapolate: 'clamp',
+                                });
+                                const cardOpacity = carouselScrollX.interpolate({
+                                    inputRange,
+                                    outputRange: [0.50, 1, 0.50],
+                                    extrapolate: 'clamp',
+                                });
+                                const cardTranslateY = carouselScrollX.interpolate({
+                                    inputRange,
+                                    outputRange: [vs(7), 0, vs(7)],
+                                    extrapolate: 'clamp',
+                                });
+
+                                const isFocused = focusedMemberIdx === i;
+                                const charColor = m.character_color ?? m.avatar_color ?? '#6B7280';
+
+                                return (
+                                    <Animated.View
+                                        key={m.user_id}
+                                        style={{
+                                            width: CARD_W,
+                                            marginHorizontal: CARD_MX,
+                                            alignItems: 'center',
+                                            opacity: cardOpacity,
+                                            transform: [
+                                                { scale: cardScale },
+                                                { translateY: cardTranslateY },
+                                            ],
+                                        }}
+                                    >
+                                        <View style={{
+                                            padding: scale(10),
+                                            borderRadius: ms(18),
+                                            backgroundColor: isDark
+                                                ? 'rgba(255,255,255,0.06)'
+                                                : 'rgba(255,255,255,0.80)',
+                                            borderWidth: isFocused ? 1.5 : 0,
+                                            borderColor: isFocused ? charColor + '88' : 'transparent',
+                                            shadowColor: charColor,
+                                            shadowOffset: { width: 0, height: isFocused ? 8 : 0 },
+                                            shadowOpacity: isFocused ? 0.45 : 0,
+                                            shadowRadius: isFocused ? 16 : 0,
+                                            elevation: isFocused ? 8 : 0,
+                                        }}>
+                                            <CharacterShape
+                                                variant="mini"
+                                                shape={m.character_shape ?? 'rect'}
+                                                color={charColor}
+                                            />
+                                        </View>
+                                        <Text style={{
+                                            fontSize: ms(10),
+                                            color: isFocused
+                                                ? (isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)')
+                                                : (isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)'),
+                                            marginTop: vs(5),
+                                            fontWeight: isFocused ? '600' : '400',
+                                            letterSpacing: 0.2,
+                                        }} numberOfLines={1}>
+                                            {(m.name || '').split(' ')[0]}
+                                        </Text>
+                                    </Animated.View>
+                                );
+                            })}
+                        </Animated.ScrollView>
+                    )}
+
+                    {/* Single member — no carousel needed */}
+                    {members.length === 1 && (
+                        <View style={{ height: vs(24) }} />
+                    )}
                 </LinearGradient>
             </View>
 
@@ -862,40 +997,6 @@ const styles = StyleSheet.create({
         gap: scale(5),
     },
     backText: { fontSize: ms(14) },
-
-    // Dock
-    dock: {
-        paddingTop: vs(24),
-        paddingHorizontal: scale(16),
-        alignItems: 'center',
-    },
-    dockLabel: {
-        fontSize: ms(9),
-        letterSpacing: 1.5,
-        color: '#454D4A',
-        marginBottom: vs(8),
-    },
-    dockAvatarRow: {
-        flexDirection: 'row',
-        gap: scale(16),
-        flexWrap: 'nowrap',
-        justifyContent: 'center',
-        width: '100%',
-    },
-    dockAvatarWrap: {
-        alignItems: 'center',
-        gap: vs(4),
-    },
-    dockCharacterWrap: {
-        width: 44,
-        height: 44,
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-    },
-    dockAvatarName: {
-        fontSize: ms(10),
-        maxWidth: 44,
-    },
 
     // Sheet
     sheet: {
