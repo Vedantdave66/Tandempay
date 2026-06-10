@@ -155,9 +155,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                             <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                 {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
                             </Text>
-                            <TouchableOpacity
-                                onPress={onPress}
-                                activeOpacity={0.70}
+                            <View
                                 style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
                                     backgroundColor: colors.accentBgFaint,
                                     borderWidth: StyleSheet.hairlineWidth,
@@ -165,7 +163,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                                 }]}
                             >
                                 <ArrowRight size={compact ? 14 : 18} color={isSettled ? colors.groupOwed : accent} />
-                            </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 )}
