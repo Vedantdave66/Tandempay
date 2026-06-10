@@ -16,3 +16,5 @@ alembic
 apscheduler
 sentry-sdk[fastapi]
 better-profanity==0.7.0
+httpx>=0.27.0
+reportlab
