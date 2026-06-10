@@ -15,6 +15,7 @@ interface GroupCardProps {
     myNetBalance?: number;
     compact?: boolean;
     onPress: () => void;
+    onLongPress?: () => void;
 }
 
 const SETTLED_THRESHOLD = 0.01;
@@ -26,7 +27,7 @@ const TILT = [
     { body: 7,  name: -10 },
 ];
 
-export default function GroupCard({ group, members = [], myNetBalance = 0, compact = false, onPress }: GroupCardProps) {
+export default function GroupCard({ group, members = [], myNetBalance = 0, compact = false, onPress, onLongPress }: GroupCardProps) {
     const { colors, isDark } = useTheme();
     const safeMembers = members ?? [];
     const visibleMembers = safeMembers.slice(0, 4);
@@ -52,6 +53,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
     return (
         <TouchableOpacity
             onPress={onPress}
+            onLongPress={onLongPress}
+            delayLongPress={350}
             activeOpacity={0.70}
             style={[styles.card, {
                 backgroundColor: 'transparent',
