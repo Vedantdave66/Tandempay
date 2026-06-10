@@ -21,6 +21,9 @@ import ExportScreen from '../screens/ExportScreen';
 import NotificationsScreen from '../screens/NotificationsScreen';
 import SettleUpScreen from '../screens/SettleUpScreen';
 import AppearanceScreen from '../screens/AppearanceScreen';
+import ReceiptScanScreen from '../screens/ReceiptScanScreen';
+import SmartSplitScreen from '../screens/SmartSplitScreen';
+import FriendsScreen from '../screens/FriendsScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -124,6 +127,21 @@ export default function RootNavigator() {
                             name="Appearance"
                             component={AppearanceScreen}
                             options={{ headerShown: false, animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="ReceiptScan"
+                            component={ReceiptScanScreen}
+                            options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="SmartSplit"
+                            component={SmartSplitScreen}
+                            options={{ presentation: 'modal' }}
+                        />
+                        <Stack.Screen
+                            name="FriendsHub"
+                            component={FriendsScreen}
+                            options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>
                 )}

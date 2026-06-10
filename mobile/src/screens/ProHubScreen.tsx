@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight } from 'lucide-react-native';
+import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 
@@ -27,6 +27,7 @@ const PRO_FEATURES = [
 ];
 
 const SETTINGS_ROWS = [
+    { icon: Users2,      label: 'Friends' },
     { icon: ShieldCheck, label: 'Privacy & Security' },
     { icon: Bell,        label: 'Notifications' },
     { icon: UserPlus,    label: 'Invite a friend' },
@@ -134,6 +135,7 @@ export default function ProHubScreen({ navigation }: any) {
                                         index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
                                     ]}
                                     onPress={() => {
+                                        if (row.label === 'Friends') return navigation.navigate('FriendsHub');
                                         if (row.label === 'Invite a friend') return handleInvite();
                                         if (row.label === 'Appearance') return navigation.navigate('Appearance');
                                         handleSettingsTap(row.label);
