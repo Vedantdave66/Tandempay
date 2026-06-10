@@ -30,3 +30,5 @@ Thumbs.db
 # Build artifacts
 tsconfig.tsbuildinfo
 .claude/
+.vercel
+.env*
