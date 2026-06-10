@@ -25,7 +25,12 @@ export default function NotificationsScreen() {
 
     const loadData = useCallback(async () => {
         try {
-            const data = await notificationsApi.list();
+            const raw = await notificationsApi.list();
+            const data: NotificationOut[] = Array.isArray(raw)
+                ? raw
+                : Array.isArray((raw as any)?.items)
+                    ? (raw as any).items
+                    : [];
             setNotifications(data);
         } catch (err) {
             console.error('Failed to load notifications', err);
