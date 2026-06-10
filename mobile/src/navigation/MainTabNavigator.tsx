@@ -20,7 +20,9 @@ export default function MainTabNavigator() {
                     position: 'absolute',
                     backgroundColor: 'transparent',
                     borderTopWidth: 0,
+                    borderTopColor: 'transparent',
                     elevation: 0,
+                    shadowOpacity: 0,
                 },
                 tabBarBackground: () => null,
             }}
