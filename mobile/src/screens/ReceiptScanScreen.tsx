@@ -77,8 +77,8 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
   useEffect(() => {
     friendsApi.getMyFriends()
-      .then(data => {
-        const list = Array.isArray(data) ? data : [];
+      .then((data: any) => {
+        const list = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
         setFriends(list);
         if (list.length > 0 && !payerId) {
           setPayerId(list[0].id);
@@ -154,6 +154,48 @@ export default function ReceiptScanScreen({ navigation }: any) {
   const myFraction = SUBTOTAL > 0 ? myFood / SUBTOTAL : 0;
   const myShare    = parseFloat((myFood + TAX * myFraction + (tip > 0 ? tip / splitCount : 0)).toFixed(2));
   const hasClaim   = claimed.size > 0;
+
+  // Payer member — computed once at component level so Share handler is stable
+  const allMembersCtx = [
+    { id: 'me', name: user?.character_nickname || 'Me', initial: (user?.character_nickname?.[0] || 'M').toUpperCase(), color: user?.character_color || colors.accent, email: '' },
+    ...friends.map(f => ({ id: f.id, name: f.name, initial: f.name[0]?.toUpperCase() ?? '?', color: f.avatar_color || '#6366F1', email: f.email })),
+  ];
+  const payerMember = allMembersCtx.find(m => m.id === payerId) ?? allMembersCtx[0];
+
+  const evenSplit = parseFloat((total / Math.max(splitCount, 1)).toFixed(2));
+
+  const handleShareLink = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+
+    const payerName  = payerMember?.id === 'me' ? (user?.character_nickname || 'Me') : (payerMember?.name ?? 'Someone');
+    const payerEmail = payerMember?.email ?? '';
+
+    const payload = {
+      a: myShare.toFixed(2),
+      p: payerName,
+      e: payerEmail,
+      d: 'Receipt Split',
+    };
+    const encoded  = btoa(unescape(encodeURIComponent(JSON.stringify(payload))));
+    const shareUrl = `https://tandempay.ca/pay?r=${encoded}`;
+
+    const message = payerEmail
+      ? `Pay ${payerName} $${myShare.toFixed(2)} via Interac e-Transfer to: ${payerEmail}`
+      : `You owe ${payerName} $${myShare.toFixed(2)} for a receipt split.`;
+
+    Share.share(
+      { message, url: shareUrl },
+      { dialogTitle: `Pay ${payerName} $${myShare.toFixed(2)}` },
+    ).catch(() => {
+      Alert.alert(
+        `Pay ${payerName} · $${myShare.toFixed(2)}`,
+        payerEmail
+          ? `Send $${myShare.toFixed(2)} via Interac e-Transfer to:\n\n${payerEmail}`
+          : `You owe ${payerName} $${myShare.toFixed(2)}.`,
+        [{ text: 'OK' }],
+      );
+    });
+  };
 
   const scanTop = scanLineY.interpolate({ inputRange: [0, 1], outputRange: ['0%', '90%'] });
 
@@ -495,87 +537,80 @@ export default function ReceiptScanScreen({ navigation }: any) {
         <View style={{ height: vs(130) }} />
       </ScrollView>
 
-      <View style={[styles.ctaBar, { backgroundColor: colors.background, gap: vs(10) }]}>
-        {hasClaim ? (() => {
-          const allMembersForCta = [
-            { id: 'me', name: user?.character_nickname || 'Me', initial: (user?.character_nickname?.[0] || 'M').toUpperCase(), color: user?.character_color || colors.accent, email: '' },
-            ...friends.map(f => ({
-              id: f.id, name: f.name,
-              initial: f.name[0]?.toUpperCase() ?? '?',
-              color: f.avatar_color || '#6366F1',
-              email: f.email,
-            })),
-          ];
-          const payerMember = allMembersForCta.find(m => m.id === payerId) ?? allMembersForCta[0];
+      <View style={[styles.ctaBar, { backgroundColor: colors.background, gap: vs(8) }]}>
 
-          const handleShareLink = async () => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            const payerName  = payerMember.id === 'me' ? (user?.character_nickname || 'Me') : payerMember.name;
-            const payerEmail = payerMember.email || '';
-            const message = [
-              `Hey! Here's your share of the bill:`,
-              ``,
-              `💰 Amount: $${myShare.toFixed(2)}`,
-              `📋 For: Receipt Split`,
-              ``,
-              payerEmail
-                ? `Send via Interac e-Transfer to:\n${payerEmail}`
-                : `Pay ${payerName} $${myShare.toFixed(2)}`,
-              ``,
-              `— Sent via TandemPay`,
-            ].join('\n');
-            try {
-              await Share.share({ message, title: `Pay ${payerName} $${myShare.toFixed(2)}` });
-            } catch {}
-          };
-
-          return (
-            <>
-              <TouchableOpacity
-                style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
-                activeOpacity={0.84}
-                onPress={() => {
-                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-                  navigation.navigate('SettleUp', {
-                    payment: {
-                      amount: myShare,
-                      description: 'Receipt Split',
-                      payee_name: payerMember.id === 'me' ? (user?.character_nickname || 'Me') : payerMember.name,
-                      payee_id: payerMember.id === 'me' ? null : payerMember.id,
-                      payer_email: payerMember.email,
-                      group_id: null,
-                      id: null,
-                      isReceiptPayment: true,
-                    },
-                  });
-                }}
-              >
-                <Text style={[styles.ctaBtnText, T.bold]}>
-                  Pay {payerMember.id === 'me' ? 'Yourself' : payerMember.name}  ·  ${myShare.toFixed(2)}
-                </Text>
-                <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.shareLinkBtn, {
-                  borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
-                }]}
-                activeOpacity={0.78}
-                onPress={handleShareLink}
-              >
-                <Link size={17} color={colors.secondaryText} strokeWidth={2} />
-                <Text style={[styles.shareLinkText, T.semibold, { color: colors.secondaryText }]}>
-                  Share Link
-                </Text>
-              </TouchableOpacity>
-            </>
-          );
-        })() : (
-          <View style={[styles.ctaBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <Text style={[styles.ctaBtnText, T.semibold, { color: colors.tertiaryText }]}>Tap items you ordered</Text>
-          </View>
+        {/* Primary — claimed items pay (only when items are selected) */}
+        {hasClaim && (
+          <TouchableOpacity
+            style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
+            activeOpacity={0.84}
+            onPress={() => {
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+              navigation.navigate('SettleUp', {
+                payment: {
+                  amount: myShare,
+                  description: 'Receipt Split',
+                  payee_name: payerMember?.id === 'me' ? (user?.character_nickname || 'Me') : (payerMember?.name ?? ''),
+                  payee_id: payerMember?.id === 'me' ? null : (payerMember?.id ?? null),
+                  payer_email: payerMember?.email,
+                  group_id: null,
+                  id: null,
+                  isReceiptPayment: true,
+                },
+              });
+            }}
+          >
+            <Text style={[styles.ctaBtnText, T.bold]}>
+              My Items · ${myShare.toFixed(2)}
+            </Text>
+            <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
+          </TouchableOpacity>
         )}
+
+        {/* Secondary row — Even Split + Share Link always visible */}
+        <View style={styles.ctaSecondRow}>
+          <TouchableOpacity
+            style={[styles.ctaSecondBtn, {
+              borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            }]}
+            activeOpacity={0.78}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+              navigation.navigate('SettleUp', {
+                payment: {
+                  amount: evenSplit,
+                  description: 'Receipt Split (Even)',
+                  payee_name: payerMember?.id === 'me' ? (user?.character_nickname || 'Me') : (payerMember?.name ?? ''),
+                  payee_id: payerMember?.id === 'me' ? null : (payerMember?.id ?? null),
+                  payer_email: payerMember?.email,
+                  group_id: null,
+                  id: null,
+                  isReceiptPayment: true,
+                },
+              });
+            }}
+          >
+            <Text style={[styles.ctaSecondText, T.bold, { color: colors.text }]}>
+              Even Split · ${evenSplit.toFixed(2)}
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.ctaSecondBtn, {
+              borderColor: isDark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
+              backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+            }]}
+            activeOpacity={0.78}
+            onPress={handleShareLink}
+          >
+            <Link size={15} color={colors.secondaryText} strokeWidth={2} />
+            <Text style={[styles.ctaSecondText, T.semibold, { color: colors.secondaryText }]}>
+              Share
+            </Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
     </SafeAreaView>
   );
@@ -654,6 +689,7 @@ const styles = StyleSheet.create({
   ctaBar:       { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: scale(20), paddingBottom: vs(36), paddingTop: vs(12) },
   ctaBtn:       { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6), paddingVertical: vs(16), borderRadius: ms(16) },
   ctaBtnText:   { fontSize: ms(16), color: '#fff' },
-  shareLinkBtn: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(8), paddingVertical: vs(13), borderRadius: ms(16), borderWidth: StyleSheet.hairlineWidth },
-  shareLinkText:{ fontSize: ms(15) },
+  ctaSecondRow: { flexDirection: 'row', gap: scale(10) },
+  ctaSecondBtn: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6), paddingVertical: vs(13), borderRadius: ms(14), borderWidth: StyleSheet.hairlineWidth },
+  ctaSecondText:{ fontSize: ms(14) },
 });
