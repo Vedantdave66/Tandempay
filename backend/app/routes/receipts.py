@@ -1,39 +1,21 @@
 import base64
 import json
+import httpx
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
-from google import genai
-from google.genai import types
-import os
 
 from app.models import User
 from app.routes.auth import get_current_user
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 
-_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
-
-
-class ParseReceiptRequest(BaseModel):
-    image_base64: str
-
-
-class ParsedItem(BaseModel):
-    id: str
-    name: str
-    price: float
-
-
-class ReceiptParseResponse(BaseModel):
-    items: List[ParsedItem]
-    subtotal: float
-    tax: float
-    tax_rate: float
-    tip_detected: float
-    total: float
-    currency: str
-
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+GEMINI_URL = (
+    "https://generativelanguage.googleapis.com/v1beta/models/"
+    "gemini-1.5-flash:generateContent"
+)
 
 PROMPT = """You are a receipt parser. Extract line items and totals from this receipt image.
 
@@ -63,6 +45,26 @@ Rules:
 - Always return all fields"""
 
 
+class ParseReceiptRequest(BaseModel):
+    image_base64: str
+
+
+class ParsedItem(BaseModel):
+    id: str
+    name: str
+    price: float
+
+
+class ReceiptParseResponse(BaseModel):
+    items: List[ParsedItem]
+    subtotal: float
+    tax: float
+    tax_rate: float
+    tip_detected: float
+    total: float
+    currency: str
+
+
 @router.post("/parse", response_model=ReceiptParseResponse)
 async def parse_receipt(
     body: ParseReceiptRequest,
@@ -80,16 +82,40 @@ async def parse_receipt(
     except Exception:
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
 
+    if not GEMINI_API_KEY:
+        raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
+
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": PROMPT},
+                    {
+                        "inline_data": {
+                            "mime_type": "image/jpeg",
+                            "data": b64,
+                        }
+                    },
+                ]
+            }
+        ],
+        "generationConfig": {
+            "temperature": 0.1,
+            "maxOutputTokens": 1024,
+        },
+    }
+
     try:
-        image_bytes = base64.b64decode(b64)
-        response = _client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=[
-                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
-                PROMPT,
-            ],
-        )
-        raw = response.text.strip()
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            resp = await client.post(
+                GEMINI_URL,
+                params={"key": GEMINI_API_KEY},
+                json=payload,
+            )
+            resp.raise_for_status()
+            result = resp.json()
+
+        raw = result["candidates"][0]["content"]["parts"][0]["text"].strip()
 
         # Strip markdown fences if present
         if raw.startswith("```"):
@@ -102,6 +128,8 @@ async def parse_receipt(
 
     except json.JSONDecodeError as e:
         raise HTTPException(status_code=502, detail=f"Gemini returned invalid JSON: {str(e)}")
+    except httpx.HTTPStatusError as e:
+        raise HTTPException(status_code=502, detail=f"Gemini API error: {e.response.text}")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"OCR service error: {str(e)}")
 
