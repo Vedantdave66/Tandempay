@@ -95,6 +95,7 @@ export default function SettleUpScreen() {
     const navigation = useNavigation<any>();
     const route = useRoute<any>();
     const { payment } = route.params;
+    const isReceiptPayment: boolean = payment.isReceiptPayment === true;
     const { isDark, colors } = useTheme();
     const t = tok(isDark, colors.accent);
     const insets = useSafeAreaInsets();
@@ -127,28 +128,32 @@ export default function SettleUpScreen() {
         try {
             if (m === 'interac') {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                let settlementId: string | null = payment.id ?? null;
 
-                if (!settlementId) {
-                    const created = await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
-                    settlementId = (created as any)?.id ?? null;
+                if (!isReceiptPayment) {
+                    // Normal group flow: create + update settlement record
+                    let settlementId: string | null = payment.id ?? null;
                     if (!settlementId) {
-                        const all = await meApi.getPayments();
-                        const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
-                            .find(r => r.payer_id === payment.payer_id && r.payee_id === payment.payee_id && r.status === 'pending');
-                        settlementId = rec?.id ?? null;
+                        const created = await settlementsApi.create(payment.group_id, payment.payee_id, amount, 'etransfer');
+                        settlementId = (created as any)?.id ?? null;
+                        if (!settlementId) {
+                            const all = await meApi.getPayments();
+                            const rec = (all as Array<{ payer_id: string; payee_id: string; status: string; id: string }>)
+                                .find(r => r.payer_id === payment.payer_id && r.payee_id === payment.payee_id && r.status === 'pending');
+                            settlementId = rec?.id ?? null;
+                        }
                     }
+                    if (settlementId) await settlementsApi.updateStatus(payment.group_id, settlementId, 'sent');
                 }
-
-                if (settlementId) await settlementsApi.updateStatus(payment.group_id, settlementId, 'sent');
+                // Receipt payment: just mark as sent locally — no backend record
                 setMethod('interac');
                 setView('sent');
             } else if (m === 'card') {
                 const { client_secret } = await paymentsApi.createPaymentIntent({
                     payee_id: payment.payee_id,
                     amount: Math.round(amount * 100),
-                    settlement_id: payment.id,
-                });
+                    // Omit settlement_id for receipt payments — no record created
+                    settlement_id: isReceiptPayment ? undefined : payment.id,
+                } as any);
                 const { error: initError } = await initPaymentSheet({
                     paymentIntentClientSecret: client_secret,
                     merchantDisplayName: 'TandemPay',
@@ -164,7 +169,9 @@ export default function SettleUpScreen() {
                     Alert.alert('Payment Failed', presentError.message);
                 }
             } else {
-                await settlementsApi.updateStatus(payment.group_id, payment.id, 'settled');
+                if (!isReceiptPayment && payment.group_id && payment.id) {
+                    await settlementsApi.updateStatus(payment.group_id, payment.id, 'settled');
+                }
                 navigation.goBack();
             }
         } catch (err: any) {

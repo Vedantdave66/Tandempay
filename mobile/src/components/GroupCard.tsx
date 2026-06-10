@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Crown, ArrowRight } from 'lucide-react-native';
+import { Crown, ArrowRight, MoreHorizontal } from 'lucide-react-native';
 import { GroupListItem, UserBalance } from '../services/api';
 import { useTheme } from '../context/ThemeContext';
 import { formatCurrency } from '../utils/formatCurrency';
@@ -15,6 +15,7 @@ interface GroupCardProps {
     myNetBalance?: number;
     compact?: boolean;
     onPress: () => void;
+    onMorePress?: () => void;
 }
 
 const SETTLED_THRESHOLD = 0.01;
@@ -26,7 +27,7 @@ const TILT = [
     { body: 7,  name: -10 },
 ];
 
-export default function GroupCard({ group, members = [], myNetBalance = 0, compact = false, onPress }: GroupCardProps) {
+export default function GroupCard({ group, members = [], myNetBalance = 0, compact = false, onPress, onMorePress }: GroupCardProps) {
     const { colors, isDark } = useTheme();
     const safeMembers = members ?? [];
     const visibleMembers = safeMembers.slice(0, 4);
@@ -64,6 +65,16 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                 elevation: isDark ? 0 : 6,
             }, compact && styles.cardCompact]}
         >
+            {onMorePress && (
+                <TouchableOpacity
+                    style={styles.moreBtn}
+                    onPress={(e) => { e.stopPropagation(); onMorePress(); }}
+                    hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+                    activeOpacity={0.55}
+                >
+                    <MoreHorizontal size={20} color={isDark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.35)'} />
+                </TouchableOpacity>
+            )}
             <View style={styles.gradientClip} pointerEvents="none">
                 <LinearGradient
                     colors={colors.cardGradient}
@@ -152,9 +163,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                             <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                 {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
                             </Text>
-                            <TouchableOpacity
-                                onPress={onPress}
-                                activeOpacity={0.70}
+                            <View
                                 style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
                                     backgroundColor: colors.accentBgFaint,
                                     borderWidth: StyleSheet.hairlineWidth,
@@ -162,7 +171,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                                 }]}
                             >
                                 <ArrowRight size={compact ? 14 : 18} color={isSettled ? colors.groupOwed : accent} />
-                            </TouchableOpacity>
+                            </View>
                         </View>
                     </View>
                 )}
@@ -300,5 +309,12 @@ const styles = StyleSheet.create({
         width: scale(36),
         height: scale(36),
         borderRadius: scale(18),
+    },
+    moreBtn: {
+        position: 'absolute',
+        top: vs(12),
+        right: scale(12),
+        zIndex: 20,
+        padding: scale(4),
     },
 });

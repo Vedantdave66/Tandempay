@@ -54,7 +54,8 @@ export default function FriendsScreen() {
                 friendsApi.getMyFriends(),
                 friendsApi.getPendingRequests()
             ]);
-            setFriends(friendsData);
+            const fd: any = friendsData;
+            setFriends(Array.isArray(fd) ? fd : Array.isArray(fd?.items) ? fd.items : []);
             setRequests(requestsData);
 
             notificationsApi.list()

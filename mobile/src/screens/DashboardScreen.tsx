@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ActivityIndicator, RefreshControl, ScrollView, Animated, Easing,
+    ActivityIndicator, RefreshControl, ScrollView, Animated, Easing, Alert,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -116,6 +116,35 @@ export default function DashboardScreen({ navigation }: any) {
     const onRefresh = () => {
         setRefreshing(true);
         loadGroups();
+    };
+
+    const handleGroupMore = (item: GroupListItem) => {
+        const isCreator = item.created_by === user?.id;
+        if (isCreator) {
+            Alert.alert(
+                'Delete Group',
+                `"${item.name}" will be permanently deleted for all members.`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Delete', style: 'destructive', onPress: async () => {
+                        try { await groupsApi.deleteGroup(item.id); loadGroups(); }
+                        catch (e: any) { Alert.alert('Error', e.message || 'Could not delete group.'); }
+                    }},
+                ]
+            );
+        } else {
+            Alert.alert(
+                'Leave Group',
+                `You'll be removed from "${item.name}".`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    { text: 'Leave', style: 'destructive', onPress: async () => {
+                        try { await groupsApi.removeMember(item.id, user!.id); loadGroups(); }
+                        catch (e: any) { Alert.alert('Error', e.message || 'Could not leave group.'); }
+                    }},
+                ]
+            );
+        }
     };
 
     useEffect(() => {
@@ -257,6 +286,7 @@ export default function DashboardScreen({ navigation }: any) {
                                     myNetBalance={myBalance?.net_balance ?? 0}
                                     compact
                                     onPress={() => navigation.navigate('Group', { groupId: item.id })}
+                                    onMorePress={() => handleGroupMore(item)}
                                 />
                             );
                         })}

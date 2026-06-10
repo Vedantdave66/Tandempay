@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ActivityIndicator, RefreshControl, ScrollView,
+    ActivityIndicator, RefreshControl, ScrollView, Alert,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -60,6 +60,52 @@ export default function GroupsScreen({ navigation }: any) {
         load();
     };
 
+    const handleGroupLongPress = (item: GroupListItem) => {
+        const isCreator = item.created_by === user?.id;
+
+        if (isCreator) {
+            Alert.alert(
+                'Delete Group',
+                `"${item.name}" will be permanently deleted for all members. This cannot be undone.`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Delete',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await groupsApi.deleteGroup(item.id);
+                                load();
+                            } catch (err: any) {
+                                Alert.alert('Error', err.message || 'Could not delete group.');
+                            }
+                        },
+                    },
+                ]
+            );
+        } else {
+            Alert.alert(
+                'Leave Group',
+                `You'll be removed from "${item.name}".`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Leave',
+                        style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await groupsApi.removeMember(item.id, user!.id);
+                                load();
+                            } catch (err: any) {
+                                Alert.alert('Error', err.message || 'Could not leave group.');
+                            }
+                        },
+                    },
+                ]
+            );
+        }
+    };
+
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
@@ -112,6 +158,7 @@ export default function GroupsScreen({ navigation }: any) {
                                     myNetBalance={myNetBalance}
                                     compact={false}
                                     onPress={() => navigation.navigate('Group', { groupId: item.id })}
+                                    onMorePress={() => handleGroupLongPress(item)}
                                 />
                             );
                         })
