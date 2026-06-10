@@ -42,8 +42,8 @@ const BUBBLE_R   = 54;
 const WALL_INSET = 56;
 
 const SCREEN_W   = Dimensions.get('window').width;
-const CARD_W     = scale(68);
-const CARD_MX    = scale(14);
+const CARD_W     = scale(72);
+const CARD_MX    = scale(12);
 const ITEM_W     = CARD_W + CARD_MX * 2;
 const SNAP_INSET = (SCREEN_W - CARD_W) / 2 - CARD_MX;
 
@@ -268,8 +268,13 @@ export default function CanvasModeView({
     const panResponders = useMemo(() => {
         return members.map((_m, memberIdx) =>
             PanResponder.create({
-                onStartShouldSetPanResponder: () => true,
-                onMoveShouldSetPanResponder: () => true,
+                // Don't steal on touch start — let ScrollView see it first
+                onStartShouldSetPanResponder: () => false,
+                onStartShouldSetPanResponderCapture: () => false,
+                // Only claim if movement is clearly vertical (dragging up toward bubbles)
+                onMoveShouldSetPanResponder: (_, gs) =>
+                    Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx) * 1.3,
+                onMoveShouldSetPanResponderCapture: () => false,
                 onPanResponderGrant: (evt) => {
                     const m = membersRef.current[memberIdx];
                     dragMemberRef.current = m;
@@ -281,6 +286,7 @@ export default function CanvasModeView({
                         shape: m?.character_shape ?? 'rect',
                         color: m?.character_color ?? m?.avatar_color ?? '#6B7280',
                     });
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 },
                 onPanResponderMove: (evt) => {
                     const { pageX, pageY } = evt.nativeEvent;
@@ -558,7 +564,7 @@ export default function CanvasModeView({
                     <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                 </TouchableOpacity>
 
-                {/* ── Character carousel dock ── */}
+                {/* ── Character carousel ── */}
                 <LinearGradient
                     colors={[
                         'transparent',
@@ -569,156 +575,100 @@ export default function CanvasModeView({
                     style={{
                         position: 'absolute',
                         bottom: 0, left: 0, right: 0,
+                        paddingTop: vs(28),
                         paddingBottom: insets.bottom + vs(14),
-                        paddingTop: vs(32),
                     }}
                     pointerEvents="box-none"
                 >
-                    {/* ── Drag handle: focused member's character ── */}
-                    {(() => {
-                        const fm = members[focusedMemberIdx];
-                        const pr = panResponders[focusedMemberIdx];
-                        if (!fm || !pr) return null;
-                        return (
-                            <View style={{ alignItems: 'center', marginBottom: vs(10) }} pointerEvents="box-none">
-                                <Text style={{
-                                    fontSize: ms(10),
-                                    color: isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)',
-                                    letterSpacing: 1.5,
-                                    marginBottom: vs(4),
-                                }}>
-                                    ↑ DRAG TO ASSIGN ↑
-                                </Text>
-                                <View
+                    <Animated.ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        snapToInterval={ITEM_W}
+                        snapToAlignment="center"
+                        decelerationRate="fast"
+                        contentContainerStyle={{ paddingHorizontal: SNAP_INSET }}
+                        onScroll={Animated.event(
+                            [{ nativeEvent: { contentOffset: { x: carouselScrollX } } }],
+                            { useNativeDriver: true }
+                        )}
+                        scrollEventThrottle={16}
+                        onMomentumScrollEnd={e => {
+                            const idx = Math.round(e.nativeEvent.contentOffset.x / ITEM_W);
+                            const clamped = Math.max(0, Math.min(idx, members.length - 1));
+                            setFocusedMemberIdx(clamped);
+                            Haptics.selectionAsync();
+                        }}
+                    >
+                        {members.map((m, i) => {
+                            const pr = panResponders[i];
+                            const inputRange = [(i - 1) * ITEM_W, i * ITEM_W, (i + 1) * ITEM_W];
+
+                            const cardScale = carouselScrollX.interpolate({
+                                inputRange,
+                                outputRange: [0.76, 1, 0.76],
+                                extrapolate: 'clamp',
+                            });
+                            const cardOpacity = carouselScrollX.interpolate({
+                                inputRange,
+                                outputRange: [0.45, 1, 0.45],
+                                extrapolate: 'clamp',
+                            });
+                            const cardTranslateY = carouselScrollX.interpolate({
+                                inputRange,
+                                outputRange: [vs(8), 0, vs(8)],
+                                extrapolate: 'clamp',
+                            });
+
+                            const charColor = m.character_color ?? m.avatar_color ?? '#6B7280';
+                            const isFocused = focusedMemberIdx === i;
+
+                            return (
+                                <Animated.View
+                                    key={m.user_id}
                                     style={{
-                                        padding: scale(10),
+                                        width: CARD_W,
+                                        marginHorizontal: CARD_MX,
+                                        alignItems: 'center',
+                                        opacity: cardOpacity,
+                                        transform: [{ scale: cardScale }, { translateY: cardTranslateY }],
+                                    }}
+                                    {...(pr ? pr.panHandlers : {})}
+                                >
+                                    <View style={{
+                                        padding: scale(11),
                                         borderRadius: ms(20),
                                         backgroundColor: isDark
                                             ? 'rgba(255,255,255,0.07)'
-                                            : 'rgba(255,255,255,0.90)',
-                                        shadowColor: fm.character_color ?? fm.avatar_color ?? colors.accent,
-                                        shadowOffset: { width: 0, height: 6 },
-                                        shadowOpacity: 0.50,
-                                        shadowRadius: 18,
-                                        elevation: 10,
-                                    }}
-                                    {...pr.panHandlers}
-                                >
-                                    <CharacterShape
-                                        variant="mini"
-                                        shape={fm.character_shape ?? 'rect'}
-                                        color={fm.character_color ?? fm.avatar_color ?? '#6B7280'}
-                                    />
-                                </View>
-                                <Text style={{
-                                    fontSize: ms(12),
-                                    color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
-                                    marginTop: vs(6),
-                                    fontWeight: '600',
-                                    letterSpacing: 0.2,
-                                }}>
-                                    {(fm.name || '').split(' ')[0]}
-                                </Text>
-                            </View>
-                        );
-                    })()}
-
-                    {/* ── Carousel ── */}
-                    {members.length > 1 && (
-                        <Animated.ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            snapToInterval={ITEM_W}
-                            snapToAlignment="center"
-                            decelerationRate="fast"
-                            contentContainerStyle={{ paddingHorizontal: SNAP_INSET }}
-                            onScroll={Animated.event(
-                                [{ nativeEvent: { contentOffset: { x: carouselScrollX } } }],
-                                { useNativeDriver: true }
-                            )}
-                            scrollEventThrottle={16}
-                            onMomentumScrollEnd={e => {
-                                const idx = Math.round(e.nativeEvent.contentOffset.x / ITEM_W);
-                                setFocusedMemberIdx(Math.max(0, Math.min(idx, members.length - 1)));
-                                Haptics.selectionAsync();
-                            }}
-                        >
-                            {members.map((m, i) => {
-                                const inputRange = [(i - 1) * ITEM_W, i * ITEM_W, (i + 1) * ITEM_W];
-                                const cardScale = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.78, 1, 0.78],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardOpacity = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.50, 1, 0.50],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardTranslateY = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [vs(7), 0, vs(7)],
-                                    extrapolate: 'clamp',
-                                });
-
-                                const isFocused = focusedMemberIdx === i;
-                                const charColor = m.character_color ?? m.avatar_color ?? '#6B7280';
-
-                                return (
-                                    <Animated.View
-                                        key={m.user_id}
-                                        style={{
-                                            width: CARD_W,
-                                            marginHorizontal: CARD_MX,
-                                            alignItems: 'center',
-                                            opacity: cardOpacity,
-                                            transform: [
-                                                { scale: cardScale },
-                                                { translateY: cardTranslateY },
-                                            ],
-                                        }}
-                                    >
-                                        <View style={{
-                                            padding: scale(10),
-                                            borderRadius: ms(18),
-                                            backgroundColor: isDark
-                                                ? 'rgba(255,255,255,0.06)'
-                                                : 'rgba(255,255,255,0.80)',
-                                            borderWidth: isFocused ? 1.5 : 0,
-                                            borderColor: isFocused ? charColor + '88' : 'transparent',
-                                            shadowColor: charColor,
-                                            shadowOffset: { width: 0, height: isFocused ? 8 : 0 },
-                                            shadowOpacity: isFocused ? 0.45 : 0,
-                                            shadowRadius: isFocused ? 16 : 0,
-                                            elevation: isFocused ? 8 : 0,
-                                        }}>
-                                            <CharacterShape
-                                                variant="mini"
-                                                shape={m.character_shape ?? 'rect'}
-                                                color={charColor}
-                                            />
-                                        </View>
-                                        <Text style={{
-                                            fontSize: ms(10),
-                                            color: isFocused
-                                                ? (isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)')
-                                                : (isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)'),
-                                            marginTop: vs(5),
-                                            fontWeight: isFocused ? '600' : '400',
-                                            letterSpacing: 0.2,
-                                        }} numberOfLines={1}>
-                                            {(m.name || '').split(' ')[0]}
-                                        </Text>
-                                    </Animated.View>
-                                );
-                            })}
-                        </Animated.ScrollView>
-                    )}
-
-                    {/* Single member — no carousel needed */}
-                    {members.length === 1 && (
-                        <View style={{ height: vs(24) }} />
-                    )}
+                                            : 'rgba(255,255,255,0.88)',
+                                        borderWidth: isFocused ? 1.5 : 0,
+                                        borderColor: isFocused ? charColor + '99' : 'transparent',
+                                        shadowColor: charColor,
+                                        shadowOffset: { width: 0, height: isFocused ? 8 : 2 },
+                                        shadowOpacity: isFocused ? 0.48 : 0.08,
+                                        shadowRadius: isFocused ? 18 : 4,
+                                        elevation: isFocused ? 10 : 1,
+                                    }}>
+                                        <CharacterShape
+                                            variant="mini"
+                                            shape={m.character_shape ?? 'rect'}
+                                            color={charColor}
+                                        />
+                                    </View>
+                                    <Text style={{
+                                        fontSize: ms(11),
+                                        color: isFocused
+                                            ? (isDark ? 'rgba(255,255,255,0.70)' : 'rgba(0,0,0,0.60)')
+                                            : (isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.22)'),
+                                        marginTop: vs(5),
+                                        fontWeight: isFocused ? '600' : '400',
+                                        letterSpacing: 0.2,
+                                    }} numberOfLines={1}>
+                                        {(m.name || '').split(' ')[0]}
+                                    </Text>
+                                </Animated.View>
+                            );
+                        })}
+                    </Animated.ScrollView>
                 </LinearGradient>
             </View>
 
