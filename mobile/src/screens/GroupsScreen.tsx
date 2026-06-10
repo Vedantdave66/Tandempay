@@ -158,7 +158,7 @@ export default function GroupsScreen({ navigation }: any) {
                                     myNetBalance={myNetBalance}
                                     compact={false}
                                     onPress={() => navigation.navigate('Group', { groupId: item.id })}
-                                    onLongPress={() => handleGroupLongPress(item)}
+                                    onMorePress={() => handleGroupLongPress(item)}
                                 />
                             );
                         })
