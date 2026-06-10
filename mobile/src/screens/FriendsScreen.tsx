@@ -153,11 +153,12 @@ export default function FriendsScreen() {
                     ) : (
                         <View style={[styles.activityCard, {
                             backgroundColor: colors.surface, borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                            borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
                             shadowColor: isDark ? '#000' : '#0A3020',
-                            shadowOpacity: isDark ? 0.50 : 0.10,
-                            shadowRadius: isDark ? 20 : 14,
-                            shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-                            elevation: isDark ? 14 : 4,
+                            shadowOpacity: isDark ? 0.28 : 0.10,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: isDark ? 8 : 6 },
+                            elevation: isDark ? 6 : 4,
                         }]}>
                             {activity.map((a, i) => {
                                 const cfg = TYPE_CONFIG[a.type] || { icon: Bell, tint: 'neutral' as const };
@@ -204,9 +205,9 @@ export default function FriendsScreen() {
                                         backgroundColor: colors.accent,
                                         opacity: emailInput.length ? 1 : 0.5,
                                         shadowColor: colors.accent,
-                                        shadowOpacity: emailInput.length ? 0.44 : 0,
-                                        shadowRadius: 12,
-                                        shadowOffset: { width: 0, height: 8 },
+                                        shadowOpacity: emailInput.length ? 0.22 : 0,
+                                        shadowRadius: 8,
+                                        shadowOffset: { width: 0, height: 6 },
                                         elevation: emailInput.length ? 8 : 0,
                                     }]}
                                     onPress={handleSendRequest}
@@ -229,11 +230,12 @@ export default function FriendsScreen() {
                                 <View key={friend.id} style={[styles.friendCard, {
                                     backgroundColor: colors.surface,
                                     borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                                    borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
                                     shadowColor: isDark ? '#000' : '#0A3020',
-                                    shadowOpacity: isDark ? 0.50 : 0.10,
-                                    shadowRadius: isDark ? 20 : 14,
-                                    shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-                                    elevation: isDark ? 14 : 4,
+                                    shadowOpacity: isDark ? 0.28 : 0.10,
+                                    shadowRadius: 14,
+                                    shadowOffset: { width: 0, height: isDark ? 8 : 6 },
+                                    elevation: isDark ? 6 : 4,
                                 }]}>
                                     <View style={styles.friendTop}>
                                         <CharacterShape shape="rect" color={friend.avatar_color} variant="mini" />
@@ -384,7 +386,7 @@ const styles = StyleSheet.create({
     activityIcon: {
         width: 44,
         height: 44,
-        borderRadius: ms(10),
+        borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -406,16 +408,16 @@ const styles = StyleSheet.create({
     },
     input: {
         flex: 1,
-        borderWidth: 1,
-        borderRadius: ms(12),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(14),
         paddingHorizontal: scale(16),
-        height: 52,
+        height: vs(52),
         fontSize: ms(16),
     },
     sendBtn: {
-        width: 52,
-        height: 52,
-        borderRadius: ms(12),
+        width: scale(52),
+        height: scale(52),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -464,9 +466,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     iconBtn: {
-        width: 36,
-        height: 36,
-        borderRadius: ms(18),
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
     },

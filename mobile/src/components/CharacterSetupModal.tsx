@@ -4,6 +4,7 @@ import {
     ActivityIndicator, StyleSheet, ScrollView,
     Animated, PanResponder,
 } from 'react-native';
+import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
@@ -92,7 +93,6 @@ function PupilDot({ size, eyeX, eyeY }: {
 export default function CharacterSetupModal({ visible, onClose }: CharacterSetupModalProps) {
     const { colors } = useTheme();
     const { refreshUser } = useAuth();
-
     const [shape, setShape] = useState<ShapeKey>('rect');
     const [color, setColor] = useState('#3ECF8E');
     const [nickname, setNickname] = useState('');
@@ -177,12 +177,16 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
         >
             <ScrollView
                 style={[styles.root, { backgroundColor: colors.background }]}
-                contentContainerStyle={styles.content}
+                contentContainerStyle={[styles.content, { paddingTop: (initialWindowMetrics?.insets.top ?? 44) + 60 }]}
                 keyboardShouldPersistTaps="handled"
             >
                 {/* Close button — only when dismissible */}
                 {onClose && (
-                    <TouchableOpacity onPress={onClose} style={styles.closeBtn} activeOpacity={0.7}>
+                    <TouchableOpacity
+                        onPress={onClose}
+                        style={[styles.closeBtn, { top: (initialWindowMetrics?.insets.top ?? 44) + 8 }]}
+                        activeOpacity={0.7}
+                    >
                         <Text style={[styles.closeBtnText, { color: colors.secondaryText }]}>✕</Text>
                     </TouchableOpacity>
                 )}
@@ -341,7 +345,6 @@ const styles = StyleSheet.create({
         flexGrow: 1,
         alignItems: 'center',
         paddingHorizontal: 24,
-        paddingTop: 64,
         paddingBottom: 48,
     },
     heading: {

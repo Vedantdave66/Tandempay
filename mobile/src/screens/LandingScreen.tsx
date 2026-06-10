@@ -219,7 +219,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: vs(40),
-    borderWidth: 1,
   },
   title: {
     fontSize: ms(36),
@@ -251,7 +250,7 @@ const styles = StyleSheet.create({
   buttonRow: {
     flexDirection: 'row',
     gap: vs(12),
-    height: 60,
+    height: vs(56),
   },
   nextBtn: {
     flex: 1,
@@ -273,7 +272,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: ms(16),
-    borderWidth: 1,
+    borderWidth: StyleSheet.hairlineWidth,
   },
   loginText: {
     fontSize: ms(16),

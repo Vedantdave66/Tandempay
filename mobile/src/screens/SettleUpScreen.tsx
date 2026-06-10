@@ -58,8 +58,8 @@ function CopyRow({ label, value, onCopy, isCopied, t }: {
     return (
         <View style={{
             flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-            backgroundColor: t.inset, borderWidth: 1, borderColor: t.insetBorder,
-            borderRadius: ms(14), padding: scale(12), paddingLeft: scale(14),
+            backgroundColor: t.inset, borderWidth: StyleSheet.hairlineWidth, borderColor: t.insetBorder,
+            borderRadius: ms(16), padding: scale(12), paddingLeft: scale(14),
         }}>
             <View style={{ flex: 1, minWidth: 0, marginRight: scale(10) }}>
                 <Text style={{ fontSize: ms(11), fontWeight: '800', letterSpacing: 0.6,
@@ -228,10 +228,10 @@ export default function SettleUpScreen() {
                         <View style={[styles.card, {
                             backgroundColor: t.card, borderColor: t.cardBorder,
                             shadowColor: '#000',
-                            shadowOpacity: isDark ? 0.50 : 0.12,
-                            shadowRadius: 20,
-                            shadowOffset: { width: 0, height: 14 },
-                            elevation: isDark ? 18 : 12,
+                            shadowOpacity: isDark ? 0.28 : 0.12,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: 8 },
+                            elevation: 6,
                         }]}>
                             <View style={styles.cardRow}>
                                 <View style={[styles.iconTile, { backgroundColor: t.overlay }]}>
@@ -299,10 +299,10 @@ export default function SettleUpScreen() {
                         <View style={[styles.card, {
                             backgroundColor: t.card, borderColor: t.cardBorder,
                             shadowColor: '#000',
-                            shadowOpacity: isDark ? 0.50 : 0.12,
-                            shadowRadius: 20,
-                            shadowOffset: { width: 0, height: 14 },
-                            elevation: isDark ? 18 : 12,
+                            shadowOpacity: isDark ? 0.28 : 0.12,
+                            shadowRadius: 14,
+                            shadowOffset: { width: 0, height: 8 },
+                            elevation: 6,
                             gap: 0,
                         }]}>
                             <TouchableOpacity
@@ -533,7 +533,7 @@ const styles = StyleSheet.create({
     freePillText: {
         fontSize: ms(11),
         ...Font.extrabold,
-        letterSpacing: 1.3,
+        letterSpacing: 0.7,
     },
     hint: {
         fontSize: ms(15),
@@ -546,10 +546,10 @@ const styles = StyleSheet.create({
         borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.44,
-        shadowRadius: 12,
-        elevation: 8,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 8,
+        elevation: 6,
     },
     primaryBtnText: {
         fontSize: ms(16),
@@ -558,8 +558,8 @@ const styles = StyleSheet.create({
 
     ghostBtn: {
         height: vs(52),
-        borderRadius: ms(14),
-        borderWidth: 1.5,
+        borderRadius: ms(16),
+        borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -580,7 +580,7 @@ const styles = StyleSheet.create({
     orText: {
         fontSize: ms(12),
         ...Font.bold,
-        letterSpacing: 1,
+        letterSpacing: 0.7,
     },
 
     feeRow: {

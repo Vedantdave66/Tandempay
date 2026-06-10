@@ -38,8 +38,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
     Animated.spring(limelightX, {
       toValue: targetX,
       useNativeDriver: true,
-      tension: 180,
-      friction: 20,
+      tension: 200,
+      friction: 28,
     }).start();
     if (!ready) setReady(true);
   }, [limelightX, ready]);
@@ -147,19 +147,20 @@ const styles = StyleSheet.create({
     top: vs(4),
     left: -scale(20),
     width: LIMELIGHT_W + scale(40),
-    height: vs(52),
+    height: vs(48),
     borderRadius: ms(4),
   },
   tabRow: {
     flexDirection: 'row',
-    paddingTop: vs(10),
-    paddingBottom: vs(4),
+    paddingTop: vs(13),
+    paddingBottom: vs(6),
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: vs(3),
+    minHeight: scale(44),
   },
   iconWrap: {
     position: 'relative',
@@ -175,6 +176,6 @@ const styles = StyleSheet.create({
   },
   label: {
     fontSize: ms(10),
-    letterSpacing: 0,
+    letterSpacing: 0.3,
   },
 });
