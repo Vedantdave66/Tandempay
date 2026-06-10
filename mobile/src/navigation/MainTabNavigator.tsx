@@ -16,6 +16,13 @@ export default function MainTabNavigator() {
             screenOptions={{
                 headerShown: false,
                 lazy: true,
+                tabBarStyle: {
+                    position: 'absolute',
+                    backgroundColor: 'transparent',
+                    borderTopWidth: 0,
+                    elevation: 0,
+                },
+                tabBarBackground: () => null,
             }}
         >
             <Tab.Screen name="Home" component={DashboardScreen} />
