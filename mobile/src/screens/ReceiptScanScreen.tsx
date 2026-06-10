@@ -43,6 +43,8 @@ export default function ReceiptScanScreen({ navigation }: any) {
   const [claimed, setClaimed]     = useState<Set<string>>(new Set());
   const [tipAmount, setTipAmount] = useState('');
   const [tipActive, setTipActive] = useState(false);
+  // Default payer = first non-me member; user can change this in the people picker
+  const [payerId, setPayerId]     = useState<string>(MOCK_MEMBERS[0].id);
 
   // Parsing animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
@@ -227,6 +229,8 @@ export default function ReceiptScanScreen({ navigation }: any) {
       ...MOCK_MEMBERS,
     ];
 
+    const payer = allMembers.find(m => m.id === payerId) ?? allMembers[1] ?? allMembers[0];
+
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
         <TouchableOpacity style={styles.backBtn} onPress={goBack}>
@@ -237,22 +241,68 @@ export default function ReceiptScanScreen({ navigation }: any) {
           opacity:   peopleAnim,
           transform: [{ translateY: peopleAnim.interpolate({ inputRange: [0, 1], outputRange: [vs(20), 0] }) }],
         }]}>
-          <Text style={[styles.peopleTitle, T.extrabold, { color: colors.text }]}>Who's splitting this?</Text>
+          {/* WHO PAID */}
+          <Text style={[styles.peopleTitle, T.extrabold, { color: colors.text }]}>Who paid the bill?</Text>
           <Text style={[styles.peopleSub, T.regular, { color: colors.secondaryText }]}>
-            Tap to include or remove people from the bill
+            Everyone else will pay them back
           </Text>
 
-          <View style={styles.memberGrid}>
+          <View style={[styles.memberGrid, { marginBottom: vs(28) }]}>
+            {allMembers.map(m => {
+              const isPayer = m.id === payerId;
+              return (
+                <TouchableOpacity
+                  key={m.id}
+                  style={styles.memberItem}
+                  activeOpacity={0.75}
+                  onPress={() => { Haptics.selectionAsync(); setPayerId(m.id); }}
+                >
+                  <View style={[styles.memberAvatar, {
+                    backgroundColor: m.color + (isPayer ? 'FF' : '30'),
+                    borderWidth: isPayer ? 2.5 : 0,
+                    borderColor: m.color,
+                  }]}>
+                    <Text style={[styles.memberInitial, { color: isPayer ? '#fff' : m.color + '99' }]}>
+                      {m.initial}
+                    </Text>
+                    {isPayer && (
+                      <View style={[styles.memberCheckmark, { backgroundColor: m.color }]}>
+                        <Text style={{ fontSize: 9 }}>💳</Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={[styles.memberName, T.semibold, { color: isPayer ? colors.text : colors.tertiaryText }]} numberOfLines={1}>
+                    {m.id === 'me' ? 'Me' : m.name}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {/* DIVIDER */}
+          <View style={[styles.sectionDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)' }]} />
+
+          {/* WHO'S SPLITTING */}
+          <Text style={[styles.peopleSplitLabel, T.extrabold, { color: colors.text, marginTop: vs(20) }]}>
+            Who's splitting it?
+          </Text>
+          <Text style={[styles.peopleSub, T.regular, { color: colors.secondaryText }]}>
+            Tap to include or remove people
+          </Text>
+
+          <View style={[styles.memberGrid, { marginTop: vs(16) }]}>
             {allMembers.map(m => {
               const isIn = included.has(m.id);
               return (
                 <TouchableOpacity key={m.id} style={styles.memberItem} activeOpacity={0.75} onPress={() => toggleMember(m.id)}>
                   <View style={[styles.memberAvatar, {
-                    backgroundColor: m.color + (isIn ? 'FF' : '40'),
+                    backgroundColor: m.color + (isIn ? 'FF' : '30'),
                     borderWidth: isIn ? 2.5 : 0,
                     borderColor: m.color,
                   }]}>
-                    <Text style={[styles.memberInitial, { color: isIn ? '#fff' : m.color + 'AA' }]}>{m.initial}</Text>
+                    <Text style={[styles.memberInitial, { color: isIn ? '#fff' : m.color + '99' }]}>
+                      {m.initial}
+                    </Text>
                     {isIn && (
                       <View style={[styles.memberCheckmark, { backgroundColor: m.color }]}>
                         <Check size={9} color="#fff" strokeWidth={3} />
@@ -260,29 +310,17 @@ export default function ReceiptScanScreen({ navigation }: any) {
                     )}
                   </View>
                   <Text style={[styles.memberName, T.semibold, { color: isIn ? colors.text : colors.tertiaryText }]} numberOfLines={1}>
-                    {m.name}
+                    {m.id === 'me' ? 'Me' : m.name}
                   </Text>
                 </TouchableOpacity>
               );
             })}
-
-            {/* Add person chip */}
-            <TouchableOpacity style={styles.memberItem} activeOpacity={0.75} onPress={() => {}}>
-              <View style={[styles.memberAvatar, {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                borderWidth: 1.5,
-                borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
-                borderStyle: 'dashed',
-              }]}>
-                <UserPlus size={20} color={colors.secondaryText} strokeWidth={1.6} />
-              </View>
-              <Text style={[styles.memberName, T.regular, { color: colors.tertiaryText }]}>Add</Text>
-            </TouchableOpacity>
           </View>
 
-          <View style={[styles.countPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
+          {/* Live split preview */}
+          <View style={[styles.countPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)', marginTop: vs(16) }]}>
             <Text style={[styles.countText, T.semibold, { color: colors.secondaryText }]}>
-              {included.size} {included.size === 1 ? 'person' : 'people'} splitting ${(total / included.size).toFixed(2)} each
+              {included.size} people · ~${((SUBTOTAL + TAX) / included.size).toFixed(2)} each before items
             </Text>
           </View>
         </Animated.View>
@@ -402,16 +440,38 @@ export default function ReceiptScanScreen({ navigation }: any) {
       </ScrollView>
 
       <View style={[styles.ctaBar, { backgroundColor: colors.background }]}>
-        {hasClaim ? (
-          <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
-            activeOpacity={0.84}
-            onPress={navigateToGroups}
-          >
-            <Text style={[styles.ctaBtnText, T.bold]}>My Share  ·  ${myShare.toFixed(2)}</Text>
-            <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
-          </TouchableOpacity>
-        ) : (
+        {hasClaim ? (() => {
+          const allMembersForCta = [
+            { id: 'me', name: user?.character_nickname || 'You', initial: (user?.character_nickname?.[0] || 'Y').toUpperCase(), color: user?.character_color || colors.accent },
+            ...MOCK_MEMBERS,
+          ];
+          const payerMember = allMembersForCta.find(m => m.id === payerId) ?? allMembersForCta[0];
+          return (
+            <TouchableOpacity
+              style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
+              activeOpacity={0.84}
+              onPress={() => {
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                navigation.navigate('SettleUp', {
+                  payment: {
+                    amount: myShare,
+                    description: 'Receipt Split',
+                    payee_name: payerMember.id === 'me' ? (user?.character_nickname || 'You') : payerMember.name,
+                    payee_id: payerMember.id === 'me' ? null : payerMember.id,
+                    group_id: null,
+                    id: null,
+                    isReceiptPayment: true,
+                  },
+                });
+              }}
+            >
+              <Text style={[styles.ctaBtnText, T.bold]}>
+                Pay {payerMember.id === 'me' ? 'Yourself' : payerMember.name}  ·  ${myShare.toFixed(2)}
+              </Text>
+              <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
+            </TouchableOpacity>
+          );
+        })() : (
           <View style={[styles.ctaBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
             <Text style={[styles.ctaBtnText, T.semibold, { color: colors.tertiaryText }]}>Tap items you ordered</Text>
           </View>
@@ -459,6 +519,8 @@ const styles = StyleSheet.create({
   memberName:      { fontSize: ms(12), textAlign: 'center' },
   countPill:       { alignSelf: 'flex-start', paddingHorizontal: scale(14), paddingVertical: vs(8), borderRadius: ms(20) },
   countText:       { fontSize: ms(13) },
+  sectionDivider:  { height: StyleSheet.hairlineWidth, marginHorizontal: -scale(4) },
+  peopleSplitLabel:{ fontSize: ms(22), letterSpacing: -0.4 },
 
   // ── Items
   itemsHeader: { flexDirection: 'row', alignItems: 'center', paddingRight: scale(16), paddingBottom: vs(4) },
