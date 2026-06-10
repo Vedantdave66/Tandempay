@@ -237,10 +237,9 @@ const styles = StyleSheet.create({
     passwordRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: StyleSheet.hairlineWidth,
-        borderRadius: ms(14),
+        borderWidth: 1,
+        borderRadius: ms(12),
         paddingHorizontal: scale(16),
-        height: vs(52),
         marginBottom: vs(20),
     },
     passwordInput: {
