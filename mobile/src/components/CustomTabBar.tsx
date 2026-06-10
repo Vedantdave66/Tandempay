@@ -20,7 +20,7 @@ const TABS = [
   { key: 'Me',       icon: User,  label: 'Me'       },
 ];
 
-const LIMELIGHT_W = scale(46);
+const LIMELIGHT_W = scale(52);
 
 export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
@@ -75,23 +75,24 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
           : 'rgba(255, 255, 255, 0.85)',
       }]} />
 
-      {/* Layer 3: top-edge shimmer — dark mode only */}
-      {isDark && (
-        <LinearGradient
-          colors={['rgba(255,255,255,0.07)', 'transparent']}
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            height: vs(18),
-            borderRadius: ms(36),
-          }}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-          pointerEvents="none"
-        />
-      )}
+      {/* Layer 3: top-edge shimmer */}
+      <LinearGradient
+        colors={[
+          isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.60)',
+          'transparent',
+        ]}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: vs(20),
+          borderRadius: ms(36),
+        }}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        pointerEvents="none"
+      />
 
       {/* Apple-style active indicator — glowing pill behind icon */}
       <Animated.View
@@ -102,8 +103,8 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
               ? colors.accent + '28'
               : colors.accent + '1F',
             shadowColor: colors.accent,
-            shadowOpacity: isDark ? 0.40 : 0.20,
-            shadowRadius: 8,
+            shadowOpacity: isDark ? 0.55 : 0.35,
+            shadowRadius: 12,
             shadowOffset: { width: 0, height: 0 },
             transform: [{ translateX: limelightX }],
           },
