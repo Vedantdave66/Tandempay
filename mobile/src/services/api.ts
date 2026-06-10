@@ -326,6 +326,31 @@ export const walletApi = {
         })
 };
 
+// --- Receipts ---
+export interface ParsedReceiptItem {
+    id: string;
+    name: string;
+    price: number;
+}
+
+export interface ReceiptParseResponse {
+    items: ParsedReceiptItem[];
+    subtotal: number;
+    tax: number;
+    tax_rate: number;
+    tip_detected: number;
+    total: number;
+    currency: string;
+}
+
+export const receiptsApi = {
+    parse: (imageBase64: string) =>
+        request<ReceiptParseResponse>('/receipts/parse', {
+            method: 'POST',
+            body: JSON.stringify({ image_base64: imageBase64 }),
+        }),
+};
+
 // --- Stripe Payments ---
 export interface CreatePaymentIntentResponse {
     client_secret: string;
