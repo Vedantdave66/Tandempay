@@ -20,7 +20,7 @@ const TABS = [
   { key: 'Me',       icon: User,  label: 'Me'       },
 ];
 
-const LIMELIGHT_W = scale(44);
+const LIMELIGHT_W = scale(52);
 
 export default function CustomTabBar({ state, descriptors, navigation }: any) {
   const { colors, isDark } = useTheme();
@@ -51,33 +51,66 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
   };
 
   return (
-    <View style={[styles.container, { borderTopColor: colors.border, paddingBottom: insets.bottom }]}>
-      {/* Solid semi-transparent pill background */}
-      <View
-        style={[StyleSheet.absoluteFillObject, {
-          backgroundColor: isDark ? 'rgba(12,15,12,0.97)' : 'rgba(255,255,255,0.97)',
-        }]}
+    <View style={[
+      styles.container,
+      {
+        bottom: insets.bottom + vs(12),
+        shadowOpacity: isDark ? 0.45 : 0.14,
+      },
+    ]}>
+      {/* Layer 1: frosted fill */}
+      <View style={[StyleSheet.absoluteFillObject, {
+        backgroundColor: isDark
+          ? 'rgba(22, 22, 26, 0.86)'
+          : 'rgba(248, 248, 252, 0.86)',
+        borderRadius: ms(36),
+      }]} />
+
+      {/* Layer 2: glass ring (border) */}
+      <View style={[StyleSheet.absoluteFillObject, {
+        borderRadius: ms(36),
+        borderWidth: 0.8,
+        borderColor: isDark
+          ? 'rgba(255, 255, 255, 0.10)'
+          : 'rgba(255, 255, 255, 0.85)',
+      }]} />
+
+      {/* Layer 3: top-edge shimmer */}
+      <LinearGradient
+        colors={[
+          isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.60)',
+          'transparent',
+        ]}
+        style={{
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          height: vs(20),
+          borderRadius: ms(36),
+        }}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+        pointerEvents="none"
       />
 
-      {/* Limelight indicator */}
+      {/* Apple-style active indicator — glowing pill behind icon */}
       <Animated.View
         style={[
-          styles.limelightBar,
-          { backgroundColor: colors.accent },
-          { transform: [{ translateX: limelightX }] },
+          styles.limelightPill,
+          {
+            backgroundColor: isDark
+              ? colors.accent + '28'
+              : colors.accent + '1F',
+            shadowColor: colors.accent,
+            shadowOpacity: isDark ? 0.55 : 0.35,
+            shadowRadius: 12,
+            shadowOffset: { width: 0, height: 0 },
+            transform: [{ translateX: limelightX }],
+          },
           !ready && { opacity: 0 },
         ]}
-      >
-        <LinearGradient
-          colors={[
-            isDark ? colors.accent + '59' : colors.accent + '38',
-            'transparent',
-          ]}
-          style={styles.limelightCone}
-          start={{ x: 0.5, y: 0 }}
-          end={{ x: 0.5, y: 1 }}
-        />
-      </Animated.View>
+      />
 
       {/* Tab buttons */}
       <View style={styles.tabRow}>
@@ -109,7 +142,7 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
                 <IconComp
                   size={22}
                   color={isFocused ? colors.accent : colors.tabIconDefault}
-                  strokeWidth={isFocused ? 2.2 : 1.8}
+                  strokeWidth={isFocused ? 2.4 : 1.6}
                 />
                 {showBadge && <View style={styles.badge} />}
               </View>
@@ -130,37 +163,39 @@ export default function CustomTabBar({ state, descriptors, navigation }: any) {
 
 const styles = StyleSheet.create({
   container: {
-    borderTopWidth: StyleSheet.hairlineWidth,
-    position: 'relative',
+    position: 'absolute',
+    bottom: 0,
+    left: scale(20),
+    right: scale(20),
+    borderRadius: ms(36),
     overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: 24,
+    elevation: 16,
   },
-  limelightBar: {
+  limelightPill: {
     position: 'absolute',
-    top: 0,
-    width: LIMELIGHT_W,
-    height: vs(4),
-    borderRadius: 999,
-    zIndex: 10,
-  },
-  limelightCone: {
-    position: 'absolute',
-    top: vs(4),
-    left: -scale(20),
-    width: LIMELIGHT_W + scale(40),
-    height: vs(48),
-    borderRadius: ms(4),
+    top: vs(8),
+    width: scale(52),
+    height: scale(44),
+    borderRadius: ms(22),
+    zIndex: 1,
   },
   tabRow: {
     flexDirection: 'row',
-    paddingTop: vs(13),
-    paddingBottom: vs(6),
+    paddingTop: vs(10),
+    paddingBottom: vs(10),
+    paddingHorizontal: scale(4),
+    zIndex: 2,
   },
   tabBtn: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     gap: vs(3),
-    minHeight: scale(44),
+    paddingVertical: vs(4),
+    minHeight: scale(52),
   },
   iconWrap: {
     position: 'relative',
@@ -173,6 +208,7 @@ const styles = StyleSheet.create({
     height: scale(8),
     borderRadius: scale(4),
     backgroundColor: '#E05252',
+    zIndex: 3,
   },
   label: {
     fontSize: ms(10),
