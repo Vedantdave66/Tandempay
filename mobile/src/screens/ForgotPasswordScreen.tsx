@@ -107,8 +107,8 @@ const styles = StyleSheet.create({
     kav:     { flex: 1 },
     back: {
         position: 'absolute', top: 20, left: 20,
-        width: 40, height: 40, borderRadius: ms(20),
-        alignItems: 'center', justifyContent: 'center', borderWidth: 1, zIndex: 10,
+        width: scale(44), height: scale(44), borderRadius: ms(14),
+        alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth, zIndex: 10,
     },
     content: { flex: 1, justifyContent: 'center', paddingHorizontal: scale(24) },
     iconBox: {
@@ -119,15 +119,15 @@ const styles = StyleSheet.create({
     logoWrap: { alignItems: 'center', marginBottom: vs(8) },
     title:    { fontSize: ms(28), fontWeight: '700', textAlign: 'center', marginBottom: vs(10) },
     subtitle: { fontSize: ms(14), textAlign: 'center', lineHeight: 22, marginBottom: vs(32) },
-    form:     { padding: scale(24), borderRadius: ms(20), borderWidth: 1, marginBottom: vs(20) },
+    form:     { padding: scale(24), borderRadius: ms(20), borderWidth: StyleSheet.hairlineWidth, marginBottom: vs(20) },
     label:    { fontSize: ms(14), fontWeight: '600', marginBottom: vs(8) },
     input: {
-        borderWidth: 1, borderRadius: ms(12),
-        paddingHorizontal: scale(16), paddingVertical: vs(14),
+        borderWidth: StyleSheet.hairlineWidth, borderRadius: ms(14),
+        paddingHorizontal: scale(16), height: vs(52),
         fontSize: ms(16), marginBottom: vs(20),
     },
     btn: {
-        height: 52, borderRadius: ms(26),
+        paddingVertical: vs(17), borderRadius: ms(16),
         alignItems: 'center', justifyContent: 'center',
     },
     btnText:  { color: '#1A1A1A', fontSize: ms(16), fontWeight: '700' },

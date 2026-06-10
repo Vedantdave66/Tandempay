@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { formatCurrency } from '../utils/formatCurrency';
 import { scale, vs, ms } from '../utils/responsive';
 import {
@@ -13,6 +13,8 @@ import {
   Alert,
   TextInput,
   StatusBar,
+  Animated,
+  Easing,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -53,6 +55,9 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [refreshing, setRefreshing] = useState(false);
 
     const [canvasMode, setCanvasMode] = useState(false);
+    const expenseAnims = useRef(
+        Array.from({ length: 10 }, () => new Animated.Value(0))
+    ).current;
     const [membersModalVisible, setMembersModalVisible] = useState(false);
     const [membersTab, setMembersTab] = useState<'friends' | 'invite'>('friends');
     const [friends, setFriends] = useState<Friend[]>([]);
@@ -70,6 +75,23 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         if (Array.isArray(raw?.settlements)) return raw.settlements;
         return [];
     }
+
+    useEffect(() => {
+        if (expenses.length === 0) return;
+        const count = Math.min(expenses.length, 5);
+        expenseAnims.forEach(a => a.setValue(0));
+        Animated.stagger(40,
+            expenseAnims.slice(0, count).map(anim =>
+                Animated.timing(anim, {
+                    toValue: 1,
+                    duration: 220,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                })
+            )
+        ).start();
+        expenseAnims.slice(5).forEach(a => a.setValue(1));
+    }, [expenses.length]);
 
     const loadData = useCallback(async () => {
         try {
@@ -290,10 +312,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         style={[styles.primaryBtn, {
                             backgroundColor: colors.accent,
                             shadowColor: colors.accent,
-                            shadowOpacity: 0.44,
-                            shadowRadius: 12,
-                            shadowOffset: { width: 0, height: 8 },
-                            elevation: 8,
+                            shadowOpacity: 0.22,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 6 },
+                            elevation: 6,
                         }]}
                         onPress={() => {
                             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -351,19 +373,19 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             <Receipt size={40} color={colors.secondaryText} style={{ marginBottom: vs(12) }} />
                             <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>No expenses yet.</Text>
                         </View>
-                    ) : expenses.map(expense => {
+                    ) : expenses.map((expense, expIdx) => {
                         const c = charFor(expense.paid_by);
                         const each = expense.amount / Math.max(expense.participants.length, 1);
                         const paidByMe = expense.paid_by === user?.id;
                         return (
-                            <View key={expense.id} style={[styles.row, {
+                            <Animated.View key={expense.id} style={{ opacity: expenseAnims[expIdx] ?? 1 }}>
+                            <View style={[styles.row, {
                                 backgroundColor: colors.surface,
-                                borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
                                 shadowColor: isDark ? '#000' : '#0A3020',
-                                shadowOpacity: isDark ? 0.50 : 0.10,
-                                shadowRadius: isDark ? 20 : 14,
-                                shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-                                elevation: isDark ? 14 : 4,
+                                shadowOpacity: isDark ? 0.28 : 0.10,
+                                shadowRadius: isDark ? 14 : 10,
+                                shadowOffset: { width: 0, height: isDark ? 10 : 4 },
+                                elevation: isDark ? 6 : 4,
                             }]}>
                                 <CharacterShape
                                     shape={c?.character_shape ?? 'rect'}
@@ -386,6 +408,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>${formatCurrency(each)} each</Text>
                                 </View>
                             </View>
+                            </Animated.View>
                         );
                     })
                 )}
@@ -397,7 +420,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     return (
                         <View key={b.user_id} style={[styles.row, styles.balanceRow, {
                             backgroundColor: colors.surface,
-                            borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                            shadowColor: isDark ? '#000' : '#0A3020',
+                            shadowOpacity: isDark ? 0.18 : 0.07,
+                            shadowRadius: 8,
+                            shadowOffset: { width: 0, height: 4 },
+                            elevation: isDark ? 4 : 2,
                         }]}>
                             <View style={styles.balanceTopRow}>
                                 <CharacterShape shape={b.character_shape ?? 'rect'} color={b.character_color ?? '#6B7280'} variant="mini" />
@@ -439,12 +466,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         return (
                             <View key={idx} style={[styles.row, {
                                 backgroundColor: colors.surface,
-                                borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
                                 shadowColor: isDark ? '#000' : '#0A3020',
-                                shadowOpacity: isDark ? 0.50 : 0.10,
-                                shadowRadius: isDark ? 20 : 14,
-                                shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-                                elevation: isDark ? 14 : 4,
+                                shadowOpacity: isDark ? 0.28 : 0.10,
+                                shadowRadius: isDark ? 14 : 10,
+                                shadowOffset: { width: 0, height: isDark ? 10 : 4 },
+                                elevation: isDark ? 6 : 4,
                             }]}>
                                 <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
                                 <ArrowRight size={16} color={colors.faintText} />
@@ -652,7 +678,6 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(20),
         paddingTop: vs(12),
         paddingBottom: vs(16),
-        borderBottomWidth: StyleSheet.hairlineWidth,
     },
     backRow: {
         flexDirection: 'row',
@@ -669,7 +694,7 @@ const styles = StyleSheet.create({
         gap: scale(12),
         marginBottom: vs(14),
     },
-    groupName: { fontSize: ms(22), letterSpacing: -0.4 },
+    groupName: { fontSize: ms(26), letterSpacing: -0.8 },
     clusterRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
@@ -687,8 +712,8 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(5),
-        borderWidth: 1,
-        borderRadius: ms(11),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(14),
         paddingHorizontal: scale(12),
         height: vs(34),
     },
@@ -700,8 +725,8 @@ const styles = StyleSheet.create({
         paddingVertical: vs(8),
         alignItems: 'flex-end',
     },
-    balanceChipLabel: { fontSize: ms(11), letterSpacing: 1.3 },
-    balanceChipValue: { fontSize: ms(18), letterSpacing: -0.3 },
+    balanceChipLabel: { fontSize: ms(11), letterSpacing: 0.6 },
+    balanceChipValue: { fontSize: ms(22), letterSpacing: -0.6 },
 
     actionRow: {
         flexDirection: 'row',
@@ -714,8 +739,8 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: scale(7),
-        borderRadius: ms(13),
-        paddingVertical: vs(12),
+        borderRadius: ms(16),
+        paddingVertical: vs(15),
     },
     primaryBtnText: { fontSize: ms(14) },
     ghostBtn: {
@@ -723,10 +748,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: scale(7),
-        borderRadius: ms(13),
-        borderWidth: 1.5,
+        borderRadius: ms(16),
+        borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(16),
-        paddingVertical: vs(12),
+        paddingVertical: vs(15),
     },
     ghostBtnText: { fontSize: ms(14) },
 
@@ -734,7 +759,7 @@ const styles = StyleSheet.create({
     tabBtn: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: vs(12),
+        paddingVertical: vs(15),
         position: 'relative',
     },
     tabBtnText: { fontSize: ms(13.5) },
@@ -747,21 +772,20 @@ const styles = StyleSheet.create({
         borderRadius: 3,
     },
 
-    scrollContent: { padding: scale(16), paddingBottom: vs(100), gap: vs(10) },
+    scrollContent: { padding: scale(20), paddingBottom: vs(100), gap: vs(14) },
 
     row: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(12),
         padding: scale(14),
-        borderRadius: ms(18),
-        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(20),
     },
     rowInfo: { flex: 1, minWidth: 0 },
-    rowTitle: { fontSize: ms(15) },
+    rowTitle: { fontSize: ms(16) },
     rowMeta: { fontSize: ms(12), marginTop: vs(2) },
     rowEnd: { alignItems: 'flex-end' },
-    rowAmount: { fontSize: ms(17), letterSpacing: -0.3 },
+    rowAmount: { fontSize: ms(20), letterSpacing: -0.6 },
     rowDate: { fontSize: ms(11), marginTop: vs(2) },
     rowEach: { fontSize: ms(12), marginTop: vs(2) },
 

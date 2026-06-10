@@ -182,12 +182,12 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 20,
         left: 20,
-        width: 40,
-        height: 40,
-        borderRadius: ms(20),
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         zIndex: 10,
     },
     content: {
@@ -206,7 +206,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: vs(20),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     title: {
         fontSize: ms(32),
@@ -219,7 +219,7 @@ const styles = StyleSheet.create({
     form: {
         padding: scale(24),
         borderRadius: ms(24),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     label: {
         fontSize: ms(14),
@@ -227,19 +227,20 @@ const styles = StyleSheet.create({
         marginBottom: vs(8),
     },
     input: {
-        borderWidth: 1,
-        borderRadius: ms(12),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(14),
         paddingHorizontal: scale(16),
-        paddingVertical: vs(14),
+        height: vs(52),
         fontSize: ms(16),
         marginBottom: vs(20),
     },
     passwordRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 1,
-        borderRadius: ms(12),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(14),
         paddingHorizontal: scale(16),
+        height: vs(52),
         marginBottom: vs(20),
     },
     passwordInput: {
@@ -252,13 +253,13 @@ const styles = StyleSheet.create({
         paddingVertical: vs(4),
     },
     button: {
-        borderRadius: ms(28),
-        paddingVertical: vs(16),
+        borderRadius: ms(16),
+        paddingVertical: vs(17),
         alignItems: 'center',
         marginTop: vs(8),
     },
     buttonDisabled: { opacity: 0.7 },
-    buttonText: { fontSize: ms(16), fontWeight: '700' },
+    buttonText: { fontSize: ms(16), fontWeight: '700', letterSpacing: 0.2 },
     strengthContainer: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -274,7 +275,7 @@ const styles = StyleSheet.create({
     strengthBar: {
         flex: 1,
         height: 4,
-        borderRadius: ms(2),
+        borderRadius: ms(8),
     },
     strengthLabel: {
         fontSize: ms(12),

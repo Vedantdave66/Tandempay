@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Animated, View, Text, StyleSheet } from 'react-native';
+import { Animated, Easing, View, Text, StyleSheet } from 'react-native';
 import { T } from '../utils/typography';
 
 const LOGO_GREEN = '#22C55E';
@@ -27,8 +27,10 @@ export default function SplashScreen({ onComplete }: Props) {
         }))
     ).current;
 
-    // Glow
-    const glowOpacity = useRef(new Animated.Value(0)).current;
+    // Glow layers — 4 concentric rings fading from inner to outer
+    const glowLayers = useRef([0.22, 0.13, 0.08, 0.04].map(
+        () => new Animated.Value(0)
+    )).current;
 
     // Heartbeat
     const heartbeatScale = useRef(new Animated.Value(1)).current;
@@ -41,20 +43,22 @@ export default function SplashScreen({ onComplete }: Props) {
         const dividerAnim = Animated.spring(dividerScale, {
             toValue: 1,
             useNativeDriver: true,
-            damping: 14,
-            stiffness: 180,
+            damping: 18,
+            stiffness: 220,
         });
 
         // 2. "Pay" slide+fade at t=560ms
         const payAnim = Animated.parallel([
             Animated.timing(payTranslate, {
                 toValue: 0,
-                duration: 380,
+                duration: 300,
+                easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
             Animated.timing(payOpacity, {
                 toValue: 1,
-                duration: 380,
+                duration: 300,
+                easing: Easing.out(Easing.cubic),
                 useNativeDriver: true,
             }),
         ]);
@@ -64,38 +68,45 @@ export default function SplashScreen({ onComplete }: Props) {
             Animated.parallel([
                 Animated.timing(letterAnims[i].translateY, {
                     toValue: 0,
-                    duration: 280,
+                    duration: 240,
+                    easing: Easing.out(Easing.cubic),
                     useNativeDriver: true,
                 }),
                 Animated.timing(letterAnims[i].opacity, {
                     toValue: 1,
-                    duration: 280,
+                    duration: 240,
+                    easing: Easing.out(Easing.cubic),
                     useNativeDriver: true,
                 }),
             ])
         );
         const tandemAnim = Animated.stagger(90, letterAnimations);
 
-        // 4. Glow fade-in at t=1800ms
-        const glowAnim = Animated.timing(glowOpacity, {
-            toValue: 0.12,
-            duration: 500,
-            useNativeDriver: true,
-        });
+        // 4. Glow fade-in at t=1800ms — 4 concentric layers
+        const glowAnim = Animated.parallel(
+            glowLayers.map((anim, i) =>
+                Animated.timing(anim, {
+                    toValue: [0.22, 0.13, 0.08, 0.04][i],
+                    duration: 600,
+                    easing: Easing.out(Easing.cubic),
+                    useNativeDriver: true,
+                })
+            )
+        );
 
         // 5. Heartbeat at t=2350ms
         const heartbeatAnim = Animated.sequence([
             Animated.spring(heartbeatScale, {
                 toValue: 1.08,
                 useNativeDriver: true,
-                damping: 8,
-                stiffness: 220,
+                damping: 10,
+                stiffness: 240,
             }),
             Animated.spring(heartbeatScale, {
                 toValue: 1,
                 useNativeDriver: true,
-                damping: 8,
-                stiffness: 220,
+                damping: 10,
+                stiffness: 240,
             }),
         ]);
 
@@ -103,22 +114,22 @@ export default function SplashScreen({ onComplete }: Props) {
         const fadeOut = Animated.timing(splashOpacity, {
             toValue: 0,
             duration: 400,
+            easing: Easing.out(Easing.cubic),
             useNativeDriver: true,
         });
 
-        // Compose the full sequence with delays
         Animated.sequence([
             Animated.delay(50),
             dividerAnim,
-            Animated.delay(560 - 50 - 350), // ~160ms gap after divider spring settles
+            Animated.delay(560 - 50 - 350),
             payAnim,
-            Animated.delay(1050 - 560 - 380), // ~110ms gap
+            Animated.delay(1050 - 560 - 300),
             tandemAnim,
-            Animated.delay(1800 - 1050 - (90 * 5 + 280)), // gap before glow
+            Animated.delay(1800 - 1050 - (90 * 5 + 240)),
             glowAnim,
-            Animated.delay(2350 - 1800 - 500), // gap before heartbeat
+            Animated.delay(50),
             heartbeatAnim,
-            Animated.delay(2900 - 2350 - 200), // gap before fade
+            Animated.delay(2900 - 2350 - 200),
             fadeOut,
         ]).start(() => {
             onComplete();
@@ -127,19 +138,21 @@ export default function SplashScreen({ onComplete }: Props) {
 
     return (
         <Animated.View style={[styles.container, { opacity: splashOpacity }]}>
-            {/* Green radial glow */}
-            <Animated.View
-                style={[
-                    styles.glow,
-                    {
-                        opacity: glowOpacity,
-                        shadowColor: LOGO_GREEN,
-                        shadowRadius: 120,
-                        shadowOpacity: 1,
-                        shadowOffset: { width: 0, height: 0 },
-                    },
-                ]}
-            />
+            {/* Radial glow — 4 concentric layers from inner to outer */}
+            {[140, 260, 380, 500].map((size, i) => (
+                <Animated.View
+                    key={i}
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        width: size,
+                        height: size,
+                        borderRadius: size / 2,
+                        backgroundColor: LOGO_GREEN,
+                        opacity: glowLayers[i],
+                    }}
+                />
+            ))}
 
             <Animated.View style={[styles.logoRow, { transform: [{ scale: heartbeatScale }] }]}>
                 {/* Tandem letters */}
@@ -194,13 +207,6 @@ const styles = StyleSheet.create({
         backgroundColor: BG,
         alignItems: 'center',
         justifyContent: 'center',
-    },
-    glow: {
-        position: 'absolute',
-        width: 200,
-        height: 200,
-        borderRadius: 100,
-        backgroundColor: LOGO_GREEN,
     },
     logoRow: {
         flexDirection: 'row',

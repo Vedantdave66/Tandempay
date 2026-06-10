@@ -69,9 +69,9 @@ export default function GroupsScreen({ navigation }: any) {
                     style={[styles.newButton, {
                         backgroundColor: colors.accent,
                         shadowColor: colors.accent,
-                        shadowOpacity: 0.44,
-                        shadowRadius: 12,
-                        shadowOffset: { width: 0, height: 8 },
+                        shadowOpacity: 0.22,
+                        shadowRadius: 8,
+                        shadowOffset: { width: 0, height: 6 },
                         elevation: 8,
                     }]}
                     activeOpacity={0.82}
@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(16),
-        paddingTop: vs(8),
+        paddingTop: vs(16),
         paddingBottom: vs(16),
     },
     title: { fontSize: ms(26), letterSpacing: -0.6 },
@@ -145,7 +145,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         gap: vs(14),
-        paddingVertical: vs(80),
+        paddingVertical: vs(32),
     },
     emptyTitle: { fontSize: ms(18) },
     emptyAction: { fontSize: ms(15) },

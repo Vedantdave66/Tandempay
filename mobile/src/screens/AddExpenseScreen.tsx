@@ -230,18 +230,18 @@ const styles = StyleSheet.create({
     headerTitle: { fontSize: ms(17), fontWeight: '700', letterSpacing: -0.2 },
     headerSubtitle: { fontSize: ms(13), marginTop: vs(2) },
     closeBtn: {
-        width: scale(34), height: scale(34), borderRadius: scale(17),
-        alignItems: 'center', justifyContent: 'center', borderWidth: 1,
+        width: scale(44), height: scale(44), borderRadius: ms(14),
+        alignItems: 'center', justifyContent: 'center', borderWidth: StyleSheet.hairlineWidth,
     },
     label: { fontSize: ms(13), fontWeight: '700', marginBottom: vs(7) },
     textInput: {
-        fontSize: ms(15), borderBottomWidth: 1, paddingVertical: vs(10),
+        fontSize: ms(15), borderBottomWidth: StyleSheet.hairlineWidth, paddingVertical: vs(10),
     },
     amountRow: {
         flexDirection: 'row', alignItems: 'center', gap: scale(6),
     },
-    amountSign: { fontSize: ms(17), fontWeight: '700' },
-    amountInput: { flex: 1, fontSize: ms(17), fontWeight: '700', paddingVertical: vs(10) },
+    amountSign: { fontSize: ms(28), fontWeight: '800' },
+    amountInput: { flex: 1, fontSize: ms(28), fontWeight: '800', letterSpacing: -1.0, paddingVertical: vs(10) },
     chipRow: {
         flexDirection: 'row', flexWrap: 'wrap', gap: scale(8), marginBottom: vs(18),
     },
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
     },
     payerChipText: { fontSize: ms(13), fontWeight: '600' },
     cta: {
-        height: vs(52), borderRadius: ms(16), alignItems: 'center', justifyContent: 'center', marginTop: vs(8),
+        paddingVertical: vs(17), borderRadius: ms(16), alignItems: 'center', justifyContent: 'center', marginTop: vs(8),
     },
     ctaText: { color: '#0A5F30', fontWeight: '700', fontSize: ms(15) },
 
@@ -262,7 +262,7 @@ const styles = StyleSheet.create({
     splittingText: { fontSize: ms(15), fontWeight: '600', marginBottom: vs(16) },
     memberRow: {
         flexDirection: 'row', alignItems: 'center', gap: scale(12),
-        padding: scale(14), borderRadius: ms(13), borderWidth: 1.5, marginBottom: vs(8),
+        padding: scale(14), borderRadius: ms(16), borderWidth: StyleSheet.hairlineWidth, marginBottom: vs(8),
     },
     memberName: { flex: 1, fontSize: ms(15), fontWeight: '500' },
     memberAmount: { fontSize: ms(15), fontWeight: '700', marginRight: scale(8) },

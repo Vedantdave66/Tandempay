@@ -145,7 +145,7 @@ export default function ActivityScreen({ navigation }: any) {
                         <Text style={[styles.rowTitle, { color: n.read ? colors.secondaryText : colors.text }]}>
                             {n.title}
                         </Text>
-                        <Text style={[styles.rowTime, { color: colors.secondaryText }]}>
+                        <Text style={[styles.rowTime, { color: colors.faintText }]}>
                             {timeAgo(n.created_at)}
                         </Text>
                     </View>
@@ -238,7 +238,7 @@ const styles = StyleSheet.create({
         borderRadius: ms(20),
     },
     markAllText: { fontSize: ms(13), fontWeight: '600' },
-    divider: { height: 1, marginBottom: vs(8) },
+    divider: { height: StyleSheet.hairlineWidth, marginBottom: vs(8) },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingBottom: vs(120) },
     groupLabel: {

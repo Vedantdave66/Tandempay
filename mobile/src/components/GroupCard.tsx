@@ -40,10 +40,10 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
     const accent = isOwe ? colors.groupOwe : colors.groupOwed;
     const boxStyle = {
         backgroundColor: colors.groupBoxFill,
-        borderWidth: StyleSheet.hairlineWidth,
-        borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+        borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
+        borderColor: 'rgba(0,0,0,0.06)',
         shadowColor: '#0A3020',
-        shadowOpacity: isDark ? 0 : 0.25,
+        shadowOpacity: isDark ? 0 : 0.10,
         shadowRadius: 8,
         shadowOffset: { width: 0, height: 6 },
         elevation: isDark ? 0 : 4,
@@ -52,16 +52,16 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
     return (
         <TouchableOpacity
             onPress={onPress}
-            activeOpacity={0.88}
+            activeOpacity={0.70}
             style={[styles.card, {
                 backgroundColor: 'transparent',
-                borderWidth: StyleSheet.hairlineWidth,
-                borderColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)',
+                borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
+                borderColor: 'rgba(0,0,0,0.06)',
                 shadowColor: '#000',
-                shadowOpacity: isDark ? 0 : 0.14,
-                shadowRadius: 18,
-                shadowOffset: { width: 0, height: 8 },
-                elevation: isDark ? 0 : 10,
+                shadowOpacity: isDark ? 0 : 0.07,
+                shadowRadius: 10,
+                shadowOffset: { width: 0, height: 4 },
+                elevation: isDark ? 0 : 6,
             }, compact && styles.cardCompact]}
         >
             <View style={styles.gradientClip} pointerEvents="none">
@@ -154,10 +154,10 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                             </Text>
                             <TouchableOpacity
                                 onPress={onPress}
-                                activeOpacity={0.82}
+                                activeOpacity={0.70}
                                 style={[styles.arrowBtn, compact && styles.arrowBtnCompact, {
                                     backgroundColor: colors.accentBgFaint,
-                                    borderWidth: 1.5,
+                                    borderWidth: StyleSheet.hairlineWidth,
                                     borderColor: isSettled ? colors.groupOwed : accent,
                                 }]}
                             >
@@ -195,7 +195,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'flex-end',
         gap: scale(2),
-        paddingTop: vs(20),
+        paddingTop: vs(24),
         paddingBottom: vs(10),
         paddingHorizontal: scale(20),
         overflow: 'visible',
@@ -234,9 +234,9 @@ const styles = StyleSheet.create({
         fontSize: ms(13),
     },
     stats: {
-        paddingHorizontal: scale(22),
+        paddingHorizontal: scale(24),
         paddingTop: vs(18),
-        paddingBottom: vs(22),
+        paddingBottom: vs(26),
         alignItems: 'stretch',
         gap: vs(16),
         zIndex: 1,
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     },
     statLabel: {
         fontSize: ms(11),
-        letterSpacing: 1.3,
+        letterSpacing: 0.6,
         textAlign: 'center',
     },
     statPill: {

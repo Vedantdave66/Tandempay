@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { formatCurrency } from '../utils/formatCurrency';
 import {
@@ -12,6 +12,8 @@ import {
     RefreshControl,
     Modal,
     TextInput,
+    Animated,
+    Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
@@ -35,6 +37,8 @@ export default function PaymentsScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    const paymentAnims = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
 
     const [fundModalVisible, setFundModalVisible] = useState(false);
     const [fundModalType, setFundModalType] = useState<'add' | 'withdraw'>('add');
@@ -80,6 +84,14 @@ export default function PaymentsScreen() {
         setLoading(true);
         loadData();
     }, [loadData]));
+
+    useEffect(() => {
+        const count = Math.min(payments.length, 5);
+        paymentAnims.forEach(a => a.setValue(0));
+        Animated.stagger(40, paymentAnims.slice(0, count).map(a =>
+            Animated.timing(a, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
+        )).start();
+    }, [payments.length]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -139,10 +151,10 @@ export default function PaymentsScreen() {
 
     const cardShadow = {
         shadowColor: isDark ? '#000' : '#0A3020',
-        shadowOpacity: isDark ? 0.50 : 0.10,
-        shadowRadius: isDark ? 20 : 14,
-        shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-        elevation: isDark ? 14 : 4,
+        shadowOpacity: isDark ? 0.28 : 0.10,
+        shadowRadius: isDark ? 14 : 14,
+        shadowOffset: { width: 0, height: isDark ? 8 : 6 },
+        elevation: isDark ? 6 : 4,
     };
 
     const renderPaymentCard = (payment: SettlementRecordOut) => {
@@ -155,6 +167,7 @@ export default function PaymentsScreen() {
             <View key={payment.id} style={[styles.card, {
                 backgroundColor: colors.surface,
                 borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
+                borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
                 ...cardShadow,
             }]}>
                 <View style={styles.cardHeader}>
@@ -185,9 +198,9 @@ export default function PaymentsScreen() {
                                 style={[styles.actionBtn, {
                                     backgroundColor: colors.accent,
                                     shadowColor: colors.accent,
-                                    shadowOffset: { width: 0, height: 8 },
-                                    shadowOpacity: 0.44,
-                                    shadowRadius: 12,
+                                    shadowOffset: { width: 0, height: 6 },
+                                    shadowOpacity: 0.22,
+                                    shadowRadius: 8,
                                     elevation: 8,
                                 }]}
                                 onPress={() => navigation.navigate('SettleUp', { payment })}
@@ -331,7 +344,11 @@ export default function PaymentsScreen() {
                                 </Text>
                             </View>
                         ) : (
-                            (settleTab === 'pending' ? pendingPayments : historyPayments).map(renderPaymentCard)
+                            (settleTab === 'pending' ? pendingPayments : historyPayments).map((p, i) => (
+                            <Animated.View key={p.id} style={{ opacity: paymentAnims[Math.min(i, 4)] }}>
+                                {renderPaymentCard(p)}
+                            </Animated.View>
+                        ))
                         )}
                     </>
                 ) : (
@@ -369,7 +386,7 @@ export default function PaymentsScreen() {
                             </View>
                         </ScrollView>
 
-                        <Text style={[styles.ledgerSectionTitle, { color: colors.text }, T.bold]}>
+                        <Text style={[styles.ledgerSectionTitle, { color: colors.text }, T.extrabold]}>
                             Ledger History
                         </Text>
 
@@ -500,7 +517,7 @@ const styles = StyleSheet.create({
     avatarText: { color: 'white', fontSize: ms(16) },
     cardTitle: { fontSize: ms(12), marginBottom: vs(2) },
     cardName: { fontSize: ms(16) },
-    amount: { fontSize: ms(22) },
+    amount: { fontSize: ms(22), letterSpacing: -0.5 },
     statusBanner: {
         marginTop: vs(16),
         padding: scale(12),
@@ -708,10 +725,14 @@ const styles = StyleSheet.create({
         fontSize: ms(24),
     },
     submitBtn: {
-        height: 56,
-        borderRadius: ms(28),
+        paddingVertical: vs(17),
+        borderRadius: ms(16),
         alignItems: 'center',
         justifyContent: 'center',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.22,
+        shadowRadius: 8,
+        elevation: 8,
     },
     submitBtnText: {
         color: 'white',

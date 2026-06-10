@@ -187,10 +187,10 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(24), paddingTop: vs(24), paddingBottom: vs(16),
     },
     title: { fontSize: ms(28), fontWeight: '900', letterSpacing: -0.5 },
-    addBtn: { width: 40, height: 40, borderRadius: ms(20), alignItems: 'center', justifyContent: 'center' },
+    addBtn: { width: scale(44), height: scale(44), borderRadius: ms(14), alignItems: 'center', justifyContent: 'center' },
     tabBar: {
         flexDirection: 'row', marginHorizontal: scale(24), marginBottom: vs(16),
-        borderRadius: ms(16), padding: scale(4), borderWidth: 1,
+        borderRadius: ms(16), padding: scale(4), borderWidth: StyleSheet.hairlineWidth,
     },
     tab: { flex: 1, paddingVertical: vs(10), borderRadius: ms(12), alignItems: 'center' },
     tabText: { fontSize: ms(14) },
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     list: { paddingHorizontal: scale(24), paddingBottom: vs(100) },
     card: {
         flexDirection: 'row', alignItems: 'center', borderRadius: ms(20),
-        padding: scale(14), marginBottom: vs(10), borderWidth: 1, gap: vs(12),
+        padding: scale(14), marginBottom: vs(10), borderWidth: StyleSheet.hairlineWidth, gap: vs(12),
     },
     cardInfo: { flex: 1 },
     cardName: { fontSize: ms(15), fontWeight: '700', marginBottom: vs(2) },
@@ -206,9 +206,9 @@ const styles = StyleSheet.create({
     badge: { paddingHorizontal: scale(10), paddingVertical: vs(4), borderRadius: ms(10), borderWidth: 1 },
     badgeText: { fontSize: ms(11), fontWeight: '700' },
     actions: { flexDirection: 'row', gap: vs(8) },
-    actionBtn: { width: 36, height: 36, borderRadius: ms(18), alignItems: 'center', justifyContent: 'center' },
+    actionBtn: { width: scale(44), height: scale(44), borderRadius: ms(14), alignItems: 'center', justifyContent: 'center' },
     sectionLabel: { fontSize: ms(11), fontWeight: '700', letterSpacing: 0.8, marginBottom: vs(8) },
-    empty: { padding: scale(40), borderRadius: ms(24), borderWidth: 1, alignItems: 'center', gap: vs(10), marginTop: vs(12) },
+    empty: { padding: scale(40), borderRadius: ms(24), borderWidth: StyleSheet.hairlineWidth, alignItems: 'center', gap: vs(10), marginTop: vs(12) },
     emptyTitle: { fontSize: ms(17), fontWeight: '700' },
     emptyText: { fontSize: ms(14), textAlign: 'center' },
 });

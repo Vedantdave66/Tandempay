@@ -134,7 +134,7 @@ export default function ProHubScreen() {
                                     key={row.label}
                                     style={[
                                         styles.settingsRow,
-                                        index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                                        index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
                                     ]}
                                     onPress={() => {
                                         if (row.label === 'Invite a friend') return handleInvite();
@@ -284,8 +284,8 @@ const styles = StyleSheet.create({
 
     // Pro card
     proCard: {
-        borderRadius: ms(20),
-        borderWidth: 1,
+        borderRadius: ms(22),
+        borderWidth: StyleSheet.hairlineWidth,
         overflow: 'hidden',
     },
     proHeader: {
@@ -333,8 +333,8 @@ const styles = StyleSheet.create({
     },
     upgradeBtn: {
         marginTop: vs(4),
-        borderRadius: ms(13),
-        paddingVertical: vs(14),
+        borderRadius: ms(16),
+        paddingVertical: vs(15),
         alignItems: 'center',
     },
     upgradeBtnText: {
@@ -345,7 +345,7 @@ const styles = StyleSheet.create({
     // Settings
     settingsCard: {
         borderRadius: ms(16),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         overflow: 'hidden',
     },
     settingsRow: {
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     appearanceLabel: {
         fontSize: ms(11),
         fontWeight: '700',
-        letterSpacing: 1.2,
+        letterSpacing: 0.7,
         marginBottom: vs(12),
     },
     swatchRow: {
