@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-09
+**Last updated:** 2026-06-10
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -14,6 +14,7 @@
 - **R1–R5 of the post-launch roadmap are all merged into `main`** — Settle Up redesign, Interac email auto-confirm, Pro subscription billing, recurring expenses, and CSV/PDF export are live in production. See "Roadmap status" below; the table that previously listed these as remaining is now stale.
 - **Mobile UI revamp (Dashboard/Groups/GroupDetail/Friends/Profile/TabBar/AddExpense + LimelightNav tab bar) shipped 2026-06-06** via PRs #123, #124, #125 — all merged into `main`.
 - **Mobile polish pass (2026-06-07/08) shipped via PRs #132–#141** — PaymentsScreen rewrite, GroupCard/GroupDetail/SettleUp fixes, ToastBanner artifact fix, Dashboard dark-mode label fix, notifications array guard, ProHub character modal + invite + accent theming. See section below.
+- **Canvas Mode + Apple HIG polish session (2026-06-08/09) shipped via PRs #142–#149** — splash animation, gradient tokens, hardcoded-green audit, CanvasModeView redesign, HIG pass across all 14 screens, floating liquid glass tab bar, AppearanceScreen, accent color fix (accentBg/accentBgFaint/accentLight now dynamic), CanvasModeView carousel dock with direct-drag. All merged into `main`. No open PRs.
 - **Latest Alembic head: `a107c01bd8f1`** (`add_auto_confirmed_to_settlement_records`, chained on `7af805ecb0e7` interac_email_logs ← `20d7c91bb5df` revoked_tokens). Confirm these have been run against prod Supabase before relying on the Interac auto-confirm flow in production.
 
 ---
@@ -151,11 +152,40 @@ All PRs listed below are **merged** unless otherwise noted.
 - **Auth screen branding**: `<Logo />` replaces hardcoded "Tandem" text on LandingScreen, LoginScreen, RegisterScreen, ForgotPasswordScreen.
 - **Password visibility toggle**: Eye/EyeOff icon on password fields in LoginScreen and RegisterScreen (`showPassword` state).
 
-### PR #146 — fix: canvas mode polish pass + diagnostic fixes *(open)*
+### PR #146 — fix: canvas mode polish pass + diagnostic fixes *(merged)*
 - **TypeScript errors cleared**: `tok()` in `SettleUpScreen` called with 1 arg (needs 2 — added `colors.accent`); `AddExpenseScreen` typed `Props` interface clashed with navigator generic (cast to `any`); `handoff/` directory added to `tsconfig.json` exclude to stop stale corrected file from causing compile errors.
 - **CanvasModeView full restore** after remote rebase reverted visual changes: BUBBLE_PALETTES → dynamic HSL + `expenseEmoji()`, `HUB_Y_CENTER` constant → dynamic `hubYCenter` + `hubYCenterRef`, `canvasGrad` → `colors.heroGradient`, hub → `Animated.View` glassmorphism + breathing, star field + nebula glow, accent orbit rings, bubble dismiss button + payer `CharacterShape`, `character_shape` fallback `'semi'` → `'rect'` everywhere.
 - **Dock moved inside canvas** as absolute `LinearGradient` overlay — no more hard-edged bottom strip; avatar row centered.
 - **Drag ghost → member's CharacterShape** — `dragGhostRef` removed; `ghost` state drives a floating `CharacterShape (variant="mini")` under the finger during drag.
+
+---
+
+## Apple HIG polish + appearance session (2026-06-09/10) — PRs #147–#149
+
+All PRs are **merged** into `main`.
+
+### PR #147 — polish: Apple HIG pass — all screens + animations *(merged)*
+- Comprehensive Apple HIG polish across 14 screens: SettleUpScreen, LoginScreen, RegisterScreen, LandingScreen, ForgotPasswordScreen, AddExpenseScreen, CreateGroupScreen, PaymentsScreen, FriendsScreen, NotificationsScreen, ActivityScreen, PendingRequestsScreen, ProHubScreen, GroupsScreen.
+- Global rules applied: `StyleSheet.hairlineWidth` on all decorative borders (was 1–1.5px); shadow reduction (max `shadowOpacity` 0.18 light / 0.28 dark, `shadowRadius` capped, `elevation` ≤ 6); corner radii unified (cards `ms(24-28)`, buttons `ms(16)`, inputs `ms(14)`, chips `ms(10-12)`); touch targets ≥ `scale(44)` on all icon-only buttons; `paddingVertical ≥ vs(15-17)` on CTAs.
+- Stagger list entrance animations on PaymentsScreen and FriendsScreen: `useRef` array of `Animated.Value`, `Animated.stagger(40ms, sequence)`, 220ms per item, capped at 5.
+- ALL-CAPS `letterSpacing` reduced to 0.6–0.8; negative `letterSpacing` on large financial text (−0.5 to −1.0).
+- `GroupCard` shadow/border reductions; `SplashScreen` 4-concentric-circle glow.
+
+### PR #148 — feat: floating liquid glass tab bar + stability fixes *(merged)*
+- **CustomTabBar complete redesign**: position absolute floating pill (`left/right scale(20)`, `borderRadius ms(36)`), three composited glass layers — frosted fill (`rgba` semi-transparent), glass ring (0.8px border), top-edge shimmer (`LinearGradient`, dark-mode only). No `BlurView`.
+- **Limelight indicator**: `Animated.spring` (`tension: 200, friction: 28`) pill glides behind active tab icon. `onLayout` measures each tab center-X; `LIMELIGHT_W = scale(46)`, height `scale(34)`, `borderRadius ms(17)` — icon-only, never covers label.
+- **`MainTabNavigator`**: `tabBarStyle` set to `{ position: 'absolute', backgroundColor: 'transparent', borderTopWidth: 0, elevation: 0 }` so screens inset correctly under floating bar.
+- **`CharacterSetupModal`**: replaced `useSafeAreaInsets()` hook with `initialWindowMetrics` static value — fixes crash inside RN `<Modal>` which has no `SafeAreaProvider` context.
+- **NotificationsScreen**: guard against undefined/paginated API response — `Array.isArray(raw) ? raw : raw?.items ?? []`.
+
+### PR #149 — feat: ProHub appearance screen, floating tab bar, HIG polish + canvas carousel *(merged)*
+- **`AppearanceScreen.tsx`** (new full-screen): live phone mock preview showing `colors.heroGradient` + `colors.cardGradient` reactive to current accent/theme; 3-per-row accent swatch grid with `<Check>` checkmark; Light/Dark toggle with `<Sun>`/`<Moon>` icons; `Haptics.selectionAsync()` on every selection. Navigated to via `navigation.navigate('Appearance')`.
+- **`ThemeContext`**: `accentBg`, `accentBgFaint`, `accentLight` now computed from current accent hex (alpha suffix `'1F'`/`'18'`/`'0F'`/`'26'`). Added to `ColorPalette` `Omit` list so hardcoded forest-green values in `Colors.ts` no longer bleed through. **Fixes the known "accent colors bleed" open item.**
+- **`ProHubScreen`**: hero `LinearGradient` uses `colors.heroGradient` token (was hardcoded hex); bottom-sheet `<Modal>` appearance block removed; Appearance row calls `navigation.navigate('Appearance')`.
+- **`RootNavigator`**: `AppearanceScreen` registered as `name="Appearance"` stack screen with `slide_from_right` animation.
+- **CustomTabBar fixes**: `overflow: 'hidden'` restored (layer clipping); shimmer conditional on `isDark`; limelight shadow reduced (`shadowOpacity` 0.40/0.20, `shadowRadius` 8).
+- **CanvasModeView carousel dock v1**: replaced flat avatar row with center-snapping `Animated.ScrollView` carousel. Focused card: scale 1.0, full opacity, elevated shadow, raised `vs(6)`. Adjacent cards: scale 0.78, opacity 0.52. Separate stationary drag handle above carousel (later replaced in v2).
+- **CanvasModeView carousel dock v2** (direct-drag, same PR branch): removed separate drag handle and "↑ DRAG TO ASSIGN ↑" label. `panHandlers` attached directly to each `Animated.View` card. `PanResponder` updated with vertical-priority detection: `onStartShouldSetPanResponder: () => false` (ScrollView sees touch first), `onMoveShouldSetPanResponder: (_, gs) => |dy| > 6 && |dy| > |dx| × 1.3` (only claim clearly-upward drags). Haptic `Light` on drag grant, `Medium` on drop. Cards: scale `[0.76, 1, 0.76]`, opacity `[0.45, 1, 0.45]`, translateY `[vs(8), 0, vs(8)]`. `CARD_W = scale(72)`, `CARD_MX = scale(12)`.
 
 ---
 
@@ -247,13 +277,13 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap and all mobile UI revamp PRs (#123–#145) are merged into `main`. PR #146 (canvas polish + diagnostic fixes, branch `feat/prohub-appearance`) is open — merge it first. Then check whether any other PRs are open (`gh pr list`), confirm Alembic migrations are current on prod (head is `a107c01bd8f1`), and do an end-to-end Interac auto-confirm test before starting new feature work. The accent-theming `accentBg`/`accentBgFaint` gap is a known remaining item."
+> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), and the full Apple HIG + canvas carousel pass are all merged into `main`. There are **no open PRs**. Run `gh pr list` to confirm, then verify Alembic migrations are current on prod (head is `a107c01bd8f1`). The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist. If starting new feature work, define R6+ first — the roadmap table is fully done."
 
 ## Open items / things to double-check next session
 
-1. **PR #146 open** — merge `feat/prohub-appearance` into `main` after review. Contains: TypeScript clean-up, CanvasModeView full restore, dock overlay, CharacterShape drag ghost.
-2. **Accent theming completeness** — `accentBg` and `accentBgFaint` in `Colors.ts` are still hardcoded green regardless of selected accent. Icon tile backgrounds and chip backgrounds will stay green when Ocean/Candy/etc. is selected. Fix: override these two fields in `ThemeContext` alongside `accent`.
-3. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
-4. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-5. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-6. **Define R6+** — the roadmap table is fully done; no documented next phase.
+1. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
+2. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
+3. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+4. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+5. **Define R6+** — the roadmap table is fully done; no documented next phase.
+6. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`. Hardcoded forest-green values in `Colors.ts` no longer bleed through on accent change.
