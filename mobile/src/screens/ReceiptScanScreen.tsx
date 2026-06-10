@@ -1,18 +1,18 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Animated, ActivityIndicator, Alert,
+  ScrollView, Animated, ActivityIndicator, Switch, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { Camera, ArrowLeft, CheckCircle2, Users, User, ChevronRight, ReceiptText } from 'lucide-react-native';
+import { Camera, ArrowLeft, Check, ReceiptText, Users } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 
-// ── Mock receipt data (replace with real API response later) ──────────────────
+// ── Mock receipt data ─────────────────────────────────────────────────────────
 const MOCK_ITEMS = [
   { id: '1', name: 'Chicken Tikka Masala', price: 18.50 },
   { id: '2', name: 'Garlic Naan (×2)',     price: 8.00  },
@@ -20,61 +20,75 @@ const MOCK_ITEMS = [
   { id: '4', name: 'Palak Paneer',         price: 16.00 },
   { id: '5', name: 'Samosa Platter',       price: 9.50  },
 ];
-const MOCK_SUBTOTAL = MOCK_ITEMS.reduce((s, i) => s + i.price, 0);
-const MOCK_TAX      = parseFloat((MOCK_SUBTOTAL * 0.13).toFixed(2));
-const MOCK_TIP      = parseFloat((MOCK_SUBTOTAL * 0.15).toFixed(2));
-const MOCK_TOTAL    = parseFloat((MOCK_SUBTOTAL + MOCK_TAX + MOCK_TIP).toFixed(2));
-
-type ClaimMode = 'mine' | 'shared' | 'none';
+const SUBTOTAL = MOCK_ITEMS.reduce((s, i) => s + i.price, 0);
+const TAX      = parseFloat((SUBTOTAL * 0.13).toFixed(2));
+const TIP      = parseFloat((SUBTOTAL * 0.15).toFixed(2));
+const TOTAL    = parseFloat((SUBTOTAL + TAX + TIP).toFixed(2));
+const GROUP_SIZE = 3; // mock group size for split calc
 
 type Phase = 'idle' | 'parsing' | 'results';
 
 export default function ReceiptScanScreen({ navigation }: any) {
   const { colors, isDark } = useTheme();
 
-  const [phase, setPhase] = useState<Phase>('idle');
-  const [claims, setClaims] = useState<Record<string, ClaimMode>>({});
+  const [phase, setPhase]                   = useState<Phase>('idle');
+  const [claimed, setClaimed]               = useState<Set<string>>(new Set());
+  const [splitRemainder, setSplitRemainder] = useState(true);
 
-  // Scanning pulse animation
+  // Parsing animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
-  const scanLineY  = useRef(new Animated.Value(0)).current;
+  const scanLineY = useRef(new Animated.Value(0)).current;
 
-  const startPulse = () => {
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim, { toValue: 1.08, duration: 700, useNativeDriver: true }),
-        Animated.timing(pulseAnim, { toValue: 1,    duration: 700, useNativeDriver: true }),
-      ])
-    ).start();
-    Animated.loop(
-      Animated.sequence([
-        Animated.timing(scanLineY, { toValue: 1, duration: 1400, useNativeDriver: false }),
-        Animated.timing(scanLineY, { toValue: 0, duration: 1400, useNativeDriver: false }),
-      ])
-    ).start();
-  };
+  // Stagger entrance for results items
+  const itemAnims = useRef(MOCK_ITEMS.map(() => ({
+    opacity:    new Animated.Value(0),
+    translateY: new Animated.Value(vs(16)),
+  }))).current;
 
+  // Per-item checkbox scale anims
+  const checkAnims = useRef(
+    Object.fromEntries(MOCK_ITEMS.map(i => [i.id, new Animated.Value(0)]))
+  ).current;
+
+  // Run stagger when results phase begins
+  useEffect(() => {
+    if (phase !== 'results') return;
+    const animations = itemAnims.flatMap(({ opacity, translateY }, idx) => [
+      Animated.timing(opacity,    { toValue: 1, duration: 220, delay: idx * 45, useNativeDriver: true }),
+      Animated.timing(translateY, { toValue: 0, duration: 220, delay: idx * 45, useNativeDriver: true }),
+    ]);
+    Animated.parallel(animations).start();
+  }, [phase]);
+
+  // ── Camera ──────────────────────────────────────────────────────────────────
   const handleOpenCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Camera Access', 'TandemPay needs camera access to scan receipts. Enable it in Settings.');
       return;
     }
-
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.85,
-      base64: false,
     });
-
     if (result.canceled) return;
 
-    // Start "parsing" phase with mock delay
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setPhase('parsing');
-    startPulse();
 
-    // Simulate OCR processing (replace with real API call later)
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim, { toValue: 1.06, duration: 800, useNativeDriver: true }),
+        Animated.timing(pulseAnim, { toValue: 1,    duration: 800, useNativeDriver: true }),
+      ])
+    ).start();
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(scanLineY, { toValue: 1, duration: 1500, useNativeDriver: false }),
+        Animated.timing(scanLineY, { toValue: 0, duration: 0,    useNativeDriver: false }),
+      ])
+    ).start();
+
     setTimeout(() => {
       pulseAnim.stopAnimation();
       scanLineY.stopAnimation();
@@ -83,43 +97,39 @@ export default function ReceiptScanScreen({ navigation }: any) {
     }, 2500);
   };
 
+  // ── Claim toggle ────────────────────────────────────────────────────────────
   const toggleClaim = (id: string) => {
     Haptics.selectionAsync();
-    setClaims(prev => {
-      const current = prev[id] ?? 'none';
-      const next: ClaimMode =
-        current === 'none'   ? 'mine'   :
-        current === 'mine'   ? 'shared' : 'none';
-      return { ...prev, [id]: next };
-    });
+    const next = new Set(claimed);
+    if (next.has(id)) {
+      next.delete(id);
+      Animated.spring(checkAnims[id], {
+        toValue: 0, useNativeDriver: true, damping: 18, stiffness: 260,
+      }).start();
+    } else {
+      next.add(id);
+      Animated.spring(checkAnims[id], {
+        toValue: 1, useNativeDriver: true, damping: 18, stiffness: 260,
+      }).start();
+    }
+    setClaimed(next);
   };
 
-  const claimColor = (mode: ClaimMode) => {
-    if (mode === 'mine')   return colors.accent;
-    if (mode === 'shared') return '#6366F1';
-    return isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
-  };
+  // ── Share calculation ────────────────────────────────────────────────────────
+  const myItemsTotal   = MOCK_ITEMS.filter(i => claimed.has(i.id)).reduce((s, i) => s + i.price, 0);
+  const unclaimedItems = MOCK_ITEMS.filter(i => !claimed.has(i.id));
+  const unclaimedTotal = unclaimedItems.reduce((s, i) => s + i.price, 0);
+  const splitShare     = splitRemainder ? unclaimedTotal / GROUP_SIZE : 0;
+  const myFoodTotal    = myItemsTotal + splitShare;
+  const myFraction     = SUBTOTAL > 0 ? myFoodTotal / SUBTOTAL : 0;
+  const myShare        = parseFloat((myFoodTotal + TAX * myFraction + TIP * myFraction).toFixed(2));
 
-  const claimLabel = (mode: ClaimMode) => {
-    if (mode === 'mine')   return 'Mine';
-    if (mode === 'shared') return 'Shared';
-    return 'Tap';
-  };
+  const scanLineTop = scanLineY.interpolate({
+    inputRange: [0, 1],
+    outputRange: ['0%', '90%'],
+  });
 
-  const claimIcon = (mode: ClaimMode) => {
-    if (mode === 'mine')   return <User   size={13} color="#fff" />;
-    if (mode === 'shared') return <Users  size={13} color="#fff" />;
-    return null;
-  };
-
-  const myItems     = MOCK_ITEMS.filter(i => (claims[i.id] ?? 'none') === 'mine');
-  const sharedItems = MOCK_ITEMS.filter(i => (claims[i.id] ?? 'none') === 'shared');
-  const myTotal     = myItems.reduce((s, i) => s + i.price, 0)
-                    + sharedItems.reduce((s, i) => s + i.price / 2, 0)
-                    + MOCK_TAX / MOCK_ITEMS.length * (myItems.length + sharedItems.length / 2)
-                    + MOCK_TIP / MOCK_ITEMS.length * (myItems.length + sharedItems.length / 2);
-
-  // ── Idle ─────────────────────────────────────────────────────────────────────
+  // ── Idle ──────────────────────────────────────────────────────────────────
   if (phase === 'idle') {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
@@ -129,25 +139,29 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
         <View style={styles.idleBody}>
           <LinearGradient
-            colors={isDark ? ['rgba(16,185,129,0.18)', 'rgba(16,185,129,0)'] : ['rgba(16,185,129,0.12)', 'rgba(16,185,129,0)']}
+            colors={isDark
+              ? ['rgba(16,185,129,0.22)', 'rgba(16,185,129,0.08)', 'rgba(16,185,129,0)']
+              : ['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.05)', 'rgba(16,185,129,0)']}
             style={styles.iconGlow}
           >
-            <View style={[styles.iconCircle, { backgroundColor: 'rgba(16,185,129,0.16)' }]}>
-              <Camera size={44} color="#10B981" strokeWidth={1.6} />
+            <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.14)' }]}>
+              <Camera size={42} color="#10B981" strokeWidth={1.6} />
             </View>
           </LinearGradient>
 
-          <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a Receipt</Text>
+          <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>
+            Scan a Receipt
+          </Text>
           <Text style={[styles.idleSubtitle, T.regular, { color: colors.secondaryText }]}>
-            Point your camera at any receipt. AI parses every item — then each roommate taps what's theirs.
+            Take a photo and each roommate taps what's theirs. Tax and tip are split automatically.
           </Text>
 
           <TouchableOpacity
             style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
-            activeOpacity={0.85}
+            activeOpacity={0.82}
             onPress={handleOpenCamera}
           >
-            <Camera size={20} color="#fff" strokeWidth={2} />
+            <Camera size={19} color="#fff" strokeWidth={2.2} />
             <Text style={[styles.cameraBtnText, T.bold]}>Open Camera</Text>
           </TouchableOpacity>
         </View>
@@ -155,151 +169,204 @@ export default function ReceiptScanScreen({ navigation }: any) {
     );
   }
 
-  // ── Parsing ───────────────────────────────────────────────────────────────────
+  // ── Parsing ────────────────────────────────────────────────────────────────
   if (phase === 'parsing') {
-    const scanY = scanLineY.interpolate({
-      inputRange: [0, 1],
-      outputRange: ['0%', '92%'],
-    });
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
         <View style={styles.parsingBody}>
-          <Animated.View style={[styles.receiptPreview, {
-            borderColor: isDark ? 'rgba(16,185,129,0.4)' : 'rgba(16,185,129,0.5)',
-            backgroundColor: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)',
-            transform: [{ scale: pulseAnim }],
-          }]}>
-            <ReceiptText size={64} color="#10B981" strokeWidth={1.2} />
-            {/* Scan line */}
-            <Animated.View style={[styles.scanLine, { top: scanY }]} />
+          <Animated.View
+            style={[
+              styles.receiptMock,
+              {
+                borderColor: isDark ? 'rgba(16,185,129,0.35)' : 'rgba(16,185,129,0.45)',
+                backgroundColor: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)',
+                transform: [{ scale: pulseAnim }],
+              },
+            ]}
+          >
+            <ReceiptText size={56} color="#10B981" strokeWidth={1.2} />
+            <Animated.View style={[styles.scanLine, { top: scanLineTop }]} />
           </Animated.View>
 
-          <ActivityIndicator color="#10B981" size="large" style={{ marginTop: vs(24) }} />
-          <Text style={[styles.parsingTitle, T.bold, { color: colors.text, marginTop: vs(16) }]}>
+          <Text style={[styles.parsingTitle, T.bold, { color: colors.text, marginTop: vs(28) }]}>
             Reading receipt…
           </Text>
-          <Text style={[styles.parsingSub, T.regular, { color: colors.secondaryText }]}>
+          <Text style={[styles.parsingSub, T.regular, { color: colors.secondaryText, marginTop: vs(6) }]}>
             Identifying items, tax & tip
           </Text>
+          <ActivityIndicator color="#10B981" size="small" style={{ marginTop: vs(20) }} />
         </View>
       </SafeAreaView>
     );
   }
 
-  // ── Results ───────────────────────────────────────────────────────────────────
+  // ── Results ────────────────────────────────────────────────────────────────
   return (
     <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
       {/* Header */}
       <View style={styles.resultsHeader}>
-        <TouchableOpacity onPress={() => { setPhase('idle'); setClaims({}); }}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => { setPhase('idle'); setClaimed(new Set()); }}
+        >
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
-        <View style={{ flex: 1, marginLeft: scale(12) }}>
-          <Text style={[styles.resultsTitle, T.extrabold, { color: colors.text }]}>Receipt Parsed</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.resultsTitle, T.extrabold, { color: colors.text }]}>Your Receipt</Text>
           <Text style={[styles.resultsSub, T.regular, { color: colors.secondaryText }]}>
-            Tap each item to claim it
+            Tap the items you ordered
           </Text>
         </View>
         <TouchableOpacity
-          style={[styles.rescanBtn, { borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)' }]}
-          onPress={() => { setPhase('idle'); setClaims({}); }}
+          style={[styles.rescanChip, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)' }]}
+          onPress={() => { setPhase('idle'); setClaimed(new Set()); }}
         >
-          <Text style={[styles.rescanText, { color: colors.secondaryText }]}>Rescan</Text>
+          <Text style={[styles.rescanText, T.semibold, { color: colors.secondaryText }]}>Rescan</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView
-        style={{ flex: 1 }}
-        contentContainerStyle={styles.resultsList}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
       >
-        {/* Claim legend */}
-        <View style={[styles.legendRow, {
-          backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-          borderRadius: ms(12),
-        }]}>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: colors.accent }]} />
-            <Text style={[styles.legendText, { color: colors.secondaryText }]}>Mine</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: '#6366F1' }]} />
-            <Text style={[styles.legendText, { color: colors.secondaryText }]}>Shared</Text>
-          </View>
-          <View style={styles.legendItem}>
-            <View style={[styles.legendDot, { backgroundColor: isDark ? 'rgba(255,255,255,0.15)' : 'rgba(0,0,0,0.12)' }]} />
-            <Text style={[styles.legendText, { color: colors.secondaryText }]}>Unclaimed</Text>
-          </View>
-        </View>
+        {/* Items label */}
+        <Text style={[styles.sectionLabel, { color: colors.tertiaryText }]}>ITEMS</Text>
 
-        {/* Items */}
-        {MOCK_ITEMS.map((item) => {
-          const mode = claims[item.id] ?? 'none';
-          const bg   = claimColor(mode);
-          const isClaimed = mode !== 'none';
+        {MOCK_ITEMS.map((item, idx) => {
+          const isClaimed = claimed.has(item.id);
+          const checkScale = checkAnims[item.id].interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.5, 1],
+          });
+
           return (
-            <TouchableOpacity
+            <Animated.View
               key={item.id}
-              style={[
-                styles.itemRow,
-                {
-                  backgroundColor: isDark ? colors.surface : '#FFFFFF',
-                  borderColor: isClaimed ? bg + '60' : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
-                  borderWidth: isClaimed ? 1.5 : StyleSheet.hairlineWidth,
-                },
-              ]}
-              activeOpacity={0.78}
-              onPress={() => toggleClaim(item.id)}
+              style={{
+                opacity:   itemAnims[idx].opacity,
+                transform: [{ translateY: itemAnims[idx].translateY }],
+              }}
             >
-              <View style={{ flex: 1 }}>
-                <Text style={[styles.itemName, T.semibold, { color: colors.text }]}>{item.name}</Text>
-                <Text style={[styles.itemPrice, T.regular, { color: colors.secondaryText }]}>
-                  ${item.price.toFixed(2)}
-                </Text>
-              </View>
-              <View style={[styles.claimBadge, {
-                backgroundColor: isClaimed ? bg : (isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)'),
-              }]}>
-                {claimIcon(mode)}
-                <Text style={[styles.claimText, { color: isClaimed ? '#fff' : colors.secondaryText }]}>
-                  {claimLabel(mode)}
-                </Text>
-              </View>
-            </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.itemCard,
+                  {
+                    backgroundColor: isDark ? colors.surface : '#FFFFFF',
+                    borderColor: isClaimed
+                      ? colors.accent + '50'
+                      : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)'),
+                    borderWidth: isClaimed ? 1.5 : StyleSheet.hairlineWidth,
+                    shadowColor: isClaimed ? colors.accent : '#000',
+                    shadowOpacity: isClaimed ? (isDark ? 0.18 : 0.10) : (isDark ? 0.14 : 0.06),
+                  },
+                ]}
+                activeOpacity={0.78}
+                onPress={() => toggleClaim(item.id)}
+              >
+                <View style={{ flex: 1 }}>
+                  <Text style={[
+                    styles.itemName,
+                    T.semibold,
+                    { color: isClaimed ? colors.accent : colors.text },
+                  ]}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.itemPrice, T.regular, { color: colors.secondaryText }]}>
+                    ${item.price.toFixed(2)}
+                  </Text>
+                </View>
+
+                {/* Circular checkbox */}
+                <Animated.View
+                  style={[
+                    styles.checkbox,
+                    {
+                      backgroundColor: isClaimed ? colors.accent : 'transparent',
+                      borderColor: isClaimed ? colors.accent : (isDark ? 'rgba(255,255,255,0.20)' : 'rgba(0,0,0,0.18)'),
+                      transform: [{ scale: isClaimed ? checkScale : new Animated.Value(1) }],
+                    },
+                  ]}
+                >
+                  {isClaimed && <Check size={14} color="#fff" strokeWidth={2.8} />}
+                </Animated.View>
+              </TouchableOpacity>
+            </Animated.View>
           );
         })}
 
-        {/* Totals card */}
-        <View style={[styles.totalsCard, {
-          backgroundColor: isDark ? colors.surface : '#FFFFFF',
-          borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
-        }]}>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.secondaryText }]}>Subtotal</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>${MOCK_SUBTOTAL.toFixed(2)}</Text>
+        {/* Split remainder toggle */}
+        <View style={[
+          styles.splitToggleRow,
+          {
+            backgroundColor: isDark ? colors.surface : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+          },
+        ]}>
+          <View style={[styles.splitIconBox, { backgroundColor: 'rgba(99,102,241,0.14)' }]}>
+            <Users size={18} color="#6366F1" strokeWidth={2} />
           </View>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.secondaryText }]}>Tax (13%)</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>${MOCK_TAX.toFixed(2)}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.splitTitle, T.semibold, { color: colors.text }]}>
+              Split unclaimed items
+            </Text>
+            <Text style={[styles.splitSub, T.regular, { color: colors.secondaryText }]}>
+              Divide equally between {GROUP_SIZE} people
+            </Text>
           </View>
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabel, { color: colors.secondaryText }]}>Tip (15%)</Text>
-            <Text style={[styles.totalValue, { color: colors.text }]}>${MOCK_TIP.toFixed(2)}</Text>
-          </View>
-          <View style={[styles.totalDivider, {
-            backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)',
-          }]} />
-          <View style={styles.totalRow}>
-            <Text style={[styles.totalLabelBold, T.bold, { color: colors.text }]}>Total</Text>
-            <Text style={[styles.totalValueBold, T.extrabold, { color: colors.text }]}>${MOCK_TOTAL.toFixed(2)}</Text>
-          </View>
-          {myTotal > 0 && (
-            <View style={[styles.myShareRow, { backgroundColor: colors.accent + '18' }]}>
-              <Text style={[styles.myShareLabel, T.semibold, { color: colors.accent }]}>Your estimated share</Text>
-              <Text style={[styles.myShareValue, T.extrabold, { color: colors.accent }]}>${myTotal.toFixed(2)}</Text>
-            </View>
-          )}
+          <Switch
+            value={splitRemainder}
+            onValueChange={v => { Haptics.selectionAsync(); setSplitRemainder(v); }}
+            trackColor={{ false: isDark ? '#2A2A2E' : '#E2E8F0', true: colors.accent + 'AA' }}
+            thumbColor={splitRemainder ? colors.accent : (isDark ? '#6B7280' : '#CBD5E1')}
+            ios_backgroundColor={isDark ? '#2A2A2E' : '#E2E8F0'}
+          />
         </View>
+
+        {/* Totals */}
+        <Text style={[styles.sectionLabel, { color: colors.tertiaryText, marginTop: vs(24) }]}>SUMMARY</Text>
+
+        <View style={[
+          styles.totalsCard,
+          {
+            backgroundColor: isDark ? colors.surface : '#FFFFFF',
+            borderColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)',
+          },
+        ]}>
+          {[
+            { label: 'Subtotal',   value: `$${SUBTOTAL.toFixed(2)}` },
+            { label: 'Tax (13%)',  value: `$${TAX.toFixed(2)}`      },
+            { label: 'Tip (15%)', value: `$${TIP.toFixed(2)}`       },
+          ].map(row => (
+            <View key={row.label} style={styles.totalRow}>
+              <Text style={[styles.totalLabel, T.regular, { color: colors.secondaryText }]}>{row.label}</Text>
+              <Text style={[styles.totalValue, T.regular, { color: colors.text }]}>{row.value}</Text>
+            </View>
+          ))}
+
+          <View style={[styles.divider, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]} />
+
+          <View style={styles.totalRow}>
+            <Text style={[styles.totalLabel, T.bold, { color: colors.text, fontSize: ms(15) }]}>Total</Text>
+            <Text style={[styles.totalValue, T.extrabold, { color: colors.text, fontSize: ms(17) }]}>${TOTAL.toFixed(2)}</Text>
+          </View>
+        </View>
+
+        {/* Your share hero */}
+        {(claimed.size > 0 || splitRemainder) && (
+          <LinearGradient
+            colors={isDark
+              ? [colors.accent + '20', colors.accent + '08']
+              : [colors.accent + '14', colors.accent + '05']}
+            style={[styles.shareHero, { borderColor: colors.accent + '30' }]}
+          >
+            <Text style={[styles.shareLabel, T.semibold, { color: colors.accent }]}>
+              YOUR ESTIMATED SHARE
+            </Text>
+            <Text style={[styles.shareAmount, T.extrabold, { color: colors.accent }]}>
+              ${myShare.toFixed(2)}
+            </Text>
+          </LinearGradient>
+        )}
 
         <View style={{ height: vs(120) }} />
       </ScrollView>
@@ -307,20 +374,21 @@ export default function ReceiptScanScreen({ navigation }: any) {
       {/* CTA */}
       <View style={[styles.ctaBar, { backgroundColor: colors.background }]}>
         <TouchableOpacity
-          style={[styles.ctaBtn, {
-            backgroundColor: colors.accent,
-            opacity: Object.keys(claims).length === 0 ? 0.4 : 1,
-          }]}
-          activeOpacity={0.85}
-          disabled={Object.keys(claims).length === 0}
+          style={[
+            styles.ctaBtn,
+            {
+              backgroundColor: colors.accent,
+              opacity: (claimed.size === 0 && !splitRemainder) ? 0.38 : 1,
+            },
+          ]}
+          activeOpacity={0.84}
+          disabled={claimed.size === 0 && !splitRemainder}
           onPress={() => {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             navigation.navigate('Groups');
           }}
         >
-          <CheckCircle2 size={20} color="#fff" strokeWidth={2.2} />
           <Text style={[styles.ctaBtnText, T.bold]}>Add to Group</Text>
-          <ChevronRight size={18} color="#fff" />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -331,105 +399,120 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backBtn: { padding: scale(16), alignSelf: 'flex-start' },
 
-  // Idle
+  // ── Idle
   idleBody: {
     flex: 1, alignItems: 'center', justifyContent: 'center',
-    paddingHorizontal: scale(36), gap: vs(16), marginTop: -vs(40),
+    paddingHorizontal: scale(36), gap: vs(14), marginTop: -vs(44),
   },
   iconGlow: {
-    width: scale(160), height: scale(160),
-    borderRadius: scale(80),
-    alignItems: 'center', justifyContent: 'center',
-    marginBottom: vs(8),
+    width: scale(180), height: scale(180), borderRadius: scale(90),
+    alignItems: 'center', justifyContent: 'center', marginBottom: vs(4),
   },
   iconCircle: {
-    width: scale(96), height: scale(96),
-    borderRadius: scale(48),
+    width: scale(88), height: scale(88), borderRadius: scale(44),
     alignItems: 'center', justifyContent: 'center',
   },
-  idleTitle:    { fontSize: ms(30), textAlign: 'center' },
-  idleSubtitle: { fontSize: ms(15), textAlign: 'center', lineHeight: 22, opacity: 0.8 },
+  idleTitle:    { fontSize: ms(28), textAlign: 'center', letterSpacing: -0.5 },
+  idleSubtitle: { fontSize: ms(15), textAlign: 'center', lineHeight: 22, opacity: 0.75 },
   cameraBtn: {
     flexDirection: 'row', alignItems: 'center', gap: scale(8),
-    paddingVertical: vs(15), paddingHorizontal: scale(32),
+    paddingVertical: vs(15), paddingHorizontal: scale(36),
     borderRadius: ms(16), marginTop: vs(8),
+    shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.30, shadowRadius: 12, elevation: 4,
   },
   cameraBtnText: { fontSize: ms(16), color: '#fff' },
 
-  // Parsing
+  // ── Parsing
   parsingBody: {
-    flex: 1, alignItems: 'center', justifyContent: 'center', gap: 0,
+    flex: 1, alignItems: 'center', justifyContent: 'center',
   },
-  receiptPreview: {
-    width: scale(160), height: scale(200),
+  receiptMock: {
+    width: scale(148), height: scale(188),
     borderRadius: ms(16), borderWidth: 2,
-    alignItems: 'center', justifyContent: 'center',
-    overflow: 'hidden',
+    alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
   },
   scanLine: {
     position: 'absolute', left: 0, right: 0,
-    height: 2, backgroundColor: '#10B981', opacity: 0.8,
+    height: 2, backgroundColor: '#10B981', opacity: 0.75,
   },
-  parsingTitle: { fontSize: ms(20) },
-  parsingSub:   { fontSize: ms(14), opacity: 0.7 },
+  parsingTitle: { fontSize: ms(19), letterSpacing: -0.3 },
+  parsingSub:   { fontSize: ms(14), opacity: 0.65 },
 
-  // Results
+  // ── Results
   resultsHeader: {
     flexDirection: 'row', alignItems: 'center',
-    paddingHorizontal: scale(20), paddingTop: vs(8), paddingBottom: vs(12),
+    paddingRight: scale(20), paddingBottom: vs(4),
   },
-  resultsTitle: { fontSize: ms(20) },
-  resultsSub:   { fontSize: ms(13), opacity: 0.7 },
-  rescanBtn: {
+  resultsTitle: { fontSize: ms(22), letterSpacing: -0.4 },
+  resultsSub:   { fontSize: ms(13), opacity: 0.65, marginTop: vs(1) },
+  rescanChip: {
     paddingHorizontal: scale(12), paddingVertical: vs(6),
     borderRadius: ms(10), borderWidth: StyleSheet.hairlineWidth,
   },
   rescanText: { fontSize: ms(13) },
-  resultsList: { paddingHorizontal: scale(20), gap: vs(10) },
 
-  legendRow: { flexDirection: 'row', justifyContent: 'center', gap: scale(20), paddingVertical: vs(10) },
-  legendItem: { flexDirection: 'row', alignItems: 'center', gap: scale(6) },
-  legendDot:  { width: 10, height: 10, borderRadius: 5 },
-  legendText: { fontSize: ms(12) },
+  scrollContent: { paddingHorizontal: scale(20), paddingTop: vs(4) },
 
-  itemRow: {
+  sectionLabel: {
+    fontSize: ms(11), letterSpacing: 0.8,
+    marginBottom: vs(10), marginTop: vs(4),
+  },
+
+  itemCard: {
     flexDirection: 'row', alignItems: 'center',
-    padding: scale(14), borderRadius: ms(16),
+    paddingHorizontal: scale(16), paddingVertical: vs(14),
+    borderRadius: ms(16),
+    marginBottom: vs(8),
+    minHeight: scale(52),
+    shadowOffset: { width: 0, height: 2 }, shadowRadius: 8, elevation: 2,
   },
   itemName:  { fontSize: ms(15), marginBottom: vs(2) },
   itemPrice: { fontSize: ms(13) },
-  claimBadge: {
-    flexDirection: 'row', alignItems: 'center', gap: scale(4),
-    paddingHorizontal: scale(10), paddingVertical: vs(5),
-    borderRadius: ms(10),
+  checkbox: {
+    width: scale(26), height: scale(26), borderRadius: scale(13),
+    borderWidth: 1.8, alignItems: 'center', justifyContent: 'center',
   },
-  claimText: { fontSize: ms(12), fontWeight: '600' },
+
+  splitToggleRow: {
+    flexDirection: 'row', alignItems: 'center',
+    padding: scale(14), borderRadius: ms(16),
+    borderWidth: StyleSheet.hairlineWidth,
+    gap: scale(12), marginTop: vs(4),
+    minHeight: scale(52),
+  },
+  splitIconBox: {
+    width: scale(36), height: scale(36), borderRadius: ms(10),
+    alignItems: 'center', justifyContent: 'center',
+  },
+  splitTitle: { fontSize: ms(14) },
+  splitSub:   { fontSize: ms(12), opacity: 0.65, marginTop: vs(1) },
 
   totalsCard: {
     borderRadius: ms(20), borderWidth: StyleSheet.hairlineWidth,
-    padding: scale(16), gap: vs(8), marginTop: vs(4),
+    paddingHorizontal: scale(16), paddingVertical: vs(14),
+    gap: vs(10),
   },
-  totalRow:       { flexDirection: 'row', justifyContent: 'space-between' },
-  totalLabel:     { fontSize: ms(14) },
-  totalValue:     { fontSize: ms(14) },
-  totalLabelBold: { fontSize: ms(16) },
-  totalValueBold: { fontSize: ms(18) },
-  totalDivider:   { height: StyleSheet.hairlineWidth, marginVertical: vs(4) },
-  myShareRow: {
-    flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
-    borderRadius: ms(12), paddingHorizontal: scale(12), paddingVertical: vs(10),
-    marginTop: vs(4),
+  totalRow:   { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  totalLabel: { fontSize: ms(14) },
+  totalValue: { fontSize: ms(14) },
+  divider:    { height: StyleSheet.hairlineWidth, marginVertical: vs(2) },
+
+  shareHero: {
+    borderRadius: ms(20), borderWidth: 1,
+    alignItems: 'center', paddingVertical: vs(20),
+    marginTop: vs(14), gap: vs(4),
   },
-  myShareLabel: { fontSize: ms(14) },
-  myShareValue: { fontSize: ms(18) },
+  shareLabel:  { fontSize: ms(11), letterSpacing: 0.8 },
+  shareAmount: { fontSize: ms(36), letterSpacing: -1 },
 
   ctaBar: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
     paddingHorizontal: scale(20), paddingBottom: vs(36), paddingTop: vs(12),
   },
   ctaBtn: {
-    flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
-    gap: scale(8), paddingVertical: vs(16), borderRadius: ms(16),
+    alignItems: 'center', justifyContent: 'center',
+    paddingVertical: vs(16), borderRadius: ms(16),
   },
-  ctaBtnText: { fontSize: ms(16), color: '#fff', flex: 1, textAlign: 'center', marginLeft: -scale(28) },
+  ctaBtnText: { fontSize: ms(16), color: '#fff' },
 });
