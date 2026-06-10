@@ -3,7 +3,8 @@ import json
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from typing import List
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 import os
 
 from app.models import User
@@ -11,8 +12,7 @@ from app.routes.auth import get_current_user
 
 router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 
-genai.configure(api_key=os.environ.get("GEMINI_API_KEY", ""))
-model = genai.GenerativeModel("gemini-1.5-flash")
+_client = genai.Client(api_key=os.environ.get("GEMINI_API_KEY", ""))
 
 
 class ParseReceiptRequest(BaseModel):
@@ -81,11 +81,14 @@ async def parse_receipt(
         raise HTTPException(status_code=400, detail="Invalid base64 image data")
 
     try:
-        image_part = {
-            "mime_type": "image/jpeg",
-            "data": b64,
-        }
-        response = model.generate_content([PROMPT, image_part])
+        image_bytes = base64.b64decode(b64)
+        response = _client.models.generate_content(
+            model="gemini-1.5-flash",
+            contents=[
+                types.Part.from_bytes(data=image_bytes, mime_type="image/jpeg"),
+                PROMPT,
+            ],
+        )
         raw = response.text.strip()
 
         # Strip markdown fences if present
