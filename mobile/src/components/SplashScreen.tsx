@@ -132,7 +132,7 @@ export default function SplashScreen({ onComplete }: Props) {
                         transform: [{ scale: dotScale }],
                     }]} />
 
-                    {/* Wordmark — two halves, one meeting */}
+                    {/* Wordmark — two halves meeting at the slash */}
                     <View style={styles.wordRow}>
                         <Animated.Text style={[styles.word, {
                             color: '#FFFFFF',
@@ -141,6 +141,7 @@ export default function SplashScreen({ onComplete }: Props) {
                         }]}>
                             Tandem
                         </Animated.Text>
+                        <Animated.View style={[styles.slash, { opacity: tandemOpacity }]} />
                         <Animated.Text style={[styles.word, {
                             color: LOGO_GREEN,
                             opacity: payOpacity,
@@ -206,14 +207,22 @@ const styles = StyleSheet.create({
         backgroundColor: LOGO_GREEN,
     },
     wordRow: {
-        flexDirection: 'column',
+        flexDirection: 'row',
         alignItems: 'center',
     },
     word: {
         ...T.extrabold,
         fontSize: ms(46),
         letterSpacing: -1.4,
-        lineHeight: ms(50),
+    },
+    // The brand slash — same construction as Logo.tsx, scaled to the splash
+    slash: {
+        width: 3,
+        height: ms(46) * 1.15,
+        backgroundColor: LOGO_GREEN,
+        borderRadius: 2,
+        transform: [{ rotate: '18deg' }],
+        marginHorizontal: ms(8),
     },
     tagline: {
         ...T.regular,
