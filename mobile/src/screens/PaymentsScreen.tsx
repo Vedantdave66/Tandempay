@@ -16,6 +16,8 @@ import {
     Easing,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
+import PressableScale from '../components/PressableScale';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -100,7 +102,6 @@ export default function PaymentsScreen() {
     };
 
     const handleUpdateStatus = async (groupId: string, id: string, status: string) => {
-        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             await settlementsApi.updateStatus(groupId, id, status);
             if (status === 'settled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -189,17 +190,14 @@ export default function PaymentsScreen() {
                 {settleTab === 'pending' && (
                     <View style={styles.actions}>
                         {isPayer && payment.status === 'pending' && (
-                            <TouchableOpacity
+                            <PressableScale
                                 style={[styles.actionBtn, { backgroundColor: colors.accent }]}
-                                onPress={() => {
-                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                    navigation.navigate('SettleUp', { payment });
-                                }}
-                                activeOpacity={0.70}
+                                onPress={() => navigation.navigate('SettleUp', { payment })}
+                                haptic="medium"
                             >
                                 <Send size={16} color="white" />
                                 <Text style={[styles.actionText, T.semibold]}>Settle up</Text>
-                            </TouchableOpacity>
+                            </PressableScale>
                         )}
                         {isPayer && payment.status === 'sent' && (
                             <Text style={[styles.waitingText, { color: colors.secondaryText }, T.regular]}>
@@ -214,14 +212,14 @@ export default function PaymentsScreen() {
                         )}
                         {!isPayer && payment.status === 'sent' && (
                             <View style={{ flexDirection: 'row', gap: scale(8), width: '100%' }}>
-                                <TouchableOpacity
+                                <PressableScale
                                     style={[styles.actionBtn, { backgroundColor: colors.accent, flex: 2 }]}
                                     onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'settled')}
-                                    activeOpacity={0.70}
+                                    haptic="medium"
                                 >
                                     <CheckCircle2 size={16} color="white" />
                                     <Text style={[styles.actionText, T.semibold]}>Confirm</Text>
-                                </TouchableOpacity>
+                                </PressableScale>
                                 <TouchableOpacity
                                     style={[styles.actionBtn, { flex: 1 }]}
                                     onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'declined')}
@@ -321,11 +319,11 @@ export default function PaymentsScreen() {
                                 <View style={[styles.iconContainer, { backgroundColor: 'rgba(52, 211, 153, 0.1)' }]}>
                                     {settleTab === 'pending' ? <Send size={40} color="#34D399" /> : <Check size={40} color="#34D399" />}
                                 </View>
-                                <Text style={[styles.emptyTitle, { color: colors.text }, T.bold]}>
-                                    {settleTab === 'pending' ? 'All caught up!' : 'No payment history'}
+                                <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>
+                                    {settleTab === 'pending' ? 'Nothing owed, nothing owing' : 'No history yet'}
                                 </Text>
                                 <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
-                                    {settleTab === 'pending' ? 'You have no pending settlement requests.' : 'Past payments will appear here.'}
+                                    {settleTab === 'pending' ? "No one's waiting on you, and you're not waiting on anyone." : 'Settled tabs end up here, for the record.'}
                                 </Text>
                             </View>
                         ) : (
@@ -339,35 +337,53 @@ export default function PaymentsScreen() {
                 ) : (
                     <>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletCardsScroll}>
-                            <View style={[styles.walletCard, { backgroundColor: '#E0E7FF', borderColor: '#C7D2FE' }]}>
+                            {/* Balance card — brand gradient, adapts to every accent and both modes */}
+                            <LinearGradient
+                                colors={colors.heroGradient}
+                                start={{ x: 0, y: 0 }}
+                                end={{ x: 1, y: 1 }}
+                                style={styles.walletCard}
+                            >
                                 <View style={styles.walletCardHeader}>
-                                    <View style={[styles.walletIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)' }]}>
-                                        <Wallet size={20} color="#4F46E5" />
+                                    <View style={[styles.walletIconBox, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.65)' }]}>
+                                        <Wallet size={20} color={isDark ? colors.text : colors.accentDark} />
                                     </View>
-                                    <Text style={[styles.walletCardTitle, T.bold]}>Tandem Balance</Text>
+                                    <Text style={[styles.walletCardTitle, { color: colors.text }, T.semibold]}>Your balance</Text>
                                 </View>
-                                <Text style={[styles.walletAvailable, T.regular]}>Available Funds</Text>
-                                <Text style={[styles.walletBalanceText, T.bold]}>${formatCurrency(walletBalance)}</Text>
+                                <Text style={[styles.walletAvailable, { color: colors.secondaryText }, T.regular]}>Ready to spend or send</Text>
+                                <Text style={[styles.walletBalanceText, { color: colors.text, fontVariant: ['tabular-nums'] }, T.bold]}>${formatCurrency(walletBalance)}</Text>
                                 <View style={styles.walletButtons}>
-                                    <TouchableOpacity style={[styles.walletBtn, { backgroundColor: 'white' }]} onPress={() => openFundModal('add')} activeOpacity={0.82}>
-                                        <Text style={[styles.walletBtnText, { color: '#4F46E5' }, T.bold]}>Add Funds</Text>
-                                    </TouchableOpacity>
-                                    <TouchableOpacity style={[styles.walletBtn, { backgroundColor: '#818CF8' }]} onPress={() => openFundModal('withdraw')} activeOpacity={0.82}>
-                                        <Text style={[styles.walletBtnText, { color: 'white' }, T.bold]}>Withdraw</Text>
-                                    </TouchableOpacity>
+                                    <PressableScale
+                                        style={[styles.walletBtn, { backgroundColor: colors.accent }]}
+                                        onPress={() => openFundModal('add')}
+                                        haptic="medium"
+                                    >
+                                        <Text style={[styles.walletBtnText, { color: '#fff' }, T.semibold]}>Add money</Text>
+                                    </PressableScale>
+                                    <PressableScale
+                                        style={[styles.walletBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(255,255,255,0.8)' }]}
+                                        onPress={() => openFundModal('withdraw')}
+                                        haptic="light"
+                                    >
+                                        <Text style={[styles.walletBtnText, { color: colors.text }, T.semibold]}>Withdraw</Text>
+                                    </PressableScale>
                                 </View>
-                                <Text style={[styles.walletPowered, T.regular]}>Powered by Tandem Ledger</Text>
-                            </View>
+                                <Text style={[styles.walletPowered, { color: colors.faintText }, T.regular]}>Powered by Tandem Ledger</Text>
+                            </LinearGradient>
 
-                            <View style={[styles.walletCard, { backgroundColor: isDark ? colors.surface : 'white', borderColor: colors.border }]}>
-                                <View style={[styles.walletIconBox, { backgroundColor: 'rgba(99, 102, 241, 0.1)', alignSelf: 'center', marginBottom: vs(12) }]}>
-                                    <CreditCard size={24} color="#6366F1" />
+                            <View style={[styles.walletCard, { backgroundColor: colors.surface }]}>
+                                <View style={[styles.walletIconBox, { backgroundColor: colors.accentBg, alignSelf: 'center', marginBottom: vs(12) }]}>
+                                    <CreditCard size={24} color={colors.accent} />
                                 </View>
-                                <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: vs(8) }, T.bold]}>Receive Payments</Text>
-                                <Text style={[styles.walletDesc, { color: colors.secondaryText }, T.regular]}>Connect your bank with Stripe to receive instant payouts from friends.</Text>
-                                <TouchableOpacity style={[styles.walletBtnFull, { backgroundColor: '#6366F1', marginTop: 'auto' }]} onPress={handleStripeConnect} activeOpacity={0.82}>
-                                    <Text style={[styles.walletBtnText, { color: 'white' }, T.bold]}>Connect Stripe ↗</Text>
-                                </TouchableOpacity>
+                                <Text style={[styles.walletCardTitle, { color: colors.text, textAlign: 'center', marginBottom: vs(8) }, T.semibold]}>Get paid, properly</Text>
+                                <Text style={[styles.walletDesc, { color: colors.secondaryText }, T.regular]}>Link your bank once and money from friends lands straight in your account.</Text>
+                                <PressableScale
+                                    style={[styles.walletBtnFull, { backgroundColor: colors.accent, marginTop: 'auto' }]}
+                                    onPress={handleStripeConnect}
+                                    haptic="light"
+                                >
+                                    <Text style={[styles.walletBtnText, { color: '#fff' }, T.semibold]}>Connect Stripe ↗</Text>
+                                </PressableScale>
                             </View>
                         </ScrollView>
 
@@ -561,46 +577,41 @@ const styles = StyleSheet.create({
     },
     walletCardTitle: {
         fontSize: ms(16),
-        color: '#111827',
     },
     walletAvailable: {
         fontSize: ms(13),
-        color: '#4B5563',
         marginBottom: vs(4),
     },
     walletBalanceText: {
         fontSize: ms(36),
-        color: '#111827',
         letterSpacing: -1.2,
         marginBottom: vs(24),
-        fontVariant: ['tabular-nums'],
     },
     walletButtons: {
         flexDirection: 'row',
-        gap: vs(12),
+        gap: scale(12),
         marginBottom: vs(16),
     },
     walletBtn: {
         flex: 1,
-        height: 40,
-        borderRadius: ms(20),
+        height: scale(44),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
     },
     walletBtnFull: {
         flexDirection: 'row',
-        height: 44,
-        borderRadius: ms(22),
+        height: scale(44),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
         width: '100%',
     },
     walletBtnText: {
-        fontSize: ms(13),
+        fontSize: ms(14),
     },
     walletPowered: {
         fontSize: ms(11),
-        color: '#6B7280',
         textAlign: 'center',
     },
     walletDesc: {

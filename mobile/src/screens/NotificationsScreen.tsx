@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { Bell, Receipt, Send, CheckCircle2, XCircle, Clock } from 'lucide-react-native';
 import { notificationsApi, NotificationOut } from '../services/api';
 import { T } from '../utils/typography';
+import CharacterShape from '../components/CharacterShape';
 
 function timeAgo(d: string) {
     const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
@@ -162,10 +163,10 @@ export default function NotificationsScreen() {
                 </View>
             ) : notifications.length === 0 ? (
                 <View style={styles.emptyState}>
-                    <Bell size={36} color={colors.secondaryText} />
-                    <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>You're all caught up</Text>
+                    <CharacterShape shape="semi" color={colors.accent} variant="mini" />
+                    <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Quiet in here</Text>
                     <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
-                        New activity from your squads will land here.
+                        When your squads get moving, you'll hear about it here first.
                     </Text>
                 </View>
             ) : (

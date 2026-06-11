@@ -70,3 +70,53 @@ metaphor), and recoloring it properly deserves a deliberate brand decision — p
 card identity, design dark-mode variants, maybe gradient stock — not a drive-by hex
 swap that would just trade one arbitrary color for another. Flagged for a dedicated
 brand pass.
+
+---
+
+# Creative Pass
+
+The brief: TandemPay should feel like the group chat that also handles the tab —
+money and trust, not fintech chrome. Three bold decisions, and the conviction
+behind each.
+
+## 1. The balance widget speaks like a friend
+
+The dashboard widget no longer says "NET BALANCE" — a ledger label nobody has
+ever said out loud. It now speaks: *"People owe you"*, *"A tab or two to
+close"*, *"Some owed, some owing"*. And when everything is settled it refuses
+to show "+$0.00" — it says **"All square"**, in accent green, because being
+even with your friends is a good state, not a zero state.
+
+**Conviction:** the most-read pixel in the app should sound like a person.
+Numbers answer questions; words set the emotional temperature. An app about
+friendships should never make "we're good" look like an empty ledger row.
+
+## 2. One press physics for the whole app — `PressableScale`
+
+A new primitive (`components/PressableScale.tsx`): everything you touch
+compresses on a snappy spring (damping 20, stiffness 320) and bounces back,
+with haptics tuned to weight — light for navigation, medium for money moves.
+GroupCards get an extra −0.5° tilt on press, because cards full of characters
+should feel like toys, not table rows. Your own character now *rises into
+frame* on the dashboard instead of just being there.
+
+**Conviction:** personality lives in the hand, not the eye. Opacity-dimming on
+press is what every template app does; physical compression is what makes a
+user subconsciously feel "this thing is built." One shared primitive means the
+entire app answers your finger identically — that consistency *is* the polish.
+
+## 3. Empty states are character moments; the wallet joined the brand
+
+Every dead-end screen now has a TandemPay character in it — a little 'semi'
+blob resting where notifications will go, a 'round' one holding the spot for
+your crew — with copy that talks ("Quiet in here", "Your crew goes here",
+"splitting stops being math homework"). And the wallet card, previously the
+flagged off-brand Tailwind-indigo rectangle, is rebuilt on `colors.heroGradient`
+so it inherits all six accent presets and both modes automatically. Debt from
+the HIG pass: paid.
+
+**Conviction:** empty states are the only screens every new user is guaranteed
+to see — they are the first impression, and most apps spend them on a grey
+icon. Putting the characters there makes the brand show up exactly when the
+data hasn't. Resolving the wallet card inside the theme system (rather than
+picking a new hex) means it can never drift off-brand again.
