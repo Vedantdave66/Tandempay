@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import {
   View, Text, StyleSheet, TouchableOpacity,
   ScrollView, Animated, ActivityIndicator, TextInput, Alert,
@@ -76,14 +76,8 @@ export default function ReceiptScanScreen({ navigation }: any) {
     }
   }, [phase]);
 
-  // Auto-open camera on mount — 300ms delay ensures screen is fully mounted
-  useEffect(() => {
-    const timer = setTimeout(() => { openCamera(); }, 300);
-    return () => clearTimeout(timer);
-  }, []);
-
   // ── Camera ────────────────────────────────────────────────────────────────
-  const openCamera = async () => {
+  const openCamera = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Camera Access', 'TandemPay needs camera access to scan receipts. Enable it in Settings.');
@@ -101,8 +95,8 @@ export default function ReceiptScanScreen({ navigation }: any) {
     // Resize + compress to stay well under Vercel's 4.5 MB body limit
     const compressed = await ImageManipulator.manipulateAsync(
       asset.uri,
-      [{ resize: { width: 1024 } }],
-      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      [{ resize: { width: 800 } }],
+      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true },
     );
     const base64Image = compressed.base64 ?? '';
     if (!base64Image) {
@@ -152,7 +146,13 @@ export default function ReceiptScanScreen({ navigation }: any) {
       setPhase('idle');
       Alert.alert('Scan Failed', msg);
     }
-  };
+  }, []);
+
+  // Auto-open camera on mount — 400ms delay ensures screen is fully mounted
+  useEffect(() => {
+    const timer = setTimeout(openCamera, 400);
+    return () => clearTimeout(timer);
+  }, [openCamera]);
 
   // ── Toggles ───────────────────────────────────────────────────────────────
   const toggleMember = (id: string) => {
@@ -234,14 +234,16 @@ export default function ReceiptScanScreen({ navigation }: any) {
               Take a photo and each roommate taps what's theirs. Tax and tip are split automatically.
             </Text>
           )}
-          <TouchableOpacity
-            style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
-            activeOpacity={0.82}
-            onPress={openCamera}
-          >
-            <Camera size={19} color="#fff" strokeWidth={2.2} />
-            <Text style={[styles.cameraBtnText, T.bold]}>{parseError ? 'Try Again' : 'Open Camera'}</Text>
-          </TouchableOpacity>
+          {parseError && (
+            <TouchableOpacity
+              style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
+              activeOpacity={0.82}
+              onPress={openCamera}
+            >
+              <Camera size={19} color="#fff" strokeWidth={2.2} />
+              <Text style={[styles.cameraBtnText, T.bold]}>Try Again</Text>
+            </TouchableOpacity>
+          )}
         </View>
       </SafeAreaView>
     );
@@ -369,9 +371,10 @@ export default function ReceiptScanScreen({ navigation }: any) {
         </View>
         <TouchableOpacity
           style={[styles.rescanChip, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)' }]}
-          onPress={() => { setPhase('people'); setClaimed(new Set()); }}
+          onPress={() => { setItems([]); setParseError(null); setPhase('idle'); setClaimed(new Set()); openCamera(); }}
         >
-          <Text style={[styles.rescanText, T.semibold, { color: colors.secondaryText }]}>Back</Text>
+          <Camera size={13} color={colors.secondaryText} strokeWidth={2} style={{ marginRight: 4 }} />
+          <Text style={[styles.rescanText, T.semibold, { color: colors.secondaryText }]}>Retake</Text>
         </TouchableOpacity>
       </View>
 
@@ -528,7 +531,7 @@ const styles = StyleSheet.create({
   itemsHeader: { flexDirection: 'row', alignItems: 'center', paddingRight: scale(16), paddingBottom: vs(4) },
   itemsTitle:  { fontSize: ms(20), letterSpacing: -0.4 },
   itemsSub:    { fontSize: ms(13), opacity: 0.65, marginTop: vs(1) },
-  rescanChip:  { paddingHorizontal: scale(12), paddingVertical: vs(6), borderRadius: ms(10), borderWidth: StyleSheet.hairlineWidth },
+  rescanChip:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: scale(12), paddingVertical: vs(6), borderRadius: ms(10), borderWidth: StyleSheet.hairlineWidth },
   rescanText:  { fontSize: ms(13) },
   itemsScroll: { paddingHorizontal: scale(20) },
 
