@@ -37,6 +37,12 @@ function expenseEmoji(title: string): string {
     return pool[title.charCodeAt(0) % pool.length];
 }
 
+// Display name for a member — their chosen character nickname wins,
+// matching GroupCard's convention
+function memberLabel(m: any): string {
+    return m?.character_nickname || (m?.name || '').split(' ')[0];
+}
+
 const HUB_R      = 82;
 const BUBBLE_R   = 54; // fallback when radii can't be derived
 const MIN_R      = 44;
@@ -919,7 +925,7 @@ export default function CanvasModeView({
                                             marginTop: vs(5),
                                             letterSpacing: 0.2,
                                         }, T.semibold]} numberOfLines={1}>
-                                            {(m.name || '').split(' ')[0]}
+                                            {memberLabel(m)}
                                         </Text>
                                     </View>
                                 );
@@ -978,7 +984,7 @@ export default function CanvasModeView({
                                     {selectedExpense.title}
                                 </Text>
                                 <Text style={[styles.sheetSubtitle, { color: colors.secondaryText }, T.regular]}>
-                                    {selectedExpense.payer_name} paid · {selectedAssigned.length} splitting
+                                    {payerMember ? memberLabel(payerMember) : selectedExpense.payer_name} paid · {selectedAssigned.length} splitting
                                 </Text>
                             </View>
                             <Text style={[styles.sheetAmount, { color: colors.text, fontVariant: ['tabular-nums'] }, T.extrabold]}>
@@ -1005,7 +1011,7 @@ export default function CanvasModeView({
                                     >
                                         <View style={[styles.assignedPip, { backgroundColor: m.character_color || m.avatar_color || colors.accent }]} />
                                         <Text style={[styles.assignedPillName, { color: colors.text }, T.semibold]}>
-                                            {(m.name || '').split(' ')[0]}
+                                            {memberLabel(m)}
                                         </Text>
                                     </View>
                                 ))}
@@ -1056,7 +1062,7 @@ export default function CanvasModeView({
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={[styles.balanceName, { color: colors.text }, T.semibold]}>
-                                                        {m.user_id === user?.id ? 'You' : (m.name || '').split(' ')[0]}
+                                                        {m.user_id === user?.id ? 'You' : memberLabel(m)}
                                                     </Text>
                                                     <Text style={[styles.balanceRole, { color: colors.secondaryText }, T.regular]}>
                                                         {isPayer ? 'Paid' : 'Owes'}
@@ -1088,7 +1094,7 @@ export default function CanvasModeView({
                                             </View>
                                         </View>
                                         <Text style={[styles.payLabel, { color: colors.secondaryText }, T.regular]}>
-                                            You owe {(payerMember?.name || 'payer').split(' ')[0]}
+                                            You owe {payerMember ? memberLabel(payerMember) : 'payer'}
                                         </Text>
                                         <Text style={[styles.payAmount, { color: colors.warningBright, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                             ${formatCurrency(perPerson)}
