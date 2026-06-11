@@ -13,6 +13,7 @@ import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import { receiptsApi, ParsedReceiptItem } from '../services/api';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 // Mock group members (replace with real group members from API later)
 const MOCK_MEMBERS = [
@@ -75,11 +76,14 @@ export default function ReceiptScanScreen({ navigation }: any) {
     }
   }, [phase]);
 
-  // Auto-open camera when screen mounts
-  useEffect(() => { handleOpenCamera(); }, []);
+  // Auto-open camera on mount — 300ms delay ensures screen is fully mounted
+  useEffect(() => {
+    const timer = setTimeout(() => { openCamera(); }, 300);
+    return () => clearTimeout(timer);
+  }, []);
 
   // ── Camera ────────────────────────────────────────────────────────────────
-  const handleOpenCamera = async () => {
+  const openCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
       Alert.alert('Camera Access', 'TandemPay needs camera access to scan receipts. Enable it in Settings.');
@@ -89,13 +93,20 @@ export default function ReceiptScanScreen({ navigation }: any) {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ['images'],
       quality: 0.85,
-      base64: true,
     });
     if (result.canceled || !result.assets?.[0]) return;
 
     const asset = result.assets[0];
-    if (!asset.base64) {
-      Alert.alert('Error', 'Could not read image data. Please try again.');
+
+    // Resize + compress to stay well under Vercel's 4.5 MB body limit
+    const compressed = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [{ resize: { width: 1024 } }],
+      { compress: 0.6, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+    );
+    const base64Image = compressed.base64 ?? '';
+    if (!base64Image) {
+      Alert.alert('Error', 'Could not compress image. Please try again.');
       return;
     }
 
@@ -115,7 +126,7 @@ export default function ReceiptScanScreen({ navigation }: any) {
     scanLoop.current.start();
 
     try {
-      const parsed = await receiptsApi.parse(asset.base64);
+      const parsed = await receiptsApi.parse(base64Image);
 
       pulseLoop.current?.stop();
       scanLoop.current?.stop();
@@ -226,7 +237,7 @@ export default function ReceiptScanScreen({ navigation }: any) {
           <TouchableOpacity
             style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
             activeOpacity={0.82}
-            onPress={handleOpenCamera}
+            onPress={openCamera}
           >
             <Camera size={19} color="#fff" strokeWidth={2.2} />
             <Text style={[styles.cameraBtnText, T.bold]}>{parseError ? 'Try Again' : 'Open Camera'}</Text>
