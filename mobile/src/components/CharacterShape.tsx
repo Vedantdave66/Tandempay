@@ -77,18 +77,38 @@ export default function CharacterShape({
                     borderRadius: cfg.eyeSize * 0.45,
                     backgroundColor: '#1A1A1A',
                 }} />
+                {/* Second glint */}
+                <View style={{
+                    position: 'absolute',
+                    bottom: 2,
+                    right: 2,
+                    width: Math.max(1, Math.round(cfg.eyeSize * 0.25)),
+                    height: Math.max(1, Math.round(cfg.eyeSize * 0.25)),
+                    borderRadius: 99,
+                    backgroundColor: 'rgba(255,255,255,0.30)',
+                }} />
             </View>
         ) : (
             <View
                 key={key}
                 style={{
-                    width: cfg.eyeSize,
-                    height: cfg.eyeSize,
-                    borderRadius: cfg.eyeSize / 2,
-                    backgroundColor: '#1A1A1A',
-                    opacity: 0.7,
+                    width: cfg.eyeSize + 1,
+                    height: cfg.eyeSize + 1,
+                    borderRadius: (cfg.eyeSize + 1) / 2,
+                    backgroundColor: 'rgba(10,10,10,0.80)',
                 }}
-            />
+            >
+                {/* Eye shine */}
+                <View style={{
+                    position: 'absolute',
+                    top: 1,
+                    left: 1,
+                    width: Math.max(1, Math.round(cfg.eyeSize * 0.35)),
+                    height: Math.max(1, Math.round(cfg.eyeSize * 0.35)),
+                    borderRadius: 99,
+                    backgroundColor: 'rgba(255,255,255,0.70)',
+                }} />
+            </View>
         );
 
     return (
@@ -104,6 +124,45 @@ export default function CharacterShape({
                 flexShrink: 0,
             }}
         >
+            {/* Gloss highlight — top edge */}
+            <View
+                pointerEvents="none"
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    left: 1,
+                    right: 1,
+                    height: Math.round(displayHeight * 0.28),
+                    borderTopLeftRadius: tl,
+                    borderTopRightRadius: tr,
+                    backgroundColor: 'rgba(255,255,255,0.22)',
+                }}
+            />
+            {/* Ground shadow */}
+            <View
+                pointerEvents="none"
+                style={{
+                    position: 'absolute',
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    height: Math.round(displayHeight * 0.18),
+                    backgroundColor: 'rgba(0,0,0,0.18)',
+                }}
+            />
+            {/* AO left edge */}
+            <View
+                pointerEvents="none"
+                style={{
+                    position: 'absolute',
+                    top: 0,
+                    bottom: 0,
+                    left: 0,
+                    width: Math.max(2, Math.round(cfg.w * 0.08)),
+                    borderTopLeftRadius: tl,
+                    backgroundColor: 'rgba(0,0,0,0.10)',
+                }}
+            />
             <View
                 style={{
                     position: 'absolute',

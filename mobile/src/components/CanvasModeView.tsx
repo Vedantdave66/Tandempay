@@ -9,7 +9,6 @@ import {
     PanResponder,
     LayoutChangeEvent,
     ViewStyle,
-    Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -43,12 +42,7 @@ const BUBBLE_R   = 54; // fallback when radii can't be derived
 const MIN_R      = 44;
 const MAX_R      = 70;
 const WALL_INSET = 56;
-
-const SCREEN_W   = Dimensions.get('window').width;
-const CARD_W     = scale(72);
-const CARD_MX    = scale(18);
-const ITEM_W     = CARD_W + CARD_MX * 2;
-const SNAP_INSET = (SCREEN_W - CARD_W) / 2 - CARD_MX;
+const DOCK_MAX   = 6; // draggable members shown in the dock
 
 interface CanvasModeViewProps {
     expenses: Expense[];
@@ -181,7 +175,7 @@ export default function CanvasModeView({
     const [selectedExpenseId, setSelectedExpenseId]   = useState<string | null>(null);
     const [sheetTab, setSheetTab]                     = useState<'balance' | 'settle'>('balance');
     const [highlightBubbleIdx, setHighlightBubbleIdx] = useState(-1);
-    const carouselScrollX = useRef(new Animated.Value(0)).current;
+    const [pressedMemberIdx, setPressedMemberIdx]     = useState(-1);
 
     // Hover index mirrored into a ref so the physics loop can spring the
     // bubble scale off the React render path (setNativeProps only)
@@ -200,6 +194,20 @@ export default function CanvasModeView({
     if (dockPulses.current.length !== members.length) {
         dockPulses.current = members.map(() => new Animated.Value(1));
     }
+
+    // Per-member pickup scale — the pressed card lifts, the rest stand by
+    const pressScales = useRef<Animated.Value[]>([]);
+    if (pressScales.current.length !== members.length) {
+        pressScales.current = members.map(() => new Animated.Value(1));
+    }
+    useEffect(() => {
+        pressScales.current.forEach((v, i) => {
+            Animated.spring(v, {
+                toValue: i === pressedMemberIdx ? 1.12 : 1,
+                damping: 18, stiffness: 280, useNativeDriver: true,
+            }).start();
+        });
+    }, [pressedMemberIdx]);
 
     // Hub heartbeat — a soft systolic rise, a settle, then rest. The glow
     // swells on the same beat so the light feels like it comes from inside.
@@ -401,17 +409,17 @@ export default function CanvasModeView({
     }, []);
 
     // Stable PanResponder per member index — fresh data flows through refs.
-    // Cards live inside the horizontal carousel, so only clearly-vertical
-    // movement claims the gesture; horizontal stays with the scroll view.
+    // The dock is a static row (no ScrollView), so each card can claim the
+    // gesture immediately without fighting a scroll container.
     const panResponders = useMemo(() => {
         return members.map((_m, memberIdx) =>
             PanResponder.create({
-                onStartShouldSetPanResponder: () => false,
-                onMoveShouldSetPanResponder: (_evt, g) =>
-                    Math.abs(g.dy) > 8 && Math.abs(g.dy) > Math.abs(g.dx) * 1.2,
+                onStartShouldSetPanResponder: () => true,
+                onMoveShouldSetPanResponder: () => true,
                 onPanResponderGrant: (evt) => {
                     const m = membersRef.current[memberIdx];
                     dragMemberRef.current = m;
+                    setPressedMemberIdx(memberIdx);
                     const { pageX, pageY } = evt.nativeEvent;
                     const { x: ox, y: oy } = canvasOriginRef.current;
                     setGhost({
@@ -420,6 +428,7 @@ export default function CanvasModeView({
                         shape: m?.character_shape ?? 'rect',
                         color: m?.character_color ?? m?.avatar_color ?? '#6B7280',
                     });
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 },
                 onPanResponderMove: (evt) => {
                     const { pageX, pageY } = evt.nativeEvent;
@@ -434,6 +443,7 @@ export default function CanvasModeView({
                     lastHoverRef.current = idx;
                 },
                 onPanResponderRelease: (evt) => {
+                    setPressedMemberIdx(-1);
                     setGhost(null);
                     setHighlightBubbleIdx(-1);
                     lastHoverRef.current = -1;
@@ -448,10 +458,14 @@ export default function CanvasModeView({
                         });
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                         pulseDockCard(memberIdx);
+                        // Kick the target bubble's hover spring so it pulses
+                        // 1.0 → ~1.12 → 1.0 inside the physics frame
+                        hoverVelsRef.current[nearest] = (hoverVelsRef.current[nearest] ?? 0) + 0.045;
                     }
                     dragMemberRef.current = null;
                 },
                 onPanResponderTerminate: () => {
+                    setPressedMemberIdx(-1);
                     setGhost(null);
                     setHighlightBubbleIdx(-1);
                     lastHoverRef.current = -1;
@@ -719,11 +733,21 @@ export default function CanvasModeView({
 
                             {/* Payer stamp */}
                             {payer && (
-                                <View style={styles.bubblePayerWrap} pointerEvents="none">
+                                <View
+                                    style={[styles.bubblePayerWrap, {
+                                        shadowColor: payer.character_color ?? payer.avatar_color ?? '#6B7280',
+                                        shadowOffset: { width: 0, height: 4 },
+                                        shadowOpacity: 0.55,
+                                        shadowRadius: 12,
+                                        elevation: 4,
+                                    }]}
+                                    pointerEvents="none"
+                                >
                                     <CharacterShape
                                         variant="cluster"
                                         shape={payer.character_shape ?? 'rect'}
                                         color={payer.character_color ?? payer.avatar_color ?? '#6B7280'}
+                                        eyeStyle="ball"
                                     />
                                 </View>
                             )}
@@ -757,12 +781,20 @@ export default function CanvasModeView({
                                         {pips.map((m, pi) => (
                                             <View
                                                 key={m.user_id}
-                                                style={[styles.pipWrap, { marginLeft: pi > 0 ? -7 : 0 }]}
+                                                style={[styles.pipWrap, {
+                                                    marginLeft: pi > 0 ? -7 : 0,
+                                                    shadowColor: m.character_color ?? m.avatar_color ?? '#6B7280',
+                                                    shadowOffset: { width: 0, height: 4 },
+                                                    shadowOpacity: 0.55,
+                                                    shadowRadius: 12,
+                                                    elevation: 3,
+                                                }]}
                                             >
                                                 <CharacterShape
                                                     variant="cluster"
                                                     shape={m.character_shape ?? 'rect'}
                                                     color={m.character_color ?? m.avatar_color ?? '#6B7280'}
+                                                    eyeStyle="ball"
                                                 />
                                             </View>
                                         ))}
@@ -773,28 +805,28 @@ export default function CanvasModeView({
                     );
                 })}
 
-                {/* Drag ghost — the carried character travels with its own light */}
+                {/* Drag ghost — lifted off the surface, carrying its own light */}
                 {ghost && (
                     <View
                         pointerEvents="none"
                         style={{
                             position: 'absolute',
-                            left: ghost.x - scale(22),
-                            top: ghost.y - vs(30),
+                            left: ghost.x - scale(16),
+                            top: ghost.y - vs(50),
                             zIndex: 200,
-                            opacity: 0.94,
+                            opacity: 0.96,
                             shadowColor: ghost.color,
-                            shadowOffset: { width: 0, height: 4 },
+                            shadowOffset: { width: 0, height: 12 },
                             shadowOpacity: 0.55,
-                            shadowRadius: 16,
-                            elevation: 12,
-                            transform: [{ scale: 1.08 }],
+                            shadowRadius: 20,
+                            elevation: 16,
                         }}
                     >
                         <CharacterShape
                             variant="mini"
                             shape={ghost.shape as any}
                             color={ghost.color}
+                            eyeStyle="ball"
                         />
                     </View>
                 )}
@@ -834,65 +866,23 @@ export default function CanvasModeView({
                     }}
                     pointerEvents="box-none"
                 >
-                    {/* ── Carousel — every card is a drag handle ── */}
+                    {/* ── Dock — static row, every card a drag handle ── */}
                     {members.length > 0 && (
-                        <Animated.ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            snapToInterval={ITEM_W}
-                            snapToAlignment="center"
-                            decelerationRate="fast"
-                            contentContainerStyle={{ paddingHorizontal: SNAP_INSET }}
-                            onScroll={Animated.event(
-                                [{ nativeEvent: { contentOffset: { x: carouselScrollX } } }],
-                                { useNativeDriver: true }
-                            )}
-                            scrollEventThrottle={16}
-                            onMomentumScrollEnd={() => {
-                                Haptics.selectionAsync();
-                            }}
-                        >
-                            {members.map((m, i) => {
-                                const inputRange = [(i - 1) * ITEM_W, i * ITEM_W, (i + 1) * ITEM_W];
-                                const cardScale = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.78, 1, 0.78],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardOpacity = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.45, 1, 0.45],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardTranslateY = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [vs(7), 0, vs(7)],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardRotateY = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: ['6deg', '0deg', '-6deg'],
-                                    extrapolate: 'clamp',
-                                });
-
+                        <View style={{
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            alignItems: 'flex-end',
+                            gap: scale(14),
+                            paddingHorizontal: scale(20),
+                            paddingBottom: vs(6),
+                        }}>
+                            {members.slice(0, DOCK_MAX).map((m, i) => {
                                 const charColor = m.character_color ?? m.avatar_color ?? '#6B7280';
+                                const pressed = pressedMemberIdx === i;
+                                const dimmed = pressedMemberIdx >= 0 && !pressed;
 
                                 return (
-                                    <Animated.View
-                                        key={m.user_id}
-                                        style={{
-                                            width: CARD_W,
-                                            marginHorizontal: CARD_MX,
-                                            alignItems: 'center',
-                                            opacity: cardOpacity,
-                                            transform: [
-                                                { scale: cardScale },
-                                                { translateY: cardTranslateY },
-                                                { perspective: 800 },
-                                                { rotateY: cardRotateY },
-                                            ],
-                                        }}
-                                    >
+                                    <View key={m.user_id} style={{ alignItems: 'center', opacity: dimmed ? 0.45 : 1 }}>
                                         <Animated.View
                                             {...panResponders[i].panHandlers}
                                             style={{
@@ -904,17 +894,23 @@ export default function CanvasModeView({
                                                 borderWidth: 1.5,
                                                 borderColor: charColor + 'AA',
                                                 shadowColor: charColor,
-                                                shadowOffset: { width: 0, height: 6 },
-                                                shadowOpacity: 0.40,
-                                                shadowRadius: 14,
-                                                elevation: 6,
-                                                transform: [{ scale: dockPulses.current[i] ?? 1 }],
+                                                shadowOffset: { width: 0, height: 4 },
+                                                shadowOpacity: pressed ? 0.70 : 0.55,
+                                                shadowRadius: 12,
+                                                elevation: pressed ? 10 : 6,
+                                                transform: [{
+                                                    scale: Animated.multiply(
+                                                        pressScales.current[i] ?? 1,
+                                                        dockPulses.current[i] ?? 1,
+                                                    ),
+                                                }],
                                             }}
                                         >
                                             <CharacterShape
                                                 variant="mini"
                                                 shape={m.character_shape ?? 'rect'}
                                                 color={charColor}
+                                                eyeStyle="ball"
                                             />
                                         </Animated.View>
                                         <Text style={[{
@@ -925,10 +921,40 @@ export default function CanvasModeView({
                                         }, T.semibold]} numberOfLines={1}>
                                             {(m.name || '').split(' ')[0]}
                                         </Text>
-                                    </Animated.View>
+                                    </View>
                                 );
                             })}
-                        </Animated.ScrollView>
+
+                            {/* Overflow — rare; not draggable */}
+                            {members.length > DOCK_MAX && (
+                                <View style={{ alignItems: 'center', opacity: 0.55 }}>
+                                    <View style={{
+                                        width: scale(46),
+                                        height: scale(58),
+                                        borderRadius: ms(18),
+                                        borderWidth: 1.5,
+                                        borderColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)',
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.60)',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <Text style={[{
+                                            fontSize: ms(13),
+                                            color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
+                                        }, T.semibold]}>
+                                            +{members.length - DOCK_MAX}
+                                        </Text>
+                                    </View>
+                                    <Text style={[{
+                                        fontSize: ms(10),
+                                        color: isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.35)',
+                                        marginTop: vs(5),
+                                    }, T.regular]}>
+                                        more
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     )}
                 </LinearGradient>
             </View>
@@ -1025,6 +1051,7 @@ export default function CanvasModeView({
                                                         variant="cluster"
                                                         shape={m.character_shape ?? 'rect'}
                                                         color={m.character_color ?? m.avatar_color ?? colors.accent}
+                                                        eyeStyle="ball"
                                                     />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
