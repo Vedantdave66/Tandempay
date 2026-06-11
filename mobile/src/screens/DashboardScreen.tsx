@@ -5,7 +5,7 @@ import {
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -317,40 +317,37 @@ export default function DashboardScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
 
-                {/* Hero card */}
-                <LinearGradient
-                    colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
-                    style={styles.heroCard}
-                >
-                    <View style={styles.heroTop}>
-                        <View style={styles.heroLeft}>
-                            <Text style={[styles.heroGreeting, { color: colors.secondaryText }, T.semibold]}>{greeting()}</Text>
-                            <Text style={[styles.heroName, { color: colors.text }, T.extrabold]}>{firstName} 👋</Text>
-                        </View>
+                {/* Greeting row — inline, no card */}
+                <View style={styles.greetingRow}>
+                    <View>
+                        <Text style={[styles.greetingLabel, { color: colors.secondaryText }, T.regular]}>{greeting()}</Text>
+                        <Text style={[styles.greetingName, { color: colors.text }, T.bold]}>{firstName}</Text>
+                    </View>
+                    <View style={{ transform: [{ scale: 0.72 }] }}>
                         <CharacterShape
                             shape={user?.character_shape ?? 'rect'}
                             color={user?.character_color ?? '#34D399'}
                             variant="hero"
                         />
                     </View>
+                </View>
 
-                    {/* Net Balance pill */}
-                    <TouchableOpacity
-                        style={[styles.netBalanceBtn, {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.82)',
-                        }]}
-                        activeOpacity={0.70}
-                        onPress={() => setShowNetModal(true)}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.netBalanceLabel, { color: colors.secondaryText }, T.bold]}>NET BALANCE</Text>
-                            <Text style={[styles.netBalanceValue, { color: netColor, fontVariant: ['tabular-nums'] }, T.extrabold]}>
-                                {netBalance >= 0 ? '+' : '-'}${formatCurrency(Math.abs(netBalance))}
-                            </Text>
-                        </View>
-                        <ChevronRight size={18} color={colors.secondaryText} strokeWidth={2} />
-                    </TouchableOpacity>
-                </LinearGradient>
+                {/* Net balance widget — flat, data-first */}
+                <TouchableOpacity
+                    style={[styles.netBalanceBtn, {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
+                    }]}
+                    activeOpacity={0.70}
+                    onPress={() => setShowNetModal(true)}
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.netBalanceLabel, { color: colors.faintText }, T.semibold]}>NET BALANCE</Text>
+                        <Text style={[styles.netBalanceValue, { color: netColor, fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                            {netBalance >= 0 ? '+' : '-'}${formatCurrency(Math.abs(netBalance))}
+                        </Text>
+                    </View>
+                    <ChevronRight size={16} color={colors.faintText} strokeWidth={2} />
+                </TouchableOpacity>
 
                 {/* Your squads */}
                 <View style={styles.sectionHeader}>
@@ -490,44 +487,40 @@ const styles = StyleSheet.create({
         borderWidth: 1.5,
     },
 
-    heroCard: {
-        marginHorizontal: scale(12),
-        borderRadius: ms(32),
-        padding: scale(26),
-    },
-    heroTop: {
+    greetingRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: scale(12),
-        marginBottom: vs(20),
+        paddingHorizontal: scale(20),
+        paddingTop: vs(4),
+        paddingBottom: vs(20),
     },
-    heroLeft: { flexShrink: 1 },
-    heroGreeting: {
+    greetingLabel: {
         fontSize: ms(13),
         marginBottom: vs(2),
     },
-    heroName: {
-        fontSize: ms(34),
-        letterSpacing: -1.2,
+    greetingName: {
+        fontSize: ms(22),
+        letterSpacing: -0.6,
     },
 
     netBalanceBtn: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginHorizontal: scale(20),
         borderRadius: ms(20),
-        padding: scale(16),
-        marginTop: vs(24),
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(16),
     },
     netBalanceLabel: {
-        fontSize: ms(11),
-        letterSpacing: 0.5,
+        fontSize: ms(10),
+        letterSpacing: 0.6,
         textTransform: 'uppercase',
         marginBottom: vs(3),
     },
     netBalanceValue: {
-        fontSize: ms(26),
-        letterSpacing: -0.8,
+        fontSize: ms(32),
+        letterSpacing: -1.2,
     },
 
     sectionHeader: {
@@ -535,7 +528,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(20),
-        paddingTop: vs(32),
+        paddingTop: vs(28),
         paddingBottom: vs(12),
     },
     sectionTitleRow: {
