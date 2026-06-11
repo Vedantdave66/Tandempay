@@ -12,18 +12,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
-
-// ── Mock receipt data (replaced with real OCR response later) ─────────────────
-const MOCK_ITEMS = [
-  { id: '1', name: 'Butter Chicken',   price: 19.50 },
-  { id: '2', name: 'Garlic Naan (×2)', price: 8.00  },
-  { id: '3', name: 'Mango Lassi',      price: 6.50  },
-  { id: '4', name: 'Palak Paneer',     price: 16.00 },
-  { id: '5', name: 'Samosa Platter',   price: 9.50  },
-];
-const SUBTOTAL = MOCK_ITEMS.reduce((s, i) => s + i.price, 0);
-const TAX_RATE = 0.13;
-const TAX      = parseFloat((SUBTOTAL * TAX_RATE).toFixed(2));
+import { receiptsApi, ParsedReceiptItem } from '../services/api';
 
 // Mock group members (replace with real group members from API later)
 const MOCK_MEMBERS = [
@@ -44,21 +33,29 @@ export default function ReceiptScanScreen({ navigation }: any) {
   const [tipAmount, setTipAmount] = useState('');
   const [tipActive, setTipActive] = useState(false);
 
+  const [items, setItems]             = useState<ParsedReceiptItem[]>([]);
+  const [subtotal, setSubtotal]       = useState(0);
+  const [tax, setTax]                 = useState(0);
+  const [taxRate, setTaxRate]         = useState(0.13);
+  const [tipDetected, setTipDetected] = useState(0);
+  const [parseError, setParseError]   = useState<string | null>(null);
+
   // Parsing animations
   const pulseAnim = useRef(new Animated.Value(1)).current;
   const scanLineY = useRef(new Animated.Value(0)).current;
   const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
   const scanLoop  = useRef<Animated.CompositeAnimation | null>(null);
 
-  // Stagger entrance for items
-  const itemAnims = useRef(MOCK_ITEMS.map(() => ({
-    opacity:    new Animated.Value(0),
-    translateY: new Animated.Value(vs(14)),
-  }))).current;
+  const MAX_ITEMS = 30;
+  const itemAnims = useRef(
+    Array.from({ length: MAX_ITEMS }, () => ({
+      opacity:    new Animated.Value(0),
+      translateY: new Animated.Value(vs(14)),
+    }))
+  ).current;
 
-  // Per-item spring scale for checkbox
   const checkAnims = useRef(
-    Object.fromEntries(MOCK_ITEMS.map(i => [i.id, new Animated.Value(0)]))
+    Object.fromEntries(Array.from({ length: MAX_ITEMS }, (_, i) => [String(i), new Animated.Value(0)]))
   ).current;
 
   // People entrance
@@ -69,13 +66,17 @@ export default function ReceiptScanScreen({ navigation }: any) {
       Animated.spring(peopleAnim, { toValue: 1, useNativeDriver: true, damping: 24, stiffness: 260 }).start();
     }
     if (phase === 'items') {
-      const anims = itemAnims.flatMap(({ opacity, translateY }, i) => [
+      const count = Math.min(items.length, MAX_ITEMS);
+      const anims = itemAnims.slice(0, count).flatMap(({ opacity, translateY }, i) => [
         Animated.timing(opacity,    { toValue: 1, duration: 200, delay: i * 40, useNativeDriver: true }),
         Animated.timing(translateY, { toValue: 0, duration: 200, delay: i * 40, useNativeDriver: true }),
       ]);
       Animated.parallel(anims).start();
     }
   }, [phase]);
+
+  // Auto-open camera when screen mounts
+  useEffect(() => { handleOpenCamera(); }, []);
 
   // ── Camera ────────────────────────────────────────────────────────────────
   const handleOpenCamera = async () => {
@@ -84,10 +85,22 @@ export default function ReceiptScanScreen({ navigation }: any) {
       Alert.alert('Camera Access', 'TandemPay needs camera access to scan receipts. Enable it in Settings.');
       return;
     }
-    const result = await ImagePicker.launchCameraAsync({ mediaTypes: ['images'], quality: 0.85 });
-    if (result.canceled) return;
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images'],
+      quality: 0.85,
+      base64: true,
+    });
+    if (result.canceled || !result.assets?.[0]) return;
+
+    const asset = result.assets[0];
+    if (!asset.base64) {
+      Alert.alert('Error', 'Could not read image data. Please try again.');
+      return;
+    }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setParseError(null);
     setPhase('parsing');
 
     pulseLoop.current = Animated.loop(Animated.sequence([
@@ -101,12 +114,33 @@ export default function ReceiptScanScreen({ navigation }: any) {
     pulseLoop.current.start();
     scanLoop.current.start();
 
-    setTimeout(() => {
+    try {
+      const parsed = await receiptsApi.parse(asset.base64);
+
       pulseLoop.current?.stop();
       scanLoop.current?.stop();
+
+      setItems(parsed.items);
+      setSubtotal(parsed.subtotal);
+      setTax(parsed.tax);
+      setTaxRate(parsed.tax_rate);
+      setTipDetected(parsed.tip_detected);
+      if (parsed.tip_detected > 0) {
+        setTipAmount(parsed.tip_detected.toFixed(2));
+        setTipActive(true);
+      }
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setPhase('people');
-    }, 2500);
+
+    } catch (err: any) {
+      pulseLoop.current?.stop();
+      scanLoop.current?.stop();
+      const msg = err?.message || 'Could not read this receipt. Try a clearer photo.';
+      setParseError(msg);
+      setPhase('idle');
+      Alert.alert('Scan Failed', msg);
+    }
   };
 
   // ── Toggles ───────────────────────────────────────────────────────────────
@@ -122,14 +156,16 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
   const toggleClaim = (id: string) => {
     Haptics.selectionAsync();
+    const idx = items.findIndex(i => i.id === id);
+    const animKey = String(idx);
     setClaimed(prev => {
       const next = new Set(prev);
       if (next.has(id)) {
         next.delete(id);
-        Animated.spring(checkAnims[id], { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
+        Animated.spring(checkAnims[animKey], { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
       } else {
         next.add(id);
-        Animated.spring(checkAnims[id], { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
+        Animated.spring(checkAnims[animKey], { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
       }
       return next;
     });
@@ -137,11 +173,11 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
   // ── Calculations ──────────────────────────────────────────────────────────
   const tip        = parseFloat(tipAmount) || 0;
-  const total      = parseFloat((SUBTOTAL + TAX + tip).toFixed(2));
+  const total      = parseFloat((subtotal + tax + tip).toFixed(2));
   const splitCount = included.size;
-  const myFood     = MOCK_ITEMS.filter(i => claimed.has(i.id)).reduce((s, i) => s + i.price, 0);
-  const myFraction = SUBTOTAL > 0 ? myFood / SUBTOTAL : 0;
-  const myShare    = parseFloat((myFood + TAX * myFraction + (tip > 0 ? tip / splitCount : 0)).toFixed(2));
+  const myFood     = items.filter(i => claimed.has(i.id)).reduce((s, i) => s + i.price, 0);
+  const myFraction = subtotal > 0 ? myFood / subtotal : 0;
+  const myShare    = parseFloat((myFood + tax * myFraction + (tip > 0 ? tip / splitCount : 0)).toFixed(2));
   const hasClaim   = claimed.size > 0;
 
   const scanTop = scanLineY.interpolate({ inputRange: [0, 1], outputRange: ['0%', '90%'] });
@@ -178,16 +214,22 @@ export default function ReceiptScanScreen({ navigation }: any) {
             </View>
           </LinearGradient>
           <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a Receipt</Text>
-          <Text style={[styles.idleSub, T.regular, { color: colors.secondaryText }]}>
-            Take a photo and each roommate taps what's theirs. Tax and tip are split automatically.
-          </Text>
+          {parseError ? (
+            <Text style={[styles.idleSub, T.regular, { color: '#EF4444', textAlign: 'center' }]}>
+              {parseError}
+            </Text>
+          ) : (
+            <Text style={[styles.idleSub, T.regular, { color: colors.secondaryText }]}>
+              Take a photo and each roommate taps what's theirs. Tax and tip are split automatically.
+            </Text>
+          )}
           <TouchableOpacity
             style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
             activeOpacity={0.82}
             onPress={handleOpenCamera}
           >
             <Camera size={19} color="#fff" strokeWidth={2.2} />
-            <Text style={[styles.cameraBtnText, T.bold]}>Open Camera</Text>
+            <Text style={[styles.cameraBtnText, T.bold]}>{parseError ? 'Try Again' : 'Open Camera'}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -282,7 +324,7 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
           <View style={[styles.countPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
             <Text style={[styles.countText, T.semibold, { color: colors.secondaryText }]}>
-              {included.size} {included.size === 1 ? 'person' : 'people'} splitting ${(total / included.size).toFixed(2)} each
+              {included.size} people · ~${((subtotal + tax) / Math.max(included.size, 1)).toFixed(2)} each before items
             </Text>
           </View>
         </Animated.View>
@@ -323,14 +365,25 @@ export default function ReceiptScanScreen({ navigation }: any) {
       </View>
 
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.itemsScroll}>
-        {MOCK_ITEMS.map((item, idx) => {
+        {items.length === 0 && (
+          <View style={{ alignItems: 'center', paddingVertical: vs(40), gap: vs(12) }}>
+            <Text style={[{ fontSize: ms(15), color: colors.secondaryText, textAlign: 'center' }, T.regular]}>
+              No items detected.{'\n'}Try scanning with better lighting.
+            </Text>
+            <TouchableOpacity onPress={() => setPhase('idle')}>
+              <Text style={[{ color: colors.accent, fontSize: ms(14) }, T.semibold]}>Scan Again</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {items.map((item, idx) => {
           const isClaimed  = claimed.has(item.id);
-          const checkScale = checkAnims[item.id].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
+          const animKey    = String(idx);
+          const checkScale = checkAnims[animKey].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
 
           return (
             <Animated.View key={item.id} style={{
-              opacity:   itemAnims[idx].opacity,
-              transform: [{ translateY: itemAnims[idx].translateY }],
+              opacity:   itemAnims[idx]?.opacity    ?? new Animated.Value(1),
+              transform: [{ translateY: itemAnims[idx]?.translateY ?? new Animated.Value(0) }],
             }}>
               <TouchableOpacity
                 style={[styles.itemRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
@@ -361,11 +414,11 @@ export default function ReceiptScanScreen({ navigation }: any) {
         <View style={[styles.summarySection, { borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
           <View style={styles.summaryRow}>
             <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Subtotal</Text>
-            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${SUBTOTAL.toFixed(2)}</Text>
+            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${subtotal.toFixed(2)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Tax {(TAX_RATE * 100).toFixed(0)}%</Text>
-            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${TAX.toFixed(2)}</Text>
+            <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Tax {(taxRate * 100).toFixed(0)}%</Text>
+            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${tax.toFixed(2)}</Text>
           </View>
 
           <View style={styles.summaryRow}>
