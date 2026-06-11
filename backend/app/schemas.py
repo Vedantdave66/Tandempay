@@ -211,6 +211,9 @@ class GroupMemberOut(BaseModel):
     email: str
     interac_email: Optional[str] = None
     avatar_color: str
+    character_shape: Optional[str] = None
+    character_color: Optional[str] = None
+    character_nickname: Optional[str] = None
 
 
 class GroupOut(BaseModel):
