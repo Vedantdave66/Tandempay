@@ -27,6 +27,7 @@ import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, C
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
+import SkeletonBlock from '../components/SkeletonBlock';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
 
@@ -210,10 +211,32 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
     if (loading && !refreshing) {
+        // Skeleton — the group's silhouette breathing while data arrives.
         return (
             <View style={[styles.container, { backgroundColor: colors.background }]}>
-                <View style={styles.center}>
-                    <ActivityIndicator color={colors.accent} size="large" />
+                {/* Header ghost: back row, group name, member cluster, balance chip */}
+                <View style={{ paddingTop: insets.top + vs(8), paddingHorizontal: scale(20) }}>
+                    <SkeletonBlock width={scale(56)} height={vs(14)} radius={ms(6)} />
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginTop: vs(16) }}>
+                        <View style={{ gap: vs(10), flex: 1 }}>
+                            <SkeletonBlock width={'55%'} height={vs(24)} radius={ms(8)} delay={120} />
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(6) }}>
+                                <SkeletonBlock width={scale(28)} height={scale(28)} radius={scale(14)} delay={240} />
+                                <SkeletonBlock width={scale(28)} height={scale(28)} radius={scale(14)} delay={240} style={{ marginLeft: -scale(10) }} />
+                                <SkeletonBlock width={scale(28)} height={scale(28)} radius={scale(14)} delay={240} style={{ marginLeft: -scale(10) }} />
+                                <SkeletonBlock width={scale(110)} height={vs(12)} radius={ms(6)} delay={240} style={{ marginLeft: scale(6) }} />
+                            </View>
+                        </View>
+                        <SkeletonBlock width={scale(84)} height={vs(52)} radius={ms(14)} delay={360} />
+                    </View>
+                </View>
+
+                {/* Expense rows ghost */}
+                <View style={{ paddingHorizontal: scale(20), marginTop: vs(28), gap: vs(14) }}>
+                    <SkeletonBlock width={'100%'} height={vs(72)} radius={ms(20)} delay={480} />
+                    <SkeletonBlock width={'100%'} height={vs(72)} radius={ms(20)} delay={600} />
+                    <SkeletonBlock width={'100%'} height={vs(72)} radius={ms(20)} delay={720} />
+                    <SkeletonBlock width={'100%'} height={vs(72)} radius={ms(20)} delay={840} />
                 </View>
             </View>
         );
