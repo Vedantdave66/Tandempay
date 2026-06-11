@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ActivityIndicator, RefreshControl, ScrollView, Animated, Easing, Alert, Modal,
+    RefreshControl, ScrollView, Animated, Easing, Alert, Modal,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -21,6 +21,7 @@ import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
 import PressableScale from '../components/PressableScale';
+import SkeletonBlock from '../components/SkeletonBlock';
 import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 
@@ -307,10 +308,40 @@ export default function DashboardScreen({ navigation }: any) {
             : colors.accent;
 
     if (loading && !refreshing) {
+        // Skeleton — the dashboard's silhouette breathing while data arrives.
+        // Mirrors the real layout rhythm so content lands without a jump.
         return (
             <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
-                <View style={styles.center}>
-                    <ActivityIndicator color={colors.accent} size="large" />
+                {/* Header: logo + bell */}
+                <View style={styles.headerRow}>
+                    <SkeletonBlock width={scale(96)} height={vs(18)} radius={ms(6)} />
+                    <SkeletonBlock width={scale(44)} height={scale(44)} radius={ms(12)} delay={120} />
+                </View>
+
+                {/* Greeting */}
+                <View style={styles.greetingRow}>
+                    <View style={{ gap: vs(8) }}>
+                        <SkeletonBlock width={scale(90)} height={vs(12)} radius={ms(6)} delay={240} />
+                        <SkeletonBlock width={scale(150)} height={vs(22)} radius={ms(8)} delay={240} />
+                    </View>
+                    <SkeletonBlock width={scale(52)} height={vs(64)} radius={ms(12)} delay={360} />
+                </View>
+
+                {/* Net balance widget */}
+                <View style={{ paddingHorizontal: scale(20) }}>
+                    <SkeletonBlock width={'100%'} height={vs(84)} radius={ms(20)} delay={480} />
+                </View>
+
+                {/* Section header */}
+                <View style={{ paddingHorizontal: scale(20), paddingTop: vs(28), paddingBottom: vs(12) }}>
+                    <SkeletonBlock width={'42%'} height={vs(18)} radius={ms(8)} delay={600} />
+                </View>
+
+                {/* Activity rows */}
+                <View style={{ paddingHorizontal: scale(20), gap: vs(8) }}>
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={720} />
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={840} />
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={960} />
                 </View>
             </SafeAreaView>
         );

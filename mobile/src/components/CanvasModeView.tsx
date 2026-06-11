@@ -5,6 +5,7 @@ import {
     StyleSheet,
     TouchableOpacity,
     Animated,
+    Easing,
     PanResponder,
     LayoutChangeEvent,
     ViewStyle,
@@ -77,11 +78,13 @@ export default function CanvasModeView({
     const hubYCenterRef = useRef(314);
     useEffect(() => { hubYCenterRef.current = hubYCenter; }, [hubYCenter]);
 
-    const STARS = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+    // Dust field — three depth layers via size + opacity, golden-angle scatter
+    const STARS = useMemo(() => Array.from({ length: 26 }, (_, i) => ({
         key: i,
         left: `${((i * 137.508) % 100).toFixed(1)}%` as any,
         top:  `${((i * 241.313) % 100).toFixed(1)}%` as any,
-        size: i % 7 === 0 ? 2 : i % 4 === 0 ? 1.4 : 0.7,
+        size: i % 7 === 0 ? 2.4 : i % 3 === 0 ? 1.5 : 0.8,
+        depth: i % 7 === 0 ? 1 : i % 3 === 0 ? 0.65 : 0.35,
     })), []);
 
     // Physics refs — updated every frame, no setState
@@ -112,14 +115,27 @@ export default function CanvasModeView({
     const [focusedMemberIdx, setFocusedMemberIdx]     = useState(0);
     const carouselScrollX = useRef(new Animated.Value(0)).current;
 
+    // Hover index mirrored into a ref so the physics loop can spring the
+    // bubble scale off the React render path (setNativeProps only).
+    const highlightIdxRef = useRef(-1);
+    useEffect(() => { highlightIdxRef.current = highlightBubbleIdx; }, [highlightBubbleIdx]);
+    const hoverScalesRef = useRef<number[]>([]);
+
     const sheetAnim    = useRef(new Animated.Value(500)).current;
     const hubScaleAnim = useRef(new Animated.Value(1)).current;
+    const hubGlowAnim  = useRef(new Animated.Value(0)).current;
 
-    // Hub breathing animation
+    // Hub breathing — the anchor of gravity inhales and exhales, slowly
     useEffect(() => {
-        const breath = Animated.loop(Animated.sequence([
-            Animated.timing(hubScaleAnim, { toValue: 1.018, duration: 3000, useNativeDriver: true }),
-            Animated.timing(hubScaleAnim, { toValue: 1,     duration: 3000, useNativeDriver: true }),
+        const breath = Animated.loop(Animated.parallel([
+            Animated.sequence([
+                Animated.timing(hubScaleAnim, { toValue: 1.018, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(hubScaleAnim, { toValue: 1,     duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ]),
+            Animated.sequence([
+                Animated.timing(hubGlowAnim, { toValue: 1, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(hubGlowAnim, { toValue: 0, duration: 3000, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ]),
         ]));
         breath.start();
         return () => breath.stop();
@@ -204,8 +220,16 @@ export default function CanvasModeView({
 
                 pos[i] = { x, y };
                 vel[i] = { vx, vy };
+
+                // Hover scale springs toward target inside the physics frame —
+                // zero re-renders, the bubble swells to meet the dragged character
+                const target = highlightIdxRef.current === i ? 1.06 : 1;
+                const cur = hoverScalesRef.current[i] ?? 1;
+                const next = Math.abs(target - cur) < 0.001 ? target : cur + (target - cur) * 0.16;
+                hoverScalesRef.current[i] = next;
+
                 bubbleRefs.current[i]?.setNativeProps({
-                    style: { transform: [{ translateX: x - BUBBLE_R }, { translateY: y - BUBBLE_R }] },
+                    style: { transform: [{ translateX: x - BUBBLE_R }, { translateY: y - BUBBLE_R }, { scale: next }] },
                 });
             }
             rafRef.current = requestAnimationFrame(tick);
@@ -347,36 +371,38 @@ export default function CanvasModeView({
                     style={StyleSheet.absoluteFillObject}
                 />
 
-                {/* Star field */}
+                {/* Dust field — selective illumination, not wallpaper */}
                 {STARS.map(s => (
                     <View key={s.key} style={{
                         position: 'absolute', left: s.left, top: s.top,
                         width: s.size, height: s.size, borderRadius: s.size / 2,
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,100,200,0.25)',
+                        backgroundColor: isDark
+                            ? `rgba(255,255,255,${(0.38 * s.depth).toFixed(2)})`
+                            : `rgba(70,90,180,${(0.22 * s.depth).toFixed(2)})`,
                         pointerEvents: 'none',
                     }} />
                 ))}
 
-                {/* Nebula glow */}
+                {/* Light bloom around the hub's gravity well */}
                 <View
                     pointerEvents="none"
                     style={{
                         position: 'absolute',
-                        width: 320, height: 320,
-                        borderRadius: 160,
+                        width: 340, height: 340,
+                        borderRadius: 170,
                         alignSelf: 'center',
-                        top: hubYCenter - 160,
+                        top: hubYCenter - 170,
                         backgroundColor: 'transparent',
                         shadowColor: colors.accent,
                         shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: isDark ? 0.18 : 0.12,
-                        shadowRadius: 80,
+                        shadowOpacity: isDark ? 0.20 : 0.12,
+                        shadowRadius: 90,
                         elevation: 0,
                     }}
                 />
 
-                {/* Orbit rings */}
-                {[296, 428, 560].map(size => (
+                {/* Orbital paths — two solid hairlines, quieter than diagram-dashes */}
+                {[300, 470].map(size => (
                     <View
                         key={size}
                         style={[
@@ -384,39 +410,54 @@ export default function CanvasModeView({
                             {
                                 width: size, height: size, borderRadius: size / 2,
                                 top: hubYCenter - size / 2,
-                                borderColor: isDark ? colors.accent + '0E' : colors.accent + '16',
+                                borderColor: isDark ? colors.accent + '12' : colors.accent + '1A',
                             },
                         ]}
                     />
                 ))}
 
-                {/* Hub */}
+                {/* Hub halo — a ring of light that breathes with the hub */}
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.hubHalo,
+                        {
+                            top: hubYCenter - (HUB_R + 14),
+                            borderColor: colors.accent,
+                            opacity: hubGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.10, 0.26] }),
+                            transform: [{ scale: hubScaleAnim }],
+                        },
+                    ]}
+                />
+
+                {/* Hub — the anchor of gravity */}
                 <Animated.View
                     style={[
                         styles.hub,
                         {
                             top: hubYCenter - HUB_R,
-                            backgroundColor: isDark ? 'rgba(8,14,26,0.92)' : 'rgba(255,255,255,0.97)',
-                            borderColor: colors.accent + '60',
+                            backgroundColor: isDark ? 'rgba(9,15,11,0.94)' : 'rgba(255,255,255,0.96)',
+                            borderColor: colors.accent + '4D',
                             shadowColor: colors.accent,
                             shadowOffset: { width: 0, height: 0 },
-                            shadowOpacity: 0.22,
-                            shadowRadius: 40,
+                            shadowOpacity: isDark ? 0.30 : 0.18,
+                            shadowRadius: 44,
                             transform: [{ scale: hubScaleAnim }],
                         },
                     ]}
                 >
-                    <Text style={[styles.hubName, { color: colors.text }, T.extrabold]} numberOfLines={2}>{groupName}</Text>
+                    <Text style={[styles.hubName, { color: colors.text }, T.bold]} numberOfLines={2}>{groupName}</Text>
+                    <View style={[styles.hubDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.08)' }]} />
                     <View style={styles.hubPills}>
                         <TouchableOpacity
-                            style={[styles.hubPill, { backgroundColor: colors.accent + '29', borderColor: colors.accent + '47' }]}
+                            style={[styles.hubPill, { backgroundColor: colors.accent + '24' }]}
                             onPress={onAddExpense}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
                         >
-                            <Text style={[styles.hubPillText, { color: colors.accent }, T.bold]}>＋ Add</Text>
+                            <Text style={[styles.hubPillText, { color: colors.accent }, T.semibold]}>＋ Add</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.hubPill, { backgroundColor: colors.gold + '2E', borderColor: colors.gold + '38' }]}
+                            style={[styles.hubPill, { backgroundColor: colors.gold + '22' }]}
                             onPress={() => {
                                 const nonPayer = members.find(m => m.user_id !== user?.id);
                                 if (nonPayer) {
@@ -432,9 +473,9 @@ export default function CanvasModeView({
                                     });
                                 }
                             }}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
                         >
-                            <Text style={[styles.hubPillText, { color: colors.gold }, T.bold]}>⟶ Settle</Text>
+                            <Text style={[styles.hubPillText, { color: colors.gold }, T.semibold]}>Settle</Text>
                         </TouchableOpacity>
                     </View>
                 </Animated.View>
@@ -442,9 +483,9 @@ export default function CanvasModeView({
                 {/* Expense bubbles */}
                 {visibleExpenses.map((exp, i) => {
                     const h         = EXPENSE_HUES[i % 6];
-                    const bg        = isDark ? `hsla(${h},58%,60%,0.20)` : `hsla(${h},55%,48%,0.14)`;
-                    const border    = isDark ? `hsla(${h},78%,68%,0.56)` : `hsla(${h},70%,44%,0.48)`;
-                    const tc        = isDark ? `hsla(${h},88%,90%,1)`    : `hsla(${h},65%,26%,1)`;
+                    const bg        = isDark ? `hsla(${h},50%,56%,0.16)` : `hsla(${h},58%,50%,0.10)`;
+                    const border    = isDark ? `hsla(${h},75%,66%,0.45)` : `hsla(${h},65%,45%,0.40)`;
+                    const tc        = isDark ? `hsla(${h},85%,90%,1)`    : `hsla(${h},65%,26%,1)`;
                     const shadowCol = isDark ? `hsla(${h},70%,55%,1)`    : `hsla(${h},70%,50%,1)`;
                     const hovered   = highlightBubbleIdx === i;
                     const assignedUids = assignments[exp.id] ?? [];
@@ -463,10 +504,10 @@ export default function CanvasModeView({
                                 {
                                     backgroundColor: bg,
                                     borderColor: hovered ? colors.accent : border,
-                                    borderWidth: hovered ? 2.5 : 1.5,
+                                    borderWidth: hovered ? 2 : 1.2,
                                     shadowColor: shadowCol,
-                                    shadowOpacity: hovered ? 0.55 : 0.32,
-                                    shadowRadius: hovered ? 22 : 10,
+                                    shadowOpacity: hovered ? 0.50 : isDark ? 0.28 : 0.18,
+                                    shadowRadius: hovered ? 24 : 12,
                                     elevation: hovered ? 10 : 5,
                                 },
                             ]}
@@ -480,7 +521,7 @@ export default function CanvasModeView({
                                 <X size={10} color={tc} />
                             </TouchableOpacity>
 
-                            <TouchableOpacity style={styles.bubbleTouchable} onPress={() => openSheet(exp.id)} activeOpacity={0.85}>
+                            <TouchableOpacity style={styles.bubbleTouchable} onPress={() => openSheet(exp.id)} activeOpacity={0.75}>
                                 {/* Payer character */}
                                 {payer && (
                                     <View style={styles.bubblePayerWrap}>
@@ -492,12 +533,12 @@ export default function CanvasModeView({
                                     </View>
                                 )}
                                 <Text
-                                    style={[styles.bubbleTitle, { color: tc, textShadowColor: isDark ? shadowCol : 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: isDark ? 12 : 0 }, T.extrabold]}
+                                    style={[styles.bubbleTitle, { color: tc, textShadowColor: isDark ? shadowCol : 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: isDark ? 10 : 0 }, T.semibold]}
                                     numberOfLines={2}
                                 >
                                     {expenseEmoji(exp.title)} {exp.title}
                                 </Text>
-                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(26,31,46,0.62)' }, T.bold]}>
+                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.82)' : 'rgba(26,31,46,0.68)', fontVariant: ['tabular-nums'] }, T.bold]}>
                                     ${formatCurrency(exp.amount)}
                                 </Text>
                                 {pips.length > 0 && (
@@ -521,7 +562,7 @@ export default function CanvasModeView({
                     );
                 })}
 
-                {/* Drag ghost — member's CharacterShape */}
+                {/* Drag ghost — the carried character travels with its own light */}
                 {ghost && (
                     <View
                         pointerEvents="none"
@@ -530,7 +571,13 @@ export default function CanvasModeView({
                             left: ghost.x - scale(22),
                             top: ghost.y - vs(30),
                             zIndex: 200,
-                            opacity: 0.92,
+                            opacity: 0.94,
+                            shadowColor: ghost.color,
+                            shadowOffset: { width: 0, height: 4 },
+                            shadowOpacity: 0.55,
+                            shadowRadius: 16,
+                            elevation: 12,
+                            transform: [{ scale: 1.08 }],
                         }}
                     >
                         <CharacterShape
@@ -548,29 +595,35 @@ export default function CanvasModeView({
                     </TouchableOpacity>
                 )}
 
-                {/* Back button */}
-                <TouchableOpacity
-                    style={[styles.backBtn, { paddingTop: insets.top + vs(8) }]}
-                    onPress={onClose}
-                    activeOpacity={0.7}
-                >
-                    <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
-                    <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
-                </TouchableOpacity>
+                {/* Back button — a quiet chip so it reads over any canvas region */}
+                <View style={[styles.backBtnWrap, { top: insets.top + vs(8) }]}>
+                    <TouchableOpacity
+                        style={[styles.backBtn, {
+                            backgroundColor: isDark ? 'rgba(9,15,11,0.72)' : 'rgba(255,255,255,0.80)',
+                        }]}
+                        onPress={onClose}
+                        activeOpacity={0.7}
+                    >
+                        <ArrowLeft size={16} color={isDark ? colors.accent : colors.accentDark} />
+                        <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.semibold]}>Back</Text>
+                    </TouchableOpacity>
+                </View>
 
-                {/* ── Character carousel dock ── */}
+                {/* ── Character carousel dock — resting just out of frame ── */}
                 <LinearGradient
                     colors={[
                         'transparent',
-                        isDark ? 'rgba(4,6,14,0.96)' : 'rgba(236,240,250,0.97)',
+                        isDark ? 'rgba(5,8,6,0.72)' : 'rgba(238,243,240,0.78)',
+                        isDark ? 'rgba(5,8,6,0.97)' : 'rgba(238,243,240,0.98)',
                     ]}
+                    locations={[0, 0.42, 1]}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
                     style={{
                         position: 'absolute',
                         bottom: 0, left: 0, right: 0,
                         paddingBottom: insets.bottom + vs(14),
-                        paddingTop: vs(32),
+                        paddingTop: vs(36),
                     }}
                     pointerEvents="box-none"
                 >
@@ -579,28 +632,31 @@ export default function CanvasModeView({
                         const fm = members[focusedMemberIdx];
                         const pr = panResponders[focusedMemberIdx];
                         if (!fm || !pr) return null;
+                        const fmColor = fm.character_color ?? fm.avatar_color ?? colors.accent;
                         return (
                             <View style={{ alignItems: 'center', marginBottom: vs(10) }} pointerEvents="box-none">
-                                <Text style={{
-                                    fontSize: ms(10),
-                                    color: isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)',
-                                    letterSpacing: 1.5,
-                                    marginBottom: vs(4),
-                                }}>
-                                    ↑ DRAG TO ASSIGN ↑
+                                <Text style={[{
+                                    fontSize: ms(11),
+                                    color: isDark ? 'rgba(255,255,255,0.34)' : 'rgba(0,0,0,0.30)',
+                                    letterSpacing: 0.4,
+                                    marginBottom: vs(6),
+                                }, T.semibold]}>
+                                    Drag to assign
                                 </Text>
                                 <View
                                     style={{
-                                        padding: scale(10),
-                                        borderRadius: ms(20),
+                                        padding: scale(11),
+                                        borderRadius: ms(22),
                                         backgroundColor: isDark
-                                            ? 'rgba(255,255,255,0.07)'
-                                            : 'rgba(255,255,255,0.90)',
-                                        shadowColor: fm.character_color ?? fm.avatar_color ?? colors.accent,
+                                            ? 'rgba(255,255,255,0.08)'
+                                            : 'rgba(255,255,255,0.92)',
+                                        borderWidth: StyleSheet.hairlineWidth,
+                                        borderColor: fmColor + '55',
+                                        shadowColor: fmColor,
                                         shadowOffset: { width: 0, height: 6 },
-                                        shadowOpacity: 0.50,
-                                        shadowRadius: 18,
-                                        elevation: 10,
+                                        shadowOpacity: 0.32,
+                                        shadowRadius: 14,
+                                        elevation: 8,
                                     }}
                                     {...pr.panHandlers}
                                 >
@@ -610,13 +666,12 @@ export default function CanvasModeView({
                                         color={fm.character_color ?? fm.avatar_color ?? '#6B7280'}
                                     />
                                 </View>
-                                <Text style={{
+                                <Text style={[{
                                     fontSize: ms(12),
                                     color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
                                     marginTop: vs(6),
-                                    fontWeight: '600',
                                     letterSpacing: 0.2,
-                                }}>
+                                }, T.semibold]}>
                                     {(fm.name || '').split(' ')[0]}
                                 </Text>
                             </View>
@@ -683,14 +738,14 @@ export default function CanvasModeView({
                                             borderRadius: ms(18),
                                             backgroundColor: isDark
                                                 ? 'rgba(255,255,255,0.06)'
-                                                : 'rgba(255,255,255,0.80)',
-                                            borderWidth: isFocused ? 1.5 : 0,
-                                            borderColor: isFocused ? charColor + '88' : 'transparent',
+                                                : 'rgba(255,255,255,0.82)',
+                                            borderWidth: isFocused ? StyleSheet.hairlineWidth : 0,
+                                            borderColor: isFocused ? charColor + '77' : 'transparent',
                                             shadowColor: charColor,
-                                            shadowOffset: { width: 0, height: isFocused ? 8 : 0 },
-                                            shadowOpacity: isFocused ? 0.45 : 0,
-                                            shadowRadius: isFocused ? 16 : 0,
-                                            elevation: isFocused ? 8 : 0,
+                                            shadowOffset: { width: 0, height: isFocused ? 6 : 0 },
+                                            shadowOpacity: isFocused ? 0.30 : 0,
+                                            shadowRadius: isFocused ? 12 : 0,
+                                            elevation: isFocused ? 6 : 0,
                                         }}>
                                             <CharacterShape
                                                 variant="mini"
@@ -698,15 +753,14 @@ export default function CanvasModeView({
                                                 color={charColor}
                                             />
                                         </View>
-                                        <Text style={{
+                                        <Text style={[{
                                             fontSize: ms(10),
                                             color: isFocused
                                                 ? (isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)')
                                                 : (isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)'),
                                             marginTop: vs(5),
-                                            fontWeight: isFocused ? '600' : '400',
                                             letterSpacing: 0.2,
-                                        }} numberOfLines={1}>
+                                        }, isFocused ? T.semibold : T.regular]} numberOfLines={1}>
                                             {(m.name || '').split(' ')[0]}
                                         </Text>
                                     </Animated.View>
@@ -737,17 +791,17 @@ export default function CanvasModeView({
                         {/* Title row */}
                         <View style={styles.sheetTitleRow}>
                             <View style={{ flex: 1 }}>
-                                <Text style={[styles.sheetTitle, { color: sheetTitleColor }, T.extrabold]} numberOfLines={1}>
-                                    {selectedExpense.title}
+                                <Text style={[styles.sheetTitle, { color: sheetTitleColor }, T.semibold]} numberOfLines={1}>
+                                    {expenseEmoji(selectedExpense.title)} {selectedExpense.title}
                                 </Text>
                                 <Text style={[styles.sheetSubtitle, { color: colors.secondaryText }, T.regular]}>
                                     {selectedExpense.payer_name} paid · {selectedAssigned.length} splitting
                                 </Text>
                             </View>
-                            <Text style={[styles.sheetAmount, { color: colors.text }, T.extrabold]}>
+                            <Text style={[styles.sheetAmount, { color: colors.text, fontVariant: ['tabular-nums'] }, T.bold]}>
                                 ${formatCurrency(selectedExpense.amount)}
                             </Text>
-                            <TouchableOpacity onPress={closeSheet} style={styles.closeBtn} activeOpacity={0.8}>
+                            <TouchableOpacity onPress={closeSheet} style={styles.closeBtn} activeOpacity={0.7}>
                                 <X size={18} color={colors.faintText} />
                             </TouchableOpacity>
                         </View>
@@ -775,21 +829,22 @@ export default function CanvasModeView({
                             </View>
                         )}
 
-                        {/* Tab bar */}
-                        <View style={[styles.sheetTabBar, { borderBottomColor: colors.border }]}>
+                        {/* Segmented control — iOS grammar, not web tabs */}
+                        <View style={[styles.sheetSegments, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
                             {(['balance', 'settle'] as const).map(tab => {
                                 const active = sheetTab === tab;
                                 return (
                                     <TouchableOpacity
                                         key={tab}
-                                        style={styles.sheetTabBtn}
-                                        onPress={() => setSheetTab(tab)}
-                                        activeOpacity={0.8}
+                                        style={[styles.sheetSegment, active && {
+                                            backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : '#FFFFFF',
+                                        }]}
+                                        onPress={() => { Haptics.selectionAsync(); setSheetTab(tab); }}
+                                        activeOpacity={0.75}
                                     >
-                                        <Text style={[styles.sheetTabText, { color: active ? colors.accent : colors.faintText }, active ? T.bold : T.semibold]}>
+                                        <Text style={[styles.sheetSegmentText, { color: active ? colors.text : colors.faintText }, active ? T.semibold : T.regular]}>
                                             {tab === 'balance' ? 'Balance' : 'Settle'}
                                         </Text>
-                                        <View style={[styles.sheetTabUnderline, { backgroundColor: active ? colors.accent : 'transparent' }]} />
                                     </TouchableOpacity>
                                 );
                             })}
@@ -820,7 +875,7 @@ export default function CanvasModeView({
                                                         {isPayer ? 'Paid' : 'Owes'}
                                                     </Text>
                                                 </View>
-                                                <Text style={[styles.balanceNet, { color: pos ? colors.accent : colors.warningBright }, T.extrabold]}>
+                                                <Text style={[styles.balanceNet, { color: pos ? colors.accent : colors.warningBright, fontVariant: ['tabular-nums'] }, T.semibold]}>
                                                     {pos ? '+' : ''}${formatCurrency(Math.abs(net))}
                                                 </Text>
                                             </View>
@@ -848,12 +903,13 @@ export default function CanvasModeView({
                                         <Text style={[styles.payLabel, { color: colors.secondaryText }, T.regular]}>
                                             You owe {(payerMember?.name || 'payer').split(' ')[0]}
                                         </Text>
-                                        <Text style={[styles.payAmount, { color: colors.warningBright }, T.extrabold]}>
+                                        <Text style={[styles.payAmount, { color: colors.warningBright, fontVariant: ['tabular-nums'] }, T.bold]}>
                                             ${formatCurrency(perPerson)}
                                         </Text>
                                         <TouchableOpacity
                                             style={[styles.payBtn, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
                                             onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                                 closeSheet();
                                                 onSettle({
                                                     payee_id: selectedExpense.paid_by,
@@ -866,9 +922,9 @@ export default function CanvasModeView({
                                                     description: selectedExpense.title,
                                                 });
                                             }}
-                                            activeOpacity={0.85}
+                                            activeOpacity={0.7}
                                         >
-                                            <Text style={[styles.payBtnText, T.bold]}>Pay ${formatCurrency(perPerson)}</Text>
+                                            <Text style={[styles.payBtnText, T.semibold]}>Pay ${formatCurrency(perPerson)}</Text>
                                         </TouchableOpacity>
                                     </View>
                                 ) : (
@@ -897,40 +953,53 @@ const styles = StyleSheet.create({
     canvas: { flex: 1, overflow: 'hidden' },
     orbitRing: {
         position: 'absolute',
-        borderStyle: 'dashed',
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         alignSelf: 'center',
     },
 
+    hubHalo: {
+        position: 'absolute',
+        width: (HUB_R + 14) * 2,
+        height: (HUB_R + 14) * 2,
+        borderRadius: HUB_R + 14,
+        borderWidth: 1,
+        alignSelf: 'center',
+    },
     hub: {
         position: 'absolute',
         width: HUB_R * 2,
         height: HUB_R * 2,
         borderRadius: HUB_R,
-        borderWidth: 2,
+        borderWidth: StyleSheet.hairlineWidth,
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: vs(8),
+        gap: vs(7),
         elevation: 8,
-        paddingHorizontal: scale(10),
+        paddingHorizontal: scale(12),
     },
     hubName: {
-        fontSize: ms(14),
-        letterSpacing: -0.5,
+        fontSize: ms(15),
+        letterSpacing: -0.4,
         textAlign: 'center',
+    },
+    hubDivider: {
+        width: scale(28),
+        height: StyleSheet.hairlineWidth,
     },
     hubPills: {
         flexDirection: 'row',
         gap: scale(6),
     },
     hubPill: {
-        borderWidth: 1,
-        borderRadius: 20,
-        paddingHorizontal: scale(8),
-        paddingVertical: vs(3),
+        borderRadius: 999,
+        paddingHorizontal: scale(10),
+        paddingVertical: vs(5),
+        minHeight: scale(26),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
-    hubPillText: { fontSize: ms(10) },
+    hubPillText: { fontSize: ms(11) },
 
     bubble: {
         position: 'absolute',
@@ -981,20 +1050,25 @@ const styles = StyleSheet.create({
         width: 18,
         height: 18,
         borderRadius: 9,
-        backgroundColor: 'rgba(0,0,0,0.18)',
+        backgroundColor: 'rgba(0,0,0,0.14)',
         alignItems: 'center',
         justifyContent: 'center',
+        zIndex: 2,
     },
 
     backdrop: { backgroundColor: 'rgba(0,0,0,0.52)' },
 
-    backBtn: {
+    backBtnWrap: {
         position: 'absolute',
-        top: 0,
         left: scale(20),
+    },
+    backBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(5),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(7),
+        borderRadius: 999,
     },
     backText: { fontSize: ms(14) },
 
@@ -1005,8 +1079,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         maxHeight: 420,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: ms(20),
+        borderTopRightRadius: ms(20),
         paddingBottom: vs(24),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
@@ -1015,9 +1089,9 @@ const styles = StyleSheet.create({
         elevation: 20,
     },
     sheetHandle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
+        width: scale(36),
+        height: vs(4),
+        borderRadius: ms(2),
         alignSelf: 'center',
         marginTop: vs(10),
         marginBottom: vs(12),
@@ -1025,9 +1099,9 @@ const styles = StyleSheet.create({
     sheetTitleRow: {
         flexDirection: 'row',
         alignItems: 'flex-start',
-        paddingHorizontal: scale(18),
+        paddingHorizontal: scale(20),
         gap: scale(10),
-        marginBottom: vs(10),
+        marginBottom: vs(12),
     },
     sheetTitle: {
         fontSize: ms(17),
@@ -1038,8 +1112,8 @@ const styles = StyleSheet.create({
         marginTop: vs(2),
     },
     sheetAmount: {
-        fontSize: ms(18),
-        letterSpacing: -0.5,
+        fontSize: ms(20),
+        letterSpacing: -0.6,
         paddingTop: vs(1),
     },
     closeBtn: {
@@ -1070,28 +1144,23 @@ const styles = StyleSheet.create({
     },
     assignedPillName: { fontSize: ms(12) },
 
-    sheetTabBar: {
+    sheetSegments: {
         flexDirection: 'row',
-        borderBottomWidth: StyleSheet.hairlineWidth,
-        marginBottom: vs(12),
+        marginHorizontal: scale(20),
+        marginBottom: vs(14),
+        padding: scale(3),
+        borderRadius: ms(10),
     },
-    sheetTabBtn: {
+    sheetSegment: {
         flex: 1,
         alignItems: 'center',
-        paddingVertical: vs(10),
+        paddingVertical: vs(8),
+        borderRadius: ms(8),
     },
-    sheetTabText: { fontSize: ms(14) },
-    sheetTabUnderline: {
-        position: 'absolute',
-        bottom: 0,
-        left: scale(12),
-        right: scale(12),
-        height: 2.5,
-        borderRadius: 2,
-    },
+    sheetSegmentText: { fontSize: ms(14) },
 
     sheetContent: {
-        paddingHorizontal: scale(18),
+        paddingHorizontal: scale(20),
         gap: vs(10),
     },
     emptyHint: {
@@ -1139,15 +1208,15 @@ const styles = StyleSheet.create({
     payAvatarText: { color: '#fff', fontSize: ms(15) },
     payArrow: { fontSize: ms(20) },
     payLabel: { fontSize: ms(13) },
-    payAmount: { fontSize: ms(24), letterSpacing: -0.5 },
+    payAmount: { fontSize: ms(28), letterSpacing: -1.0 },
     payBtn: {
-        borderRadius: ms(13),
-        paddingHorizontal: scale(24),
-        paddingVertical: vs(12),
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.38,
-        shadowRadius: 10,
-        elevation: 6,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(28),
+        paddingVertical: vs(13),
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.22,
+        shadowRadius: 8,
+        elevation: 5,
     },
     payBtnText: { color: '#fff', fontSize: ms(15) },
 });
