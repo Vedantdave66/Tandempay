@@ -57,7 +57,7 @@ export default function AppearanceScreen({ navigation }: any) {
                 {/* Live phone mock preview */}
                 <View style={styles.mockWrap}>
                     <View style={[styles.mockPhone, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <LinearGradient colors={colors.heroGradient} style={styles.mockHero}>
+                        <LinearGradient colors={colors.heroGradient} locations={[0, 0.35, 1]} style={styles.mockHero}>
                             <View style={[styles.mockAvatar, { backgroundColor: colors.accent + '40' }]} />
                             <View style={[styles.mockName, { backgroundColor: colors.accent + '30' }]} />
                         </LinearGradient>

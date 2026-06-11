@@ -99,7 +99,7 @@ export default function LandingScreen({ navigation }: any) {
       {/* Header */}
       <View style={styles.nav}>
         <View style={styles.logoRow}>
-          <LinearGradient colors={[colors.accent, '#10B981']} style={styles.logoIcon}>
+          <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.logoIcon}>
             <Wallet size={20} color="white" />
           </LinearGradient>
           <Logo size={20} />
@@ -160,7 +160,7 @@ export default function LandingScreen({ navigation }: any) {
                 <Text style={[styles.loginText, { color: colors.text }]}>Log In</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.registerBtn} onPress={() => navigation.navigate('Register')}>
-                <LinearGradient colors={['#4ADE80', '#10B981']} style={styles.gradientBtn}>
+                <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.gradientBtn}>
                   <Text style={styles.registerText}>Sign Up</Text>
                   <ChevronRight size={20} color="white" />
                 </LinearGradient>

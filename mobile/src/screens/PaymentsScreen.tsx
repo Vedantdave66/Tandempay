@@ -340,6 +340,7 @@ export default function PaymentsScreen() {
                             {/* Balance card — brand gradient, adapts to every accent and both modes */}
                             <LinearGradient
                                 colors={colors.heroGradient}
+                                locations={[0, 0.35, 1]}
                                 start={{ x: 0, y: 0 }}
                                 end={{ x: 1, y: 1 }}
                                 style={styles.walletCard}

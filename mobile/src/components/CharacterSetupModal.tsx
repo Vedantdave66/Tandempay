@@ -23,16 +23,36 @@ const COLORS = [
     '#EC4899', '#8B5CF6', '#14B8A6', '#F97316',
 ];
 
+// Preview dimensions are MINI_CONFIGS.mini (CharacterShape.tsx) scaled by
+// ~3.4× so the big preview keeps exactly the proportions of the selector tile
+// you tapped. Eye positions scale by the same factor.
 const SINGLE_SHAPE_CONFIG: Record<ShapeKey, {
     width: number; height: number; tl: number; tr: number;
     eyeLeft: number; eyeTop: number; eyeType: 'ball' | 'pupil';
     eyeSize: number; eyeGap: number;
     mouthLeft?: number; mouthTop?: number;
 }> = {
-    rect:  { width: 110, height: 250, tl: 8,   tr: 8,   eyeLeft: 30, eyeTop: 40, eyeType: 'ball',  eyeSize: 16, eyeGap: 18 },
-    tall:  { width: 140, height: 330, tl: 8,   tr: 8,   eyeLeft: 43, eyeTop: 55, eyeType: 'ball',  eyeSize: 18, eyeGap: 18 },
-    semi:  { width: 230, height: 160, tl: 115, tr: 115, eyeLeft: 93, eyeTop: 60, eyeType: 'pupil', eyeSize: 12, eyeGap: 20 },
-    round: { width: 130, height: 230, tl: 65,  tr: 65,  eyeLeft: 45, eyeTop: 45, eyeType: 'pupil', eyeSize: 12, eyeGap: 16, mouthLeft: 25, mouthTop: 90 },
+    //  mini: { w:32, h:52, radius:'6px 6px 0 0', eyeTop:10, eyeLeft:8, eyeSize:5, eyeGap:6 }
+    rect: {
+        width: 108, height: 177, tl: 20, tr: 20,
+        eyeLeft: 27, eyeTop: 34, eyeType: 'ball', eyeSize: 18, eyeGap: 20,
+    },
+    //  mini: { w:22, h:64, radius:'4px 4px 0 0', eyeTop:12, eyeLeft:4, eyeSize:5, eyeGap:4 }
+    tall: {
+        width: 75, height: 218, tl: 14, tr: 14,
+        eyeLeft: 14, eyeTop: 41, eyeType: 'ball', eyeSize: 18, eyeGap: 14,
+    },
+    //  mini: { w:56, h:30, radius:'28px 28px 0 0', eyeTop:8, eyeLeft:19, eyeSize:5, eyeGap:8 }
+    semi: {
+        width: 190, height: 102, tl: 95, tr: 95,
+        eyeLeft: 65, eyeTop: 27, eyeType: 'pupil', eyeSize: 14, eyeGap: 27,
+    },
+    //  mini: { w:40, h:52, radius:'20px 20px 0 0', eyeTop:12, eyeLeft:12, eyeSize:5, eyeGap:6, mouthLeft:11, mouthTop:36 }
+    round: {
+        width: 136, height: 177, tl: 68, tr: 68,
+        eyeLeft: 41, eyeTop: 41, eyeType: 'pupil', eyeSize: 14, eyeGap: 20,
+        mouthLeft: 37, mouthTop: 122,
+    },
 };
 
 // ── Eye sub-components ────────────────────────────────────────────────────────
@@ -246,7 +266,7 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                                     position: 'absolute',
                                     left: cfg.mouthLeft,
                                     top: cfg.mouthTop,
-                                    width: 80,
+                                    width: cfg.width * 0.55,
                                     height: 4,
                                     borderRadius: 2,
                                     backgroundColor: '#1A1A1A',
@@ -360,7 +380,7 @@ const styles = StyleSheet.create({
     },
     previewContainer: {
         width: '100%',
-        height: 340,
+        height: 260, // enough for tallest shape (tall = 218) with breathing room
         justifyContent: 'flex-end',
         alignItems: 'center',
         marginBottom: 28,
@@ -373,10 +393,11 @@ const styles = StyleSheet.create({
     },
     shapeCol: {
         padding: 10,
-        borderRadius: 12,
+        borderRadius: 16,
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'flex-end',
+        minHeight: 88, // enough for mini rect (52px) + padding
     },
     colorRow: {
         flexDirection: 'row',
