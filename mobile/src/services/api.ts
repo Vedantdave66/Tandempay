@@ -94,6 +94,9 @@ export interface GroupMember {
     name: string;
     email: string;
     avatar_color: string;
+    character_shape?: string | null;
+    character_color?: string | null;
+    character_nickname?: string | null;
 }
 
 export interface Group {
