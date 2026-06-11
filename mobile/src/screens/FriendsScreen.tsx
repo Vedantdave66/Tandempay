@@ -62,8 +62,8 @@ export default function FriendsScreen() {
             notificationsApi.list()
                 .then(data => setActivity((data || []).slice(0, 8)))
                 .catch(() => {});
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // data unavailable — keep empty state
         } finally {
             setLoading(false);
         }
