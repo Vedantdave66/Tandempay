@@ -206,13 +206,14 @@ const styles = StyleSheet.create({
         backgroundColor: LOGO_GREEN,
     },
     wordRow: {
-        flexDirection: 'row',
+        flexDirection: 'column',
         alignItems: 'center',
     },
     word: {
         ...T.extrabold,
         fontSize: ms(46),
         letterSpacing: -1.4,
+        lineHeight: ms(50),
     },
     tagline: {
         ...T.regular,
