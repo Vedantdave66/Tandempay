@@ -23,7 +23,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2 } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -67,6 +67,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [inviteLoading, setInviteLoading] = useState(false);
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
+    const [deletingId, setDeletingId] = useState<string | null>(null);
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -189,6 +190,31 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 },
             },
         ]);
+    };
+
+    const handleDeleteExpense = (expense: Expense) => {
+        Alert.alert(
+            'Delete expense',
+            `Remove "${expense.title}" ($${formatCurrency(expense.amount)})? This can't be undone.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        setDeletingId(expense.id);
+                        try {
+                            await expensesApi.delete(groupId, expense.id);
+                            setExpenses(prev => prev.filter(e => e.id !== expense.id));
+                        } catch {
+                            Alert.alert('Error', 'Could not delete this expense. Try again.');
+                        } finally {
+                            setDeletingId(null);
+                        }
+                    },
+                },
+            ]
+        );
     };
 
     const handleInviteByEmail = async () => {
@@ -439,6 +465,20 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         {new Date(expense.created_at).toLocaleDateString()}
                                     </Text>
                                     <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>${formatCurrency(each)} each</Text>
+                                    {paidByMe && (
+                                        <TouchableOpacity
+                                            onPress={() => handleDeleteExpense(expense)}
+                                            disabled={deletingId === expense.id}
+                                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                            activeOpacity={0.7}
+                                            style={{ marginTop: vs(4), opacity: deletingId === expense.id ? 0.4 : 1 }}
+                                        >
+                                            {deletingId === expense.id
+                                                ? <ActivityIndicator size="small" color={colors.danger} />
+                                                : <Trash2 size={ms(15)} color={colors.danger} />
+                                            }
+                                        </TouchableOpacity>
+                                    )}
                                 </View>
                             </View>
                             </Animated.View>
