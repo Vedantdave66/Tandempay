@@ -150,7 +150,7 @@ export default function FriendsScreen() {
                 ) : activeTab === 'activity' ? (
                     activity.length === 0 ? (
                         <View style={styles.emptyState}>
-                            <Bell size={36} color={colors.secondaryText} style={{ marginBottom: vs(8) }} />
+                            <CharacterShape shape="tall" color={colors.indigo} variant="mini" />
                             <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Nothing here yet</Text>
                             <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
                                 When your friends and squads get busy, you'll see it here.
@@ -217,9 +217,9 @@ export default function FriendsScreen() {
 
                         {friends.length === 0 ? (
                             <View style={[styles.emptyState, { marginTop: vs(24) }]}>
-                                <Users size={36} color={colors.secondaryText} style={{ marginBottom: vs(8) }} />
-                                <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>No friends yet</Text>
-                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add someone by email above and splitting gets a lot easier.</Text>
+                                <CharacterShape shape="round" color={colors.accent} variant="mini" />
+                                <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Your crew goes here</Text>
+                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add someone by email above and splitting stops being math homework.</Text>
                             </View>
                         ) : (
                             friends.map(friend => (
@@ -283,7 +283,7 @@ export default function FriendsScreen() {
                                             </View>
                                             <View style={{ marginLeft: scale(12) }}>
                                                 <Text style={[styles.friendName, { color: colors.text }, T.semibold]}>{req.receiver_email}</Text>
-                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>Pending acceptance...</Text>
+                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>Waiting on them…</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -470,6 +470,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         paddingTop: vs(48),
         paddingHorizontal: scale(40),
+        gap: vs(8),
     },
     emptyTitle: {
         fontSize: ms(17),

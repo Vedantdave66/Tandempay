@@ -10,6 +10,7 @@ import { notificationsApi, NotificationOut } from '../services/api';
 import * as Haptics from 'expo-haptics';
 import { Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
 import { T } from '../utils/typography';
+import CharacterShape from '../components/CharacterShape';
 
 // Icon per type; colour stays disciplined — green for confirmed money,
 // danger for declined, greyscale for everything else.
@@ -204,8 +205,8 @@ export default function ActivityScreen({ navigation }: any) {
                     )}
                     ListEmptyComponent={
                         <View style={styles.empty}>
-                            <Bell color={colors.secondaryText} size={36} />
-                            <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Nothing here yet</Text>
+                            <CharacterShape shape="semi" color={colors.accent} variant="mini" />
+                            <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Quiet in here</Text>
                             <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
                                 When your squads add expenses or settle up, you'll see it here first.
                             </Text>

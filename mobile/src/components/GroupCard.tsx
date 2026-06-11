@@ -8,6 +8,7 @@ import { formatCurrency } from '../utils/formatCurrency';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import CharacterShape from './CharacterShape';
+import PressableScale from './PressableScale';
 
 interface GroupCardProps {
     group: GroupListItem;
@@ -51,9 +52,11 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
     };
 
     return (
-        <TouchableOpacity
+        <PressableScale
             onPress={onPress}
-            activeOpacity={0.70}
+            scaleTo={0.98}
+            rotateTo="-0.5deg"
+            haptic="light"
             style={[styles.card, {
                 backgroundColor: 'transparent',
                 borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
@@ -176,7 +179,7 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                     </View>
                 )}
             </View>
-        </TouchableOpacity>
+        </PressableScale>
     );
 }
 

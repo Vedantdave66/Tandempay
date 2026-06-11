@@ -20,6 +20,7 @@ import { useNotifications } from '../context/NotificationContext';
 import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
+import PressableScale from '../components/PressableScale';
 import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 
@@ -46,6 +47,16 @@ function greeting(): string {
     if (h < 12) return 'Good morning';
     if (h < 18) return 'Good afternoon';
     return 'Good evening';
+}
+
+// The balance widget speaks like a friend, not a ledger.
+function balanceVoice(owed: number, owing: number): string {
+    const isOwed = owed > 0.005;
+    const isOwing = owing > 0.005;
+    if (isOwed && isOwing) return 'Some owed, some owing';
+    if (isOwed)            return 'People owe you';
+    if (isOwing)           return 'A tab or two to close';
+    return 'Nothing hanging over anyone';
 }
 
 interface BreakdownRow { groupName: string; amount: number; }
@@ -171,6 +182,16 @@ export default function DashboardScreen({ navigation }: any) {
         Array.from({ length: 5 }, () => new Animated.Value(0))
     ).current;
 
+    // Your character rises into frame on arrival — it's you showing up, not an icon loading.
+    const characterRise = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        if (!loading) {
+            Animated.spring(characterRise, {
+                toValue: 1, damping: 18, stiffness: 220, useNativeDriver: true,
+            }).start();
+        }
+    }, [loading]);
+
     const loadGroups = async () => {
         try {
             const raw = await groupsApi.list();
@@ -278,11 +299,12 @@ export default function DashboardScreen({ navigation }: any) {
 
     const firstName = user?.name?.split(' ')[0] ?? '';
     const netBalance = owedToMe - iOwe;
+    const allSquare = owedToMe < 0.005 && iOwe < 0.005;
     const netColor = netBalance > 0.005
         ? colors.accent
         : netBalance < -0.005
             ? colors.gold
-            : colors.secondaryText;
+            : colors.accent;
 
     if (loading && !refreshing) {
         return (
@@ -324,34 +346,46 @@ export default function DashboardScreen({ navigation }: any) {
                         <Text style={[styles.greetingLabel, { color: colors.secondaryText }, T.regular]}>{greeting()}</Text>
                         <Text style={[styles.greetingName, { color: colors.text }, T.bold]}>{firstName}</Text>
                     </View>
-                    <View style={{ transform: [{ scale: 0.72 }] }}>
+                    <Animated.View style={{
+                        opacity: characterRise,
+                        transform: [
+                            { scale: 0.72 },
+                            { translateY: characterRise.interpolate({ inputRange: [0, 1], outputRange: [vs(16), 0] }) },
+                        ],
+                    }}>
                         <CharacterShape
                             shape={user?.character_shape ?? 'rect'}
                             color={user?.character_color ?? '#34D399'}
                             variant="hero"
                         />
-                    </View>
+                    </Animated.View>
                 </View>
 
-                {/* Net balance widget — flat, data-first */}
-                <TouchableOpacity
+                {/* Net balance — the widget speaks, the number answers */}
+                <PressableScale
+                    haptic="light"
+                    scaleTo={0.98}
                     style={[styles.netBalanceBtn, {
                         backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
                     }]}
-                    activeOpacity={0.70}
-                    onPress={() => {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setShowNetModal(true);
-                    }}
+                    onPress={() => setShowNetModal(true)}
                 >
                     <View style={{ flex: 1 }}>
-                        <Text style={[styles.netBalanceLabel, { color: colors.faintText }, T.semibold]}>NET BALANCE</Text>
-                        <Text style={[styles.netBalanceValue, { color: netColor, fontVariant: ['tabular-nums'] }, T.extrabold]}>
-                            {netBalance >= 0 ? '+' : '-'}${formatCurrency(Math.abs(netBalance))}
+                        <Text style={[styles.netBalanceLabel, { color: colors.secondaryText }, T.regular]}>
+                            {balanceVoice(owedToMe, iOwe)}
                         </Text>
+                        {allSquare ? (
+                            <Text style={[styles.netBalanceValue, { color: netColor }, T.extrabold]}>
+                                All square
+                            </Text>
+                        ) : (
+                            <Text style={[styles.netBalanceValue, { color: netColor, fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                                {netBalance >= 0 ? '+' : '-'}${formatCurrency(Math.abs(netBalance))}
+                            </Text>
+                        )}
                     </View>
                     <ChevronRight size={16} color={colors.faintText} strokeWidth={2} />
-                </TouchableOpacity>
+                </PressableScale>
 
                 {/* Your squads */}
                 <View style={styles.sectionHeader}>
@@ -373,7 +407,7 @@ export default function DashboardScreen({ navigation }: any) {
                 {groups.length === 0 ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
-                            No squads yet — create one to get started.
+                            Your squads live here. Make one and stop doing tab math in the group chat.
                         </Text>
                     </View>
                 ) : (
@@ -517,9 +551,7 @@ const styles = StyleSheet.create({
         paddingVertical: vs(16),
     },
     netBalanceLabel: {
-        fontSize: ms(10),
-        letterSpacing: 0.6,
-        textTransform: 'uppercase',
+        fontSize: ms(13),
         marginBottom: vs(3),
     },
     netBalanceValue: {
