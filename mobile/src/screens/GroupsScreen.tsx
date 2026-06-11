@@ -109,20 +109,18 @@ export default function GroupsScreen({ navigation }: any) {
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }, T.extrabold]}>Your squads</Text>
+                <View>
+                    <Text style={[styles.title, { color: colors.text }, T.bold]}>Your squads</Text>
+                    <Text style={[styles.subtitle, { color: colors.secondaryText }, T.regular]}>
+                        {groups.length === 0 ? 'Nothing yet' : `${groups.length} squad${groups.length === 1 ? '' : 's'}`}
+                    </Text>
+                </View>
                 <TouchableOpacity
                     onPress={() => navigation.navigate('CreateGroup')}
-                    style={[styles.newButton, {
-                        backgroundColor: colors.accent,
-                        shadowColor: colors.accent,
-                        shadowOpacity: 0.22,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 6 },
-                        elevation: 8,
-                    }]}
-                    activeOpacity={0.82}
+                    style={[styles.newButton, { backgroundColor: colors.accentBg }]}
+                    activeOpacity={0.70}
                 >
-                    <Text style={[styles.newButtonText, T.bold]}>+ New</Text>
+                    <Text style={[styles.newButtonText, { color: colors.accent }, T.semibold]}>+ New</Text>
                 </TouchableOpacity>
             </View>
 
@@ -142,8 +140,11 @@ export default function GroupsScreen({ navigation }: any) {
                         <View style={styles.empty}>
                             <CharacterShape shape="round" color={colors.accent} variant="hero" />
                             <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>No squads yet</Text>
-                            <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.70}>
-                                <Text style={[styles.emptyAction, { color: colors.accentDark }, T.bold]}>Create one →</Text>
+                            <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
+                                Roommates, road trips, group dinners — make a squad and stop doing math.
+                            </Text>
+                            <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.75}>
+                                <Text style={[styles.emptyAction, { color: colors.accent }, T.semibold]}>Create one</Text>
                             </TouchableOpacity>
                         </View>
                     ) : (
@@ -173,27 +174,30 @@ const styles = StyleSheet.create({
     safe: { flex: 1 },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        paddingHorizontal: scale(16),
+        paddingHorizontal: scale(20),
         paddingTop: vs(16),
         paddingBottom: vs(16),
     },
-    title: { fontSize: ms(26), letterSpacing: -0.6 },
+    title: { fontSize: ms(28), letterSpacing: -0.8 },
+    subtitle: { fontSize: ms(13), marginTop: vs(2) },
     newButton: {
-        borderRadius: ms(12),
+        borderRadius: 999,
         paddingHorizontal: scale(14),
-        paddingVertical: vs(9),
+        paddingVertical: vs(8),
     },
-    newButtonText: { fontSize: ms(13), color: '#fff' },
+    newButtonText: { fontSize: ms(14) },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
-    list: { paddingHorizontal: scale(16) },
+    list: { paddingHorizontal: scale(20) },
     empty: {
         alignItems: 'center',
         justifyContent: 'center',
-        gap: vs(14),
+        gap: vs(8),
         paddingVertical: vs(32),
+        paddingHorizontal: scale(32),
     },
-    emptyTitle: { fontSize: ms(18) },
-    emptyAction: { fontSize: ms(15) },
+    emptyTitle: { fontSize: ms(17), marginTop: vs(8) },
+    emptyDesc: { fontSize: ms(15), textAlign: 'center', lineHeight: 21 },
+    emptyAction: { fontSize: ms(17), marginTop: vs(8) },
 });

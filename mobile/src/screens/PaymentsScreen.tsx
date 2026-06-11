@@ -20,6 +20,7 @@ import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut } from '../services/api';
 import { T } from '../utils/typography';
 
@@ -88,7 +89,7 @@ export default function PaymentsScreen() {
     useEffect(() => {
         const count = Math.min(payments.length, 5);
         paymentAnims.forEach(a => a.setValue(0));
-        Animated.stagger(40, paymentAnims.slice(0, count).map(a =>
+        Animated.stagger(30, paymentAnims.slice(0, count).map(a =>
             Animated.timing(a, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true })
         )).start();
     }, [payments.length]);
@@ -99,10 +100,13 @@ export default function PaymentsScreen() {
     };
 
     const handleUpdateStatus = async (groupId: string, id: string, status: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             await settlementsApi.updateStatus(groupId, id, status);
+            if (status === 'settled') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             loadData();
         } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert("Error", err.message || "Failed to update payment.");
         }
     };
@@ -114,6 +118,7 @@ export default function PaymentsScreen() {
             return;
         }
 
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setFundLoading(true);
         try {
             if (fundModalType === 'add') {
@@ -124,8 +129,10 @@ export default function PaymentsScreen() {
             setFundModalVisible(false);
             setFundAmount('');
             loadData();
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert("Success", fundModalType === 'add' ? "Funds added successfully." : "Withdrawal initiated.");
         } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert("Error", err.message || "Wallet action failed.");
         } finally {
             setFundLoading(false);
@@ -149,27 +156,15 @@ export default function PaymentsScreen() {
     const pendingPayments = (payments ?? []).filter(p => p.status === 'pending' || p.status === 'sent');
     const historyPayments = (payments ?? []).filter(p => p.status === 'settled' || p.status === 'declined');
 
-    const cardShadow = {
-        shadowColor: isDark ? '#000' : '#0A3020',
-        shadowOpacity: isDark ? 0.28 : 0.10,
-        shadowRadius: isDark ? 14 : 14,
-        shadowOffset: { width: 0, height: isDark ? 8 : 6 },
-        elevation: isDark ? 6 : 4,
-    };
-
     const renderPaymentCard = (payment: SettlementRecordOut) => {
         const isPayer = payment.payer_id === user?.id;
         const otherUserType = isPayer ? 'Paying' : 'Receiving from';
         const otherUserName = isPayer ? payment.payee_name : payment.payer_name;
         const otherUserAvatar = isPayer ? payment.payee_avatar_color : payment.payer_avatar_color;
+        const statusLabel = payment.status.charAt(0).toUpperCase() + payment.status.slice(1);
 
         return (
-            <View key={payment.id} style={[styles.card, {
-                backgroundColor: colors.surface,
-                borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
-                borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
-                ...cardShadow,
-            }]}>
+            <View key={payment.id} style={[styles.card, { backgroundColor: colors.surface }]}>
                 <View style={styles.cardHeader}>
                     <View style={styles.cardInfo}>
                         <View style={[styles.avatar, { backgroundColor: otherUserAvatar }]}>
@@ -177,17 +172,17 @@ export default function PaymentsScreen() {
                         </View>
                         <View>
                             <Text style={[styles.cardTitle, { color: colors.secondaryText }, T.regular]}>{otherUserType}</Text>
-                            <Text style={[styles.cardName, { color: colors.text }, T.bold]}>{otherUserName}</Text>
+                            <Text style={[styles.cardName, { color: colors.text }, T.semibold]}>{otherUserName}</Text>
                         </View>
                     </View>
-                    <Text style={[styles.amount, { color: isPayer ? colors.danger : colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                    <Text style={[styles.amount, { color: isPayer ? colors.danger : colors.accent, fontVariant: ['tabular-nums'] }, T.bold]}>
                         ${formatCurrency(payment.amount)}
                     </Text>
                 </View>
 
                 <View style={[styles.statusBanner, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.02)' }]}>
-                    <Text style={[styles.statusText, { color: colors.text }, T.regular]}>
-                        Status: <Text style={[T.extrabold, { color: payment.status === 'settled' ? colors.accent : payment.status === 'declined' ? colors.danger : colors.secondaryText }]}>{payment.status.toUpperCase()}</Text>
+                    <Text style={[styles.statusText, { color: colors.secondaryText }, T.regular]}>
+                        Status: <Text style={[T.semibold, { color: payment.status === 'settled' ? colors.accent : payment.status === 'declined' ? colors.danger : colors.text }]}>{statusLabel}</Text>
                     </Text>
                 </View>
 
@@ -195,19 +190,15 @@ export default function PaymentsScreen() {
                     <View style={styles.actions}>
                         {isPayer && payment.status === 'pending' && (
                             <TouchableOpacity
-                                style={[styles.actionBtn, {
-                                    backgroundColor: colors.accent,
-                                    shadowColor: colors.accent,
-                                    shadowOffset: { width: 0, height: 6 },
-                                    shadowOpacity: 0.22,
-                                    shadowRadius: 8,
-                                    elevation: 8,
-                                }]}
-                                onPress={() => navigation.navigate('SettleUp', { payment })}
-                                activeOpacity={0.82}
+                                style={[styles.actionBtn, { backgroundColor: colors.accent }]}
+                                onPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    navigation.navigate('SettleUp', { payment });
+                                }}
+                                activeOpacity={0.70}
                             >
                                 <Send size={16} color="white" />
-                                <Text style={[styles.actionText, T.bold]}>Settle up</Text>
+                                <Text style={[styles.actionText, T.semibold]}>Settle up</Text>
                             </TouchableOpacity>
                         )}
                         {isPayer && payment.status === 'sent' && (
@@ -222,29 +213,21 @@ export default function PaymentsScreen() {
                             </Text>
                         )}
                         {!isPayer && payment.status === 'sent' && (
-                            <View style={{ flexDirection: 'row', gap: vs(8), width: '100%' }}>
+                            <View style={{ flexDirection: 'row', gap: scale(8), width: '100%' }}>
                                 <TouchableOpacity
-                                    style={[styles.actionBtn, {
-                                        backgroundColor: colors.accent, flex: 2,
-                                        shadowColor: colors.accent,
-                                        shadowOffset: { width: 0, height: 8 },
-                                        shadowOpacity: 0.44,
-                                        shadowRadius: 12,
-                                        elevation: 8,
-                                    }]}
+                                    style={[styles.actionBtn, { backgroundColor: colors.accent, flex: 2 }]}
                                     onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'settled')}
-                                    activeOpacity={0.82}
+                                    activeOpacity={0.70}
                                 >
                                     <CheckCircle2 size={16} color="white" />
-                                    <Text style={[styles.actionText, T.bold]}>Confirm</Text>
+                                    <Text style={[styles.actionText, T.semibold]}>Confirm</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
-                                    style={[styles.actionBtn, { backgroundColor: colors.danger, flex: 1 }]}
+                                    style={[styles.actionBtn, { flex: 1 }]}
                                     onPress={() => handleUpdateStatus(payment.group_id, payment.id, 'declined')}
-                                    activeOpacity={0.82}
+                                    activeOpacity={0.60}
                                 >
-                                    <XCircle size={16} color="white" />
-                                    <Text style={[styles.actionText, T.bold]}>Decline</Text>
+                                    <Text style={[styles.actionText, { color: colors.danger }, T.semibold]}>Decline</Text>
                                 </TouchableOpacity>
                             </View>
                         )}
@@ -257,22 +240,24 @@ export default function PaymentsScreen() {
     const renderWalletTransaction = (tx: WalletTransactionOut) => {
         const isPositive = tx.amount > 0;
         return (
-            <View key={tx.id} style={[styles.ledgerRow, { borderBottomColor: colors.border }]}>
-                <View style={[styles.ledgerIcon, { backgroundColor: isPositive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)' }]}>
-                    {isPositive ? <ArrowDownToLine size={16} color="#10B981" /> : <Clock size={16} color="#EF4444" />}
+            <View key={tx.id} style={[styles.ledgerRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+                <View style={[styles.ledgerIcon, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)' }]}>
+                    {isPositive
+                        ? <ArrowDownToLine size={20} color={colors.accent} />
+                        : <Clock size={20} color={colors.secondaryText} />}
                 </View>
                 <View style={{ flex: 1 }}>
-                    <Text style={[styles.ledgerType, { color: colors.text }, T.bold]}>{tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}</Text>
+                    <Text style={[styles.ledgerType, { color: colors.text }, T.regular]}>{tx.type.charAt(0).toUpperCase() + tx.type.slice(1)}</Text>
                     <Text style={[styles.ledgerDate, { color: colors.secondaryText }, T.regular]}>
                         {new Date(tx.created_at).toLocaleDateString()}
                     </Text>
                 </View>
                 <View style={{ alignItems: 'flex-end' }}>
-                    <Text style={[styles.ledgerAmount, { color: isPositive ? colors.accent : colors.text, fontVariant: ['tabular-nums'] }, T.bold]}>
+                    <Text style={[styles.ledgerAmount, { color: isPositive ? colors.accent : colors.text, fontVariant: ['tabular-nums'] }, T.semibold]}>
                         {isPositive ? '+' : '-'}${formatCurrency(Math.abs(tx.amount))}
                     </Text>
-                    <Text style={[styles.ledgerStatus, { color: tx.status === 'completed' ? colors.accent : '#F59E0B' }, T.extrabold]}>
-                        {tx.status.toUpperCase()}
+                    <Text style={[styles.ledgerStatus, { color: tx.status === 'completed' ? colors.secondaryText : colors.gold }, T.semibold]}>
+                        {tx.status.charAt(0).toUpperCase() + tx.status.slice(1)}
                     </Text>
                 </View>
             </View>
@@ -282,42 +267,42 @@ export default function PaymentsScreen() {
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }, T.extrabold]}>Payments & Wallet</Text>
+                <Text style={[styles.title, { color: colors.text }, T.bold]}>Payments</Text>
 
-                <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: vs(16) }]}>
+                <View style={[styles.segmentContainer, { backgroundColor: colors.surface, marginBottom: vs(16) }]}>
                     <TouchableOpacity
                         style={[styles.segment, masterTab === 'wallet' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white' }]}
-                        onPress={() => setMasterTab('wallet')}
-                        activeOpacity={0.88}
+                        onPress={() => { Haptics.selectionAsync(); setMasterTab('wallet'); }}
+                        activeOpacity={0.75}
                     >
                         <Wallet size={16} color={masterTab === 'wallet' ? colors.text : colors.secondaryText} style={{ marginRight: scale(6) }} />
-                        <Text style={[styles.segmentText, { color: masterTab === 'wallet' ? colors.text : colors.secondaryText }, masterTab === 'wallet' ? T.bold : T.regular]}>Wallet</Text>
+                        <Text style={[styles.segmentText, { color: masterTab === 'wallet' ? colors.text : colors.secondaryText }, masterTab === 'wallet' ? T.semibold : T.regular]}>Wallet</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.segment, masterTab === 'settle' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white' }]}
-                        onPress={() => setMasterTab('settle')}
-                        activeOpacity={0.88}
+                        onPress={() => { Haptics.selectionAsync(); setMasterTab('settle'); }}
+                        activeOpacity={0.75}
                     >
                         <Send size={16} color={masterTab === 'settle' ? colors.text : colors.secondaryText} style={{ marginRight: scale(6) }} />
-                        <Text style={[styles.segmentText, { color: masterTab === 'settle' ? colors.text : colors.secondaryText }, masterTab === 'settle' ? T.bold : T.regular]}>Settle Up</Text>
+                        <Text style={[styles.segmentText, { color: masterTab === 'settle' ? colors.text : colors.secondaryText }, masterTab === 'settle' ? T.semibold : T.regular]}>Settle Up</Text>
                     </TouchableOpacity>
                 </View>
 
                 {masterTab === 'settle' && (
-                    <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: vs(8) }]}>
+                    <View style={[styles.segmentContainer, { backgroundColor: colors.surface, marginBottom: vs(8) }]}>
                         <TouchableOpacity
                             style={[styles.segment, settleTab === 'pending' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white' }]}
-                            onPress={() => setSettleTab('pending')}
-                            activeOpacity={0.88}
+                            onPress={() => { Haptics.selectionAsync(); setSettleTab('pending'); }}
+                            activeOpacity={0.75}
                         >
-                            <Text style={[styles.segmentText, { color: settleTab === 'pending' ? colors.text : colors.secondaryText }, settleTab === 'pending' ? T.bold : T.regular]}>Action Required</Text>
+                            <Text style={[styles.segmentText, { color: settleTab === 'pending' ? colors.text : colors.secondaryText }, settleTab === 'pending' ? T.semibold : T.regular]}>Action Required</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
                             style={[styles.segment, settleTab === 'history' && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white' }]}
-                            onPress={() => setSettleTab('history')}
-                            activeOpacity={0.88}
+                            onPress={() => { Haptics.selectionAsync(); setSettleTab('history'); }}
+                            activeOpacity={0.75}
                         >
-                            <Text style={[styles.segmentText, { color: settleTab === 'history' ? colors.text : colors.secondaryText }, settleTab === 'history' ? T.bold : T.regular]}>History</Text>
+                            <Text style={[styles.segmentText, { color: settleTab === 'history' ? colors.text : colors.secondaryText }, settleTab === 'history' ? T.semibold : T.regular]}>History</Text>
                         </TouchableOpacity>
                     </View>
                 )}
@@ -362,7 +347,7 @@ export default function PaymentsScreen() {
                                     <Text style={[styles.walletCardTitle, T.bold]}>Tandem Balance</Text>
                                 </View>
                                 <Text style={[styles.walletAvailable, T.regular]}>Available Funds</Text>
-                                <Text style={[styles.walletBalanceText, T.extrabold]}>${formatCurrency(walletBalance)}</Text>
+                                <Text style={[styles.walletBalanceText, T.bold]}>${formatCurrency(walletBalance)}</Text>
                                 <View style={styles.walletButtons}>
                                     <TouchableOpacity style={[styles.walletBtn, { backgroundColor: 'white' }]} onPress={() => openFundModal('add')} activeOpacity={0.82}>
                                         <Text style={[styles.walletBtnText, { color: '#4F46E5' }, T.bold]}>Add Funds</Text>
@@ -386,11 +371,11 @@ export default function PaymentsScreen() {
                             </View>
                         </ScrollView>
 
-                        <Text style={[styles.ledgerSectionTitle, { color: colors.text }, T.extrabold]}>
+                        <Text style={[styles.ledgerSectionTitle, { color: colors.text }, T.bold]}>
                             Ledger History
                         </Text>
 
-                        <View style={[styles.ledgerContainer, { backgroundColor: colors.surface, borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)', ...cardShadow }]}>
+                        <View style={[styles.ledgerContainer, { backgroundColor: colors.surface }]}>
                             {(walletTransactions ?? []).length === 0 ? (
                                 <View style={styles.ledgerEmpty}>
                                     <RotateCcw size={32} color={colors.secondaryText} />
@@ -408,10 +393,10 @@ export default function PaymentsScreen() {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }, T.extrabold]}>
+                            <Text style={[styles.modalTitle, { color: colors.text }, T.semibold]}>
                                 {fundModalType === 'add' ? 'Add Funds' : 'Withdraw Funds'}
                             </Text>
-                            <TouchableOpacity onPress={() => setFundModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]} activeOpacity={0.88}>
+                            <TouchableOpacity onPress={() => setFundModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]} activeOpacity={0.75}>
                                 <X size={20} color={colors.text} />
                             </TouchableOpacity>
                         </View>
@@ -436,17 +421,12 @@ export default function PaymentsScreen() {
                             style={[styles.submitBtn, {
                                 backgroundColor: colors.accent,
                                 opacity: fundLoading ? 0.7 : 1,
-                                shadowColor: colors.accent,
-                                shadowOffset: { width: 0, height: 8 },
-                                shadowOpacity: 0.44,
-                                shadowRadius: 12,
-                                elevation: 8,
                             }]}
                             onPress={handleWalletAction}
                             disabled={fundLoading}
-                            activeOpacity={0.82}
+                            activeOpacity={0.70}
                         >
-                            {fundLoading ? <ActivityIndicator color="white" /> : <Text style={[styles.submitBtnText, T.extrabold]}>Confirm</Text>}
+                            {fundLoading ? <ActivityIndicator color="white" /> : <Text style={[styles.submitBtnText, T.semibold]}>Confirm</Text>}
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -464,15 +444,14 @@ const styles = StyleSheet.create({
         paddingBottom: vs(8),
     },
     title: {
-        fontSize: ms(26),
-        letterSpacing: -0.6,
+        fontSize: ms(28),
+        letterSpacing: -0.8,
         marginBottom: vs(20),
     },
     segmentContainer: {
         flexDirection: 'row',
         padding: scale(4),
         borderRadius: ms(12),
-        borderWidth: StyleSheet.hairlineWidth,
     },
     segment: {
         flex: 1,
@@ -492,8 +471,7 @@ const styles = StyleSheet.create({
     },
 
     card: {
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(16),
         marginBottom: vs(16),
         padding: scale(16),
     },
@@ -517,7 +495,7 @@ const styles = StyleSheet.create({
     avatarText: { color: 'white', fontSize: ms(16) },
     cardTitle: { fontSize: ms(12), marginBottom: vs(2) },
     cardName: { fontSize: ms(16) },
-    amount: { fontSize: ms(22), letterSpacing: -0.5 },
+    amount: { fontSize: ms(22), letterSpacing: -0.8 },
     statusBanner: {
         marginTop: vs(16),
         padding: scale(12),
@@ -533,9 +511,9 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: vs(8),
-        height: 48,
-        borderRadius: ms(12),
+        gap: scale(8),
+        height: scale(48),
+        borderRadius: ms(14),
         width: '100%',
     },
     actionText: { color: 'white', fontSize: ms(15) },
@@ -566,7 +544,6 @@ const styles = StyleSheet.create({
         width: 280,
         borderRadius: ms(24),
         padding: scale(24),
-        borderWidth: StyleSheet.hairlineWidth,
         marginRight: scale(16),
     },
     walletCardHeader: {
@@ -594,6 +571,7 @@ const styles = StyleSheet.create({
     walletBalanceText: {
         fontSize: ms(36),
         color: '#111827',
+        letterSpacing: -1.2,
         marginBottom: vs(24),
         fontVariant: ['tabular-nums'],
     },
@@ -636,8 +614,7 @@ const styles = StyleSheet.create({
         marginBottom: vs(16),
     },
     ledgerContainer: {
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(16),
         overflow: 'hidden',
     },
     ledgerEmpty: {
@@ -656,15 +633,15 @@ const styles = StyleSheet.create({
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
     ledgerIcon: {
-        width: 40,
-        height: 40,
-        borderRadius: ms(20),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
         marginRight: scale(12),
     },
     ledgerType: {
-        fontSize: ms(16),
+        fontSize: ms(17),
         marginBottom: vs(2),
     },
     ledgerDate: {
@@ -672,12 +649,11 @@ const styles = StyleSheet.create({
     },
     ledgerAmount: {
         fontSize: ms(17),
-        letterSpacing: -0.3,
+        letterSpacing: -0.5,
         marginBottom: vs(2),
     },
     ledgerStatus: {
-        fontSize: ms(11),
-        letterSpacing: 1.3,
+        fontSize: ms(12),
     },
 
     modalOverlay: {
@@ -686,8 +662,8 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-end',
     },
     modalContent: {
-        borderTopLeftRadius: 32,
-        borderTopRightRadius: 32,
+        borderTopLeftRadius: ms(20),
+        borderTopRightRadius: ms(20),
         padding: scale(24),
         minHeight: '40%',
     },
@@ -698,7 +674,8 @@ const styles = StyleSheet.create({
         marginBottom: vs(16),
     },
     modalTitle: {
-        fontSize: ms(24),
+        fontSize: ms(17),
+        letterSpacing: -0.3,
     },
     closeModalBtn: {
         width: 36,
@@ -710,11 +687,11 @@ const styles = StyleSheet.create({
     inputContainer: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderWidth: 2,
-        borderRadius: ms(16),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderRadius: ms(14),
         paddingHorizontal: scale(16),
         marginBottom: vs(24),
-        height: 60,
+        height: vs(60),
     },
     currencySymbol: {
         fontSize: ms(24),
@@ -725,17 +702,13 @@ const styles = StyleSheet.create({
         fontSize: ms(24),
     },
     submitBtn: {
-        paddingVertical: vs(17),
-        borderRadius: ms(16),
+        paddingVertical: vs(16),
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.22,
-        shadowRadius: 8,
-        elevation: 8,
     },
     submitBtnText: {
         color: 'white',
-        fontSize: ms(16),
+        fontSize: ms(17),
     },
 });

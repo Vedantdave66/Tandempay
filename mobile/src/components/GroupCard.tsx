@@ -127,8 +127,8 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
                     <Text style={{
                         color: colors.text,
                         fontSize: compact ? ms(18) : ms(22),
-                        ...T.extrabold,
-                        letterSpacing: -0.4,
+                        ...T.bold,
+                        letterSpacing: -0.6,
                         textAlign: 'center',
                     }} numberOfLines={1}>
                         {group.name}
@@ -146,9 +146,9 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
 
             <View style={[styles.stats, compact && styles.statsCompact]}>
                 <View style={styles.statBlock}>
-                    <Text style={[styles.statLabel, { color: colors.groupLabel }, T.extrabold]}>TOTAL EXPENSES</Text>
+                    <Text style={[styles.statLabel, { color: colors.groupLabel }, T.semibold]}>TOTAL EXPENSES</Text>
                     <View style={[styles.statPill, boxStyle, compact && styles.statPillCompact]}>
-                        <Text style={[styles.statValue, { color: colors.text, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                        <Text style={[styles.statValue, { color: colors.text, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.bold]}>
                             ${formatCurrency(group.total_expenses)}
                         </Text>
                     </View>
@@ -156,11 +156,11 @@ export default function GroupCard({ group, members = [], myNetBalance = 0, compa
 
                 {balanceLoaded && (
                     <View style={styles.statBlock}>
-                        <Text style={[styles.statLabel, { color: colors.groupLabel }, T.extrabold]}>
+                        <Text style={[styles.statLabel, { color: colors.groupLabel }, T.semibold]}>
                             {isOwed ? "YOU'RE OWED" : isOwe ? 'YOU OWE' : 'STATUS'}
                         </Text>
                         <View style={[styles.balancePill, boxStyle, compact && styles.balancePillCompact]}>
-                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.extrabold]}>
+                            <Text style={[styles.balanceValue, { color: isSettled ? colors.groupOwed : accent, fontSize: compact ? ms(21) : ms(26, 0.3), fontVariant: ['tabular-nums'] }, T.bold]}>
                                 {isSettled ? '✓ Settled' : `$${formatCurrency(Math.abs(balance))}`}
                             </Text>
                             <View
