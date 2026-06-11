@@ -852,10 +852,7 @@ export default function CanvasModeView({
 
                 {/* ── Character carousel dock ── */}
                 <LinearGradient
-                    colors={[
-                        'transparent',
-                        isDark ? 'rgba(4,6,14,0.96)' : 'rgba(236,240,250,0.97)',
-                    ]}
+                    colors={[colors.background + '00', colors.background + 'F7']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
                     style={{

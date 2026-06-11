@@ -78,6 +78,7 @@ export default function ProHubScreen({ navigation }: any) {
                 {/* Hero */}
                 <LinearGradient
                     colors={colors.heroGradient}
+                    locations={[0, 0.35, 1]}
                     style={styles.hero}
                 >
                     <CharacterShape
