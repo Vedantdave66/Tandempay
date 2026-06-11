@@ -114,9 +114,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         }
     }, [groupId]);
 
-    useEffect(() => {
+    // Refetch on every focus, not just mount — so character edits made in
+    // the profile (yours or, since the last visit, a friend's) flow into the
+    // member list and the canvas without a manual pull-to-refresh.
+    useFocusEffect(useCallback(() => {
         loadData();
-    }, [loadData]);
+    }, [loadData]));
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -309,7 +312,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             )}
                         </View>
                         <TouchableOpacity
-                            onPress={() => { setCanvasMode(v => !v); Haptics.selectionAsync(); }}
+                            onPress={() => {
+                                // Entering canvas — silently pull fresh member
+                                // characters so the scene matches everyone's
+                                // latest shape/color/nickname
+                                if (!canvasMode) loadData();
+                                setCanvasMode(v => !v);
+                                Haptics.selectionAsync();
+                            }}
                             style={[
                                 styles.canvasToggleBtn,
                                 {
