@@ -50,38 +50,18 @@ const MAX_R      = 70;
 const WALL_INSET = 56;
 const DOCK_MAX   = 6; // draggable members shown in the dock
 
-// Demo-mode fixtures — a believable crew so unauthenticated screens (landing,
-// onboarding) can show the live canvas without any API data
-const DEMO_MEMBERS: GroupMember[] = [
-    { user_id: 'demo-1', name: 'Vedant', email: '', avatar_color: '#16A34A', character_shape: 'rect',  character_color: '#16A34A', character_nickname: 'V' },
-    { user_id: 'demo-2', name: 'Sarah',  email: '', avatar_color: '#3B82F6', character_shape: 'tall',  character_color: '#3B82F6', character_nickname: 'S' },
-    { user_id: 'demo-3', name: 'Mike',   email: '', avatar_color: '#F59E0B', character_shape: 'semi',  character_color: '#F59E0B', character_nickname: 'M' },
-    { user_id: 'demo-4', name: 'Aisha',  email: '', avatar_color: '#EC4899', character_shape: 'round', character_color: '#EC4899', character_nickname: 'A' },
-    { user_id: 'demo-5', name: 'Jordan', email: '', avatar_color: '#8B5CF6', character_shape: 'semi',  character_color: '#8B5CF6', character_nickname: 'J' },
-];
-
-const DEMO_EXPENSES: Expense[] = [
-    { id: 'demo-e1', title: 'Pizza Night', amount: 48, paid_by: 'demo-1', payer_name: 'Vedant', payer_avatar_color: '#16A34A', split_type: 'equal', created_at: '', participants: [] },
-    { id: 'demo-e2', title: 'Groceries',   amount: 85, paid_by: 'demo-2', payer_name: 'Sarah',  payer_avatar_color: '#3B82F6', split_type: 'equal', created_at: '', participants: [] },
-    { id: 'demo-e3', title: 'Uber Home',   amount: 24, paid_by: 'demo-3', payer_name: 'Mike',   payer_avatar_color: '#F59E0B', split_type: 'equal', created_at: '', participants: [] },
-    { id: 'demo-e4', title: 'Coffee Run',  amount: 12, paid_by: 'demo-4', payer_name: 'Aisha',  payer_avatar_color: '#EC4899', split_type: 'equal', created_at: '', participants: [] },
-    { id: 'demo-e5', title: 'Hydro Bill',  amount: 62, paid_by: 'demo-5', payer_name: 'Jordan', payer_avatar_color: '#8B5CF6', split_type: 'equal', created_at: '', participants: [] },
-];
-
 interface CanvasModeViewProps {
-    expenses?: Expense[];
-    members?: GroupMember[];
-    groupId?: string;
-    groupName?: string;
-    user?: User | null;
+    expenses: Expense[];
+    members: GroupMember[];
+    groupId: string;
+    groupName: string;
+    user: User | null;
     colors: any;
     isDark: boolean;
-    onAddExpense?: () => void;
-    onSettle?: (payment: any) => void;
-    onClose?: () => void;
+    onAddExpense: () => void;
+    onSettle: (payment: any) => void;
+    onClose: () => void;
     style?: ViewStyle;
-    /** Passive showcase mode — mock data, no interaction, no chrome */
-    demo?: boolean;
 }
 
 // A star that twinkles on its own clock — duration and phase keyed off its
@@ -117,14 +97,10 @@ function TwinkleStar({ left, top, size, index, isDark }: {
 }
 
 export default function CanvasModeView({
-    expenses: expensesProp = [], members: membersProp = [],
-    groupId = '', groupName = 'TandemPay', user = null, colors, isDark,
-    onAddExpense, onSettle, onClose, style, demo = false,
+    expenses, members, groupId, groupName, user, colors, isDark,
+    onAddExpense, onSettle, onClose, style,
 }: CanvasModeViewProps) {
     const insets = useSafeAreaInsets();
-
-    const expenses = demo ? DEMO_EXPENSES : expensesProp;
-    const members  = demo ? DEMO_MEMBERS  : membersProp;
 
     // Hidden bubble ids (long-press dismiss)
     const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
@@ -442,7 +418,6 @@ export default function CanvasModeView({
     // The dock is a static row (no ScrollView), so each card can claim the
     // gesture immediately without fighting a scroll container.
     const panResponders = useMemo(() => {
-        if (demo) return [];
         return members.map((_m, memberIdx) =>
             PanResponder.create({
                 onStartShouldSetPanResponder: () => true,
@@ -505,7 +480,7 @@ export default function CanvasModeView({
             })
         );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [members.length, nearestBubble, pulseDockCard, demo]);
+    }, [members.length, nearestBubble, pulseDockCard]);
 
     // ─── Derived sheet data ──────────────────────────────────────────────────────
 
@@ -530,7 +505,7 @@ export default function CanvasModeView({
     // ─── Render ──────────────────────────────────────────────────────────────────
 
     return (
-        <View style={[styles.root, style]} pointerEvents={demo ? 'none' : 'auto'}>
+        <View style={[styles.root, style]}>
             {/* ── Canvas (fills entire screen) ── */}
             <View ref={canvasViewRef} style={styles.canvas} onLayout={handleCanvasLayout}>
                 <LinearGradient
@@ -680,14 +655,14 @@ export default function CanvasModeView({
                     />
 
                     <Text style={[styles.hubName, { color: colors.text }, T.extrabold]} numberOfLines={2}>{groupName}</Text>
-                    {!demo && (Math.abs(netBalance) < 0.005 ? (
+                    {Math.abs(netBalance) < 0.005 ? (
                         <Text style={[styles.hubBalance, { color: colors.secondaryText }, T.semibold]}>All settled</Text>
                     ) : (
                         <Text style={[styles.hubBalance, { color: netBalance > 0 ? colors.accent : colors.warningBright, fontVariant: ['tabular-nums'] }, T.bold]}>
                             {netBalance > 0 ? "You're owed" : 'You owe'} ${formatCurrency(Math.abs(netBalance))}
                         </Text>
-                    ))}
-                    {!demo && <View style={styles.hubPills}>
+                    )}
+                    <View style={styles.hubPills}>
                         <TouchableOpacity
                             style={[styles.hubPill, { backgroundColor: colors.accent + '24', borderColor: colors.accent + '59' }]}
                             onPress={onAddExpense}
@@ -700,7 +675,7 @@ export default function CanvasModeView({
                             onPress={() => {
                                 const nonPayer = members.find(m => m.user_id !== user?.id);
                                 if (nonPayer) {
-                                    onSettle?.({
+                                    onSettle({
                                         payee_id: nonPayer.user_id,
                                         payee_name: nonPayer.name,
                                         payee_email: nonPayer.email,
@@ -716,7 +691,7 @@ export default function CanvasModeView({
                         >
                             <Text style={[styles.hubPillText, { color: colors.gold }, T.bold]}>⟶ Settle</Text>
                         </TouchableOpacity>
-                    </View>}
+                    </View>
                 </Animated.View>
 
                 {/* Expense bubbles */}
@@ -870,7 +845,7 @@ export default function CanvasModeView({
                 )}
 
                 {/* Back button — frosted pill */}
-                {!demo && <View style={[styles.backBtnWrap, { top: insets.top + vs(8) }]}>
+                <View style={[styles.backBtnWrap, { top: insets.top + vs(8) }]}>
                     <TouchableOpacity
                         style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}
                         onPress={onClose}
@@ -879,10 +854,10 @@ export default function CanvasModeView({
                         <ArrowLeft size={16} color={isDark ? colors.accent : colors.accentDark} />
                         <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
                     </TouchableOpacity>
-                </View>}
+                </View>
 
                 {/* ── Character carousel dock ── */}
-                {!demo && <LinearGradient
+                <LinearGradient
                     colors={[colors.background + '00', colors.background + 'F7']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
@@ -984,7 +959,7 @@ export default function CanvasModeView({
                             )}
                         </View>
                     )}
-                </LinearGradient>}
+                </LinearGradient>
             </View>
 
             {/* ── Detail sheet ── */}
@@ -1126,7 +1101,7 @@ export default function CanvasModeView({
                                             onPress={() => {
                                                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                                 closeSheet();
-                                                onSettle?.({
+                                                onSettle({
                                                     payee_id: selectedExpense.paid_by,
                                                     payee_name: payerMember?.name ?? 'User',
                                                     payee_email: payerMember?.email ?? '',
