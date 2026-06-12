@@ -18,12 +18,12 @@ GEMINI_URL = (
     "gemini-2.5-flash:generateContent"
 )
 
-PROMPT = """You are a receipt parser. Extract every single line item from this receipt exactly as it appears — do not skip, filter, or summarise anything.
+PROMPT = """You are a receipt parser. Extract every single line item from this receipt exactly as it appears - do not skip, filter, or summarise anything.
 
 RULES:
-- Include ALL lines: food, drinks, discounts, modifications, tax, tip, gratuity, promotions, service charges, rounding adjustments — everything.
-- Negative prices are valid — keep them exactly as negative numbers.
-- Prices may have $ symbols or not — strip any currency symbol and return a plain decimal number either way (e.g. $5.99 → 5.99, 5.99 → 5.99).
+- Include ALL lines: food, drinks, discounts, modifications, tax, tip, gratuity, promotions, service charges, rounding adjustments - everything.
+- Negative prices are valid - keep them exactly as negative numbers.
+- Prices may have $ symbols or not - strip any currency symbol and return a plain decimal number either way (e.g. $5.99 → 5.99, 5.99 → 5.99).
 - If a price is truly unreadable, use 0.0.
 - For total: use TOTAL DUE or ROUNDED TOTAL if present, otherwise the largest total shown.
 - item name: use the exact text from the receipt, cleaned up for readability (expand obvious abbreviations if clear, e.g. 'REG-CAESAR.SALAD' → 'Caesar Salad').
