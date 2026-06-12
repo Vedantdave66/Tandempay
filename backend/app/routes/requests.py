@@ -30,7 +30,6 @@ from app.routes.auth import get_current_user
 from app.schemas import PaymentRequestCreate, PaymentRequestOut, PaginatedResponse
 from app.idempotency import idempotent
 from app.services.push import push_for_user
-from app.services.email_service import email_for_notification
 from app.ledger import (
     lock_users_sorted,
     pre_validate_balance,
@@ -110,7 +109,6 @@ async def create_payment_request(
     )
     reloaded = result.scalars().first()
     await push_for_user(reloaded.payer, notification.title, notification.message, notification.id)
-    await email_for_notification(reloaded.payer.email, "payment_request_received", notification.title, notification.message)
     return _build_payment_request_out(reloaded)
 
 

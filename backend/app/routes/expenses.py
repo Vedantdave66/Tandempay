@@ -11,7 +11,6 @@ from app.routes.auth import get_current_user
 from app.services.audit import log_action
 from app.audit_log import AuditActions
 from app.services.push import push_for_user
-from app.services.email_service import email_for_notification
 import logging
 
 logger = logging.getLogger("tandempay.expenses")
@@ -133,7 +132,6 @@ async def create_expense(
     await db.flush()
     for recipient, title, msg, nid in push_queue:
         await push_for_user(recipient, title, msg, nid)
-        await email_for_notification(recipient.email, "expense_added", title, msg)
 
     await log_action(
         db=db,
