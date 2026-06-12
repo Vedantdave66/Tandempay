@@ -1,5 +1,6 @@
-import React, { Fragment, useEffect, useRef } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, StyleSheet } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -12,6 +13,7 @@ import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import LandingScreen from '../screens/LandingScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
@@ -89,7 +91,15 @@ export default function RootNavigator() {
     const { user, loading } = useAuth();
     const { colors, isDark } = useTheme();
 
-    if (loading) {
+    // First-run check — unseen onboarding routes new users to the carousel
+    const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
+    useEffect(() => {
+        AsyncStorage.getItem('@onboarding_seen')
+            .then(v => setOnboardingSeen(v === 'true'))
+            .catch(() => setOnboardingSeen(true));
+    }, []);
+
+    if (loading || (!user && onboardingSeen === null)) {
         return <AuthHoldScreen background={colors.background} />;
     }
 
@@ -118,6 +128,8 @@ export default function RootNavigator() {
             >
                 {!user ? (
                     <Stack.Group screenOptions={{ animation: 'fade' }}>
+                        {/* First screen in the group is the initial route */}
+                        {!onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />}
                         <Stack.Screen name="Landing" component={LandingScreen} />
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Register" component={RegisterScreen} />

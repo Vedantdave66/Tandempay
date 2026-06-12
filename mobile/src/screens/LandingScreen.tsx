@@ -1,298 +1,205 @@
-import React, { useRef, useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  TouchableOpacity, 
-  SafeAreaView, 
-  Dimensions,
-  FlatList,
-  Animated
+import React, { useRef, useState, useEffect } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    TouchableOpacity,
+    Animated,
+    Easing,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
-import { LinearGradient } from 'expo-linear-gradient';
-import { Wallet, Receipt, TrendingUp, Send, ChevronRight } from 'lucide-react-native';
+import { T } from '../utils/typography';
 import { useTheme } from '../context/ThemeContext';
-import ThemeToggle from '../components/ThemeToggle';
 import Logo from '../components/Logo';
+import CanvasModeView from '../components/CanvasModeView';
+import CharacterShape from '../components/CharacterShape';
 
-const { width } = Dimensions.get('window');
-
-const SLIDES = [
-  {
-    id: 'hero',
-    title: 'Split expenses.\nSettle instantly.',
-    subtitle: 'Say goodbye to awkward money conversations. Track shared expenses, simplify group balances, and settle up securely.',
-    icon: Wallet,
-    color: '#16A34A',
-    bg: 'rgba(22, 163, 74, 0.1)',
-  },
-  {
-    id: 'log',
-    title: 'Log Expenses',
-    subtitle: 'Who paid for what? Add expenses quickly and choose how to split them: equally or by exact amounts.',
-    icon: Receipt,
-    color: '#FBBF24',
-    bg: 'rgba(251, 191, 36, 0.1)',
-  },
-  {
-    id: 'balances',
-    title: 'Smart Balances',
-    subtitle: 'Tandem calculates debts automatically. We show you the minimum transactions needed to settle up.',
-    icon: TrendingUp,
-    color: '#34D399',
-    bg: 'rgba(52, 211, 153, 0.1)',
-  },
-  {
-    id: 'settle',
-    title: 'Pay Through App',
-    subtitle: 'Pay your friends directly within Tandem and instantly mark balances as settled. Secure and fast.',
-    icon: Send,
-    color: '#6366F1',
-    bg: 'rgba(99, 102, 241, 0.1)',
-  }
-];
+interface OnboardingCharacter {
+    character_shape: string;
+    character_color: string;
+}
 
 export default function LandingScreen({ navigation }: any) {
-  const { colors, isDark } = useTheme();
-  const [currentIndex, setCurrentIndex] = useState(0);
-  const scrollX = useRef(new Animated.Value(0)).current;
-  const slidesRef = useRef<FlatList>(null);
+    const { colors, isDark } = useTheme();
+    const insets = useSafeAreaInsets();
 
-  const viewableItemsChanged = useRef(({ viewableItems }: any) => {
-    if (viewableItems[0]) {
-      setCurrentIndex(viewableItems[0].index);
-    }
-  }).current;
+    const [onboardingChar, setOnboardingChar] = useState<OnboardingCharacter | null>(null);
 
-  const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
+    // Sequential entry: logo → hero → sub → CTAs
+    const logoAnim = useRef(new Animated.Value(0)).current;
+    const heroAnim = useRef(new Animated.Value(0)).current;
+    const subAnim  = useRef(new Animated.Value(0)).current;
+    const ctaAnim  = useRef(new Animated.Value(0)).current;
 
-  const scrollToNext = () => {
-    if (currentIndex < SLIDES.length - 1) {
-      slidesRef.current?.scrollToIndex({ index: currentIndex + 1 });
-    } else {
-      navigation.navigate('Register');
-    }
-  };
+    // The picked character breathes while it waits for you
+    const breathAnim = useRef(new Animated.Value(1)).current;
 
-  const renderItem = ({ item, index }: any) => {
-    const Icon = item.icon;
+    useEffect(() => {
+        AsyncStorage.getItem('@onboarding_character')
+            .then(raw => {
+                if (!raw) return;
+                const parsed = JSON.parse(raw);
+                if (parsed?.character_shape && parsed?.character_color) {
+                    setOnboardingChar(parsed);
+                }
+            })
+            .catch(() => {});
+    }, []);
+
+    useEffect(() => {
+        Animated.parallel([
+            Animated.timing(logoAnim, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            Animated.sequence([
+                Animated.delay(400),
+                Animated.timing(heroAnim, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]),
+            Animated.sequence([
+                Animated.delay(740),
+                Animated.timing(subAnim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]),
+            Animated.sequence([
+                Animated.delay(1020),
+                Animated.timing(ctaAnim, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+            ]),
+        ]).start();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    useEffect(() => {
+        if (!onboardingChar) return;
+        const loop = Animated.loop(Animated.sequence([
+            Animated.timing(breathAnim, { toValue: 1.04, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(breathAnim, { toValue: 1.0, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]));
+        loop.start();
+        return () => loop.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [onboardingChar]);
+
+    const handleGetStarted = () => {
+        navigation.navigate('Register', onboardingChar ?? {});
+    };
+
     return (
-      <View style={[styles.slide, { width }]}>
-        <View style={[styles.iconCircle, { backgroundColor: item.bg, borderColor: item.bg.replace('0.1', '0.2') }]}>
-          <Icon size={48} color={item.id === 'hero' ? colors.accent : item.color} />
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+            {/* Live canvas — the app's heartbeat, running before you even sign up */}
+            <CanvasModeView demo colors={colors} isDark={isDark} style={StyleSheet.absoluteFillObject as any} />
+
+            {/* Legibility overlay */}
+            <View
+                pointerEvents="none"
+                style={[StyleSheet.absoluteFillObject, { backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.3)' }]}
+            />
+
+            <View style={[styles.content, { paddingTop: insets.top + vs(72), paddingBottom: insets.bottom + vs(36) }]}>
+                {/* Logo wordmark */}
+                <Animated.View
+                    style={{
+                        opacity: logoAnim,
+                        transform: [{ scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
+                    }}
+                >
+                    <Logo size={26} />
+                </Animated.View>
+
+                <View style={styles.heroBlock}>
+                    {/* Your character, waiting for you */}
+                    {onboardingChar && (
+                        <Animated.View
+                            style={{
+                                opacity: heroAnim,
+                                transform: [{ scale: breathAnim }],
+                                marginBottom: vs(20),
+                                alignItems: 'center',
+                            }}
+                        >
+                            <CharacterShape
+                                variant="card"
+                                shape={onboardingChar.character_shape}
+                                color={onboardingChar.character_color}
+                                eyeStyle="ball"
+                            />
+                        </Animated.View>
+                    )}
+
+                    <Animated.Text
+                        style={[styles.hero, T.extrabold, {
+                            opacity: heroAnim,
+                            transform: [{ translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
+                        }]}
+                    >
+                        Split bills.{'\n'}Settle free.
+                    </Animated.Text>
+
+                    <Animated.Text style={[styles.subtext, T.regular, { opacity: subAnim }]}>
+                        Free Interac settlement for{'\n'}Canadian roommates 🇨🇦
+                    </Animated.Text>
+                </View>
+
+                <Animated.View
+                    style={{
+                        width: '100%',
+                        alignItems: 'center',
+                        gap: vs(18),
+                        opacity: ctaAnim,
+                        transform: [{ translateY: ctaAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+                    }}
+                >
+                    <TouchableOpacity
+                        style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
+                        onPress={handleGetStarted}
+                        activeOpacity={0.85}
+                    >
+                        <Text style={[styles.ctaText, T.semibold]}>Get Started</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
+                        <Text style={[styles.loginLink, T.semibold]}>Log In</Text>
+                    </TouchableOpacity>
+                </Animated.View>
+            </View>
         </View>
-        <Text style={[styles.title, { color: colors.text }]}>
-          {item.id === 'hero' ? (
-            <>Split expenses.{'\n'}<Text style={{ color: colors.accent }}>Settle instantly.</Text></>
-          ) : item.title}
-        </Text>
-        <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-          {item.subtitle}
-        </Text>
-      </View>
     );
-  };
-
-  return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      {/* Header */}
-      <View style={styles.nav}>
-        <View style={styles.logoRow}>
-          <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.logoIcon}>
-            <Wallet size={20} color="white" />
-          </LinearGradient>
-          <Logo size={20} />
-        </View>
-        <ThemeToggle />
-      </View>
-
-      <FlatList
-        data={SLIDES}
-        renderItem={renderItem}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        pagingEnabled
-        bounces={false}
-        keyExtractor={(item) => item.id}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { x: scrollX } } }], {
-          useNativeDriver: false,
-        })}
-        onViewableItemsChanged={viewableItemsChanged}
-        viewabilityConfig={viewConfig}
-        scrollEventThrottle={32}
-        ref={slidesRef}
-      />
-
-      <View style={styles.footer}>
-        <View style={styles.indicatorContainer}>
-          {SLIDES.map((_, i) => {
-            const inputRange = [(i - 1) * width, i * width, (i + 1) * width];
-            const dotWidth = scrollX.interpolate({
-              inputRange,
-              outputRange: [8, 24, 8],
-              extrapolate: 'clamp',
-            });
-            const opacity = scrollX.interpolate({
-              inputRange,
-              outputRange: [0.3, 1, 0.3],
-              extrapolate: 'clamp',
-            });
-            return (
-              <Animated.View
-                key={i}
-                style={[
-                  styles.dot,
-                  { width: dotWidth, opacity, backgroundColor: colors.accent }
-                ]}
-              />
-            );
-          })}
-        </View>
-
-        <View style={styles.buttonRow}>
-          {currentIndex === SLIDES.length - 1 ? (
-            <>
-              <TouchableOpacity 
-                style={[styles.loginBtn, { borderColor: colors.border }]} 
-                onPress={() => navigation.navigate('Login')}
-              >
-                <Text style={[styles.loginText, { color: colors.text }]}>Log In</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.registerBtn} onPress={() => navigation.navigate('Register')}>
-                <LinearGradient colors={[colors.accent, colors.accentDark]} style={styles.gradientBtn}>
-                  <Text style={styles.registerText}>Sign Up</Text>
-                  <ChevronRight size={20} color="white" />
-                </LinearGradient>
-              </TouchableOpacity>
-            </>
-          ) : (
-            <TouchableOpacity style={styles.nextBtn} onPress={scrollToNext}>
-               <Text style={[styles.nextText, { color: colors.text }]}>Next</Text>
-               <ChevronRight size={20} color={colors.text} />
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
-    </SafeAreaView>
-  );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  nav: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: scale(24),
-    paddingVertical: vs(16),
-  },
-  logoRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: vs(12),
-  },
-  logoIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: ms(10),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoText: {
-    fontSize: ms(20),
-    fontWeight: 'bold',
-    letterSpacing: -0.5,
-  },
-  slide: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: scale(32),
-    paddingTop: vs(60),
-  },
-  iconCircle: {
-    width: 120,
-    height: 120,
-    borderRadius: ms(60),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: vs(40),
-  },
-  title: {
-    fontSize: ms(36),
-    fontWeight: '900',
-    textAlign: 'center',
-    marginBottom: vs(16),
-    lineHeight: 40,
-  },
-  subtitle: {
-    fontSize: ms(16),
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  footer: {
-    paddingHorizontal: scale(24),
-    paddingBottom: vs(40),
-  },
-  indicatorContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: vs(40),
-    gap: vs(8),
-  },
-  dot: {
-    height: 8,
-    borderRadius: ms(4),
-  },
-  buttonRow: {
-    flexDirection: 'row',
-    gap: vs(12),
-    height: vs(56),
-  },
-  nextBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: vs(8),
-    borderRadius: ms(16),
-    borderWidth: 1,
-    borderColor: 'transparent',
-    backgroundColor: 'rgba(74, 222, 128, 0.1)',
-  },
-  nextText: {
-    fontSize: ms(18),
-    fontWeight: 'bold',
-  },
-  loginBtn: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: ms(16),
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-  loginText: {
-    fontSize: ms(16),
-    fontWeight: 'bold',
-  },
-  registerBtn: {
-    flex: 2,
-    borderRadius: ms(16),
-    overflow: 'hidden',
-  },
-  gradientBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: vs(4),
-  },
-  registerText: {
-    color: 'white',
-    fontSize: ms(16),
-    fontWeight: 'bold',
-  },
+    content: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingHorizontal: scale(28),
+    },
+    heroBlock: {
+        alignItems: 'center',
+    },
+    hero: {
+        fontSize: ms(40),
+        letterSpacing: -1.6,
+        lineHeight: ms(46),
+        textAlign: 'center',
+        color: '#FFFFFF',
+        marginBottom: vs(14),
+    },
+    subtext: {
+        fontSize: ms(15),
+        lineHeight: ms(22),
+        textAlign: 'center',
+        color: 'rgba(255,255,255,0.75)',
+    },
+    ctaBtn: {
+        width: '100%',
+        borderRadius: 99,
+        paddingVertical: vs(16),
+        alignItems: 'center',
+    },
+    ctaText: {
+        color: '#FFFFFF',
+        fontSize: ms(16),
+    },
+    loginLink: {
+        fontSize: ms(15),
+        color: 'rgba(255,255,255,0.65)',
+    },
 });
