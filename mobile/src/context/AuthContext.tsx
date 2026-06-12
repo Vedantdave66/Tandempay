@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { authApi, User } from '../services/api';
+import { registerForPushNotificationsAsync } from '../services/pushService';
 
 interface AuthContextType {
     user: User | null;
@@ -34,6 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (token) {
                 const u = await authApi.me();
                 setUser(u);
+                registerForPushNotificationsAsync().catch(() => {});
             }
         } catch (error) {
             console.log('Failed to fetch user with token', error);
@@ -47,6 +49,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem('token', token);
         const u = await authApi.me();
         setUser(u);
+        registerForPushNotificationsAsync().catch(() => {});
     };
 
     const logout = async () => {

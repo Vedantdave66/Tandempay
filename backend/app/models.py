@@ -65,6 +65,7 @@ class User(Base):
     character_shape: Mapped[Optional[str]] = mapped_column(String(20), nullable=True, default='rect')
     character_color: Mapped[Optional[str]] = mapped_column(String(7), nullable=True, default='#34D399')
     character_nickname: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
+    push_token: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
     groups: Mapped[list["GroupMember"]] = relationship(back_populates="user")
     expenses_paid: Mapped[list["Expense"]] = relationship(back_populates="payer")

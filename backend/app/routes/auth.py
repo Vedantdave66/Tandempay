@@ -196,6 +196,8 @@ async def update_me(
         current_user.character_color = data.character_color
     if data.character_nickname is not None:
         current_user.character_nickname = data.character_nickname.strip() or None
+    if data.push_token is not None:
+        current_user.push_token = data.push_token.strip() or None
 
     await db.flush()
     await db.commit()

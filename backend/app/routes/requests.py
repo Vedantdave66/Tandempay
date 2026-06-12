@@ -29,6 +29,7 @@ from app.models import PaymentRequest, User, GroupMember, Notification, WalletTr
 from app.routes.auth import get_current_user
 from app.schemas import PaymentRequestCreate, PaymentRequestOut, PaginatedResponse
 from app.idempotency import idempotent
+from app.services.push import push_for_user
 from app.ledger import (
     lock_users_sorted,
     pre_validate_balance,
@@ -107,6 +108,7 @@ async def create_payment_request(
         .filter(PaymentRequest.id == new_request.id)
     )
     reloaded = result.scalars().first()
+    await push_for_user(reloaded.payer, notification.title, notification.message, notification.id)
     return _build_payment_request_out(reloaded)
 
 
