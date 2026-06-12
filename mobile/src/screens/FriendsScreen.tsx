@@ -9,9 +9,11 @@ import {
     ActivityIndicator,
     Alert,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
 import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
 import { friendsApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
@@ -37,6 +39,8 @@ function timeAgo(d: string) {
 }
 
 export default function FriendsScreen() {
+    const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const { colors, isDark } = useTheme();
 
     const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'pending'>('activity');
@@ -237,7 +241,22 @@ export default function FriendsScreen() {
                                                 {friend.shared_groups_count} shared squads
                                             </Text>
                                         </View>
-                                        <TouchableOpacity style={styles.settleBtn} activeOpacity={0.75}>
+                                        <TouchableOpacity
+                                            style={styles.settleBtn}
+                                            activeOpacity={0.75}
+                                            onPress={() => navigation.navigate('SettleUp', {
+                                                payment: {
+                                                    payee_id: friend.id,
+                                                    payee_name: friend.name,
+                                                    payee_email: friend.email,
+                                                    payee_avatar_color: friend.avatar_color,
+                                                    amount: 0,
+                                                    group_id: '',
+                                                    payer_id: user?.id,
+                                                    description: `Payment to ${friend.name}`,
+                                                },
+                                            })}
+                                        >
                                             <Text style={[styles.settleBtnText, { color: colors.accent }, T.semibold]}>Settle up</Text>
                                         </TouchableOpacity>
                                     </View>

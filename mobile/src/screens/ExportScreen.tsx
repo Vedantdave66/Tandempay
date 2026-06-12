@@ -9,10 +9,12 @@ import {
     Alert,
     Linking,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Download, FileText, Sheet, Crown } from 'lucide-react-native';
+import { BASE_URL } from '../services/api';
 
 const EXPORT_OPTIONS = [
     {
@@ -38,7 +40,7 @@ export default function ExportScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
 
-    const handleExport = (format: string) => {
+    const handleExport = async (format: string) => {
         if (!isPro) {
             Alert.alert(
                 'Pro feature',
@@ -49,7 +51,12 @@ export default function ExportScreen({ navigation }: any) {
                 ],
             );
         } else {
-            Alert.alert('Coming soon', `${format.toUpperCase()} export will be available in a future update.`);
+            try {
+                const token = await AsyncStorage.getItem('token');
+                await Linking.openURL(`${BASE_URL}/export/${format}?token=${token}`);
+            } catch {
+                Alert.alert('Export failed', 'Could not open the export. Try again.');
+            }
         }
     };
 
