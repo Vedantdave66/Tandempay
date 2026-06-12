@@ -80,7 +80,10 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     if (phase !== 'group_picker') return;
     setPickerLoading(true);
     groupsApi.list()
-      .then(setPickerGroups)
+      .then(raw => {
+        const groups = Array.isArray(raw) ? raw : (raw as any)?.items ?? (raw as any)?.groups ?? [];
+        setPickerGroups(groups);
+      })
       .catch(() => Alert.alert('Error', 'Could not load groups.'))
       .finally(() => setPickerLoading(false));
   }, [phase]);
