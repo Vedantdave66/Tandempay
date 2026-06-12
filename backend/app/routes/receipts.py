@@ -19,7 +19,7 @@ GEMINI_URL = (
 
 PROMPT = """You are a receipt parser. Extract line items and totals from this receipt image.
 
-Return ONLY valid JSON — no markdown, no explanation:
+Return ONLY valid JSON - no markdown, no explanation:
 {
   "items": [
     {"id": "1", "name": "Item name", "price": 12.50}
@@ -33,9 +33,9 @@ Return ONLY valid JSON — no markdown, no explanation:
 }
 
 Rules:
-- items: food/product lines only — exclude subtotal, tax, tip, total, discounts
+- items: food/product lines only - exclude subtotal, tax, tip, total, discounts
 - Combine quantity into name: "Garlic Naan x2" not two separate lines
-- price: line total (quantity × unit price)
+- price: line total (quantity x unit price)
 - subtotal: sum of items before tax/tip
 - tax: actual dollar amount from the receipt
 - tax_rate: tax / subtotal to 4 decimal places; use 0.13 if unreadable
