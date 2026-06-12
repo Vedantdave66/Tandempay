@@ -8,7 +8,7 @@ import { authApi } from '../services/api';
 import { Wallet, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '../components/Logo';
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({ navigation, route }: any) {
     const { login } = useAuth();
     const { colors, isDark } = useTheme();
     const [name, setName] = useState('');
@@ -44,6 +44,11 @@ export default function RegisterScreen({ navigation }: any) {
         try {
             const res = await authApi.register(name.trim(), email.trim(), password);
             await login(res.access_token);
+            // Apply the character picked during onboarding — fire-and-forget
+            const { character_shape, character_color } = route?.params ?? {};
+            if (character_shape && character_color) {
+                authApi.updateProfile({ character_shape, character_color }).catch(() => {});
+            }
         } catch (err: any) {
             setError(err.message || 'Registration failed');
         } finally {

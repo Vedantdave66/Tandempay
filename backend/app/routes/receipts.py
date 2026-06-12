@@ -35,13 +35,16 @@ Return ONLY valid JSON - no markdown, no explanation:
 }
 
 Rules:
-- items: food/product lines only - exclude subtotal, tax, tip, total, discounts
+- items: food/product lines only — exclude subtotal, tax, tip, total, discounts
+- Ignore any line items with negative prices — these are discounts or modifications, not real items
+- Ignore TAX, PROMO, and TIP lines — extract food and drink items only
 - Combine quantity into name: "Garlic Naan x2" not two separate lines
 - price: line total (quantity x unit price)
 - subtotal: sum of items before tax/tip
 - tax: actual dollar amount from the receipt
 - tax_rate: tax / subtotal to 4 decimal places; use 0.13 if unreadable
 - tip_detected: tip amount if on receipt, else 0
+- total: use TOTAL DUE or ROUNDED TOTAL if present, never SUBTOTAL
 - currency: "CAD" if Canadian or ambiguous, else "USD"
 - Estimate illegible values from context
 - Always return all fields"""
@@ -151,6 +154,7 @@ async def parse_receipt(
         "generationConfig": {
             "temperature": 0.1,
             "maxOutputTokens": 1024,
+            "response_mime_type": "application/json",
         },
     }
 
