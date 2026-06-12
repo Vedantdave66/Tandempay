@@ -13,12 +13,47 @@ import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import { useTheme } from '../context/ThemeContext';
 import Logo from '../components/Logo';
-import CanvasModeView from '../components/CanvasModeView';
 import CharacterShape from '../components/CharacterShape';
 
 interface OnboardingCharacter {
     character_shape: string;
     character_color: string;
+}
+
+// Background crew — loose scatter across the screen. Shapes use the valid
+// CharacterShape set (rect/tall/semi/round); duration stagger keeps the
+// breathing out of sync.
+const FLOATERS = [
+    { shape: 'round', color: '#16A34A', duration: 1600, pos: { top: '12%', left: '8%' } },
+    { shape: 'rect',  color: '#3B82F6', duration: 1750, pos: { top: '15%', right: '10%' } },
+    { shape: 'semi',  color: '#F59E0B', duration: 1900, pos: { top: '44%', left: '6%' } },
+    { shape: 'tall',  color: '#EC4899', duration: 2050, pos: { top: '47%', right: '8%' } },
+    { shape: 'round', color: '#8B5CF6', duration: 2200, pos: { bottom: '20%', alignSelf: 'center' } },
+] as const;
+
+function FloatingCharacter({ shape, color, duration, pos }: {
+    shape: string; color: string; duration: number; pos: object;
+}) {
+    const breath = useRef(new Animated.Value(1)).current;
+
+    useEffect(() => {
+        const loop = Animated.loop(Animated.sequence([
+            Animated.timing(breath, { toValue: 1.06, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(breath, { toValue: 1.0, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]));
+        loop.start();
+        return () => loop.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <Animated.View
+            pointerEvents="none"
+            style={[{ position: 'absolute', opacity: 0.7, transform: [{ scale: breath }] }, pos]}
+        >
+            <CharacterShape variant="card" shape={shape} color={color} eyeStyle="ball" />
+        </Animated.View>
+    );
 }
 
 export default function LandingScreen({ navigation }: any) {
@@ -84,8 +119,10 @@ export default function LandingScreen({ navigation }: any) {
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-            {/* Live canvas — the app's heartbeat, running before you even sign up */}
-            <CanvasModeView demo colors={colors} isDark={isDark} style={StyleSheet.absoluteFillObject as any} />
+            {/* Floating background crew */}
+            {FLOATERS.map(f => (
+                <FloatingCharacter key={f.color} shape={f.shape} color={f.color} duration={f.duration} pos={f.pos} />
+            ))}
 
             {/* Legibility overlay */}
             <View
