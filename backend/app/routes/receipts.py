@@ -23,10 +23,10 @@ PROMPT = """You are a receipt parser. Extract every single line item from this r
 RULES:
 - Include ALL lines: food, drinks, discounts, modifications, tax, tip, gratuity, promotions, service charges, rounding adjustments - everything.
 - Negative prices are valid - keep them exactly as negative numbers.
-- Prices may have $ symbols or not - strip any currency symbol and return a plain decimal number either way (e.g. $5.99 → 5.99, 5.99 → 5.99).
+- Prices may have $ symbols or not - strip any currency symbol and return a plain decimal number either way (e.g. $5.99 -> 5.99, 5.99 -> 5.99).
 - If a price is truly unreadable, use 0.0.
 - For total: use TOTAL DUE or ROUNDED TOTAL if present, otherwise the largest total shown.
-- item name: use the exact text from the receipt, cleaned up for readability (expand obvious abbreviations if clear, e.g. 'REG-CAESAR.SALAD' → 'Caesar Salad').
+- item name: use the exact text from the receipt, cleaned up for readability (expand obvious abbreviations if clear, e.g. 'REG-CAESAR.SALAD' -> 'Caesar Salad').
 - Merchant: restaurant or store name from the header. Use 'Receipt' if not visible.
 - is_discount: set to true when price is negative or the item is clearly a discount, promotion, or promo line.
 - Do not wrap in markdown or add explanations. Pure JSON only."""
@@ -137,9 +137,9 @@ async def parse_receipt(
         raw = raw.strip()
 
         # Sanitise currency symbols Gemini may embed in JSON values
-        raw = re.sub(r':\s*-\$?([\d.]+)', r': -\1', raw)       # negative: -$5.99 → -5.99
-        raw = re.sub(r':\s*"\$?([\d.]+)"', r': \1', raw)        # quoted:  "$5.99" → 5.99
-        raw = re.sub(r':\s*\$?([\d.]+)', r': \1', raw)          # unquoted: $5.99  → 5.99
+        raw = re.sub(r':\s*-\$?([\d.]+)', r': -\1', raw)       # negative: -$5.99 -> -5.99
+        raw = re.sub(r':\s*"\$?([\d.]+)"', r': \1', raw)        # quoted:  "$5.99" -> 5.99
+        raw = re.sub(r':\s*\$?([\d.]+)', r': \1', raw)          # unquoted: $5.99  -> 5.99
 
         data = json.loads(raw)
 
