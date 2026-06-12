@@ -2,6 +2,7 @@ import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react'
 import {
   View, Text, StyleSheet, TouchableOpacity, ScrollView,
   Modal, Animated, ActivityIndicator, Image, Alert, Dimensions,
+  InteractionManager, Linking, Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
@@ -49,6 +50,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
   const [pickerGroups, setPickerGroups]         = useState<GroupListItem[]>([]);
   const [pickerLoading, setPickerLoading]       = useState(false);
+  const [pickerError, setPickerError]           = useState(false);
   const [selectingGroupId, setSelectingGroupId] = useState<string | null>(null);
 
   const [capturedUri, setCapturedUri] = useState<string | null>(null);
@@ -65,18 +67,32 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
   const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
   const cardAnim  = useRef(new Animated.Value(SCREEN_H)).current;
 
+  // Camera lifecycle guards: launching the camera while the picker Modal is
+  // still animating closed makes iOS dismiss it immediately. The camera only
+  // opens from the Modal's onDismiss, gated by these refs.
+  const cameraOpenPending       = useRef(false);
+  const shouldOpenCameraOnDismiss = useRef(false);
+  const startedWithGroup        = useRef(!!paramsGroupId);
+
+  useEffect(() => () => { cameraOpenPending.current = false; }, []);
+
   // ── Load groups when picker opens ─────────────────────────────────────────
-  useEffect(() => {
-    if (!pickerVisible) return;
+  const loadGroups = useCallback(() => {
     setPickerLoading(true);
+    setPickerError(false);
     groupsApi.list()
       .then(raw => {
         const groups = Array.isArray(raw) ? raw : (raw as any)?.items ?? (raw as any)?.groups ?? [];
         setPickerGroups(groups);
       })
-      .catch(() => Alert.alert('Error', 'Could not load groups.'))
+      .catch(() => setPickerError(true))
       .finally(() => setPickerLoading(false));
-  }, [pickerVisible]);
+  }, []);
+
+  useEffect(() => {
+    if (!pickerVisible) return;
+    loadGroups();
+  }, [pickerVisible, loadGroups]);
 
   useEffect(() => {
     if (pickerVisible) {
@@ -106,52 +122,97 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
   // ── Camera ─────────────────────────────────────────────────────────────────
   const openCamera = useCallback(async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      setParseError('Camera permission denied. Enable camera access in Settings to scan receipts.');
-      setPhase('error');
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ['images'],
-      quality: 0.85,
-    });
-    if (result.canceled || !result.assets?.[0]) return;
-
-    const asset = result.assets[0];
-    const compressed = await ImageManipulator.manipulateAsync(
-      asset.uri,
-      [{ resize: { width: 800 } }],
-      { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true },
-    );
-    const base64Image = compressed.base64 ?? '';
-    if (!base64Image) {
-      Alert.alert('Error', 'Could not process image. Please try again.');
-      return;
-    }
-
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setCapturedUri(compressed.uri);
-    setParseError(null);
-    setClaimed(new Set());
-    setItemsExpanded(false);
-    setParseResult(null);
-    setPhase('parsing');
-
     try {
-      const parsed = await receiptsApi.parse(base64Image);
-      setParseResult(parsed);
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPhase('result');
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Camera Access Required',
+          'TandemPay needs camera access to scan receipts. Enable it in Settings.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Open Settings', onPress: () => Linking.openSettings() },
+          ],
+        );
+        cameraOpenPending.current = false;
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ['images'],
+        quality: 0.85,
+      });
+      cameraOpenPending.current = false;
+      if (result.canceled || !result.assets?.[0]) {
+        // Don't strand the user: if the group came from the picker, reopen it
+        if (!startedWithGroup.current) {
+          setPhase('idle');
+          setPickerVisible(true);
+        }
+        return;
+      }
+
+      const asset = result.assets[0];
+      const compressed = await ImageManipulator.manipulateAsync(
+        asset.uri,
+        [{ resize: { width: 800 } }],
+        { compress: 0.5, format: ImageManipulator.SaveFormat.JPEG, base64: true },
+      );
+      const base64Image = compressed.base64 ?? '';
+      if (!base64Image) {
+        Alert.alert('Error', 'Could not process image. Please try again.');
+        return;
+      }
+
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      setCapturedUri(compressed.uri);
+      setParseError(null);
+      setClaimed(new Set());
+      setItemsExpanded(false);
+      setParseResult(null);
+      setPhase('parsing');
+
+      try {
+        const parsed = await receiptsApi.parse(base64Image);
+        if (parsed.parse_failed) {
+          setParseError("Couldn't read this receipt. Try a clearer photo.");
+          setPhase('error');
+          return;
+        }
+        setParseResult(parsed);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        setPhase('result');
+      } catch (err: any) {
+        setParseError(err?.message || 'Could not read this receipt. Try a clearer photo.');
+        setPhase('error');
+      }
     } catch (err: any) {
-      setParseError(err?.message || 'Could not read this receipt. Try a clearer photo.');
-      setPhase('error');
+      cameraOpenPending.current = false;
+      Alert.alert('Camera Error', err?.message || 'Could not open the camera. Please try again.');
     }
   }, []);
 
+  // Opens the camera only after the picker Modal has fully dismissed and all
+  // animations/interactions have settled — anything earlier and iOS kills it.
+  const openCameraAfterModalClose = useCallback(() => {
+    if (!shouldOpenCameraOnDismiss.current) return;
+    shouldOpenCameraOnDismiss.current = false;
+    if (cameraOpenPending.current) return;
+    cameraOpenPending.current = true;
+    InteractionManager.runAfterInteractions(() => {
+      // Extra safety buffer for slower devices
+      setTimeout(() => {
+        cameraOpenPending.current = false;
+        openCamera();
+      }, 150);
+    });
+  }, [openCamera]);
+
+  // Modal.onDismiss is iOS-only; on Android fire off the visibility change
+  useEffect(() => {
+    if (Platform.OS === 'android' && !pickerVisible) openCameraAfterModalClose();
+  }, [pickerVisible, openCameraAfterModalClose]);
+
   // Auto-open camera when group context provided via route.params
-  const startedWithGroup = useRef(!!paramsGroupId);
   useEffect(() => {
     if (!startedWithGroup.current) return;
     const t = setTimeout(openCamera, 400);
@@ -216,7 +277,13 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
   // ── GROUP PICKER MODAL ─────────────────────────────────────────────────────
   const renderPicker = () => (
-    <Modal visible={pickerVisible} transparent animationType="none" onRequestClose={closePicker}>
+    <Modal
+      visible={pickerVisible}
+      transparent
+      animationType="none"
+      onRequestClose={() => setPickerVisible(false)}
+      onDismiss={openCameraAfterModalClose}
+    >
       <View style={{ flex: 1 }}>
         <TouchableOpacity
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
@@ -239,6 +306,21 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
           {pickerLoading ? (
             <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: vs(28) }} />
+          ) : pickerError ? (
+            <View style={styles.pickerEmpty}>
+              <Users size={36} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(10) }} />
+              <Text style={[styles.pickerEmptyTitle, T.bold, { color: colors.text }]}>Couldn't load groups</Text>
+              <Text style={[styles.pickerEmptySub, T.regular, { color: colors.secondaryText }]}>
+                Check your connection and try again.
+              </Text>
+              <TouchableOpacity
+                style={[styles.pickerRetryBtn, { backgroundColor: colors.accent }]}
+                onPress={loadGroups}
+                activeOpacity={0.82}
+              >
+                <Text style={[styles.pickerRetryText, T.bold]}>Retry</Text>
+              </TouchableOpacity>
+            </View>
           ) : pickerGroups.length === 0 ? (
             <View style={styles.pickerEmpty}>
               <Users size={36} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(10) }} />
@@ -266,8 +348,10 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
                       setGroupId(g.id);
                       setGroupName(g.name);
                       setGroupMembers(full.members);
+                      // Only close the modal here — the camera opens from
+                      // the Modal's onDismiss once teardown is complete
+                      shouldOpenCameraOnDismiss.current = true;
                       closePicker();
-                      setTimeout(openCamera, 350);
                     } catch {
                       Alert.alert('Error', 'Could not load group. Try again.');
                     } finally {
@@ -665,6 +749,8 @@ const styles = StyleSheet.create({
   pickerEmpty:    { alignItems: 'center', paddingHorizontal: scale(36), marginTop: vs(28) },
   pickerEmptyTitle: { fontSize: ms(16), marginBottom: vs(6) },
   pickerEmptySub:   { fontSize: ms(13), textAlign: 'center', lineHeight: 20, opacity: 0.7 },
+  pickerRetryBtn:   { paddingVertical: vs(11), paddingHorizontal: scale(32), borderRadius: ms(12), marginTop: vs(16) },
+  pickerRetryText:  { fontSize: ms(14), color: '#fff' },
 
   // ── Parsing
   parsingBody:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(24) },

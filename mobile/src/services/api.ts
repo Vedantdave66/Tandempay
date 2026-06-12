@@ -375,6 +375,9 @@ export interface ReceiptParseResponse {
     tip_detected: number;
     total: number;
     currency: string;
+    merchant?: string;
+    // Backend graceful fallback — true when Gemini output could not be parsed
+    parse_failed?: boolean;
 }
 
 export const receiptsApi = {
