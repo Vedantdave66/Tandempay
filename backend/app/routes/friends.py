@@ -8,6 +8,7 @@ from app.models import User, FriendRequest, Notification, Group, GroupMember
 from app.schemas import FriendRequestCreate, FriendRequestOut, UserOut
 from app.routes.auth import get_current_user
 from app.services.push import push_for_user
+from app.services.email_service import email_for_notification
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -68,6 +69,7 @@ async def send_friend_request(
         db.add(notification)
         await db.flush()
         await push_for_user(target_user, notification.title, notification.message, notification.id)
+        await email_for_notification(target_user.email, "friend_request", notification.title, notification.message)
 
     await db.commit()
     await db.refresh(new_request)
@@ -161,6 +163,7 @@ async def accept_request(
     await db.flush()
     if sender:
         await push_for_user(sender, notification.title, notification.message, notification.id)
+        await email_for_notification(sender.email, "friend_accepted", notification.title, notification.message)
 
     await db.commit()
     return {"status": "success", "message": "Request accepted"}

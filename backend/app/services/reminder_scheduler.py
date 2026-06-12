@@ -15,6 +15,7 @@ from sqlalchemy.orm import selectinload
 
 from app.database import async_session
 from app.models import ExpenseReminder, Expense, ExpenseParticipant, Notification, User
+from app.services.email_service import email_for_notification
 
 logger = logging.getLogger("tandempay.reminders")
 
@@ -89,28 +90,43 @@ async def _fire_reminder(
     payer = payer_result.scalar_one_or_none()
     payer_name = payer.name if payer else "Someone"
 
+    # Batch-load participants who will be notified so we can email them
+    participant_ids = [p.user_id for p in expense.participants if p.user_id != expense.paid_by]
+    users_by_id: dict[str, User] = {}
+    if participant_ids:
+        users_result = await db.execute(select(User).where(User.id.in_(participant_ids)))
+        users_by_id = {u.id: u for u in users_result.scalars().all()}
+
     # Create a notification for each participant (except the payer)
     notif_count = 0
+    email_tasks: list[tuple[str, str, str, str]] = []
     for participant in expense.participants:
         if participant.user_id == expense.paid_by:
             continue  # Don't notify the payer
 
+        msg = (
+            f"\u23f0 Reminder: You owe ${participant.share_amount:.2f} "
+            f'for "{expense.title}". Sent by {payer_name}.'
+        )
         notif = Notification(
             user_id=participant.user_id,
             type="expense_reminder",
             title="Payment Reminder",
-            message=(
-                f"\u23f0 Reminder: You owe ${participant.share_amount:.2f} "
-                f'for "{expense.title}". Sent by {payer_name}.'
-            ),
+            message=msg,
             group_id=expense.group_id,
             reference_id=expense.id,
         )
         db.add(notif)
         notif_count += 1
+        recipient = users_by_id.get(participant.user_id)
+        if recipient:
+            email_tasks.append((recipient.email, "expense_reminder", "Payment Reminder", msg))
 
     # Advance to the next reminder time
     reminder.next_reminder_at = now + datetime.timedelta(days=reminder.interval_days)
+
+    for to_email, ntype, title, msg in email_tasks:
+        await email_for_notification(to_email, ntype, title, msg)
 
     logger.info(
         f"[reminder_tick] Fired {notif_count} notification(s) for expense "

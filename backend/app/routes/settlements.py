@@ -18,6 +18,7 @@ from app.services.audit import log_action
 from app.audit_log import AuditActions
 from app.services.balance_service import _compute_balances
 from app.services.push import push_for_user
+from app.services.email_service import email_for_notification
 
 router = APIRouter(prefix="/api/groups/{group_id}/settlement-records", tags=["settlement-records"])
 
@@ -144,6 +145,7 @@ async def create_settlement(
     db.add(notif)
     await db.flush()
     await push_for_user(payee, notif.title, notif.message, notif.id)
+    await email_for_notification(payee.email, notif.type, notif.title, notif.message)
 
     await log_action(
         db=db,
@@ -285,8 +287,10 @@ async def update_settlement_status(
     await db.flush()
     if data.status == "sent":
         await push_for_user(payee, notif.title, notif.message, notif.id)
+        await email_for_notification(payee.email, notif.type, notif.title, notif.message)
     elif data.status in ("settled", "declined"):
         await push_for_user(payer, notif.title, notif.message, notif.id)
+        await email_for_notification(payer.email, notif.type, notif.title, notif.message)
 
     # Derive audit action from the new status value.
     # "sent" is a payer-internal step; only payee-driven transitions

@@ -15,6 +15,7 @@ from sqlalchemy import select, or_
 
 from app.models import User, SettlementRecord, Notification, InteracEmailLog
 from app.services.email_parser import ParsedInteracEmail
+from app.services.email_service import email_for_notification
 
 logger = logging.getLogger("tandempay.interac_matcher")
 
@@ -205,7 +206,16 @@ async def confirm_settlement(
             reference_id=settlement.id,
         ))
 
+    # Load users to get emails before commit (expire_on_commit would clear attributes)
+    users_result = await db.execute(
+        select(User).where(User.id.in_([settlement.payer_id, settlement.payee_id]))
+    )
+    _emails = [u.email for u in users_result.scalars().all()]
+
     await db.commit()
+
+    for email in _emails:
+        await email_for_notification(email, "payment_confirmed", "Payment Auto-Confirmed", msg)
     logger.info(
         "interac_matcher: confirmed settlement=%s via log=%s",
         settlement.id, log.id,

@@ -12,6 +12,7 @@ from app.models import User, Payment
 from app.routes.auth import get_current_user
 from app.idempotency import idempotent
 from app.services.push import send_expo_push
+from app.services.email_service import email_for_notification
 import logging
 from datetime import datetime, timedelta, timezone
 from app.config import get_settings
@@ -180,11 +181,13 @@ async def create_payment(
         ))
         await db.flush()
         _push_token = payee.push_token
-        _notif_title, _notif_msg, _notif_id = notif.title, notif.message, notif.id
+        _payee_email = payee.email
+        _notif_title, _notif_msg, _notif_id, _notif_type = notif.title, notif.message, notif.id, notif.type
         await db.commit()
         logger.info(f"[{correlation_id}] Pending claim created, payee notified.")
         if _push_token:
             await send_expo_push(_push_token, _notif_title, _notif_msg, {"notificationId": _notif_id})
+        await email_for_notification(_payee_email, _notif_type, _notif_title, _notif_msg)
         return {"status": "pending_claim", "payment_id": new_payment.id, "client_secret": None}
 
     try:
