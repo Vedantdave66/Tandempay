@@ -14,7 +14,7 @@ router = APIRouter(prefix="/api/receipts", tags=["receipts"])
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_URL = (
     "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.0-flash-lite:generateContent"
+    "gemini-2.5-flash:generateContent"
 )
 
 PROMPT = """You are a receipt parser. Extract line items and totals from this receipt image.
