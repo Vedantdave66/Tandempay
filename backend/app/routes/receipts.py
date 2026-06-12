@@ -1,10 +1,12 @@
+import ast
 import base64
 import json
+import re
 import httpx
 import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 from app.models import User
 from app.routes.auth import get_current_user
@@ -47,6 +49,10 @@ Rules:
 - Estimate illegible values from context
 - Always return all fields"""
 
+_FALLBACK = dict(items=[], subtotal=0.0, tax=0.0, tax_rate=0.13,
+                 tip_detected=0.0, total=0.0, currency="CAD",
+                 merchant="Receipt", parse_failed=True)
+
 
 class ParseReceiptRequest(BaseModel):
     image_base64: str
@@ -66,6 +72,49 @@ class ReceiptParseResponse(BaseModel):
     tip_detected: float
     total: float
     currency: str
+    merchant: str = "Receipt"
+    parse_failed: Optional[bool] = None
+
+
+def _extract_json(text: str) -> dict:
+    """Four-step extraction pipeline. Raises ValueError when all steps fail."""
+    # Step A: direct parse
+    try:
+        return json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Step B: strip markdown fences
+    stripped = re.sub(r"```[a-z]*\n?", "", text).strip()
+    try:
+        return json.loads(stripped)
+    except (json.JSONDecodeError, ValueError):
+        pass
+
+    # Step C: first {...} block
+    match = re.search(r"\{.*\}", stripped, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group())
+        except (json.JSONDecodeError, ValueError):
+            pass
+
+    # Step D: Python literal parser (handles single-quoted JSON-like output)
+    try:
+        result = ast.literal_eval(text)
+        if isinstance(result, dict):
+            return result
+    except (ValueError, SyntaxError):
+        pass
+
+    raise ValueError("All JSON extraction steps failed")
+
+
+def _coerce_price(raw) -> float:
+    try:
+        return float(str(raw).replace("$", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        return 0.0
 
 
 @router.post("/parse", response_model=ReceiptParseResponse)
@@ -120,37 +169,42 @@ async def parse_receipt(
             result = resp.json()
 
         raw = result["candidates"][0]["content"]["parts"][0]["text"].strip()
+        data = _extract_json(raw)
 
-        # Strip markdown fences if present
-        if raw.startswith("```"):
-            raw = raw.split("```")[1]
-            if raw.startswith("json"):
-                raw = raw[4:]
-        raw = raw.strip()
-
-        data = json.loads(raw)
-
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=502, detail=f"Gemini returned invalid JSON: {str(e)}")
     except httpx.HTTPStatusError as e:
         raise HTTPException(status_code=502, detail=f"Gemini API error: {e.response.text}")
+    except (KeyError, IndexError, ValueError):
+        return ReceiptParseResponse(**_FALLBACK)
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"OCR service error: {str(e)}")
 
+    # Sanitize items; negative prices are valid (discounts)
     items = []
-    for i, item in enumerate(data.get("items", []), start=1):
+    for i, item in enumerate(data.get("items") or [], start=1):
+        price = _coerce_price(item.get("price", 0))
         items.append(ParsedItem(
             id=str(item.get("id", i)),
             name=str(item.get("name", "Item")),
-            price=float(item.get("price", 0)),
+            price=price,
         ))
+
+    if not items:
+        return ReceiptParseResponse(**_FALLBACK)
+
+    # Fall back to summing positive items if total is absent or unparseable
+    raw_total = data.get("total")
+    try:
+        total = float(str(raw_total).replace("$", "").replace(",", "").strip())
+    except (TypeError, ValueError):
+        total = sum(item.price for item in items if item.price > 0)
 
     return ReceiptParseResponse(
         items=items,
-        subtotal=float(data.get("subtotal", 0)),
-        tax=float(data.get("tax", 0)),
-        tax_rate=float(data.get("tax_rate", 0.13)),
-        tip_detected=float(data.get("tip_detected", 0)),
-        total=float(data.get("total", 0)),
+        subtotal=_coerce_price(data.get("subtotal", 0)),
+        tax=_coerce_price(data.get("tax", 0)),
+        tax_rate=_coerce_price(data.get("tax_rate", 0.13)) or 0.13,
+        tip_detected=_coerce_price(data.get("tip_detected", 0)),
+        total=total,
         currency=str(data.get("currency", "CAD")),
+        merchant=str(data.get("merchant", "Receipt")),
     )
