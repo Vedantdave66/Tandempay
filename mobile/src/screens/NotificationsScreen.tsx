@@ -65,8 +65,8 @@ export default function NotificationsScreen() {
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
         try {
             await notificationsApi.markRead(id);
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // optimistic update already applied — swallow
         }
     };
 
@@ -77,8 +77,8 @@ export default function NotificationsScreen() {
         try {
             await notificationsApi.markAllRead();
             loadData();
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // optimistic update already applied — swallow
         }
     };
 

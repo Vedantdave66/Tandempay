@@ -329,6 +329,36 @@ export const walletApi = {
         })
 };
 
+// --- Recurring Expenses ---
+export interface RecurringExpenseOut {
+    id: string;
+    group_id: string | null;
+    created_by_id: string;
+    description: string;
+    amount: number;
+    currency: string;
+    frequency: string;
+    next_run_date: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export const recurringApi = {
+    list: () => request<{ items: RecurringExpenseOut[]; total: number }>('/recurring'),
+    create: (data: {
+        description: string;
+        amount: number;
+        frequency: string;
+        next_run_date: string;
+        group_id?: string;
+        currency?: string;
+    }) => request<RecurringExpenseOut>('/recurring', {
+        method: 'POST',
+        body: JSON.stringify({ currency: 'CAD', ...data }),
+    }),
+};
+
 // --- Receipts ---
 export interface ParsedReceiptItem {
     id: string;

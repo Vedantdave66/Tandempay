@@ -8,13 +8,16 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Modal,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
+import { useAuth } from '../context/AuthContext';
 import * as Haptics from 'expo-haptics';
-import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
-import { friendsApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
+import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake, ChevronRight } from 'lucide-react-native';
+import { friendsApi, groupsApi, balancesApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
@@ -37,6 +40,8 @@ function timeAgo(d: string) {
 }
 
 export default function FriendsScreen() {
+    const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const { colors, isDark } = useTheme();
 
     const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'pending'>('activity');
@@ -48,6 +53,11 @@ export default function FriendsScreen() {
 
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [settleLoading, setSettleLoading] = useState<string | null>(null);
+    const [groupPickerVisible, setGroupPickerVisible] = useState(false);
+    const [groupPickerFriend, setGroupPickerFriend] = useState<Friend | null>(null);
+    const [sharedGroups, setSharedGroups] = useState<Array<{ id: string; name: string }>>([]);
+    const [pickerLoading, setPickerLoading] = useState<string | null>(null);
 
     const loadData = async () => {
         try {
@@ -62,8 +72,8 @@ export default function FriendsScreen() {
             notificationsApi.list()
                 .then(data => setActivity((data || []).slice(0, 8)))
                 .catch(() => {});
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // data unavailable — keep empty state
         } finally {
             setLoading(false);
         }
@@ -109,6 +119,82 @@ export default function FriendsScreen() {
             await loadData();
         } catch (err: any) {
             Alert.alert("Error", err.message);
+        }
+    };
+
+    const goToSettle = async (friend: Friend, groupId: string, groupName: string) => {
+        try {
+            const suggestions = await balancesApi.getSettlements(groupId);
+            const mine = suggestions.find(
+                s => s.from_user_id === user?.id && s.to_user_id === friend.id
+            );
+            navigation.navigate('SettleUp', {
+                payment: {
+                    payee_id:           friend.id,
+                    payee_name:         friend.name,
+                    payee_email:        friend.email,
+                    payee_avatar_color: friend.avatar_color,
+                    amount:             mine?.amount ?? 0,
+                    group_id:           groupId,
+                    payer_id:           user?.id,
+                    description:        groupName,
+                },
+            });
+        } catch {
+            // If suggestions fail, navigate with 0 so user can still proceed
+            navigation.navigate('SettleUp', {
+                payment: {
+                    payee_id:           friend.id,
+                    payee_name:         friend.name,
+                    payee_email:        friend.email,
+                    payee_avatar_color: friend.avatar_color,
+                    amount:             0,
+                    group_id:           groupId,
+                    payer_id:           user?.id,
+                    description:        groupName,
+                },
+            });
+        }
+    };
+
+    const handleSettleUp = async (friend: Friend) => {
+        if (friend.shared_groups_count === 0) {
+            Alert.alert('No shared groups', 'Add a shared group first to settle up.');
+            return;
+        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setSettleLoading(friend.id);
+        try {
+            const allGroups = await groupsApi.list();
+            const details = await Promise.all(allGroups.map(g => groupsApi.get(g.id)));
+            const shared = details.filter(g => g.members.some(m => m.user_id === friend.id));
+
+            if (shared.length === 0) {
+                Alert.alert('No shared groups', 'Add a shared group first to settle up.');
+                return;
+            }
+            if (shared.length === 1) {
+                await goToSettle(friend, shared[0].id, shared[0].name);
+            } else {
+                setGroupPickerFriend(friend);
+                setSharedGroups(shared.map(g => ({ id: g.id, name: g.name })));
+                setGroupPickerVisible(true);
+            }
+        } catch {
+            Alert.alert('Error', 'Could not load groups. Try again.');
+        } finally {
+            setSettleLoading(null);
+        }
+    };
+
+    const handlePickGroup = async (groupId: string, groupName: string) => {
+        if (!groupPickerFriend) return;
+        setPickerLoading(groupId);
+        try {
+            await goToSettle(groupPickerFriend, groupId, groupName);
+            setGroupPickerVisible(false);
+        } finally {
+            setPickerLoading(null);
         }
     };
 
@@ -237,8 +323,16 @@ export default function FriendsScreen() {
                                                 {friend.shared_groups_count} shared squads
                                             </Text>
                                         </View>
-                                        <TouchableOpacity style={styles.settleBtn} activeOpacity={0.75}>
-                                            <Text style={[styles.settleBtnText, { color: colors.accent }, T.semibold]}>Settle up</Text>
+                                        <TouchableOpacity
+                                            style={styles.settleBtn}
+                                            activeOpacity={0.75}
+                                            onPress={() => handleSettleUp(friend)}
+                                            disabled={settleLoading === friend.id}
+                                        >
+                                            {settleLoading === friend.id
+                                                ? <ActivityIndicator size="small" color={colors.accent} />
+                                                : <Text style={[styles.settleBtnText, { color: colors.accent }, T.semibold]}>Settle up</Text>
+                                            }
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -303,6 +397,48 @@ export default function FriendsScreen() {
                     </>
                 )}
             </ScrollView>
+            <Modal
+                visible={groupPickerVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setGroupPickerVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.pickerOverlay}
+                    activeOpacity={1}
+                    onPress={() => setGroupPickerVisible(false)}
+                >
+                    <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.pickerTitle, { color: colors.text }, T.bold]}>
+                            Which group?
+                        </Text>
+                        {sharedGroups.map((g, i) => (
+                            <TouchableOpacity
+                                key={g.id}
+                                style={[
+                                    styles.pickerRow,
+                                    i < sharedGroups.length - 1 && {
+                                        borderBottomWidth: StyleSheet.hairlineWidth,
+                                        borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                    },
+                                ]}
+                                onPress={() => handlePickGroup(g.id, g.name)}
+                                disabled={!!pickerLoading}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[styles.pickerRowText, { color: colors.text }, T.semibold]}>
+                                    {g.name}
+                                </Text>
+                                {pickerLoading === g.id
+                                    ? <ActivityIndicator size="small" color={colors.accent} />
+                                    : <ChevronRight size={scale(18)} color={colors.faintText} />
+                                }
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -480,5 +616,39 @@ const styles = StyleSheet.create({
         fontSize: ms(15),
         textAlign: 'center',
         lineHeight: 21,
+    },
+
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    pickerSheet: {
+        borderTopLeftRadius: ms(24),
+        borderTopRightRadius: ms(24),
+        paddingHorizontal: scale(24),
+        paddingTop: vs(16),
+        paddingBottom: vs(48),
+    },
+    pickerHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: ms(2),
+        alignSelf: 'center',
+        marginBottom: vs(20),
+    },
+    pickerTitle: {
+        fontSize: ms(20),
+        marginBottom: vs(8),
+    },
+    pickerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: vs(16),
+        minHeight: vs(44),
+    },
+    pickerRowText: {
+        fontSize: ms(16),
     },
 });

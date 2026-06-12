@@ -41,8 +41,8 @@ export default function PendingRequestsScreen({ navigation }: any) {
             ]);
             setFriends(f || []);
             setPending(p || { sent: [], received: [] });
-        } catch (err) {
-            console.log(err);
+        } catch {
+            // keep empty state on failure
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -82,7 +82,7 @@ export default function PendingRequestsScreen({ navigation }: any) {
                     onPress={() => navigation.navigate('AddFriend')}
                     style={[styles.addBtn, { backgroundColor: colors.accent }]}
                 >
-                    <UserPlus color="#064E3B" size={18} />
+                    <UserPlus color={colors.accentDark} size={18} />
                 </TouchableOpacity>
             </View>
 
@@ -164,7 +164,7 @@ export default function PendingRequestsScreen({ navigation }: any) {
                                         <X color={colors.secondaryText} size={16} />
                                     </TouchableOpacity>
                                     <TouchableOpacity onPress={() => accept(item.id)} disabled={!!actionId} style={[styles.actionBtn, { backgroundColor: colors.accent }]}>
-                                        {actionId === item.id ? <ActivityIndicator color="#064E3B" size="small" /> : <Check color="#064E3B" size={16} />}
+                                        {actionId === item.id ? <ActivityIndicator color={colors.accentDark} size="small" /> : <Check color={colors.accentDark} size={16} />}
                                     </TouchableOpacity>
                                 </View>
                             ) : (

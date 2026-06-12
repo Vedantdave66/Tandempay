@@ -75,8 +75,8 @@ export default function ActivityScreen({ navigation }: any) {
         try {
             const data = await notificationsApi.list();
             setNotifications(data || []);
-        } catch (err) {
-            console.log(err);
+        } catch {
+            // notifications unavailable — show empty state
         } finally {
             setLoading(false);
             setRefreshing(false);

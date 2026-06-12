@@ -236,7 +236,7 @@ export default function DashboardScreen({ navigation }: any) {
                 })
                 .catch(() => {});
         } catch (err) {
-            console.log('[Dashboard] Failed to load groups:', err);
+            console.error('[Dashboard] Failed to load groups:', err);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -366,7 +366,7 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Bell color={colors.secondaryText} size={20} />
                         {unreadCount > 0 && (
-                            <View style={[styles.bellDot, { borderColor: colors.background }]} />
+                            <View style={[styles.bellDot, { borderColor: colors.background, backgroundColor: colors.danger }]} />
                         )}
                     </TouchableOpacity>
                 </View>
@@ -552,7 +552,6 @@ const styles = StyleSheet.create({
         width: scale(8),
         height: scale(8),
         borderRadius: scale(4),
-        backgroundColor: '#E05252',
         borderWidth: 1.5,
     },
 

@@ -15,7 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
-import { Expense } from '../services/api';
+import { Expense, GroupMember, User } from '../services/api';
 import { formatCurrency } from '../utils/formatCurrency';
 import { ArrowLeft, X } from 'lucide-react-native';
 import CharacterShape from './CharacterShape';
@@ -39,7 +39,7 @@ function expenseEmoji(title: string): string {
 
 // Display name for a member — their chosen character nickname wins,
 // matching GroupCard's convention
-function memberLabel(m: any): string {
+function memberLabel(m: GroupMember): string {
     return m?.character_nickname || (m?.name || '').split(' ')[0];
 }
 
@@ -52,10 +52,10 @@ const DOCK_MAX   = 6; // draggable members shown in the dock
 
 interface CanvasModeViewProps {
     expenses: Expense[];
-    members: any[];
+    members: GroupMember[];
     groupId: string;
     groupName: string;
-    user: any;
+    user: User | null;
     colors: any;
     isDark: boolean;
     onAddExpense: () => void;
@@ -491,11 +491,11 @@ export default function CanvasModeView({
     const selectedAssigned        = selectedExpense ? (assignments[selectedExpense.id] ?? []) : [];
     const selectedAssignedMembers = selectedAssigned
         .map(uid => members.find(m => m.user_id === uid))
-        .filter(Boolean);
+        .filter((m): m is GroupMember => m !== undefined);
     const perPerson   = selectedExpense && selectedAssigned.length > 0 ? selectedExpense.amount / selectedAssigned.length : 0;
     const payerMember = selectedExpense ? members.find(m => m.user_id === selectedExpense.paid_by) ?? null : null;
     const iAmPayer    = selectedExpense?.paid_by === user?.id;
-    const iAmAssigned = selectedExpense ? selectedAssigned.includes(user?.id) : false;
+    const iAmAssigned = selectedExpense ? selectedAssigned.includes(user?.id ?? '') : false;
 
     const selectedBubbleIdx = selectedExpense ? visibleExpenses.findIndex(e => e.id === selectedExpense.id) : -1;
     const sheetTitleColor   = selectedBubbleIdx >= 0
@@ -705,7 +705,7 @@ export default function CanvasModeView({
                     const assignedUids = assignments[exp.id] ?? [];
                     const pips = assignedUids
                         .map(uid => members.find(m => m.user_id === uid))
-                        .filter(Boolean)
+                        .filter((m): m is GroupMember => m !== undefined)
                         .slice(0, 3);
                     const payer = members.find(m => m.user_id === exp.paid_by);
                     const br    = bubbleRadii[i] ?? BUBBLE_R;
