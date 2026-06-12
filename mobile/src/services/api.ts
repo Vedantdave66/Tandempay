@@ -85,6 +85,7 @@ export const authApi = {
         character_shape?: string;
         character_color?: string;
         character_nickname?: string;
+        push_token?: string;
     }) => request<User>('/auth/me', { method: 'PATCH', body: JSON.stringify(data) }),
 };
 

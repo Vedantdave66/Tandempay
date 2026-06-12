@@ -7,6 +7,7 @@ from app.database import get_db
 from app.models import User, FriendRequest, Notification, Group, GroupMember
 from app.schemas import FriendRequestCreate, FriendRequestOut, UserOut
 from app.routes.auth import get_current_user
+from app.services.push import push_for_user
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -65,6 +66,8 @@ async def send_friend_request(
             reference_id=new_request.id
         )
         db.add(notification)
+        await db.flush()
+        await push_for_user(target_user, notification.title, notification.message, notification.id)
 
     await db.commit()
     await db.refresh(new_request)
@@ -142,7 +145,10 @@ async def accept_request(
         raise HTTPException(status_code=400, detail="Request is already processed.")
         
     req.status = "accepted"
-    
+
+    sender_result = await db.execute(select(User).where(User.id == req.sender_id))
+    sender = sender_result.scalar_one_or_none()
+
     # Notify the sender
     notification = Notification(
         user_id=req.sender_id,
@@ -152,7 +158,10 @@ async def accept_request(
         reference_id=req.id
     )
     db.add(notification)
-    
+    await db.flush()
+    if sender:
+        await push_for_user(sender, notification.title, notification.message, notification.id)
+
     await db.commit()
     return {"status": "success", "message": "Request accepted"}
 
