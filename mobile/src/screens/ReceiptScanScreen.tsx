@@ -1,83 +1,73 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
-  View, Text, StyleSheet, TouchableOpacity,
-  ScrollView, Animated, ActivityIndicator, TextInput, Alert,
+  View, Text, StyleSheet, TouchableOpacity, ScrollView,
+  Modal, Animated, ActivityIndicator, Image, Alert, Dimensions,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { Camera, ArrowLeft, Check, ReceiptText, ChevronRight, UserPlus, Users } from 'lucide-react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { Camera, ArrowLeft, ChevronRight, ChevronDown, ChevronUp, Users, Check, ReceiptText } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
-import { receiptsApi, groupsApi, ParsedReceiptItem, GroupListItem, GroupMember } from '../services/api';
-import * as ImageManipulator from 'expo-image-manipulator';
+import {
+  receiptsApi, groupsApi, expensesApi,
+  ParsedReceiptItem, GroupListItem, GroupMember,
+} from '../services/api';
+import CharacterShape from '../components/CharacterShape';
+import SkeletonBlock from '../components/SkeletonBlock';
 
-type Phase = 'group_picker' | 'idle' | 'parsing' | 'people' | 'items';
+type Phase = 'idle' | 'parsing' | 'result' | 'error';
+
+const { height: SCREEN_H } = Dimensions.get('window');
+const SHEET_H = SCREEN_H * 0.55;
+
+interface MemberEntry {
+  user_id: string;
+  name: string;
+  character_shape: string;
+  character_color: string;
+}
 
 export default function ReceiptScanScreen({ navigation, route }: any) {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
-  // If caller already provides group context (e.g. GroupDetailScreen), skip picker.
-  const paramsGroupId: string | undefined = route?.params?.groupId;
+  const paramsGroupId: string | undefined  = route?.params?.groupId;
   const paramsMembers: GroupMember[] | undefined = route?.params?.members;
-  const startedWithGroup = useRef(!!paramsGroupId);
 
-  const [phase, setPhase] = useState<Phase>(paramsGroupId ? 'idle' : 'group_picker');
+  const [phase, setPhase]               = useState<Phase>('idle');
+  const [pickerVisible, setPickerVisible] = useState(false);
 
-  // Group state
-  const [groupId, setGroupId]           = useState<string | null>(paramsGroupId ?? null);
+  const [groupId, setGroupId]       = useState<string | null>(paramsGroupId ?? null);
+  const [groupName, setGroupName]   = useState<string>('');
   const [groupMembers, setGroupMembers] = useState<GroupMember[]>(paramsMembers ?? []);
 
-  // Group picker state
   const [pickerGroups, setPickerGroups]         = useState<GroupListItem[]>([]);
   const [pickerLoading, setPickerLoading]       = useState(false);
   const [selectingGroupId, setSelectingGroupId] = useState<string | null>(null);
 
-  // People & claims — seed included from real member user_ids when available
-  const [included, setIncluded] = useState<Set<string>>(
-    paramsMembers
-      ? new Set(['me', ...paramsMembers.map(m => m.user_id)])
-      : new Set(['me']),
-  );
-  const [claimed, setClaimed]     = useState<Set<string>>(new Set());
-  const [tipAmount, setTipAmount] = useState('');
-  const [tipActive, setTipActive] = useState(false);
+  const [capturedUri, setCapturedUri] = useState<string | null>(null);
+  const [parseResult, setParseResult] = useState<{
+    items: ParsedReceiptItem[]; subtotal: number; tax: number;
+    tax_rate: number; tip_detected: number; total: number; currency: string;
+  } | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
 
-  const [items, setItems]             = useState<ParsedReceiptItem[]>([]);
-  const [subtotal, setSubtotal]       = useState(0);
-  const [tax, setTax]                 = useState(0);
-  const [taxRate, setTaxRate]         = useState(0.13);
-  const [tipDetected, setTipDetected] = useState(0);
-  const [parseError, setParseError]   = useState<string | null>(null);
+  const [itemsExpanded, setItemsExpanded] = useState(false);
+  const [claimed, setClaimed]             = useState<Set<string>>(new Set());
+  const [adding, setAdding]               = useState(false);
 
-  // Parsing animations
-  const pulseAnim = useRef(new Animated.Value(1)).current;
-  const scanLineY = useRef(new Animated.Value(0)).current;
-  const pulseLoop = useRef<Animated.CompositeAnimation | null>(null);
-  const scanLoop  = useRef<Animated.CompositeAnimation | null>(null);
+  const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
+  const cardAnim  = useRef(new Animated.Value(SCREEN_H)).current;
 
-  const MAX_ITEMS = 30;
-  const itemAnims = useRef(
-    Array.from({ length: MAX_ITEMS }, () => ({
-      opacity:    new Animated.Value(0),
-      translateY: new Animated.Value(vs(14)),
-    }))
-  ).current;
-
-  const checkAnims = useRef(
-    Object.fromEntries(Array.from({ length: MAX_ITEMS }, (_, i) => [String(i), new Animated.Value(0)]))
-  ).current;
-
-  // People entrance
-  const peopleAnim = useRef(new Animated.Value(0)).current;
-
-  // ── Load groups for picker ─────────────────────────────────────────────────
+  // ── Load groups when picker opens ─────────────────────────────────────────
   useEffect(() => {
-    if (phase !== 'group_picker') return;
+    if (!pickerVisible) return;
     setPickerLoading(true);
     groupsApi.list()
       .then(raw => {
@@ -86,27 +76,40 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       })
       .catch(() => Alert.alert('Error', 'Could not load groups.'))
       .finally(() => setPickerLoading(false));
-  }, [phase]);
+  }, [pickerVisible]);
 
   useEffect(() => {
-    if (phase === 'people') {
-      Animated.spring(peopleAnim, { toValue: 1, useNativeDriver: true, damping: 24, stiffness: 260 }).start();
+    if (pickerVisible) {
+      Animated.spring(sheetAnim, {
+        toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true,
+      }).start();
     }
-    if (phase === 'items') {
-      const count = Math.min(items.length, MAX_ITEMS);
-      const anims = itemAnims.slice(0, count).flatMap(({ opacity, translateY }, i) => [
-        Animated.timing(opacity,    { toValue: 1, duration: 200, delay: i * 40, useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 200, delay: i * 40, useNativeDriver: true }),
-      ]);
-      Animated.parallel(anims).start();
+  }, [pickerVisible]);
+
+  useEffect(() => {
+    if (phase === 'result') {
+      cardAnim.setValue(SCREEN_H);
+      Animated.spring(cardAnim, {
+        toValue: 0, damping: 22, stiffness: 200, useNativeDriver: true,
+      }).start();
     }
   }, [phase]);
 
-  // ── Camera ────────────────────────────────────────────────────────────────
+  const closePicker = useCallback(() => {
+    Animated.spring(sheetAnim, {
+      toValue: SHEET_H, damping: 20, stiffness: 200, useNativeDriver: true,
+    }).start(() => {
+      setPickerVisible(false);
+      sheetAnim.setValue(SHEET_H);
+    });
+  }, [sheetAnim]);
+
+  // ── Camera ─────────────────────────────────────────────────────────────────
   const openCamera = useCallback(async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== 'granted') {
-      Alert.alert('Camera Access', 'TandemPay needs camera access to scan receipts. Enable it in Settings.');
+      setParseError('Camera permission denied. Enable camera access in Settings to scan receipts.');
+      setPhase('error');
       return;
     }
 
@@ -117,8 +120,6 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     if (result.canceled || !result.assets?.[0]) return;
 
     const asset = result.assets[0];
-
-    // Resize + compress to stay well under Vercel's 4.5 MB body limit
     const compressed = await ImageManipulator.manipulateAsync(
       asset.uri,
       [{ resize: { width: 800 } }],
@@ -126,196 +127,194 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     );
     const base64Image = compressed.base64 ?? '';
     if (!base64Image) {
-      Alert.alert('Error', 'Could not compress image. Please try again.');
+      Alert.alert('Error', 'Could not process image. Please try again.');
       return;
     }
 
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setCapturedUri(compressed.uri);
     setParseError(null);
+    setClaimed(new Set());
+    setItemsExpanded(false);
+    setParseResult(null);
     setPhase('parsing');
-
-    pulseLoop.current = Animated.loop(Animated.sequence([
-      Animated.timing(pulseAnim, { toValue: 1.06, duration: 800, useNativeDriver: true }),
-      Animated.timing(pulseAnim, { toValue: 1,    duration: 800, useNativeDriver: true }),
-    ]));
-    scanLoop.current = Animated.loop(Animated.sequence([
-      Animated.timing(scanLineY, { toValue: 1, duration: 1500, useNativeDriver: false }),
-      Animated.timing(scanLineY, { toValue: 0, duration: 0,    useNativeDriver: false }),
-    ]));
-    pulseLoop.current.start();
-    scanLoop.current.start();
 
     try {
       const parsed = await receiptsApi.parse(base64Image);
-
-      pulseLoop.current?.stop();
-      scanLoop.current?.stop();
-
-      setItems(parsed.items);
-      setSubtotal(parsed.subtotal);
-      setTax(parsed.tax);
-      setTaxRate(parsed.tax_rate);
-      setTipDetected(parsed.tip_detected);
-      if (parsed.tip_detected > 0) {
-        setTipAmount(parsed.tip_detected.toFixed(2));
-        setTipActive(true);
-      }
-
+      setParseResult(parsed);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      setPhase('people');
-
+      setPhase('result');
     } catch (err: any) {
-      pulseLoop.current?.stop();
-      scanLoop.current?.stop();
-      const msg = err?.message || 'Could not read this receipt. Try a clearer photo.';
-      setParseError(msg);
-      setPhase('idle');
-      Alert.alert('Scan Failed', msg);
+      setParseError(err?.message || 'Could not read this receipt. Try a clearer photo.');
+      setPhase('error');
     }
   }, []);
 
-  // Auto-open camera on mount only when groupId was provided via route.params
+  // Auto-open camera when group context provided via route.params
+  const startedWithGroup = useRef(!!paramsGroupId);
   useEffect(() => {
     if (!startedWithGroup.current) return;
-    const timer = setTimeout(openCamera, 400);
-    return () => clearTimeout(timer);
+    const t = setTimeout(openCamera, 400);
+    return () => clearTimeout(t);
   }, [openCamera]);
 
-  // ── Toggles ───────────────────────────────────────────────────────────────
-  const toggleMember = (id: string) => {
-    Haptics.selectionAsync();
-    setIncluded(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) { if (next.size > 1) next.delete(id); }
-      else next.add(id);
-      return next;
-    });
-  };
+  // ── Computed split values ─────────────────────────────────────────────────
+  const allMembers = useMemo<MemberEntry[]>(() => {
+    const others = groupMembers.filter(m => m.user_id !== user?.id).map(m => ({
+      user_id: m.user_id,
+      name: m.name,
+      character_shape: m.character_shape ?? 'rect',
+      character_color: m.character_color ?? m.avatar_color ?? colors.accent,
+    }));
+    return [
+      {
+        user_id: 'me',
+        name: 'You',
+        character_shape: user?.character_shape ?? 'rect',
+        character_color: user?.character_color ?? colors.accent,
+      },
+      ...others,
+    ];
+  }, [groupMembers, user, colors.accent]);
 
-  const toggleClaim = (id: string) => {
-    Haptics.selectionAsync();
-    const idx = items.findIndex(i => i.id === id);
-    const animKey = String(idx);
-    setClaimed(prev => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-        Animated.spring(checkAnims[animKey], { toValue: 0, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
-      } else {
-        next.add(id);
-        Animated.spring(checkAnims[animKey], { toValue: 1, useNativeDriver: true, damping: 18, stiffness: 280 }).start();
-      }
-      return next;
-    });
-  };
+  const splitCount = allMembers.length;
+  const total      = parseResult?.total ?? 0;
+  const evenShare  = splitCount > 0 ? parseFloat((total / splitCount).toFixed(2)) : 0;
 
-  // ── Calculations ──────────────────────────────────────────────────────────
-  const tip        = parseFloat(tipAmount) || 0;
-  const total      = parseFloat((subtotal + tax + tip).toFixed(2));
-  const splitCount = included.size;
-  const myFood     = items.filter(i => claimed.has(i.id)).reduce((s, i) => s + i.price, 0);
-  const myFraction = subtotal > 0 ? myFood / subtotal : 0;
-  const myShare    = parseFloat((myFood + tax * myFraction + (tip > 0 ? tip / splitCount : 0)).toFixed(2));
-  const hasClaim   = claimed.size > 0;
+  const myFoodTotal = useMemo(
+    () => (parseResult?.items ?? []).filter(i => claimed.has(i.id)).reduce((s, i) => s + i.price, 0),
+    [claimed, parseResult],
+  );
+  const myShare = useMemo(() => {
+    if (!parseResult || claimed.size === 0) return evenShare;
+    const { subtotal, tax, tip_detected } = parseResult;
+    const frac = subtotal > 0 ? myFoodTotal / subtotal : 0;
+    return parseFloat((myFoodTotal + tax * frac + tip_detected / splitCount).toFixed(2));
+  }, [parseResult, claimed, myFoodTotal, evenShare, splitCount]);
 
-  const scanTop = scanLineY.interpolate({ inputRange: [0, 1], outputRange: ['0%', '90%'] });
+  // ── Add Expense ────────────────────────────────────────────────────────────
+  const handleAddExpense = useCallback(async () => {
+    if (!groupId || !parseResult || !user) return;
+    setAdding(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const participantIds = allMembers.map(m => m.user_id === 'me' ? user.id : m.user_id);
+      await expensesApi.create(groupId, {
+        title: 'Shared Receipt',
+        amount: parseResult.total,
+        paid_by: user.id,
+        participant_ids: participantIds,
+      });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      navigation.navigate('MainTabs', { screen: 'Groups' });
+    } catch (err: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert('Error', err.message || 'Could not add expense. Please try again.');
+      setAdding(false);
+    }
+  }, [groupId, parseResult, user, allMembers, navigation]);
 
-  // ── Phase navigation ──────────────────────────────────────────────────────
-  const goBack = () => {
-    if (phase === 'idle' && !startedWithGroup.current) { setPhase('group_picker'); return; }
-    if (phase === 'people') { setPhase('idle'); setClaimed(new Set()); return; }
-    if (phase === 'items')  { setPhase('people'); return; }
-    navigation.goBack();
-  };
-
-  // Fix: from a modal stack screen, reach the tab navigator by name
-  const navigateToGroups = () => {
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    navigation.navigate('MainTabs', { screen: 'Groups' });
-  };
-
-  // ── GROUP PICKER ──────────────────────────────────────────────────────────
-  if (phase === 'group_picker') {
-    return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <ArrowLeft size={22} color={colors.text} />
-        </TouchableOpacity>
-
-        <View style={styles.pickerHeader}>
-          <Text style={[styles.pickerTitle, T.extrabold, { color: colors.text }]}>Which group?</Text>
-          <Text style={[styles.pickerSub, T.regular, { color: colors.secondaryText }]}>
-            Choose the group to split this receipt with
-          </Text>
-        </View>
-
-        {pickerLoading ? (
-          <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: vs(48) }} />
-        ) : pickerGroups.length === 0 ? (
-          <View style={styles.pickerEmpty}>
-            <Users size={40} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(12) }} />
-            <Text style={[styles.pickerEmptyTitle, T.bold, { color: colors.text }]}>No groups yet</Text>
-            <Text style={[styles.pickerEmptySub, T.regular, { color: colors.secondaryText }]}>
-              Create a group first to split receipts.
+  // ── GROUP PICKER MODAL ─────────────────────────────────────────────────────
+  const renderPicker = () => (
+    <Modal visible={pickerVisible} transparent animationType="none" onRequestClose={closePicker}>
+      <View style={{ flex: 1 }}>
+        <TouchableOpacity
+          style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+          activeOpacity={1}
+          onPress={closePicker}
+        />
+        <Animated.View style={[styles.pickerSheet, {
+          backgroundColor: colors.surface,
+          transform: [{ translateY: sheetAnim }],
+        }]}>
+          <View style={styles.handleRow}>
+            <View style={[styles.handlePill, { backgroundColor: colors.border }]} />
+          </View>
+          <View style={{ paddingHorizontal: scale(24), paddingBottom: vs(14) }}>
+            <Text style={[styles.pickerTitle, T.extrabold, { color: colors.text }]}>Which group?</Text>
+            <Text style={[styles.pickerSub, T.regular, { color: colors.secondaryText }]}>
+              Choose the group to split this receipt with
             </Text>
           </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.pickerList} showsVerticalScrollIndicator={false}>
-            {pickerGroups.map(g => (
-              <TouchableOpacity
-                key={g.id}
-                style={[styles.pickerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                activeOpacity={0.75}
-                disabled={!!selectingGroupId}
-                onPress={async () => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setSelectingGroupId(g.id);
-                  try {
-                    const full = await groupsApi.get(g.id);
-                    // Exclude the current user — they're represented by the 'me' slot in people phase
-                    const members = full.members.filter(m => m.user_id !== user?.id);
-                    setGroupId(g.id);
-                    setGroupMembers(members);
-                    setIncluded(new Set(['me', ...members.map(m => m.user_id)]));
-                    setPhase('idle');
-                    openCamera();
-                  } catch {
-                    Alert.alert('Error', 'Could not load group members. Try again.');
-                  } finally {
-                    setSelectingGroupId(null);
-                  }
-                }}
-              >
-                <View style={[styles.pickerRowIcon, {
-                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
-                }]}>
-                  <Users size={20} color={colors.accent} />
-                </View>
-                <View style={styles.pickerRowInfo}>
-                  <Text style={[styles.pickerRowName, T.semibold, { color: colors.text }]}>{g.name}</Text>
-                  <Text style={[styles.pickerRowMeta, T.regular, { color: colors.secondaryText }]}>
-                    {g.member_count} member{g.member_count !== 1 ? 's' : ''}
-                  </Text>
-                </View>
-                {selectingGroupId === g.id
-                  ? <ActivityIndicator size="small" color={colors.accent} />
-                  : <ChevronRight size={18} color={colors.secondaryText} />
-                }
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        )}
-      </SafeAreaView>
-    );
-  }
 
-  // ── IDLE ──────────────────────────────────────────────────────────────────
+          {pickerLoading ? (
+            <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: vs(28) }} />
+          ) : pickerGroups.length === 0 ? (
+            <View style={styles.pickerEmpty}>
+              <Users size={36} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(10) }} />
+              <Text style={[styles.pickerEmptyTitle, T.bold, { color: colors.text }]}>No groups yet</Text>
+              <Text style={[styles.pickerEmptySub, T.regular, { color: colors.secondaryText }]}>
+                Create a group first to split receipts.
+              </Text>
+            </View>
+          ) : (
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingHorizontal: scale(16), paddingBottom: vs(32) }}
+            >
+              {pickerGroups.map(g => (
+                <TouchableOpacity
+                  key={g.id}
+                  style={[styles.pickerRow, { backgroundColor: colors.background, borderColor: colors.border }]}
+                  activeOpacity={0.75}
+                  disabled={!!selectingGroupId}
+                  onPress={async () => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setSelectingGroupId(g.id);
+                    try {
+                      const full = await groupsApi.get(g.id);
+                      setGroupId(g.id);
+                      setGroupName(g.name);
+                      setGroupMembers(full.members);
+                      closePicker();
+                      setTimeout(openCamera, 350);
+                    } catch {
+                      Alert.alert('Error', 'Could not load group. Try again.');
+                    } finally {
+                      setSelectingGroupId(null);
+                    }
+                  }}
+                >
+                  {/* Mini character cluster — placeholder shapes since GroupListItem has no member shapes */}
+                  <View style={styles.pickerCluster}>
+                    {Array.from({ length: Math.min(g.member_count, 3) }).map((_, i) => (
+                      <View key={i} style={{ marginLeft: i > 0 ? -6 : 0, zIndex: 3 - i }}>
+                        <CharacterShape
+                          shape="rect"
+                          color={colors.accent + (i === 0 ? '' : i === 1 ? 'BB' : '77')}
+                          variant="cluster"
+                        />
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.pickerRowInfo}>
+                    <Text style={[styles.pickerRowName, T.semibold, { color: colors.text }]}>{g.name}</Text>
+                    <Text style={[styles.pickerRowMeta, T.regular, { color: colors.secondaryText }]}>
+                      {g.member_count} member{g.member_count !== 1 ? 's' : ''}
+                    </Text>
+                  </View>
+                  {selectingGroupId === g.id
+                    ? <ActivityIndicator size="small" color={colors.accent} />
+                    : <ChevronRight size={18} color={colors.secondaryText} />
+                  }
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </Animated.View>
+      </View>
+    </Modal>
+  );
+
+  // ── IDLE ───────────────────────────────────────────────────────────────────
   if (phase === 'idle') {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-          <ArrowLeft size={22} color={colors.text} />
-        </TouchableOpacity>
+      <View style={[styles.root, { backgroundColor: colors.background }]}>
+        <View style={[styles.topBar, { paddingTop: insets.top + vs(4) }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <ArrowLeft size={22} color={colors.text} />
+          </TouchableOpacity>
+        </View>
         <View style={styles.idleBody}>
           <LinearGradient
             colors={isDark
@@ -323,391 +322,400 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
               : ['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.05)', 'rgba(16,185,129,0)']}
             style={styles.iconGlow}
           >
-            <View style={[styles.iconCircle, { backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.14)' }]}>
+            <View style={[styles.iconCircle, {
+              backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.14)',
+            }]}>
               <Camera size={42} color="#10B981" strokeWidth={1.6} />
             </View>
           </LinearGradient>
           <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a Receipt</Text>
-          {parseError ? (
-            <Text style={[styles.idleSub, T.regular, { color: '#EF4444', textAlign: 'center' }]}>
-              {parseError}
-            </Text>
-          ) : (
-            <Text style={[styles.idleSub, T.regular, { color: colors.secondaryText }]}>
-              Take a photo and each roommate taps what's theirs. Tax and tip are split automatically.
-            </Text>
-          )}
-          {parseError && (
+          <Text style={[styles.idleSub, T.regular, { color: colors.secondaryText }]}>
+            Snap a photo and split the bill in seconds.
+          </Text>
+          <TouchableOpacity
+            style={[styles.scanBtn, { backgroundColor: colors.accent }]}
+            activeOpacity={0.82}
+            onPress={() => { if (!groupId) setPickerVisible(true); else openCamera(); }}
+          >
+            <Camera size={19} color="#fff" strokeWidth={2.2} />
+            <Text style={[styles.scanBtnText, T.bold]}>Scan Receipt</Text>
+          </TouchableOpacity>
+          {groupName ? (
             <TouchableOpacity
-              style={[styles.cameraBtn, { backgroundColor: '#10B981' }]}
-              activeOpacity={0.82}
-              onPress={openCamera}
+              style={[styles.changeGroupChip, { borderColor: colors.border }]}
+              onPress={() => setPickerVisible(true)}
+              activeOpacity={0.7}
             >
-              <Camera size={19} color="#fff" strokeWidth={2.2} />
-              <Text style={[styles.cameraBtnText, T.bold]}>Try Again</Text>
+              <Users size={13} color={colors.secondaryText} />
+              <Text style={[{ fontSize: ms(12), color: colors.secondaryText }, T.semibold]}>
+                {groupName} · change
+              </Text>
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
-      </SafeAreaView>
+        {renderPicker()}
+      </View>
     );
   }
 
-  // ── PARSING ───────────────────────────────────────────────────────────────
+  // ── PARSING ────────────────────────────────────────────────────────────────
   if (phase === 'parsing') {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+      <View style={[styles.root, { backgroundColor: '#0A0A0A' }]}>
+        {capturedUri && (
+          <Image
+            source={{ uri: capturedUri }}
+            style={[StyleSheet.absoluteFill, { opacity: 0.35 }]}
+            blurRadius={18}
+            resizeMode="cover"
+          />
+        )}
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
         <View style={styles.parsingBody}>
-          <Animated.View style={[styles.receiptMock, {
-            borderColor: isDark ? 'rgba(16,185,129,0.35)' : 'rgba(16,185,129,0.45)',
-            backgroundColor: isDark ? 'rgba(16,185,129,0.06)' : 'rgba(16,185,129,0.04)',
-            transform: [{ scale: pulseAnim }],
-          }]}>
-            <ReceiptText size={52} color="#10B981" strokeWidth={1.2} />
-            <Animated.View style={[styles.scanLine, { top: scanTop }]} />
-          </Animated.View>
-          <Text style={[styles.parsingTitle, T.bold, { color: colors.text, marginTop: vs(28) }]}>Reading receipt…</Text>
-          <Text style={[styles.parsingSub, T.regular, { color: colors.secondaryText, marginTop: vs(6) }]}>Identifying items, tax & tip</Text>
-          <ActivityIndicator color="#10B981" size="small" style={{ marginTop: vs(20) }} />
+          <Text style={[styles.parsingTitle, T.bold, { color: '#fff', marginBottom: vs(24) }]}>
+            Reading receipt…
+          </Text>
+          <SkeletonBlock width={scale(260)} height={vs(16)} radius={ms(8)} delay={0} />
+          <View style={{ height: vs(10) }} />
+          <SkeletonBlock width={scale(200)} height={vs(14)} radius={ms(7)} delay={120} />
+          <View style={{ height: vs(10) }} />
+          <SkeletonBlock width={scale(230)} height={vs(14)} radius={ms(7)} delay={240} />
+          <View style={{ height: vs(10) }} />
+          <SkeletonBlock width={scale(180)} height={vs(14)} radius={ms(7)} delay={360} />
+          <View style={{ height: vs(10) }} />
+          <SkeletonBlock width={scale(210)} height={vs(14)} radius={ms(7)} delay={480} />
+          <Text style={[{ fontSize: ms(13), color: 'rgba(255,255,255,0.45)', marginTop: vs(20) }, T.regular]}>
+            Identifying items, tax & tip
+          </Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
-  // ── PEOPLE ────────────────────────────────────────────────────────────────
-  if (phase === 'people') {
-    const allMembers = [
-      {
-        id: 'me',
-        name: 'You',
-        initial: (user?.character_nickname?.[0] ?? 'Y').toUpperCase(),
-        color: user?.character_color ?? colors.accent,
-      },
-      ...groupMembers.map(m => ({
-        id: m.user_id,
-        name: m.name,
-        initial: (m.name?.[0] ?? '?').toUpperCase(),
-        color: m.avatar_color,
-      })),
-    ];
-
+  // ── ERROR ──────────────────────────────────────────────────────────────────
+  if (phase === 'error') {
     return (
-      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
-          <ArrowLeft size={22} color={colors.text} />
-        </TouchableOpacity>
-
-        <Animated.View style={[styles.peopleBody, {
-          opacity:   peopleAnim,
-          transform: [{ translateY: peopleAnim.interpolate({ inputRange: [0, 1], outputRange: [vs(20), 0] }) }],
-        }]}>
-          <Text style={[styles.peopleTitle, T.extrabold, { color: colors.text }]}>Who's splitting this?</Text>
-          <Text style={[styles.peopleSub, T.regular, { color: colors.secondaryText }]}>
-            Tap to include or remove people from the bill
-          </Text>
-
-          <View style={styles.memberGrid}>
-            {allMembers.map(m => {
-              const isIn = included.has(m.id);
-              return (
-                <TouchableOpacity key={m.id} style={styles.memberItem} activeOpacity={0.75} onPress={() => toggleMember(m.id)}>
-                  <View style={[styles.memberAvatar, {
-                    backgroundColor: m.color + (isIn ? 'FF' : '40'),
-                    borderWidth: isIn ? 2.5 : 0,
-                    borderColor: m.color,
-                  }]}>
-                    <Text style={[styles.memberInitial, { color: isIn ? '#fff' : m.color + 'AA' }]}>{m.initial}</Text>
-                    {isIn && (
-                      <View style={[styles.memberCheckmark, { backgroundColor: m.color }]}>
-                        <Check size={9} color="#fff" strokeWidth={3} />
-                      </View>
-                    )}
-                  </View>
-                  <Text style={[styles.memberName, T.semibold, { color: isIn ? colors.text : colors.tertiaryText }]} numberOfLines={1}>
-                    {m.name}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-
-            {/* Add person chip */}
-            <TouchableOpacity style={styles.memberItem} activeOpacity={0.75} onPress={() => {}}>
-              <View style={[styles.memberAvatar, {
-                backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)',
-                borderWidth: 1.5,
-                borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
-                borderStyle: 'dashed',
-              }]}>
-                <UserPlus size={20} color={colors.secondaryText} strokeWidth={1.6} />
-              </View>
-              <Text style={[styles.memberName, T.regular, { color: colors.tertiaryText }]}>Add</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={[styles.countPill, { backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)' }]}>
-            <Text style={[styles.countText, T.semibold, { color: colors.secondaryText }]}>
-              {included.size} people · ~${((subtotal + tax) / Math.max(included.size, 1)).toFixed(2)} each before items
-            </Text>
-          </View>
-        </Animated.View>
-
-        <View style={[styles.ctaBar, { backgroundColor: colors.background }]}>
-          <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
-            activeOpacity={0.84}
-            onPress={() => { Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium); setPhase('items'); }}
-          >
-            <Text style={[styles.ctaBtnText, T.bold]}>Choose My Items</Text>
-            <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
+      <View style={[styles.root, { backgroundColor: capturedUri ? '#0A0A0A' : colors.background }]}>
+        {capturedUri && (
+          <Image
+            source={{ uri: capturedUri }}
+            style={[StyleSheet.absoluteFill, { opacity: 0.25 }]}
+            blurRadius={20}
+            resizeMode="cover"
+          />
+        )}
+        {capturedUri && (
+          <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.55)' }]} />
+        )}
+        <View style={[styles.topBar, { paddingTop: insets.top + vs(4) }]}>
+          <TouchableOpacity style={styles.backBtn} onPress={() => setPhase('idle')}>
+            <ArrowLeft size={22} color={capturedUri ? '#fff' : colors.text} />
           </TouchableOpacity>
         </View>
-      </SafeAreaView>
-    );
-  }
-
-  // ── ITEMS ─────────────────────────────────────────────────────────────────
-  return (
-    <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-      <View style={styles.itemsHeader}>
-        <TouchableOpacity style={styles.backBtnInline} onPress={goBack}>
-          <ArrowLeft size={22} color={colors.text} />
-        </TouchableOpacity>
-        <View style={{ flex: 1 }}>
-          <Text style={[styles.itemsTitle, T.extrabold, { color: colors.text }]}>Choose Your Items</Text>
-          <Text style={[styles.itemsSub, T.regular, { color: colors.secondaryText }]}>
-            {claimed.size > 0 ? `${claimed.size} item${claimed.size > 1 ? 's' : ''} selected` : 'Tap what you ordered'}
-          </Text>
-        </View>
-        <TouchableOpacity
-          style={[styles.rescanChip, { borderColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.09)' }]}
-          onPress={() => { setItems([]); setParseError(null); setPhase('idle'); setClaimed(new Set()); openCamera(); }}
-        >
-          <Camera size={13} color={colors.secondaryText} strokeWidth={2} style={{ marginRight: 4 }} />
-          <Text style={[styles.rescanText, T.semibold, { color: colors.secondaryText }]}>Retake</Text>
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.itemsScroll}>
-        {items.length === 0 && (
-          <View style={{ alignItems: 'center', paddingVertical: vs(40), gap: vs(12) }}>
-            <Text style={[{ fontSize: ms(15), color: colors.secondaryText, textAlign: 'center' }, T.regular]}>
-              No items detected.{'\n'}Try scanning with better lighting.
+        <View style={styles.errorBody}>
+          <View style={[styles.errorCard, { backgroundColor: colors.surface }]}>
+            <ReceiptText size={40} color="#EF4444" strokeWidth={1.4} style={{ marginBottom: vs(14) }} />
+            <Text style={[styles.errorTitle, T.bold, { color: colors.text }]}>Scan Failed</Text>
+            <Text style={[styles.errorMsg, T.regular, { color: colors.secondaryText }]}>
+              {parseError}
             </Text>
-            <TouchableOpacity onPress={() => setPhase('idle')}>
-              <Text style={[{ color: colors.accent, fontSize: ms(14) }, T.semibold]}>Scan Again</Text>
+            <TouchableOpacity
+              style={[styles.errorPrimaryBtn, { backgroundColor: colors.accent }]}
+              onPress={() => { setPhase('idle'); openCamera(); }}
+              activeOpacity={0.82}
+            >
+              <Camera size={17} color="#fff" />
+              <Text style={[styles.errorBtnText, T.bold]}>Try Again</Text>
             </TouchableOpacity>
-          </View>
-        )}
-        {items.map((item, idx) => {
-          const isClaimed  = claimed.has(item.id);
-          const animKey    = String(idx);
-          const checkScale = checkAnims[animKey].interpolate({ inputRange: [0, 1], outputRange: [0.4, 1] });
-
-          return (
-            <Animated.View key={item.id} style={{
-              opacity:   itemAnims[idx]?.opacity    ?? new Animated.Value(1),
-              transform: [{ translateY: itemAnims[idx]?.translateY ?? new Animated.Value(0) }],
-            }}>
+            {groupId && (
               <TouchableOpacity
-                style={[styles.itemRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}
+                onPress={() => navigation.navigate('AddExpense', { groupId, members: groupMembers })}
+                style={{ marginTop: vs(12) }}
                 activeOpacity={0.7}
-                onPress={() => toggleClaim(item.id)}
               >
-                <Animated.View style={[styles.itemCheckbox, {
-                  backgroundColor: isClaimed ? colors.accent : 'transparent',
-                  borderColor: isClaimed ? colors.accent : (isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.20)'),
-                  transform: [{ scale: isClaimed ? checkScale : new Animated.Value(1) }],
-                }]}>
-                  {isClaimed && <Check size={13} color="#fff" strokeWidth={3} />}
-                </Animated.View>
-
-                <Text style={[styles.itemName, T.semibold, { color: isClaimed ? colors.accent : colors.text, flex: 1, marginLeft: scale(12) }]}>
-                  {item.name}
+                <Text style={[{ fontSize: ms(14), color: colors.accent }, T.semibold]}>
+                  Enter manually →
                 </Text>
-
-                <Text style={[styles.itemPrice, T.semibold, { color: isClaimed ? colors.accent : colors.secondaryText }]}>
-                  ${item.price.toFixed(2)}
-                </Text>
-              </TouchableOpacity>
-            </Animated.View>
-          );
-        })}
-
-        {/* Summary */}
-        <View style={[styles.summarySection, { borderTopColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]}>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Subtotal</Text>
-            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${subtotal.toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Tax {(taxRate * 100).toFixed(0)}%</Text>
-            <Text style={[styles.summaryValue, T.regular, { color: colors.text }]}>${tax.toFixed(2)}</Text>
-          </View>
-
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, T.regular, { color: colors.secondaryText }]}>Tip</Text>
-            {tipActive ? (
-              <View style={[styles.tipInputWrap, { borderColor: colors.accent + '60', backgroundColor: colors.accent + '0F' }]}>
-                <Text style={[styles.tipDollar, { color: colors.accent }]}>$</Text>
-                <TextInput
-                  style={[styles.tipInput, T.semibold, { color: colors.accent }]}
-                  value={tipAmount}
-                  onChangeText={setTipAmount}
-                  keyboardType="decimal-pad"
-                  autoFocus
-                  placeholder="0.00"
-                  placeholderTextColor={colors.accent + '60'}
-                  onBlur={() => { if (!tipAmount) setTipActive(false); }}
-                />
-              </View>
-            ) : (
-              <TouchableOpacity onPress={() => { Haptics.selectionAsync(); setTipActive(true); }}>
-                <Text style={[styles.addTipBtn, T.semibold, { color: colors.accent }]}>Add Tip</Text>
               </TouchableOpacity>
             )}
           </View>
+        </View>
+      </View>
+    );
+  }
 
-          <View style={[styles.summaryDivider, { backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.07)' }]} />
-          <View style={styles.summaryRow}>
-            <Text style={[styles.summaryLabel, T.bold, { color: colors.text, fontSize: ms(15) }]}>Total</Text>
-            <Text style={[styles.summaryValue, T.extrabold, { color: colors.text, fontSize: ms(15) }]}>${total.toFixed(2)}</Text>
-          </View>
+  // ── RESULT ─────────────────────────────────────────────────────────────────
+  return (
+    <View style={[styles.root, { backgroundColor: '#0A0A0A' }]}>
+      {capturedUri && (
+        <Image
+          source={{ uri: capturedUri }}
+          style={[StyleSheet.absoluteFill, { opacity: 0.35 }]}
+          blurRadius={18}
+          resizeMode="cover"
+        />
+      )}
+      <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.50)' }]} />
+
+      <View style={[styles.topBar, { paddingTop: insets.top + vs(4) }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => setPhase('idle')}>
+          <ArrowLeft size={22} color="#fff" />
+        </TouchableOpacity>
+        <Text style={[styles.resultTopTitle, T.bold, { color: 'rgba(255,255,255,0.7)' }]}>
+          {groupName || 'Receipt'}
+        </Text>
+        <View style={{ width: scale(44) }} />
+      </View>
+
+      <Animated.View style={[styles.resultCard, {
+        backgroundColor: colors.surface,
+        paddingBottom: insets.bottom + vs(12),
+        transform: [{ translateY: cardAnim }],
+      }]}>
+        <View style={styles.handleRow}>
+          <View style={[styles.handlePill, { backgroundColor: colors.border }]} />
         </View>
 
-        <View style={{ height: vs(130) }} />
-      </ScrollView>
-
-      <View style={[styles.ctaBar, { backgroundColor: colors.background }]}>
-        {hasClaim ? (
-          <TouchableOpacity
-            style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
-            activeOpacity={0.84}
-            onPress={navigateToGroups}
-          >
-            <Text style={[styles.ctaBtnText, T.bold]}>My Share  ·  ${myShare.toFixed(2)}</Text>
-            <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
-          </TouchableOpacity>
-        ) : (
-          <View style={[styles.ctaBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)' }]}>
-            <Text style={[styles.ctaBtnText, T.semibold, { color: colors.tertiaryText }]}>Tap items you ordered</Text>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScroll}>
+          {/* Total */}
+          <View style={{ marginBottom: vs(18) }}>
+            <Text style={[styles.receiptLabel, T.regular, { color: colors.secondaryText }]}>
+              RECEIPT TOTAL
+            </Text>
+            <Text style={[styles.receiptTotal, T.extrabold, { color: colors.text }]}>
+              ${parseResult?.total.toFixed(2)}
+              <Text style={[{ fontSize: ms(15), color: colors.secondaryText }, T.semibold]}>
+                {'  '}{parseResult?.currency}
+              </Text>
+            </Text>
           </View>
-        )}
-      </View>
-    </SafeAreaView>
+
+          {/* Even split card */}
+          <View style={[styles.splitCard, {
+            backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.03)',
+            borderColor: colors.border,
+          }]}>
+            <View style={styles.splitCluster}>
+              {allMembers.slice(0, 5).map((m, i) => (
+                <View key={m.user_id} style={{ marginLeft: i > 0 ? -8 : 0, zIndex: 5 - i }}>
+                  <CharacterShape
+                    shape={m.character_shape}
+                    color={m.character_color}
+                    variant="mini"
+                  />
+                </View>
+              ))}
+              {allMembers.length > 5 && (
+                <View style={[styles.splitClusterMore, { backgroundColor: colors.border, marginLeft: -8 }]}>
+                  <Text style={[{ fontSize: ms(10), color: colors.secondaryText }, T.bold]}>
+                    +{allMembers.length - 5}
+                  </Text>
+                </View>
+              )}
+            </View>
+            <View style={{ marginTop: vs(10) }}>
+              <Text style={[styles.splitLabel, T.regular, { color: colors.secondaryText }]}>
+                ÷ {splitCount} {splitCount === 1 ? 'person' : 'people'}
+              </Text>
+              <Text style={[styles.splitEach, T.extrabold, { color: colors.accent }]}>
+                ${evenShare.toFixed(2)}{' '}
+                <Text style={[{ fontSize: ms(13), color: colors.secondaryText }, T.regular]}>each</Text>
+              </Text>
+            </View>
+          </View>
+
+          {/* Collapsible items */}
+          <TouchableOpacity
+            style={[styles.customizeRow, { borderTopColor: colors.border }]}
+            onPress={() => setItemsExpanded(v => !v)}
+            activeOpacity={0.75}
+          >
+            <Text style={[styles.customizeLabel, T.semibold, { color: colors.text }]}>
+              {itemsExpanded
+                ? 'Customize split'
+                : `Customize split · ${(parseResult?.items ?? []).length} items`}
+            </Text>
+            {itemsExpanded
+              ? <ChevronUp size={18} color={colors.secondaryText} />
+              : <ChevronDown size={18} color={colors.secondaryText} />
+            }
+          </TouchableOpacity>
+
+          {itemsExpanded && (
+            <View style={[styles.itemsList, { borderColor: colors.border }]}>
+              {(parseResult?.items ?? []).length === 0 ? (
+                <Text style={[{ fontSize: ms(13), color: colors.secondaryText, padding: scale(12) }, T.regular]}>
+                  No individual items detected — using total only.
+                </Text>
+              ) : (parseResult?.items ?? []).map(item => {
+                const isClaimed = claimed.has(item.id);
+                return (
+                  <TouchableOpacity
+                    key={item.id}
+                    style={[styles.itemRow, { borderBottomColor: colors.border }]}
+                    activeOpacity={0.7}
+                    onPress={() => {
+                      Haptics.selectionAsync();
+                      setClaimed(prev => {
+                        const next = new Set(prev);
+                        if (next.has(item.id)) next.delete(item.id);
+                        else next.add(item.id);
+                        return next;
+                      });
+                    }}
+                  >
+                    <View style={[styles.itemCheck, {
+                      backgroundColor: isClaimed ? colors.accent : 'transparent',
+                      borderColor: isClaimed ? colors.accent : (isDark ? 'rgba(255,255,255,0.22)' : 'rgba(0,0,0,0.20)'),
+                    }]}>
+                      {isClaimed && <Check size={12} color="#fff" strokeWidth={3} />}
+                    </View>
+                    <Text style={[styles.itemName, T.semibold, {
+                      color: isClaimed ? colors.accent : colors.text, flex: 1,
+                    }]} numberOfLines={2}>{item.name}</Text>
+                    <Text style={[styles.itemPrice, T.semibold, {
+                      color: isClaimed ? colors.accent : colors.secondaryText,
+                    }]}>${item.price.toFixed(2)}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+              {claimed.size > 0 && (
+                <View style={[styles.myShareRow, { backgroundColor: colors.accentBg }]}>
+                  <Text style={[{ fontSize: ms(13), color: colors.accent }, T.semibold]}>My share</Text>
+                  <Text style={[{ fontSize: ms(16), color: colors.accent }, T.extrabold]}>
+                    ${myShare.toFixed(2)}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+          <View style={{ height: vs(8) }} />
+        </ScrollView>
+
+        <View style={[styles.ctaWrap, { borderTopColor: colors.border }]}>
+          <TouchableOpacity
+            style={[styles.addExpenseBtn, {
+              backgroundColor: colors.accent,
+              shadowColor: colors.accent,
+              opacity: adding ? 0.75 : 1,
+            }]}
+            activeOpacity={0.82}
+            onPress={handleAddExpense}
+            disabled={adding}
+          >
+            {adding ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <>
+                <Text style={[styles.addExpenseBtnText, T.bold]}>
+                  Add Expense · ${parseResult?.total.toFixed(2)}
+                </Text>
+                <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1 },
-  backBtn:       { padding: scale(16), alignSelf: 'flex-start' },
-  backBtnInline: { padding: scale(16) },
-
-  // ── Group picker
-  pickerHeader: {
-    paddingHorizontal: scale(24),
-    paddingTop: vs(4),
-    paddingBottom: vs(20),
-  },
-  pickerTitle: { fontSize: ms(28), letterSpacing: -0.5 },
-  pickerSub:   { fontSize: ms(14), opacity: 0.65, marginTop: vs(6), lineHeight: 20 },
-  pickerList:  { paddingHorizontal: scale(20), paddingBottom: vs(48) },
-  pickerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: ms(18),
-    borderWidth: 1,
-    padding: scale(16),
-    marginBottom: vs(10),
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.04,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  pickerRowIcon: {
-    width: 44,
-    height: 44,
-    borderRadius: ms(13),
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: scale(14),
-  },
-  pickerRowInfo:  { flex: 1 },
-  pickerRowName:  { fontSize: ms(15), marginBottom: vs(2) },
-  pickerRowMeta:  { fontSize: ms(12) },
-  pickerEmpty: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: scale(36),
-    marginTop: -vs(44),
-  },
-  pickerEmptyTitle: { fontSize: ms(17), marginBottom: vs(6) },
-  pickerEmptySub:   { fontSize: ms(14), textAlign: 'center', lineHeight: 20, opacity: 0.7 },
+  root:   { flex: 1 },
+  topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: scale(6), justifyContent: 'space-between' },
+  backBtn: { padding: scale(12), alignSelf: 'flex-start' },
 
   // ── Idle
-  idleBody:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(36), gap: vs(14), marginTop: -vs(44) },
-  iconGlow:      { width: scale(180), height: scale(180), borderRadius: scale(90), alignItems: 'center', justifyContent: 'center', marginBottom: vs(4) },
-  iconCircle:    { width: scale(88), height: scale(88), borderRadius: scale(44), alignItems: 'center', justifyContent: 'center' },
-  idleTitle:     { fontSize: ms(28), textAlign: 'center', letterSpacing: -0.5 },
-  idleSub:       { fontSize: ms(15), textAlign: 'center', lineHeight: 22, opacity: 0.75 },
-  cameraBtn: {
+  idleBody:        { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(36), gap: vs(14), marginTop: -vs(40) },
+  iconGlow:        { width: scale(180), height: scale(180), borderRadius: scale(90), alignItems: 'center', justifyContent: 'center', marginBottom: vs(4) },
+  iconCircle:      { width: scale(88), height: scale(88), borderRadius: scale(44), alignItems: 'center', justifyContent: 'center' },
+  idleTitle:       { fontSize: ms(28), textAlign: 'center', letterSpacing: -0.5 },
+  idleSub:         { fontSize: ms(15), textAlign: 'center', lineHeight: 22, opacity: 0.75 },
+  scanBtn: {
     flexDirection: 'row', alignItems: 'center', gap: scale(8),
     paddingVertical: vs(15), paddingHorizontal: scale(36),
     borderRadius: ms(16), marginTop: vs(8),
-    shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 4,
+    shadowColor: '#10B981', shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.28, shadowRadius: 12, elevation: 4,
   },
-  cameraBtnText: { fontSize: ms(16), color: '#fff' },
+  scanBtnText:      { fontSize: ms(16), color: '#fff' },
+  changeGroupChip:  { flexDirection: 'row', alignItems: 'center', gap: scale(5), paddingHorizontal: scale(12), paddingVertical: vs(7), borderRadius: ms(10), borderWidth: StyleSheet.hairlineWidth },
+
+  // ── Picker sheet
+  pickerSheet: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    height: SHEET_H,
+    borderTopLeftRadius: ms(28), borderTopRightRadius: ms(28),
+    shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
+    shadowOpacity: 0.18, shadowRadius: 24, elevation: 24,
+  },
+  handleRow:  { alignItems: 'center', paddingTop: vs(12), paddingBottom: vs(6) },
+  handlePill: { width: scale(40), height: vs(4), borderRadius: 2 },
+  pickerTitle: { fontSize: ms(22), letterSpacing: -0.4 },
+  pickerSub:   { fontSize: ms(14), opacity: 0.65, marginTop: vs(4), lineHeight: 20 },
+  pickerRow: {
+    flexDirection: 'row', alignItems: 'center',
+    borderRadius: ms(16), borderWidth: 1,
+    padding: scale(14), marginBottom: vs(8),
+  },
+  pickerCluster: { flexDirection: 'row', alignItems: 'flex-end', marginRight: scale(12) },
+  pickerRowInfo:  { flex: 1 },
+  pickerRowName:  { fontSize: ms(15), marginBottom: vs(2) },
+  pickerRowMeta:  { fontSize: ms(12) },
+  pickerEmpty:    { alignItems: 'center', paddingHorizontal: scale(36), marginTop: vs(28) },
+  pickerEmptyTitle: { fontSize: ms(16), marginBottom: vs(6) },
+  pickerEmptySub:   { fontSize: ms(13), textAlign: 'center', lineHeight: 20, opacity: 0.7 },
 
   // ── Parsing
-  parsingBody:  { flex: 1, alignItems: 'center', justifyContent: 'center' },
-  receiptMock:  { width: scale(148), height: scale(188), borderRadius: ms(16), borderWidth: 2, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
-  scanLine:     { position: 'absolute', left: 0, right: 0, height: 2, backgroundColor: '#10B981', opacity: 0.75 },
-  parsingTitle: { fontSize: ms(19), letterSpacing: -0.3 },
-  parsingSub:   { fontSize: ms(14), opacity: 0.65 },
+  parsingBody:  { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(24) },
+  parsingTitle: { fontSize: ms(20), letterSpacing: -0.3 },
 
-  // ── People
-  peopleBody:      { flex: 1, paddingHorizontal: scale(24), paddingTop: vs(4) },
-  peopleTitle:     { fontSize: ms(26), letterSpacing: -0.5 },
-  peopleSub:       { fontSize: ms(14), opacity: 0.65, marginTop: vs(6), lineHeight: 20 },
-  memberGrid:      { flexDirection: 'row', flexWrap: 'wrap', gap: scale(16), marginTop: vs(28), marginBottom: vs(24) },
-  memberItem:      { alignItems: 'center', width: scale(64), gap: vs(6) },
-  memberAvatar:    { width: scale(56), height: scale(56), borderRadius: scale(28), alignItems: 'center', justifyContent: 'center' },
-  memberInitial:   { fontSize: ms(22), fontWeight: '700' },
-  memberCheckmark: { position: 'absolute', bottom: -2, right: -2, width: scale(18), height: scale(18), borderRadius: scale(9), alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: 'white' },
-  memberName:      { fontSize: ms(12), textAlign: 'center' },
-  countPill:       { alignSelf: 'flex-start', paddingHorizontal: scale(14), paddingVertical: vs(8), borderRadius: ms(20) },
-  countText:       { fontSize: ms(13) },
-
-  // ── Items
-  itemsHeader: { flexDirection: 'row', alignItems: 'center', paddingRight: scale(16), paddingBottom: vs(4) },
-  itemsTitle:  { fontSize: ms(20), letterSpacing: -0.4 },
-  itemsSub:    { fontSize: ms(13), opacity: 0.65, marginTop: vs(1) },
-  rescanChip:  { flexDirection: 'row', alignItems: 'center', paddingHorizontal: scale(12), paddingVertical: vs(6), borderRadius: ms(10), borderWidth: StyleSheet.hairlineWidth },
-  rescanText:  { fontSize: ms(13) },
-  itemsScroll: { paddingHorizontal: scale(20) },
-
-  itemRow: {
-    flexDirection: 'row', alignItems: 'center',
-    paddingVertical: vs(14),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    minHeight: scale(52),
+  // ── Error
+  errorBody: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(28) },
+  errorCard: {
+    width: '100%', alignItems: 'center', padding: scale(28),
+    borderRadius: ms(28),
+    shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.14, shadowRadius: 24, elevation: 12,
   },
-  itemCheckbox: { width: scale(24), height: scale(24), borderRadius: scale(12), borderWidth: 1.8, alignItems: 'center', justifyContent: 'center' },
-  itemName:     { fontSize: ms(15) },
-  itemPrice:    { fontSize: ms(15), letterSpacing: -0.2 },
+  errorTitle:      { fontSize: ms(20), letterSpacing: -0.3, marginBottom: vs(8) },
+  errorMsg:        { fontSize: ms(14), textAlign: 'center', lineHeight: 20, marginBottom: vs(20), opacity: 0.8 },
+  errorPrimaryBtn: { flexDirection: 'row', alignItems: 'center', gap: scale(8), paddingVertical: vs(13), paddingHorizontal: scale(32), borderRadius: ms(14) },
+  errorBtnText:    { fontSize: ms(15), color: '#fff' },
 
-  summarySection: { paddingTop: vs(20), gap: vs(12), borderTopWidth: StyleSheet.hairlineWidth, marginTop: vs(4) },
-  summaryRow:     { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  summaryLabel:   { fontSize: ms(14) },
-  summaryValue:   { fontSize: ms(14) },
-  summaryDivider: { height: StyleSheet.hairlineWidth, marginVertical: vs(4) },
-  tipInputWrap:   { flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderRadius: ms(8), paddingHorizontal: scale(8), paddingVertical: vs(3) },
-  tipDollar:      { fontSize: ms(14), fontWeight: '600', marginRight: 2 },
-  tipInput:       { fontSize: ms(14), minWidth: scale(44), padding: 0 },
-  addTipBtn:      { fontSize: ms(14) },
+  // ── Result
+  resultTopTitle: { fontSize: ms(14) },
+  resultCard: {
+    position: 'absolute', bottom: 0, left: 0, right: 0,
+    maxHeight: SCREEN_H * 0.78,
+    borderTopLeftRadius: ms(28), borderTopRightRadius: ms(28),
+    shadowColor: '#000', shadowOffset: { width: 0, height: -8 },
+    shadowOpacity: 0.22, shadowRadius: 28, elevation: 28,
+  },
+  resultScroll: { paddingHorizontal: scale(24), paddingTop: vs(4), paddingBottom: vs(12) },
+  receiptLabel: { fontSize: ms(10), letterSpacing: 1.2, textTransform: 'uppercase', marginBottom: vs(4) },
+  receiptTotal: { fontSize: ms(40), letterSpacing: -1.5, lineHeight: vs(50) },
 
-  // ── Shared CTA
-  ctaBar:     { position: 'absolute', bottom: 0, left: 0, right: 0, paddingHorizontal: scale(20), paddingBottom: vs(36), paddingTop: vs(12) },
-  ctaBtn:     { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6), paddingVertical: vs(16), borderRadius: ms(16) },
-  ctaBtnText: { fontSize: ms(16), color: '#fff' },
+  splitCard:         { borderRadius: ms(18), borderWidth: 1, padding: scale(16), marginBottom: vs(16) },
+  splitCluster:      { flexDirection: 'row', alignItems: 'flex-end' },
+  splitClusterMore:  { width: scale(24), height: scale(32), borderRadius: ms(4), alignItems: 'center', justifyContent: 'center' },
+  splitLabel:        { fontSize: ms(12), marginBottom: vs(2) },
+  splitEach:         { fontSize: ms(22), letterSpacing: -0.5 },
+
+  customizeRow:  { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: vs(14), borderTopWidth: StyleSheet.hairlineWidth },
+  customizeLabel: { fontSize: ms(14) },
+  itemsList:     { borderWidth: StyleSheet.hairlineWidth, borderRadius: ms(14), overflow: 'hidden', marginBottom: vs(4) },
+  itemRow:       { flexDirection: 'row', alignItems: 'center', gap: scale(12), padding: scale(13), borderBottomWidth: StyleSheet.hairlineWidth, minHeight: scale(48) },
+  itemCheck:     { width: scale(22), height: scale(22), borderRadius: scale(11), borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  itemName:      { fontSize: ms(14) },
+  itemPrice:     { fontSize: ms(14), letterSpacing: -0.2 },
+  myShareRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: scale(14) },
+
+  ctaWrap:         { paddingHorizontal: scale(20), paddingTop: vs(12), borderTopWidth: StyleSheet.hairlineWidth },
+  addExpenseBtn: {
+    flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: scale(6),
+    paddingVertical: vs(16), borderRadius: ms(16),
+    shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.28, shadowRadius: 12, elevation: 8,
+  },
+  addExpenseBtnText: { fontSize: ms(16), color: '#fff' },
 });
