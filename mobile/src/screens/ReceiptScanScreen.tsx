@@ -62,9 +62,8 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
   const [claimed, setClaimed]             = useState<Set<string>>(new Set());
   const [adding, setAdding]               = useState(false);
 
-  const sheetAnim         = useRef(new Animated.Value(SHEET_H)).current;
-  const cardAnim          = useRef(new Animated.Value(SCREEN_H)).current;
-  const pendingCameraOpen = useRef(false);
+  const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
+  const cardAnim  = useRef(new Animated.Value(SCREEN_H)).current;
 
   // ── Load groups when picker opens ─────────────────────────────────────────
   useEffect(() => {
@@ -84,14 +83,8 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       Animated.spring(sheetAnim, {
         toValue: 0, damping: 20, stiffness: 200, useNativeDriver: true,
       }).start();
-    } else if (pendingCameraOpen.current) {
-      // Android: onDismiss is not fired; handle the pending open here instead.
-      // A small delay ensures the modal's native layer is fully removed before
-      // the camera session starts, preventing immediate dismissal.
-      pendingCameraOpen.current = false;
-      setTimeout(openCamera, 300);
     }
-  }, [pickerVisible, openCamera]);
+  }, [pickerVisible]);
 
   useEffect(() => {
     if (phase === 'result') {
@@ -223,18 +216,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
   // ── GROUP PICKER MODAL ─────────────────────────────────────────────────────
   const renderPicker = () => (
-    <Modal
-      visible={pickerVisible}
-      transparent
-      animationType="none"
-      onRequestClose={closePicker}
-      onDismiss={() => {
-        if (pendingCameraOpen.current) {
-          pendingCameraOpen.current = false;
-          openCamera();
-        }
-      }}
-    >
+    <Modal visible={pickerVisible} transparent animationType="none" onRequestClose={closePicker}>
       <View style={{ flex: 1 }}>
         <TouchableOpacity
           style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
@@ -284,8 +266,8 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
                       setGroupId(g.id);
                       setGroupName(g.name);
                       setGroupMembers(full.members);
-                      pendingCameraOpen.current = true;
                       closePicker();
+                      setTimeout(openCamera, 350);
                     } catch {
                       Alert.alert('Error', 'Could not load group. Try again.');
                     } finally {
