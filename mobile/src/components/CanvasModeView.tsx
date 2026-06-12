@@ -5,17 +5,17 @@ import {
     StyleSheet,
     TouchableOpacity,
     Animated,
+    Easing,
     PanResponder,
     LayoutChangeEvent,
     ViewStyle,
-    Dimensions,
 } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
-import { Expense } from '../services/api';
+import { Expense, GroupMember, User } from '../services/api';
 import { formatCurrency } from '../utils/formatCurrency';
 import { ArrowLeft, X } from 'lucide-react-native';
 import CharacterShape from './CharacterShape';
@@ -37,22 +37,25 @@ function expenseEmoji(title: string): string {
     return pool[title.charCodeAt(0) % pool.length];
 }
 
-const HUB_R      = 82;
-const BUBBLE_R   = 54;
-const WALL_INSET = 56;
+// Display name for a member — their chosen character nickname wins,
+// matching GroupCard's convention
+function memberLabel(m: GroupMember): string {
+    return m?.character_nickname || (m?.name || '').split(' ')[0];
+}
 
-const SCREEN_W   = Dimensions.get('window').width;
-const CARD_W     = scale(68);
-const CARD_MX    = scale(14);
-const ITEM_W     = CARD_W + CARD_MX * 2;
-const SNAP_INSET = (SCREEN_W - CARD_W) / 2 - CARD_MX;
+const HUB_R      = 82;
+const BUBBLE_R   = 54; // fallback when radii can't be derived
+const MIN_R      = 44;
+const MAX_R      = 70;
+const WALL_INSET = 56;
+const DOCK_MAX   = 6; // draggable members shown in the dock
 
 interface CanvasModeViewProps {
     expenses: Expense[];
-    members: any[];
+    members: GroupMember[];
     groupId: string;
     groupName: string;
-    user: any;
+    user: User | null;
     colors: any;
     isDark: boolean;
     onAddExpense: () => void;
@@ -61,15 +64,82 @@ interface CanvasModeViewProps {
     style?: ViewStyle;
 }
 
+// A star that twinkles on its own clock — duration and phase keyed off its
+// index so the field never pulses in unison
+function TwinkleStar({ left, top, size, index, isDark }: {
+    left: any; top: any; size: number; index: number; isDark: boolean;
+}) {
+    const tw = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const dur = 2000 + ((index * 727) % 3000);
+        const loop = Animated.loop(Animated.sequence([
+            Animated.delay((index * 211) % 1400),
+            Animated.timing(tw, { toValue: 1, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(tw, { toValue: 0, duration: dur, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]));
+        loop.start();
+        return () => loop.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <Animated.View
+            pointerEvents="none"
+            style={{
+                position: 'absolute', left, top,
+                width: size, height: size, borderRadius: size / 2,
+                backgroundColor: isDark ? '#FFFFFF' : '#6478C8',
+                opacity: tw.interpolate({ inputRange: [0, 1], outputRange: isDark ? [0.2, 0.6] : [0.12, 0.38] }),
+            }}
+        />
+    );
+}
+
 export default function CanvasModeView({
     expenses, members, groupId, groupName, user, colors, isDark,
     onAddExpense, onSettle, onClose, style,
 }: CanvasModeViewProps) {
     const insets = useSafeAreaInsets();
 
-    // Hidden bubble ids (dismiss ×)
+    // Hidden bubble ids (long-press dismiss)
     const [hiddenIds, setHiddenIds] = useState<Set<string>>(new Set());
     const visibleExpenses = expenses.filter(e => !hiddenIds.has(e.id)).slice(0, 6);
+
+    // Proportional radii — bigger expenses carry more visual mass
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    const bubbleRadii = useMemo(() => {
+        if (visibleExpenses.length === 0) return [] as number[];
+        const amounts = visibleExpenses.map(e => e.amount);
+        const min = Math.min(...amounts);
+        const max = Math.max(...amounts);
+        return visibleExpenses.map(e =>
+            max === min ? BUBBLE_R : MIN_R + ((e.amount - min) / (max - min)) * (MAX_R - MIN_R),
+        );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [visibleExpenses.map(e => `${e.id}:${e.amount}`).join('|')]);
+    const radiiRef = useRef<number[]>([]);
+    radiiRef.current = bubbleRadii;
+
+    // Per-bubble fade values for the long-press dismiss; reset whenever the
+    // visible set changes size
+    const bubbleOpacities = useRef<Animated.Value[]>([]);
+    if (bubbleOpacities.current.length !== visibleExpenses.length) {
+        bubbleOpacities.current = visibleExpenses.map(() => new Animated.Value(1));
+    }
+
+    // Net position for this group, from real participant shares
+    const netBalance = useMemo(() => {
+        let net = 0;
+        for (const e of expenses) {
+            const mine = e.participants?.find(p => p.user_id === user?.id);
+            const myShare = mine?.share_amount
+                ?? (e.participants?.length ? e.amount / e.participants.length : 0);
+            if (e.paid_by === user?.id) net += e.amount - myShare;
+            else if (mine) net -= myShare;
+        }
+        return net;
+    }, [expenses, user?.id]);
 
     // Dynamic hub Y center — computed from canvas height
     const [canvasH, setCanvasH] = useState(0);
@@ -77,11 +147,12 @@ export default function CanvasModeView({
     const hubYCenterRef = useRef(314);
     useEffect(() => { hubYCenterRef.current = hubYCenter; }, [hubYCenter]);
 
-    const STARS = useMemo(() => Array.from({ length: 28 }, (_, i) => ({
+    // Star field — three size classes, golden-angle scatter
+    const STARS = useMemo(() => Array.from({ length: 40 }, (_, i) => ({
         key: i,
         left: `${((i * 137.508) % 100).toFixed(1)}%` as any,
         top:  `${((i * 241.313) % 100).toFixed(1)}%` as any,
-        size: i % 7 === 0 ? 2 : i % 4 === 0 ? 1.4 : 0.7,
+        size: i % 7 === 0 ? 2.0 : i % 3 === 0 ? 1.2 : 0.6,
     })), []);
 
     // Physics refs — updated every frame, no setState
@@ -98,6 +169,7 @@ export default function CanvasModeView({
         x: number; y: number; shape: string; color: string;
     } | null>(null);
     const dragMemberRef = useRef<any>(null);
+    const lastHoverRef  = useRef(-1);
 
     // Up-to-date copies accessible inside stable callbacks
     const membersRef           = useRef(members);
@@ -109,20 +181,68 @@ export default function CanvasModeView({
     const [selectedExpenseId, setSelectedExpenseId]   = useState<string | null>(null);
     const [sheetTab, setSheetTab]                     = useState<'balance' | 'settle'>('balance');
     const [highlightBubbleIdx, setHighlightBubbleIdx] = useState(-1);
-    const [focusedMemberIdx, setFocusedMemberIdx]     = useState(0);
-    const carouselScrollX = useRef(new Animated.Value(0)).current;
+    const [pressedMemberIdx, setPressedMemberIdx]     = useState(-1);
+
+    // Hover index mirrored into a ref so the physics loop can spring the
+    // bubble scale off the React render path (setNativeProps only)
+    const highlightIdxRef = useRef(-1);
+    useEffect(() => { highlightIdxRef.current = highlightBubbleIdx; }, [highlightBubbleIdx]);
+    const hoverScalesRef = useRef<number[]>([]);
+    const hoverVelsRef   = useRef<number[]>([]);
 
     const sheetAnim    = useRef(new Animated.Value(500)).current;
     const hubScaleAnim = useRef(new Animated.Value(1)).current;
+    const hubGlowAnim  = useRef(new Animated.Value(0)).current;
+    const ringSpinAnim = useRef(new Animated.Value(0)).current;
 
-    // Hub breathing animation
+    // Per-member drop-pulse values for the dock cards
+    const dockPulses = useRef<Animated.Value[]>([]);
+    if (dockPulses.current.length !== members.length) {
+        dockPulses.current = members.map(() => new Animated.Value(1));
+    }
+
+    // Per-member pickup scale — the pressed card lifts, the rest stand by
+    const pressScales = useRef<Animated.Value[]>([]);
+    if (pressScales.current.length !== members.length) {
+        pressScales.current = members.map(() => new Animated.Value(1));
+    }
     useEffect(() => {
-        const breath = Animated.loop(Animated.sequence([
-            Animated.timing(hubScaleAnim, { toValue: 1.018, duration: 3000, useNativeDriver: true }),
-            Animated.timing(hubScaleAnim, { toValue: 1,     duration: 3000, useNativeDriver: true }),
+        pressScales.current.forEach((v, i) => {
+            Animated.spring(v, {
+                toValue: i === pressedMemberIdx ? 1.12 : 1,
+                damping: 18, stiffness: 280, useNativeDriver: true,
+            }).start();
+        });
+    }, [pressedMemberIdx]);
+
+    // Hub heartbeat — a soft systolic rise, a settle, then rest. The glow
+    // swells on the same beat so the light feels like it comes from inside.
+    useEffect(() => {
+        const beat = Animated.loop(Animated.parallel([
+            Animated.sequence([
+                Animated.spring(hubScaleAnim, { toValue: 1.022, damping: 18, stiffness: 120, useNativeDriver: true }),
+                Animated.spring(hubScaleAnim, { toValue: 1, damping: 18, stiffness: 120, useNativeDriver: true }),
+                Animated.delay(1300),
+            ]),
+            Animated.sequence([
+                Animated.timing(hubGlowAnim, { toValue: 1, duration: 700, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.timing(hubGlowAnim, { toValue: 0, duration: 1400, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.delay(1300),
+            ]),
         ]));
-        breath.start();
-        return () => breath.stop();
+        beat.start();
+        return () => beat.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    // The outermost orbit creeps through a full revolution every 90 seconds —
+    // imperceptible until you notice the satellite, and then the room is alive
+    useEffect(() => {
+        const spin = Animated.loop(
+            Animated.timing(ringSpinAnim, { toValue: 1, duration: 90000, easing: Easing.linear, useNativeDriver: true }),
+        );
+        spin.start();
+        return () => spin.stop();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
@@ -136,17 +256,19 @@ export default function CanvasModeView({
         const velocities: { vx: number; vy: number }[] = [];
         for (let i = 0; i < count; i++) {
             const angle = (i / count) * Math.PI * 2 - Math.PI / 2;
+            const br = radiiRef.current[i] ?? BUBBLE_R;
             positions.push({
-                x: Math.max(WALL_INSET + BUBBLE_R, Math.min(w - WALL_INSET - BUBBLE_R, hubX + Math.cos(angle) * r)),
-                y: Math.max(WALL_INSET + BUBBLE_R, Math.min(h - WALL_INSET - BUBBLE_R, hubY + Math.sin(angle) * r)),
+                x: Math.max(WALL_INSET + br, Math.min(w - WALL_INSET - br, hubX + Math.cos(angle) * r)),
+                y: Math.max(WALL_INSET + br, Math.min(h - WALL_INSET - br, hubY + Math.sin(angle) * r)),
             });
             velocities.push({ vx: (Math.random() - 0.5) * 0.3, vy: (Math.random() - 0.5) * 0.3 });
         }
         posRef.current = positions;
         velRef.current = velocities;
         positions.forEach((p, i) => {
+            const br = radiiRef.current[i] ?? BUBBLE_R;
             bubbleRefs.current[i]?.setNativeProps({
-                style: { transform: [{ translateX: p.x - BUBBLE_R }, { translateY: p.y - BUBBLE_R }] },
+                style: { transform: [{ translateX: p.x - br }, { translateY: p.y - br }] },
             });
         });
     }, []);
@@ -162,19 +284,25 @@ export default function CanvasModeView({
             for (let i = 0; i < pos.length; i++) {
                 let { x, y } = pos[i];
                 let { vx, vy } = vel[i];
+                const br = radiiRef.current[i] ?? BUBBLE_R;
 
-                vx += (Math.random() - 0.5) * 0.006;
-                vy += (Math.random() - 0.5) * 0.006;
+                vx += (Math.random() - 0.5) * 0.010;
+                vy += (Math.random() - 0.5) * 0.010;
                 vx *= 0.997;
                 vy *= 0.997;
                 const speed = Math.sqrt(vx * vx + vy * vy);
-                if (speed > 0.55) { vx = (vx / speed) * 0.55; vy = (vy / speed) * 0.55; }
+                if (speed > 0.70) { vx = (vx / speed) * 0.70; vy = (vy / speed) * 0.70; }
+                // Never let a bubble fall completely still — the canvas breathes
+                if (speed < 0.08) {
+                    vx += (Math.random() - 0.5) * 0.04;
+                    vy += (Math.random() - 0.5) * 0.04;
+                }
 
                 // Repel from hub
                 const dx = x - hubX;
                 const dy = y - hubY;
                 const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-                const minHub = HUB_R + BUBBLE_R + 26;
+                const minHub = HUB_R + br + 26;
                 if (dist < minHub) {
                     const f = ((minHub - dist) / minHub) * 0.4;
                     vx += (dx / dist) * f;
@@ -187,7 +315,7 @@ export default function CanvasModeView({
                     const ox = x - pos[j].x;
                     const oy = y - pos[j].y;
                     const od = Math.sqrt(ox * ox + oy * oy) || 1;
-                    const minBub = BUBBLE_R * 2 + 18;
+                    const minBub = br + (radiiRef.current[j] ?? BUBBLE_R) + 18;
                     if (od < minBub) {
                         const f = ((minBub - od) / minBub) * 0.3;
                         vx += (ox / od) * f;
@@ -197,15 +325,27 @@ export default function CanvasModeView({
 
                 x += vx;
                 y += vy;
-                if (x < WALL_INSET + BUBBLE_R) { x = WALL_INSET + BUBBLE_R; vx = Math.abs(vx) * 0.6; }
-                if (x > w - WALL_INSET - BUBBLE_R) { x = w - WALL_INSET - BUBBLE_R; vx = -Math.abs(vx) * 0.6; }
-                if (y < WALL_INSET + BUBBLE_R) { y = WALL_INSET + BUBBLE_R; vy = Math.abs(vy) * 0.6; }
-                if (y > h - WALL_INSET - BUBBLE_R) { y = h - WALL_INSET - BUBBLE_R; vy = -Math.abs(vy) * 0.6; }
+                if (x < WALL_INSET + br) { x = WALL_INSET + br; vx = Math.abs(vx) * 0.6; }
+                if (x > w - WALL_INSET - br) { x = w - WALL_INSET - br; vx = -Math.abs(vx) * 0.6; }
+                if (y < WALL_INSET + br) { y = WALL_INSET + br; vy = Math.abs(vy) * 0.6; }
+                if (y > h - WALL_INSET - br) { y = h - WALL_INSET - br; vy = -Math.abs(vy) * 0.6; }
 
                 pos[i] = { x, y };
                 vel[i] = { vx, vy };
+
+                // Hover scale — a real spring (damping 20, stiffness 320)
+                // integrated inside the physics frame, zero re-renders
+                const target = highlightIdxRef.current === i ? 1.06 : 1;
+                const cur = hoverScalesRef.current[i] ?? 1;
+                let hv = hoverVelsRef.current[i] ?? 0;
+                hv = (hv + (target - cur) * 0.18) * 0.78;
+                let next = cur + hv;
+                if (Math.abs(target - next) < 0.0006 && Math.abs(hv) < 0.0006) { next = target; hv = 0; }
+                hoverScalesRef.current[i] = next;
+                hoverVelsRef.current[i] = hv;
+
                 bubbleRefs.current[i]?.setNativeProps({
-                    style: { transform: [{ translateX: x - BUBBLE_R }, { translateY: y - BUBBLE_R }] },
+                    style: { transform: [{ translateX: x - br }, { translateY: y - br }, { scale: next }] },
                 });
             }
             rafRef.current = requestAnimationFrame(tick);
@@ -244,7 +384,7 @@ export default function CanvasModeView({
     }, [sheetAnim]);
 
     const closeSheet = useCallback(() => {
-        Animated.timing(sheetAnim, { toValue: 500, useNativeDriver: true, duration: 220 }).start(() => {
+        Animated.timing(sheetAnim, { toValue: 500, useNativeDriver: true, duration: 220, easing: Easing.out(Easing.cubic) }).start(() => {
             setSelectedExpenseId(null);
         });
     }, [sheetAnim]);
@@ -259,12 +399,24 @@ export default function CanvasModeView({
         let bestD = Infinity;
         posRef.current.forEach((p, i) => {
             const d = Math.hypot(cx - p.x, cy - p.y);
-            if (d < BUBBLE_R + 30 && d < bestD) { bestD = d; best = i; }
+            if (d < (radiiRef.current[i] ?? BUBBLE_R) + 30 && d < bestD) { bestD = d; best = i; }
         });
         return best;
     }, []);
 
-    // Stable PanResponder per member index — fresh data flows through refs
+    // After a drop lands, the dragged member's dock card takes a little bow
+    const pulseDockCard = useCallback((idx: number) => {
+        const v = dockPulses.current[idx];
+        if (!v) return;
+        Animated.sequence([
+            Animated.spring(v, { toValue: 1.15, damping: 12, stiffness: 300, useNativeDriver: true }),
+            Animated.spring(v, { toValue: 1, damping: 12, stiffness: 300, useNativeDriver: true }),
+        ]).start();
+    }, []);
+
+    // Stable PanResponder per member index — fresh data flows through refs.
+    // The dock is a static row (no ScrollView), so each card can claim the
+    // gesture immediately without fighting a scroll container.
     const panResponders = useMemo(() => {
         return members.map((_m, memberIdx) =>
             PanResponder.create({
@@ -273,6 +425,7 @@ export default function CanvasModeView({
                 onPanResponderGrant: (evt) => {
                     const m = membersRef.current[memberIdx];
                     dragMemberRef.current = m;
+                    setPressedMemberIdx(memberIdx);
                     const { pageX, pageY } = evt.nativeEvent;
                     const { x: ox, y: oy } = canvasOriginRef.current;
                     setGhost({
@@ -281,16 +434,25 @@ export default function CanvasModeView({
                         shape: m?.character_shape ?? 'rect',
                         color: m?.character_color ?? m?.avatar_color ?? '#6B7280',
                     });
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 },
                 onPanResponderMove: (evt) => {
                     const { pageX, pageY } = evt.nativeEvent;
                     const { x: ox, y: oy } = canvasOriginRef.current;
                     setGhost(prev => prev ? { ...prev, x: pageX - ox, y: pageY - oy } : null);
-                    setHighlightBubbleIdx(nearestBubble(pageX, pageY));
+                    const idx = nearestBubble(pageX, pageY);
+                    setHighlightBubbleIdx(idx);
+                    // The bubble greets the carried character — once per entry
+                    if (idx >= 0 && idx !== lastHoverRef.current) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    }
+                    lastHoverRef.current = idx;
                 },
                 onPanResponderRelease: (evt) => {
+                    setPressedMemberIdx(-1);
                     setGhost(null);
                     setHighlightBubbleIdx(-1);
+                    lastHoverRef.current = -1;
                     const nearest = nearestBubble(evt.nativeEvent.pageX, evt.nativeEvent.pageY);
                     if (nearest >= 0 && dragMemberRef.current) {
                         const exp = visibleExpensesRef.current[nearest];
@@ -301,18 +463,24 @@ export default function CanvasModeView({
                             return { ...prev, [exp.id]: [...cur, uid] };
                         });
                         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                        pulseDockCard(memberIdx);
+                        // Kick the target bubble's hover spring so it pulses
+                        // 1.0 → ~1.12 → 1.0 inside the physics frame
+                        hoverVelsRef.current[nearest] = (hoverVelsRef.current[nearest] ?? 0) + 0.045;
                     }
                     dragMemberRef.current = null;
                 },
                 onPanResponderTerminate: () => {
+                    setPressedMemberIdx(-1);
                     setGhost(null);
                     setHighlightBubbleIdx(-1);
+                    lastHoverRef.current = -1;
                     dragMemberRef.current = null;
                 },
             })
         );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [members.length, nearestBubble]);
+    }, [members.length, nearestBubble, pulseDockCard]);
 
     // ─── Derived sheet data ──────────────────────────────────────────────────────
 
@@ -323,11 +491,11 @@ export default function CanvasModeView({
     const selectedAssigned        = selectedExpense ? (assignments[selectedExpense.id] ?? []) : [];
     const selectedAssignedMembers = selectedAssigned
         .map(uid => members.find(m => m.user_id === uid))
-        .filter(Boolean);
+        .filter((m): m is GroupMember => m !== undefined);
     const perPerson   = selectedExpense && selectedAssigned.length > 0 ? selectedExpense.amount / selectedAssigned.length : 0;
     const payerMember = selectedExpense ? members.find(m => m.user_id === selectedExpense.paid_by) ?? null : null;
     const iAmPayer    = selectedExpense?.paid_by === user?.id;
-    const iAmAssigned = selectedExpense ? selectedAssigned.includes(user?.id) : false;
+    const iAmAssigned = selectedExpense ? selectedAssigned.includes(user?.id ?? '') : false;
 
     const selectedBubbleIdx = selectedExpense ? visibleExpenses.findIndex(e => e.id === selectedExpense.id) : -1;
     const sheetTitleColor   = selectedBubbleIdx >= 0
@@ -341,63 +509,132 @@ export default function CanvasModeView({
             {/* ── Canvas (fills entire screen) ── */}
             <View ref={canvasViewRef} style={styles.canvas} onLayout={handleCanvasLayout}>
                 <LinearGradient
-                    colors={colors.heroGradient as [string, string, string]}
+                    colors={isDark
+                        ? ['#050810', '#080C12', '#060A10']
+                        : ['#F0F4FF', '#EEF2FC', '#F2F6FF']}
                     start={{ x: 0.5, y: 0 }}
                     end={{ x: 0.5, y: 1 }}
                     style={StyleSheet.absoluteFillObject}
                 />
 
-                {/* Star field */}
+                {/* Star field — each star on its own twinkle */}
                 {STARS.map(s => (
-                    <View key={s.key} style={{
-                        position: 'absolute', left: s.left, top: s.top,
-                        width: s.size, height: s.size, borderRadius: s.size / 2,
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.35)' : 'rgba(80,100,200,0.25)',
-                        pointerEvents: 'none',
-                    }} />
+                    <TwinkleStar key={s.key} left={s.left} top={s.top} size={s.size} index={s.key} isDark={isDark} />
                 ))}
 
-                {/* Nebula glow */}
-                <View
-                    pointerEvents="none"
-                    style={{
-                        position: 'absolute',
-                        width: 320, height: 320,
-                        borderRadius: 160,
-                        alignSelf: 'center',
-                        top: hubYCenter - 160,
-                        backgroundColor: 'transparent',
-                        shadowColor: colors.accent,
-                        shadowOffset: { width: 0, height: 0 },
-                        shadowOpacity: isDark ? 0.18 : 0.12,
-                        shadowRadius: 80,
-                        elevation: 0,
-                    }}
-                />
+                {/* Nebula — three stacked breaths of accent light behind the hub */}
+                {[
+                    { r: 40, o: 0.18 },
+                    { r: 70, o: 0.10 },
+                    { r: 110, o: 0.06 },
+                ].map(({ r, o }) => (
+                    <View
+                        key={r}
+                        pointerEvents="none"
+                        style={{
+                            position: 'absolute',
+                            width: 300, height: 300,
+                            borderRadius: 150,
+                            alignSelf: 'center',
+                            top: hubYCenter - 150,
+                            backgroundColor: 'transparent',
+                            shadowColor: colors.accent,
+                            shadowOffset: { width: 0, height: 0 },
+                            shadowOpacity: o,
+                            shadowRadius: r,
+                            elevation: 0,
+                        }}
+                    />
+                ))}
 
-                {/* Orbit rings */}
-                {[296, 428, 560].map(size => (
+                {/* Orbit paths — solid hairlines fading with distance */}
+                {[
+                    { size: 296, op: isDark ? 0.03 : 0.05 },
+                    { size: 428, op: isDark ? 0.04 : 0.07 },
+                ].map(({ size, op }) => (
                     <View
                         key={size}
+                        pointerEvents="none"
                         style={[
                             styles.orbitRing,
                             {
                                 width: size, height: size, borderRadius: size / 2,
                                 top: hubYCenter - size / 2,
-                                borderColor: isDark ? colors.accent + '0E' : colors.accent + '16',
+                                borderColor: colors.accent,
+                                opacity: op,
                             },
                         ]}
                     />
                 ))}
 
-                {/* Hub */}
+                {/* Outermost orbit rotates once every 90s, carrying a satellite */}
+                <Animated.View
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        alignSelf: 'center',
+                        top: hubYCenter - 280,
+                        width: 560, height: 560,
+                        transform: [{ rotate: ringSpinAnim.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '360deg'] }) }],
+                    }}
+                >
+                    <View style={[styles.orbitRing, {
+                        width: 560, height: 560, borderRadius: 280,
+                        top: 0,
+                        borderColor: colors.accent,
+                        opacity: isDark ? 0.06 : 0.10,
+                    }]} />
+                    <View style={{
+                        position: 'absolute',
+                        top: -2, left: 278,
+                        width: 4, height: 4, borderRadius: 2,
+                        backgroundColor: colors.accent,
+                        opacity: isDark ? 0.38 : 0.45,
+                    }} />
+                </Animated.View>
+
+                {/* Ambient halo — a ring of light that breathes with the hub */}
+                <Animated.View
+                    pointerEvents="none"
+                    style={[
+                        styles.hubHalo,
+                        {
+                            top: hubYCenter - (HUB_R + 16),
+                            borderColor: colors.accent,
+                            opacity: hubGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.08, 0.22] }),
+                            transform: [{ scale: hubScaleAnim }],
+                        },
+                    ]}
+                />
+
+                {/* Diffuse bloom — the glow pulse (effective shadowOpacity 0.22 → 0.35) */}
+                <Animated.View
+                    pointerEvents="none"
+                    style={{
+                        position: 'absolute',
+                        width: HUB_R * 2, height: HUB_R * 2,
+                        borderRadius: HUB_R,
+                        alignSelf: 'center',
+                        top: hubYCenter - HUB_R,
+                        backgroundColor: 'transparent',
+                        shadowColor: colors.accent,
+                        shadowOffset: { width: 0, height: 0 },
+                        shadowOpacity: 0.35,
+                        shadowRadius: 46,
+                        elevation: 0,
+                        opacity: hubGlowAnim.interpolate({ inputRange: [0, 1], outputRange: [0.63, 1] }),
+                        transform: [{ scale: hubScaleAnim }],
+                    }}
+                />
+
+                {/* Hub — the gravitational heart */}
                 <Animated.View
                     style={[
                         styles.hub,
                         {
                             top: hubYCenter - HUB_R,
-                            backgroundColor: isDark ? 'rgba(8,14,26,0.92)' : 'rgba(255,255,255,0.97)',
-                            borderColor: colors.accent + '60',
+                            backgroundColor: isDark ? 'rgba(9,15,27,0.94)' : 'rgba(255,255,255,0.97)',
+                            borderColor: colors.accent + '80',
                             shadowColor: colors.accent,
                             shadowOffset: { width: 0, height: 0 },
                             shadowOpacity: 0.22,
@@ -406,17 +643,35 @@ export default function CanvasModeView({
                         },
                     ]}
                 >
+                    {/* Inner ring — depth, like a lens element */}
+                    <View
+                        pointerEvents="none"
+                        style={[styles.hubInnerRing, { borderColor: colors.accent + (isDark ? '2E' : '24') }]}
+                    />
+                    {/* Top curvature highlight */}
+                    <View
+                        pointerEvents="none"
+                        style={[styles.hubHighlight, { backgroundColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.55)' }]}
+                    />
+
                     <Text style={[styles.hubName, { color: colors.text }, T.extrabold]} numberOfLines={2}>{groupName}</Text>
+                    {Math.abs(netBalance) < 0.005 ? (
+                        <Text style={[styles.hubBalance, { color: colors.secondaryText }, T.semibold]}>All settled</Text>
+                    ) : (
+                        <Text style={[styles.hubBalance, { color: netBalance > 0 ? colors.accent : colors.warningBright, fontVariant: ['tabular-nums'] }, T.bold]}>
+                            {netBalance > 0 ? "You're owed" : 'You owe'} ${formatCurrency(Math.abs(netBalance))}
+                        </Text>
+                    )}
                     <View style={styles.hubPills}>
                         <TouchableOpacity
-                            style={[styles.hubPill, { backgroundColor: colors.accent + '29', borderColor: colors.accent + '47' }]}
+                            style={[styles.hubPill, { backgroundColor: colors.accent + '24', borderColor: colors.accent + '59' }]}
                             onPress={onAddExpense}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
                         >
                             <Text style={[styles.hubPillText, { color: colors.accent }, T.bold]}>＋ Add</Text>
                         </TouchableOpacity>
                         <TouchableOpacity
-                            style={[styles.hubPill, { backgroundColor: colors.gold + '2E', borderColor: colors.gold + '38' }]}
+                            style={[styles.hubPill, { backgroundColor: colors.gold + '24', borderColor: colors.gold + '4D' }]}
                             onPress={() => {
                                 const nonPayer = members.find(m => m.user_id !== user?.id);
                                 if (nonPayer) {
@@ -432,7 +687,7 @@ export default function CanvasModeView({
                                     });
                                 }
                             }}
-                            activeOpacity={0.8}
+                            activeOpacity={0.7}
                         >
                             <Text style={[styles.hubPillText, { color: colors.gold }, T.bold]}>⟶ Settle</Text>
                         </TouchableOpacity>
@@ -442,62 +697,89 @@ export default function CanvasModeView({
                 {/* Expense bubbles */}
                 {visibleExpenses.map((exp, i) => {
                     const h         = EXPENSE_HUES[i % 6];
-                    const bg        = isDark ? `hsla(${h},58%,60%,0.20)` : `hsla(${h},55%,48%,0.14)`;
-                    const border    = isDark ? `hsla(${h},78%,68%,0.56)` : `hsla(${h},70%,44%,0.48)`;
-                    const tc        = isDark ? `hsla(${h},88%,90%,1)`    : `hsla(${h},65%,26%,1)`;
-                    const shadowCol = isDark ? `hsla(${h},70%,55%,1)`    : `hsla(${h},70%,50%,1)`;
+                    const bg        = isDark ? `hsla(${h},40%,8%,0.72)`   : `hsla(${h},30%,98%,0.90)`;
+                    const border    = isDark ? `hsla(${h},80%,65%,0.60)`  : `hsla(${h},65%,45%,0.45)`;
+                    const tc        = isDark ? `hsla(${h},88%,90%,1)`     : `hsla(${h},65%,26%,1)`;
+                    const shadowCol = isDark ? `hsla(${h},70%,55%,1)`     : `hsla(${h},70%,50%,1)`;
                     const hovered   = highlightBubbleIdx === i;
                     const assignedUids = assignments[exp.id] ?? [];
                     const pips = assignedUids
                         .map(uid => members.find(m => m.user_id === uid))
-                        .filter(Boolean)
+                        .filter((m): m is GroupMember => m !== undefined)
                         .slice(0, 3);
                     const payer = members.find(m => m.user_id === exp.paid_by);
+                    const br    = bubbleRadii[i] ?? BUBBLE_R;
 
                     return (
-                        <View
+                        <Animated.View
                             key={exp.id}
-                            ref={el => { bubbleRefs.current[i] = el; }}
+                            ref={el => { bubbleRefs.current[i] = el as any; }}
                             style={[
                                 styles.bubble,
                                 {
+                                    width: br * 2,
+                                    height: br * 2,
+                                    borderRadius: br,
+                                    opacity: bubbleOpacities.current[i] ?? 1,
                                     backgroundColor: bg,
                                     borderColor: hovered ? colors.accent : border,
-                                    borderWidth: hovered ? 2.5 : 1.5,
-                                    shadowColor: shadowCol,
-                                    shadowOpacity: hovered ? 0.55 : 0.32,
-                                    shadowRadius: hovered ? 22 : 10,
-                                    elevation: hovered ? 10 : 5,
+                                    shadowColor: hovered ? colors.accent : shadowCol,
+                                    shadowOpacity: hovered ? 0.55 : isDark ? 0.28 : 0.14,
+                                    shadowRadius: hovered ? 32 : 16,
+                                    elevation: hovered ? 12 : 6,
                                 },
                             ]}
                         >
-                            {/* Dismiss */}
-                            <TouchableOpacity
-                                style={styles.bubbleX}
-                                onPress={() => setHiddenIds(prev => new Set([...prev, exp.id]))}
-                                hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
-                            >
-                                <X size={10} color={tc} />
-                            </TouchableOpacity>
+                            {/* Inner top highlight — glass curvature */}
+                            <View pointerEvents="none" style={[styles.bubbleHighlight, {
+                                height: br,
+                                borderTopLeftRadius: br,
+                                borderTopRightRadius: br,
+                            }]} />
 
-                            <TouchableOpacity style={styles.bubbleTouchable} onPress={() => openSheet(exp.id)} activeOpacity={0.85}>
-                                {/* Payer character */}
-                                {payer && (
-                                    <View style={styles.bubblePayerWrap}>
-                                        <CharacterShape
-                                            variant="cluster"
-                                            shape={payer.character_shape ?? 'rect'}
-                                            color={payer.character_color ?? payer.avatar_color ?? '#6B7280'}
-                                        />
-                                    </View>
-                                )}
-                                <Text
-                                    style={[styles.bubbleTitle, { color: tc, textShadowColor: isDark ? shadowCol : 'transparent', textShadowOffset: { width: 0, height: 0 }, textShadowRadius: isDark ? 12 : 0 }, T.extrabold]}
-                                    numberOfLines={2}
+                            {/* Payer stamp */}
+                            {payer && (
+                                <View
+                                    style={[styles.bubblePayerWrap, {
+                                        shadowColor: payer.character_color ?? payer.avatar_color ?? '#6B7280',
+                                        shadowOffset: { width: 0, height: 4 },
+                                        shadowOpacity: 0.55,
+                                        shadowRadius: 12,
+                                        elevation: 4,
+                                    }]}
+                                    pointerEvents="none"
                                 >
-                                    {expenseEmoji(exp.title)} {exp.title}
+                                    <CharacterShape
+                                        variant="cluster"
+                                        shape={payer.character_shape ?? 'rect'}
+                                        color={payer.character_color ?? payer.avatar_color ?? '#6B7280'}
+                                        eyeStyle="ball"
+                                    />
+                                </View>
+                            )}
+
+                            <TouchableOpacity
+                                style={styles.bubbleTouchable}
+                                onPress={() => openSheet(exp.id)}
+                                onLongPress={() => {
+                                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                    const fade = bubbleOpacities.current[i];
+                                    if (fade) {
+                                        Animated.spring(fade, { toValue: 0, damping: 20, stiffness: 300, useNativeDriver: true }).start(() => {
+                                            setHiddenIds(prev => new Set([...prev, exp.id]));
+                                        });
+                                    } else {
+                                        setHiddenIds(prev => new Set([...prev, exp.id]));
+                                    }
+                                }}
+                                delayLongPress={500}
+                                activeOpacity={0.7}
+                            >
+                                <Text style={styles.bubbleEmoji}>{expenseEmoji(exp.title)}</Text>
+                                <Text style={[styles.bubbleTitle, { color: tc }, T.bold]} numberOfLines={2}>
+                                    {exp.title}
                                 </Text>
-                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.78)' : 'rgba(26,31,46,0.62)' }, T.bold]}>
+                                <Text style={[styles.bubbleAmount, { color: isDark ? 'rgba(255,255,255,0.86)' : 'rgba(26,31,46,0.72)', fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                     ${formatCurrency(exp.amount)}
                                 </Text>
                                 {pips.length > 0 && (
@@ -505,38 +787,52 @@ export default function CanvasModeView({
                                         {pips.map((m, pi) => (
                                             <View
                                                 key={m.user_id}
-                                                style={[styles.pipWrap, { marginLeft: pi > 0 ? -7 : 0 }]}
+                                                style={[styles.pipWrap, {
+                                                    marginLeft: pi > 0 ? -7 : 0,
+                                                    shadowColor: m.character_color ?? m.avatar_color ?? '#6B7280',
+                                                    shadowOffset: { width: 0, height: 4 },
+                                                    shadowOpacity: 0.55,
+                                                    shadowRadius: 12,
+                                                    elevation: 3,
+                                                }]}
                                             >
                                                 <CharacterShape
                                                     variant="cluster"
                                                     shape={m.character_shape ?? 'rect'}
                                                     color={m.character_color ?? m.avatar_color ?? '#6B7280'}
+                                                    eyeStyle="ball"
                                                 />
                                             </View>
                                         ))}
                                     </View>
                                 )}
                             </TouchableOpacity>
-                        </View>
+                        </Animated.View>
                     );
                 })}
 
-                {/* Drag ghost — member's CharacterShape */}
+                {/* Drag ghost — lifted off the surface, carrying its own light */}
                 {ghost && (
                     <View
                         pointerEvents="none"
                         style={{
                             position: 'absolute',
-                            left: ghost.x - scale(22),
-                            top: ghost.y - vs(30),
+                            left: ghost.x - scale(16),
+                            top: ghost.y - vs(50),
                             zIndex: 200,
-                            opacity: 0.92,
+                            opacity: 0.96,
+                            shadowColor: ghost.color,
+                            shadowOffset: { width: 0, height: 12 },
+                            shadowOpacity: 0.55,
+                            shadowRadius: 20,
+                            elevation: 16,
                         }}
                     >
                         <CharacterShape
                             variant="mini"
                             shape={ghost.shape as any}
                             color={ghost.color}
+                            eyeStyle="ball"
                         />
                     </View>
                 )}
@@ -548,176 +844,120 @@ export default function CanvasModeView({
                     </TouchableOpacity>
                 )}
 
-                {/* Back button */}
-                <TouchableOpacity
-                    style={[styles.backBtn, { paddingTop: insets.top + vs(8) }]}
-                    onPress={onClose}
-                    activeOpacity={0.7}
-                >
-                    <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
-                    <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
-                </TouchableOpacity>
+                {/* Back button — frosted pill */}
+                <View style={[styles.backBtnWrap, { top: insets.top + vs(8) }]}>
+                    <TouchableOpacity
+                        style={[styles.backBtn, { backgroundColor: isDark ? 'rgba(255,255,255,0.10)' : 'rgba(0,0,0,0.06)' }]}
+                        onPress={onClose}
+                        activeOpacity={0.7}
+                    >
+                        <ArrowLeft size={16} color={isDark ? colors.accent : colors.accentDark} />
+                        <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
+                    </TouchableOpacity>
+                </View>
 
                 {/* ── Character carousel dock ── */}
                 <LinearGradient
-                    colors={[
-                        'transparent',
-                        isDark ? 'rgba(4,6,14,0.96)' : 'rgba(236,240,250,0.97)',
-                    ]}
+                    colors={[colors.background + '00', colors.background + 'F7']}
                     start={{ x: 0, y: 0 }}
                     end={{ x: 0, y: 1 }}
                     style={{
                         position: 'absolute',
                         bottom: 0, left: 0, right: 0,
                         paddingBottom: insets.bottom + vs(14),
-                        paddingTop: vs(32),
+                        paddingTop: vs(48),
                     }}
                     pointerEvents="box-none"
                 >
-                    {/* ── Drag handle: focused member's character ── */}
-                    {(() => {
-                        const fm = members[focusedMemberIdx];
-                        const pr = panResponders[focusedMemberIdx];
-                        if (!fm || !pr) return null;
-                        return (
-                            <View style={{ alignItems: 'center', marginBottom: vs(10) }} pointerEvents="box-none">
-                                <Text style={{
-                                    fontSize: ms(10),
-                                    color: isDark ? 'rgba(255,255,255,0.30)' : 'rgba(0,0,0,0.25)',
-                                    letterSpacing: 1.5,
-                                    marginBottom: vs(4),
-                                }}>
-                                    ↑ DRAG TO ASSIGN ↑
-                                </Text>
-                                <View
-                                    style={{
-                                        padding: scale(10),
-                                        borderRadius: ms(20),
-                                        backgroundColor: isDark
-                                            ? 'rgba(255,255,255,0.07)'
-                                            : 'rgba(255,255,255,0.90)',
-                                        shadowColor: fm.character_color ?? fm.avatar_color ?? colors.accent,
-                                        shadowOffset: { width: 0, height: 6 },
-                                        shadowOpacity: 0.50,
-                                        shadowRadius: 18,
-                                        elevation: 10,
-                                    }}
-                                    {...pr.panHandlers}
-                                >
-                                    <CharacterShape
-                                        variant="mini"
-                                        shape={fm.character_shape ?? 'rect'}
-                                        color={fm.character_color ?? fm.avatar_color ?? '#6B7280'}
-                                    />
-                                </View>
-                                <Text style={{
-                                    fontSize: ms(12),
-                                    color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
-                                    marginTop: vs(6),
-                                    fontWeight: '600',
-                                    letterSpacing: 0.2,
-                                }}>
-                                    {(fm.name || '').split(' ')[0]}
-                                </Text>
-                            </View>
-                        );
-                    })()}
-
-                    {/* ── Carousel ── */}
-                    {members.length > 1 && (
-                        <Animated.ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            snapToInterval={ITEM_W}
-                            snapToAlignment="center"
-                            decelerationRate="fast"
-                            contentContainerStyle={{ paddingHorizontal: SNAP_INSET }}
-                            onScroll={Animated.event(
-                                [{ nativeEvent: { contentOffset: { x: carouselScrollX } } }],
-                                { useNativeDriver: true }
-                            )}
-                            scrollEventThrottle={16}
-                            onMomentumScrollEnd={e => {
-                                const idx = Math.round(e.nativeEvent.contentOffset.x / ITEM_W);
-                                setFocusedMemberIdx(Math.max(0, Math.min(idx, members.length - 1)));
-                                Haptics.selectionAsync();
-                            }}
-                        >
-                            {members.map((m, i) => {
-                                const inputRange = [(i - 1) * ITEM_W, i * ITEM_W, (i + 1) * ITEM_W];
-                                const cardScale = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.78, 1, 0.78],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardOpacity = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [0.50, 1, 0.50],
-                                    extrapolate: 'clamp',
-                                });
-                                const cardTranslateY = carouselScrollX.interpolate({
-                                    inputRange,
-                                    outputRange: [vs(7), 0, vs(7)],
-                                    extrapolate: 'clamp',
-                                });
-
-                                const isFocused = focusedMemberIdx === i;
+                    {/* ── Dock — static row, every card a drag handle ── */}
+                    {members.length > 0 && (
+                        <View style={{
+                            flexDirection: 'row',
+                            justifyContent: 'center',
+                            alignItems: 'flex-end',
+                            gap: scale(14),
+                            paddingHorizontal: scale(20),
+                            paddingBottom: vs(6),
+                        }}>
+                            {members.slice(0, DOCK_MAX).map((m, i) => {
                                 const charColor = m.character_color ?? m.avatar_color ?? '#6B7280';
+                                const pressed = pressedMemberIdx === i;
+                                const dimmed = pressedMemberIdx >= 0 && !pressed;
 
                                 return (
-                                    <Animated.View
-                                        key={m.user_id}
-                                        style={{
-                                            width: CARD_W,
-                                            marginHorizontal: CARD_MX,
-                                            alignItems: 'center',
-                                            opacity: cardOpacity,
-                                            transform: [
-                                                { scale: cardScale },
-                                                { translateY: cardTranslateY },
-                                            ],
-                                        }}
-                                    >
-                                        <View style={{
-                                            padding: scale(10),
-                                            borderRadius: ms(18),
-                                            backgroundColor: isDark
-                                                ? 'rgba(255,255,255,0.06)'
-                                                : 'rgba(255,255,255,0.80)',
-                                            borderWidth: isFocused ? 1.5 : 0,
-                                            borderColor: isFocused ? charColor + '88' : 'transparent',
-                                            shadowColor: charColor,
-                                            shadowOffset: { width: 0, height: isFocused ? 8 : 0 },
-                                            shadowOpacity: isFocused ? 0.45 : 0,
-                                            shadowRadius: isFocused ? 16 : 0,
-                                            elevation: isFocused ? 8 : 0,
-                                        }}>
+                                    <View key={m.user_id} style={{ alignItems: 'center', opacity: dimmed ? 0.45 : 1 }}>
+                                        <Animated.View
+                                            {...panResponders[i].panHandlers}
+                                            style={{
+                                                padding: scale(10),
+                                                borderRadius: ms(18),
+                                                backgroundColor: isDark
+                                                    ? 'rgba(255,255,255,0.06)'
+                                                    : 'rgba(255,255,255,0.80)',
+                                                borderWidth: 1.5,
+                                                borderColor: charColor + 'AA',
+                                                shadowColor: charColor,
+                                                shadowOffset: { width: 0, height: 4 },
+                                                shadowOpacity: pressed ? 0.70 : 0.55,
+                                                shadowRadius: 12,
+                                                elevation: pressed ? 10 : 6,
+                                                transform: [{
+                                                    scale: Animated.multiply(
+                                                        pressScales.current[i] ?? 1,
+                                                        dockPulses.current[i] ?? 1,
+                                                    ),
+                                                }],
+                                            }}
+                                        >
                                             <CharacterShape
                                                 variant="mini"
                                                 shape={m.character_shape ?? 'rect'}
                                                 color={charColor}
+                                                eyeStyle="ball"
                                             />
-                                        </View>
-                                        <Text style={{
+                                        </Animated.View>
+                                        <Text style={[{
                                             fontSize: ms(10),
-                                            color: isFocused
-                                                ? (isDark ? 'rgba(255,255,255,0.65)' : 'rgba(0,0,0,0.55)')
-                                                : (isDark ? 'rgba(255,255,255,0.28)' : 'rgba(0,0,0,0.25)'),
+                                            color: isDark ? 'rgba(255,255,255,0.60)' : 'rgba(0,0,0,0.50)',
                                             marginTop: vs(5),
-                                            fontWeight: isFocused ? '600' : '400',
                                             letterSpacing: 0.2,
-                                        }} numberOfLines={1}>
-                                            {(m.name || '').split(' ')[0]}
+                                        }, T.semibold]} numberOfLines={1}>
+                                            {memberLabel(m)}
                                         </Text>
-                                    </Animated.View>
+                                    </View>
                                 );
                             })}
-                        </Animated.ScrollView>
-                    )}
 
-                    {/* Single member — no carousel needed */}
-                    {members.length === 1 && (
-                        <View style={{ height: vs(24) }} />
+                            {/* Overflow — rare; not draggable */}
+                            {members.length > DOCK_MAX && (
+                                <View style={{ alignItems: 'center', opacity: 0.55 }}>
+                                    <View style={{
+                                        width: scale(46),
+                                        height: scale(58),
+                                        borderRadius: ms(18),
+                                        borderWidth: 1.5,
+                                        borderColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.14)',
+                                        backgroundColor: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.60)',
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                    }}>
+                                        <Text style={[{
+                                            fontSize: ms(13),
+                                            color: isDark ? 'rgba(255,255,255,0.55)' : 'rgba(0,0,0,0.45)',
+                                        }, T.semibold]}>
+                                            +{members.length - DOCK_MAX}
+                                        </Text>
+                                    </View>
+                                    <Text style={[{
+                                        fontSize: ms(10),
+                                        color: isDark ? 'rgba(255,255,255,0.40)' : 'rgba(0,0,0,0.35)',
+                                        marginTop: vs(5),
+                                    }, T.regular]}>
+                                        more
+                                    </Text>
+                                </View>
+                            )}
+                        </View>
                     )}
                 </LinearGradient>
             </View>
@@ -726,11 +966,11 @@ export default function CanvasModeView({
             <Animated.View
                 style={[
                     styles.sheet,
-                    { backgroundColor: isDark ? '#141C16' : '#F5FAF6', transform: [{ translateY: sheetAnim }] },
+                    { backgroundColor: isDark ? '#0E1614' : '#F7FBF8', transform: [{ translateY: sheetAnim }] },
                 ]}
                 pointerEvents={selectedExpenseId ? 'box-none' : 'none'}
             >
-                <View style={[styles.sheetHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.12)' }]} />
+                <View style={[styles.sheetHandle, { backgroundColor: colors.accent + '30' }]} />
 
                 {selectedExpense && (
                     <>
@@ -741,13 +981,13 @@ export default function CanvasModeView({
                                     {selectedExpense.title}
                                 </Text>
                                 <Text style={[styles.sheetSubtitle, { color: colors.secondaryText }, T.regular]}>
-                                    {selectedExpense.payer_name} paid · {selectedAssigned.length} splitting
+                                    {payerMember ? memberLabel(payerMember) : selectedExpense.payer_name} paid · {selectedAssigned.length} splitting
                                 </Text>
                             </View>
-                            <Text style={[styles.sheetAmount, { color: colors.text }, T.extrabold]}>
+                            <Text style={[styles.sheetAmount, { color: colors.text, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                 ${formatCurrency(selectedExpense.amount)}
                             </Text>
-                            <TouchableOpacity onPress={closeSheet} style={styles.closeBtn} activeOpacity={0.8}>
+                            <TouchableOpacity onPress={closeSheet} style={styles.closeBtn} activeOpacity={0.7}>
                                 <X size={18} color={colors.faintText} />
                             </TouchableOpacity>
                         </View>
@@ -768,7 +1008,7 @@ export default function CanvasModeView({
                                     >
                                         <View style={[styles.assignedPip, { backgroundColor: m.character_color || m.avatar_color || colors.accent }]} />
                                         <Text style={[styles.assignedPillName, { color: colors.text }, T.semibold]}>
-                                            {(m.name || '').split(' ')[0]}
+                                            {memberLabel(m)}
                                         </Text>
                                     </View>
                                 ))}
@@ -783,8 +1023,8 @@ export default function CanvasModeView({
                                     <TouchableOpacity
                                         key={tab}
                                         style={styles.sheetTabBtn}
-                                        onPress={() => setSheetTab(tab)}
-                                        activeOpacity={0.8}
+                                        onPress={() => { Haptics.selectionAsync(); setSheetTab(tab); }}
+                                        activeOpacity={0.7}
                                     >
                                         <Text style={[styles.sheetTabText, { color: active ? colors.accent : colors.faintText }, active ? T.bold : T.semibold]}>
                                             {tab === 'balance' ? 'Balance' : 'Settle'}
@@ -809,18 +1049,23 @@ export default function CanvasModeView({
                                         const pos     = net > 0;
                                         return (
                                             <View key={m.user_id} style={styles.balanceRow}>
-                                                <View style={[styles.balanceAvatar, { backgroundColor: m.character_color || m.avatar_color || colors.accent }]}>
-                                                    <Text style={[styles.balanceAvatarText, T.bold]}>{(m.name || '?')[0].toUpperCase()}</Text>
+                                                <View style={styles.balanceCharWrap}>
+                                                    <CharacterShape
+                                                        variant="cluster"
+                                                        shape={m.character_shape ?? 'rect'}
+                                                        color={m.character_color ?? m.avatar_color ?? colors.accent}
+                                                        eyeStyle="ball"
+                                                    />
                                                 </View>
                                                 <View style={{ flex: 1 }}>
                                                     <Text style={[styles.balanceName, { color: colors.text }, T.semibold]}>
-                                                        {m.user_id === user?.id ? 'You' : (m.name || '').split(' ')[0]}
+                                                        {m.user_id === user?.id ? 'You' : memberLabel(m)}
                                                     </Text>
                                                     <Text style={[styles.balanceRole, { color: colors.secondaryText }, T.regular]}>
                                                         {isPayer ? 'Paid' : 'Owes'}
                                                     </Text>
                                                 </View>
-                                                <Text style={[styles.balanceNet, { color: pos ? colors.accent : colors.warningBright }, T.extrabold]}>
+                                                <Text style={[styles.balanceNet, { color: pos ? colors.accent : colors.warningBright, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                                     {pos ? '+' : ''}${formatCurrency(Math.abs(net))}
                                                 </Text>
                                             </View>
@@ -846,14 +1091,15 @@ export default function CanvasModeView({
                                             </View>
                                         </View>
                                         <Text style={[styles.payLabel, { color: colors.secondaryText }, T.regular]}>
-                                            You owe {(payerMember?.name || 'payer').split(' ')[0]}
+                                            You owe {payerMember ? memberLabel(payerMember) : 'payer'}
                                         </Text>
-                                        <Text style={[styles.payAmount, { color: colors.warningBright }, T.extrabold]}>
+                                        <Text style={[styles.payAmount, { color: colors.warningBright, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                             ${formatCurrency(perPerson)}
                                         </Text>
                                         <TouchableOpacity
                                             style={[styles.payBtn, { backgroundColor: colors.gold, shadowColor: colors.gold }]}
                                             onPress={() => {
+                                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
                                                 closeSheet();
                                                 onSettle({
                                                     payee_id: selectedExpense.paid_by,
@@ -866,7 +1112,7 @@ export default function CanvasModeView({
                                                     description: selectedExpense.title,
                                                 });
                                             }}
-                                            activeOpacity={0.85}
+                                            activeOpacity={0.7}
                                         >
                                             <Text style={[styles.payBtnText, T.bold]}>Pay ${formatCurrency(perPerson)}</Text>
                                         </TouchableOpacity>
@@ -897,27 +1143,54 @@ const styles = StyleSheet.create({
     canvas: { flex: 1, overflow: 'hidden' },
     orbitRing: {
         position: 'absolute',
-        borderStyle: 'dashed',
-        borderWidth: 1,
+        borderStyle: 'solid',
+        borderWidth: StyleSheet.hairlineWidth,
         alignSelf: 'center',
     },
 
+    hubHalo: {
+        position: 'absolute',
+        width: (HUB_R + 16) * 2,
+        height: (HUB_R + 16) * 2,
+        borderRadius: HUB_R + 16,
+        borderWidth: 1,
+        alignSelf: 'center',
+    },
     hub: {
         position: 'absolute',
         width: HUB_R * 2,
         height: HUB_R * 2,
         borderRadius: HUB_R,
-        borderWidth: 2,
+        borderWidth: 1.5,
         alignSelf: 'center',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: vs(8),
+        gap: vs(6),
         elevation: 8,
         paddingHorizontal: scale(10),
+        overflow: 'hidden',
+    },
+    hubInnerRing: {
+        position: 'absolute',
+        top: 5, left: 5, right: 5, bottom: 5,
+        borderRadius: HUB_R - 5,
+        borderWidth: 1,
+    },
+    hubHighlight: {
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        height: HUB_R,
+        borderTopLeftRadius: HUB_R,
+        borderTopRightRadius: HUB_R,
     },
     hubName: {
-        fontSize: ms(14),
-        letterSpacing: -0.5,
+        fontSize: ms(15),
+        letterSpacing: -0.6,
+        textAlign: 'center',
+    },
+    hubBalance: {
+        fontSize: ms(12),
+        letterSpacing: -0.2,
         textAlign: 'center',
     },
     hubPills: {
@@ -927,8 +1200,8 @@ const styles = StyleSheet.create({
     hubPill: {
         borderWidth: 1,
         borderRadius: 20,
-        paddingHorizontal: scale(8),
-        paddingVertical: vs(3),
+        paddingHorizontal: scale(9),
+        paddingVertical: vs(4),
     },
     hubPillText: { fontSize: ms(10) },
 
@@ -936,32 +1209,43 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 0,
         left: 0,
-        width: BUBBLE_R * 2,
-        height: BUBBLE_R * 2,
-        borderRadius: BUBBLE_R,
-        shadowOffset: { width: 0, height: 0 },
+        borderWidth: 1.5,
+        shadowOffset: { width: 0, height: 6 },
+        overflow: 'visible',
+    },
+    bubbleHighlight: {
+        position: 'absolute',
+        top: 0, left: 0, right: 0,
+        backgroundColor: 'rgba(255,255,255,0.07)',
     },
     bubbleTouchable: {
         flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         padding: scale(6),
-        gap: vs(2),
+        gap: vs(1),
     },
     bubblePayerWrap: {
-        width: 22,
-        height: 22,
+        position: 'absolute',
+        top: scale(8),
+        left: scale(12),
+        zIndex: 2,
         alignItems: 'center',
         justifyContent: 'flex-end',
-        marginBottom: vs(2),
+    },
+    bubbleEmoji: {
+        fontSize: ms(18),
+        textAlign: 'center',
     },
     bubbleTitle: {
-        fontSize: ms(12),
+        fontSize: ms(11),
+        letterSpacing: -0.2,
         textAlign: 'center',
-        lineHeight: 14,
+        lineHeight: 13,
     },
     bubbleAmount: {
-        fontSize: ms(11),
+        fontSize: ms(12),
+        letterSpacing: -0.4,
         textAlign: 'center',
     },
     bubblePips: {
@@ -974,27 +1258,19 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'flex-end',
     },
-    bubbleX: {
-        position: 'absolute',
-        top: scale(6),
-        right: scale(6),
-        width: 18,
-        height: 18,
-        borderRadius: 9,
-        backgroundColor: 'rgba(0,0,0,0.18)',
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-
     backdrop: { backgroundColor: 'rgba(0,0,0,0.52)' },
 
-    backBtn: {
+    backBtnWrap: {
         position: 'absolute',
-        top: 0,
         left: scale(20),
+    },
+    backBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(5),
+        borderRadius: ms(20),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(6),
     },
     backText: { fontSize: ms(14) },
 
@@ -1005,8 +1281,8 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         maxHeight: 420,
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
         paddingBottom: vs(24),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: -4 },
@@ -1015,9 +1291,9 @@ const styles = StyleSheet.create({
         elevation: 20,
     },
     sheetHandle: {
-        width: 36,
-        height: 4,
-        borderRadius: 2,
+        width: 40,
+        height: 5,
+        borderRadius: 2.5,
         alignSelf: 'center',
         marginTop: vs(10),
         marginBottom: vs(12),
@@ -1030,16 +1306,16 @@ const styles = StyleSheet.create({
         marginBottom: vs(10),
     },
     sheetTitle: {
-        fontSize: ms(17),
-        letterSpacing: -0.3,
+        fontSize: ms(18),
+        letterSpacing: -0.5,
     },
     sheetSubtitle: {
         fontSize: ms(12),
         marginTop: vs(2),
     },
     sheetAmount: {
-        fontSize: ms(18),
-        letterSpacing: -0.5,
+        fontSize: ms(22),
+        letterSpacing: -0.8,
         paddingTop: vs(1),
     },
     closeBtn: {
@@ -1086,8 +1362,8 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: scale(12),
         right: scale(12),
-        height: 2.5,
-        borderRadius: 2,
+        height: 3,
+        borderRadius: 1.5,
     },
 
     sheetContent: {
@@ -1103,16 +1379,14 @@ const styles = StyleSheet.create({
     balanceRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(10),
+        gap: scale(12),
     },
-    balanceAvatar: {
-        width: 32,
-        height: 32,
-        borderRadius: 16,
+    balanceCharWrap: {
+        width: 36,
+        height: 34,
         alignItems: 'center',
-        justifyContent: 'center',
+        justifyContent: 'flex-end',
     },
-    balanceAvatarText: { color: '#fff', fontSize: ms(13) },
     balanceName: { fontSize: ms(14) },
     balanceRole: { fontSize: ms(11), marginTop: vs(1) },
     balanceNet: { fontSize: ms(16), letterSpacing: -0.3 },
@@ -1141,12 +1415,12 @@ const styles = StyleSheet.create({
     payLabel: { fontSize: ms(13) },
     payAmount: { fontSize: ms(24), letterSpacing: -0.5 },
     payBtn: {
-        borderRadius: ms(13),
+        borderRadius: ms(16),
         paddingHorizontal: scale(24),
-        paddingVertical: vs(12),
+        paddingVertical: vs(15),
         shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.38,
-        shadowRadius: 10,
+        shadowOpacity: 0.42,
+        shadowRadius: 12,
         elevation: 6,
     },
     payBtnText: { color: '#fff', fontSize: ms(15) },

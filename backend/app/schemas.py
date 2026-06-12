@@ -158,6 +158,7 @@ class UserOut(BaseModel):
     character_shape: Optional[str] = 'rect'
     character_color: Optional[str] = '#34D399'
     character_nickname: Optional[str] = None
+    push_token: Optional[str] = None
 
 
 class UserUpdate(BaseModel):
@@ -173,6 +174,7 @@ class UserUpdate(BaseModel):
     character_shape: Optional[str] = Field(default=None, max_length=20)
     character_color: Optional[str] = Field(default=None, max_length=7)
     character_nickname: Optional[str] = Field(default=None, max_length=50)
+    push_token: Optional[str] = Field(default=None, max_length=255)
 
     @field_validator("character_nickname", mode="before")
     @classmethod
@@ -211,6 +213,9 @@ class GroupMemberOut(BaseModel):
     email: str
     interac_email: Optional[str] = None
     avatar_color: str
+    character_shape: Optional[str] = None
+    character_color: Optional[str] = None
+    character_nickname: Optional[str] = None
 
 
 class GroupOut(BaseModel):

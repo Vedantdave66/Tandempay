@@ -10,6 +10,7 @@ from app.schemas import ExpenseCreate, ExpenseOut, ExpenseParticipantOut, Pagina
 from app.routes.auth import get_current_user
 from app.services.audit import log_action
 from app.audit_log import AuditActions
+from app.services.push import push_for_user
 import logging
 
 logger = logging.getLogger("tandempay.expenses")
@@ -114,8 +115,10 @@ async def create_expense(
     ]
 
     # Notify participants (except the creator)
+    push_queue: list[tuple] = []
     for ep in participants:
         if ep.user_id != current_user.id:
+            recipient = users_by_id[ep.user_id]
             notif = Notification(
                 user_id=ep.user_id,
                 type="expense_added",
@@ -125,7 +128,10 @@ async def create_expense(
                 reference_id=expense.id,
             )
             db.add(notif)
+            push_queue.append((recipient, notif.title, notif.message, notif.id))
     await db.flush()
+    for recipient, title, msg, nid in push_queue:
+        await push_for_user(recipient, title, msg, nid)
 
     await log_action(
         db=db,

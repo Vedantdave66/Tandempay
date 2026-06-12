@@ -85,6 +85,7 @@ export const authApi = {
         character_shape?: string;
         character_color?: string;
         character_nickname?: string;
+        push_token?: string;
     }) => request<User>('/auth/me', { method: 'PATCH', body: JSON.stringify(data) }),
 };
 
@@ -94,6 +95,9 @@ export interface GroupMember {
     name: string;
     email: string;
     avatar_color: string;
+    character_shape?: string | null;
+    character_color?: string | null;
+    character_nickname?: string | null;
 }
 
 export interface Group {
@@ -324,6 +328,36 @@ export const walletApi = {
             method: 'POST',
             body: JSON.stringify({ amount, destination })
         })
+};
+
+// --- Recurring Expenses ---
+export interface RecurringExpenseOut {
+    id: string;
+    group_id: string | null;
+    created_by_id: string;
+    description: string;
+    amount: number;
+    currency: string;
+    frequency: string;
+    next_run_date: string;
+    is_active: boolean;
+    created_at: string;
+    updated_at: string;
+}
+
+export const recurringApi = {
+    list: () => request<{ items: RecurringExpenseOut[]; total: number }>('/recurring'),
+    create: (data: {
+        description: string;
+        amount: number;
+        frequency: string;
+        next_run_date: string;
+        group_id?: string;
+        currency?: string;
+    }) => request<RecurringExpenseOut>('/recurring', {
+        method: 'POST',
+        body: JSON.stringify({ currency: 'CAD', ...data }),
+    }),
 };
 
 // --- Receipts ---

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -8,11 +8,17 @@ import {
     SafeAreaView,
     Alert,
     Linking,
+    ActivityIndicator,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as FileSystem from 'expo-file-system';
+import * as Sharing from 'expo-sharing';
 import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { Download, FileText, Sheet, Crown } from 'lucide-react-native';
+import { BASE_URL } from '../services/api';
+import { T } from '../utils/typography';
 
 const EXPORT_OPTIONS = [
     {
@@ -22,6 +28,8 @@ const EXPORT_OPTIONS = [
         desc: 'Download your full expense history',
         iconColor: '#16a34a',
         iconBg: 'rgba(22,163,74,0.1)',
+        ext: 'csv',
+        mime: 'text/csv',
     },
     {
         key: 'pdf',
@@ -30,6 +38,8 @@ const EXPORT_OPTIONS = [
         desc: 'Download your full expense history',
         iconColor: '#6366F1',
         iconBg: 'rgba(99,102,241,0.1)',
+        ext: 'pdf',
+        mime: 'application/pdf',
     },
 ];
 
@@ -38,7 +48,9 @@ export default function ExportScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
 
-    const handleExport = (format: string) => {
+    const [loading, setLoading] = useState<string | null>(null);
+
+    const handleExport = async (format: string) => {
         if (!isPro) {
             Alert.alert(
                 'Pro feature',
@@ -48,8 +60,39 @@ export default function ExportScreen({ navigation }: any) {
                     { text: 'Learn more', onPress: () => Linking.openURL('https://tandempay.ca/pricing') },
                 ],
             );
-        } else {
-            Alert.alert('Coming soon', `${format.toUpperCase()} export will be available in a future update.`);
+            return;
+        }
+
+        setLoading(format);
+        try {
+            const token = await AsyncStorage.getItem('token');
+            const url = `${BASE_URL}/export/${format}`;
+            const option = EXPORT_OPTIONS.find(o => o.key === format)!;
+            const localUri = `${FileSystem.cacheDirectory}tandempay-export.${option.ext}`;
+
+            const result = await FileSystem.downloadAsync(url, localUri, {
+                headers: { Authorization: `Bearer ${token}` },
+            });
+
+            if (result.status !== 200) {
+                throw new Error(`Server returned ${result.status}`);
+            }
+
+            const canShare = await Sharing.isAvailableAsync();
+            if (!canShare) {
+                Alert.alert('Saved', `File saved to ${result.uri}`);
+                return;
+            }
+
+            await Sharing.shareAsync(result.uri, {
+                mimeType: option.mime,
+                dialogTitle: `TandemPay ${format.toUpperCase()} Export`,
+                UTI: format === 'pdf' ? 'com.adobe.pdf' : 'public.comma-separated-values-text',
+            });
+        } catch (err: any) {
+            Alert.alert('Export failed', err.message || 'Could not download the file. Try again.');
+        } finally {
+            setLoading(null);
         }
     };
 
@@ -65,6 +108,7 @@ export default function ExportScreen({ navigation }: any) {
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 {EXPORT_OPTIONS.map((option) => {
                     const Icon = option.icon;
+                    const isLoading = loading === option.key;
                     return (
                         <TouchableOpacity
                             key={option.key}
@@ -75,15 +119,19 @@ export default function ExportScreen({ navigation }: any) {
                             ]}
                             onPress={() => handleExport(option.key)}
                             activeOpacity={0.75}
+                            disabled={isLoading}
                         >
                             <View style={[styles.cardIcon, { backgroundColor: option.iconBg }]}>
                                 <Icon size={24} color={option.iconColor} />
                             </View>
                             <View style={styles.cardText}>
-                                <Text style={[styles.cardLabel, { color: colors.text }]}>{option.label}</Text>
+                                <Text style={[styles.cardLabel, { color: colors.text }, T.bold]}>{option.label}</Text>
                                 <Text style={[styles.cardDesc, { color: colors.secondaryText }]}>{option.desc}</Text>
                             </View>
-                            <Download size={18} color={isPro ? colors.accent : colors.secondaryText} />
+                            {isLoading
+                                ? <ActivityIndicator size="small" color={colors.accent} />
+                                : <Download size={18} color={isPro ? colors.accent : colors.secondaryText} />
+                            }
                         </TouchableOpacity>
                     );
                 })}
@@ -166,7 +214,6 @@ const styles = StyleSheet.create({
     cardText: { flex: 1 },
     cardLabel: {
         fontSize: ms(15),
-        fontWeight: '700',
         marginBottom: vs(3),
     },
     cardDesc: {

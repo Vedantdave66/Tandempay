@@ -8,12 +8,16 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Modal,
 } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
-import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
-import { friendsApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
+import { useAuth } from '../context/AuthContext';
+import * as Haptics from 'expo-haptics';
+import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake, ChevronRight } from 'lucide-react-native';
+import { friendsApi, groupsApi, balancesApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
@@ -36,6 +40,8 @@ function timeAgo(d: string) {
 }
 
 export default function FriendsScreen() {
+    const navigation = useNavigation<any>();
+    const { user } = useAuth();
     const { colors, isDark } = useTheme();
 
     const [activeTab, setActiveTab] = useState<'activity' | 'friends' | 'pending'>('activity');
@@ -47,6 +53,11 @@ export default function FriendsScreen() {
 
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
+    const [settleLoading, setSettleLoading] = useState<string | null>(null);
+    const [groupPickerVisible, setGroupPickerVisible] = useState(false);
+    const [groupPickerFriend, setGroupPickerFriend] = useState<Friend | null>(null);
+    const [sharedGroups, setSharedGroups] = useState<Array<{ id: string; name: string }>>([]);
+    const [pickerLoading, setPickerLoading] = useState<string | null>(null);
 
     const loadData = async () => {
         try {
@@ -61,8 +72,8 @@ export default function FriendsScreen() {
             notificationsApi.list()
                 .then(data => setActivity((data || []).slice(0, 8)))
                 .catch(() => {});
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // data unavailable — keep empty state
         } finally {
             setLoading(false);
         }
@@ -74,13 +85,16 @@ export default function FriendsScreen() {
 
     const handleSendRequest = async () => {
         if (!emailInput.trim()) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         setSubmitting(true);
         try {
             await friendsApi.sendRequest(emailInput.trim());
             setEmailInput('');
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             Alert.alert("Success", "Friend request sent!");
             await loadData();
         } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
             Alert.alert("Error", err.message || "Failed to send request.");
         } finally {
             setSubmitting(false);
@@ -88,8 +102,10 @@ export default function FriendsScreen() {
     };
 
     const handleAccept = async (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         try {
             await friendsApi.acceptRequest(id);
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             await loadData();
         } catch (err: any) {
             Alert.alert("Error", err.message);
@@ -97,11 +113,88 @@ export default function FriendsScreen() {
     };
 
     const handleDecline = async (id: string) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         try {
             await friendsApi.declineRequest(id);
             await loadData();
         } catch (err: any) {
             Alert.alert("Error", err.message);
+        }
+    };
+
+    const goToSettle = async (friend: Friend, groupId: string, groupName: string) => {
+        try {
+            const suggestions = await balancesApi.getSettlements(groupId);
+            const mine = suggestions.find(
+                s => s.from_user_id === user?.id && s.to_user_id === friend.id
+            );
+            navigation.navigate('SettleUp', {
+                payment: {
+                    payee_id:           friend.id,
+                    payee_name:         friend.name,
+                    payee_email:        friend.email,
+                    payee_avatar_color: friend.avatar_color,
+                    amount:             mine?.amount ?? 0,
+                    group_id:           groupId,
+                    payer_id:           user?.id,
+                    description:        groupName,
+                },
+            });
+        } catch {
+            // If suggestions fail, navigate with 0 so user can still proceed
+            navigation.navigate('SettleUp', {
+                payment: {
+                    payee_id:           friend.id,
+                    payee_name:         friend.name,
+                    payee_email:        friend.email,
+                    payee_avatar_color: friend.avatar_color,
+                    amount:             0,
+                    group_id:           groupId,
+                    payer_id:           user?.id,
+                    description:        groupName,
+                },
+            });
+        }
+    };
+
+    const handleSettleUp = async (friend: Friend) => {
+        if (friend.shared_groups_count === 0) {
+            Alert.alert('No shared groups', 'Add a shared group first to settle up.');
+            return;
+        }
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        setSettleLoading(friend.id);
+        try {
+            const allGroups = await groupsApi.list();
+            const details = await Promise.all(allGroups.map(g => groupsApi.get(g.id)));
+            const shared = details.filter(g => g.members.some(m => m.user_id === friend.id));
+
+            if (shared.length === 0) {
+                Alert.alert('No shared groups', 'Add a shared group first to settle up.');
+                return;
+            }
+            if (shared.length === 1) {
+                await goToSettle(friend, shared[0].id, shared[0].name);
+            } else {
+                setGroupPickerFriend(friend);
+                setSharedGroups(shared.map(g => ({ id: g.id, name: g.name })));
+                setGroupPickerVisible(true);
+            }
+        } catch {
+            Alert.alert('Error', 'Could not load groups. Try again.');
+        } finally {
+            setSettleLoading(null);
+        }
+    };
+
+    const handlePickGroup = async (groupId: string, groupName: string) => {
+        if (!groupPickerFriend) return;
+        setPickerLoading(groupId);
+        try {
+            await goToSettle(groupPickerFriend, groupId, groupName);
+            setGroupPickerVisible(false);
+        } finally {
+            setPickerLoading(null);
         }
     };
 
@@ -116,21 +209,19 @@ export default function FriendsScreen() {
     return (
         <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text }, T.extrabold]}>Your people 👋</Text>
+                <Text style={[styles.title, { color: colors.text }, T.bold]}>Friends</Text>
 
-                <View style={[styles.segmentContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                <View style={[styles.segmentContainer, { backgroundColor: colors.surface }]}>
                     {segments.map(seg => {
                         const active = activeTab === seg.id;
-                        const Icon = seg.icon;
                         return (
                             <TouchableOpacity
                                 key={seg.id}
-                                style={[styles.segment, active && { backgroundColor: colors.accent }]}
-                                onPress={() => setActiveTab(seg.id)}
-                                activeOpacity={0.88}
+                                style={[styles.segment, active && { backgroundColor: isDark ? 'rgba(255,255,255,0.1)' : 'white' }]}
+                                onPress={() => { Haptics.selectionAsync(); setActiveTab(seg.id); }}
+                                activeOpacity={0.75}
                             >
-                                <Icon size={15} color={active ? '#fff' : colors.secondaryText} />
-                                <Text style={[styles.segmentText, { color: active ? '#fff' : colors.secondaryText }, active ? T.bold : T.semibold]}>
+                                <Text style={[styles.segmentText, { color: active ? colors.text : colors.secondaryText }, active ? T.semibold : T.regular]}>
                                     {seg.label}
                                 </Text>
                             </TouchableOpacity>
@@ -144,23 +235,15 @@ export default function FriendsScreen() {
                     <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
                 ) : activeTab === 'activity' ? (
                     activity.length === 0 ? (
-                        <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Bell size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
-                            <Text style={[styles.emptyTitle, { color: colors.text }, T.bold]}>No activity yet</Text>
+                        <View style={styles.emptyState}>
+                            <CharacterShape shape="tall" color={colors.indigo} variant="mini" />
+                            <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Nothing here yet</Text>
                             <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
-                                Activity from your friends and squads will show up here.
+                                When your friends and squads get busy, you'll see it here.
                             </Text>
                         </View>
                     ) : (
-                        <View style={[styles.activityCard, {
-                            backgroundColor: colors.surface, borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
-                            borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
-                            shadowColor: isDark ? '#000' : '#0A3020',
-                            shadowOpacity: isDark ? 0.28 : 0.10,
-                            shadowRadius: 14,
-                            shadowOffset: { width: 0, height: isDark ? 8 : 6 },
-                            elevation: isDark ? 6 : 4,
-                        }]}>
+                        <View style={[styles.activityCard, { backgroundColor: colors.surface }]}>
                             {activity.map((a, i) => {
                                 const cfg = TYPE_CONFIG[a.type] || { icon: Bell, tint: 'neutral' as const };
                                 const Icon = cfg.icon;
@@ -170,14 +253,17 @@ export default function FriendsScreen() {
                                         key={a.id}
                                         style={[
                                             styles.activityRow,
-                                            !isLast && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
+                                            !isLast && {
+                                                borderBottomWidth: StyleSheet.hairlineWidth,
+                                                borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                            },
                                         ]}
                                     >
                                         <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
-                                            <Icon size={18} color={cfg.tint === 'green' ? colors.accent : colors.secondaryText} />
+                                            <Icon size={20} color={cfg.tint === 'green' ? colors.accent : colors.secondaryText} />
                                         </View>
                                         <View style={{ flex: 1 }}>
-                                            <Text style={[styles.activityText, { color: colors.text }, T.semibold]} numberOfLines={2}>
+                                            <Text style={[styles.activityText, { color: colors.text }, T.regular]} numberOfLines={2}>
                                                 {a.message || a.title}
                                             </Text>
                                             <Text style={[styles.activityTime, { color: colors.faintText }, T.regular]}>{timeAgo(a.created_at)}</Text>
@@ -190,7 +276,7 @@ export default function FriendsScreen() {
                 ) : activeTab === 'friends' ? (
                     <>
                         <View style={styles.addFriendSection}>
-                            <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Add Friend by Email</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>ADD BY EMAIL</Text>
                             <View style={styles.inputRow}>
                                 <TextInput
                                     style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, ...T.regular }]}
@@ -205,15 +291,10 @@ export default function FriendsScreen() {
                                     style={[styles.sendBtn, {
                                         backgroundColor: colors.accent,
                                         opacity: emailInput.length ? 1 : 0.5,
-                                        shadowColor: colors.accent,
-                                        shadowOpacity: emailInput.length ? 0.22 : 0,
-                                        shadowRadius: 8,
-                                        shadowOffset: { width: 0, height: 6 },
-                                        elevation: emailInput.length ? 8 : 0,
                                     }]}
                                     onPress={handleSendRequest}
                                     disabled={!emailInput.length || submitting}
-                                    activeOpacity={0.82}
+                                    activeOpacity={0.70}
                                 >
                                     {submitting ? <ActivityIndicator color="white" /> : <MailPlus color="#fff" size={20} />}
                                 </TouchableOpacity>
@@ -221,23 +302,14 @@ export default function FriendsScreen() {
                         </View>
 
                         {friends.length === 0 ? (
-                            <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border, marginTop: vs(24) }]}>
-                                <Users size={40} color={colors.secondaryText} style={{ marginBottom: vs(16) }} />
-                                <Text style={[styles.emptyTitle, { color: colors.text }, T.bold]}>No friends yet</Text>
-                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add friends using their email to make splitting easier.</Text>
+                            <View style={[styles.emptyState, { marginTop: vs(24) }]}>
+                                <CharacterShape shape="round" color={colors.accent} variant="mini" />
+                                <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Your crew goes here</Text>
+                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add someone by email above and splitting stops being math homework.</Text>
                             </View>
                         ) : (
                             friends.map(friend => (
-                                <View key={friend.id} style={[styles.friendCard, {
-                                    backgroundColor: colors.surface,
-                                    borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
-                                    borderWidth: isDark ? 0 : StyleSheet.hairlineWidth,
-                                    shadowColor: isDark ? '#000' : '#0A3020',
-                                    shadowOpacity: isDark ? 0.28 : 0.10,
-                                    shadowRadius: 14,
-                                    shadowOffset: { width: 0, height: isDark ? 8 : 6 },
-                                    elevation: isDark ? 6 : 4,
-                                }]}>
+                                <View key={friend.id} style={[styles.friendCard, { backgroundColor: colors.surface }]}>
                                     <View style={styles.friendTop}>
                                         <CharacterShape shape="rect" color={friend.avatar_color} variant="mini" />
                                         <View style={{ marginLeft: scale(12) }}>
@@ -247,12 +319,20 @@ export default function FriendsScreen() {
                                     </View>
                                     <View style={styles.friendBottom}>
                                         <View style={[styles.sharedChip, { backgroundColor: colors.accentBg }]}>
-                                            <Text style={[styles.sharedChipText, { color: colors.accent }, T.bold]}>
+                                            <Text style={[styles.sharedChipText, { color: colors.accent }, T.semibold]}>
                                                 {friend.shared_groups_count} shared squads
                                             </Text>
                                         </View>
-                                        <TouchableOpacity style={[styles.settleBtn, { borderColor: colors.border, backgroundColor: colors.surface }]} activeOpacity={0.88}>
-                                            <Text style={[styles.settleBtnText, { color: colors.accent }, T.bold]}>Settle up</Text>
+                                        <TouchableOpacity
+                                            style={styles.settleBtn}
+                                            activeOpacity={0.75}
+                                            onPress={() => handleSettleUp(friend)}
+                                            disabled={settleLoading === friend.id}
+                                        >
+                                            {settleLoading === friend.id
+                                                ? <ActivityIndicator size="small" color={colors.accent} />
+                                                : <Text style={[styles.settleBtnText, { color: colors.accent }, T.semibold]}>Settle up</Text>
+                                            }
                                         </TouchableOpacity>
                                     </View>
                                 </View>
@@ -263,17 +343,9 @@ export default function FriendsScreen() {
                     <>
                         {requests.received.length > 0 && (
                             <View style={{ marginBottom: vs(28) }}>
-                                <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Received</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>RECEIVED</Text>
                                 {requests.received.map(req => (
-                                    <View key={req.id} style={[styles.friendCard, {
-                                        backgroundColor: colors.surface,
-                                        borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
-                                        shadowColor: isDark ? '#000' : '#0A3020',
-                                        shadowOpacity: isDark ? 0.50 : 0.10,
-                                        shadowRadius: isDark ? 20 : 14,
-                                        shadowOffset: { width: 0, height: isDark ? 14 : 6 },
-                                        elevation: isDark ? 14 : 4,
-                                    }]}>
+                                    <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface }]}>
                                         <View style={styles.friendTop}>
                                             <CharacterShape shape="rect" color={req.sender_avatar} variant="mini" />
                                             <View style={{ marginLeft: scale(12), flex: 1 }}>
@@ -281,11 +353,11 @@ export default function FriendsScreen() {
                                                 <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>{req.sender_email}</Text>
                                             </View>
                                             <View style={styles.actionBtns}>
-                                                <TouchableOpacity onPress={() => handleAccept(req.id)} style={[styles.iconBtn, { backgroundColor: colors.accentBg }]} activeOpacity={0.82}>
-                                                    <UserCheck size={18} color={colors.accent} />
+                                                <TouchableOpacity onPress={() => handleAccept(req.id)} style={[styles.iconBtn, { backgroundColor: colors.accentBg }]} activeOpacity={0.70}>
+                                                    <UserCheck size={20} color={colors.accent} />
                                                 </TouchableOpacity>
-                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { backgroundColor: colors.warningBg, marginLeft: scale(8) }]} activeOpacity={0.82}>
-                                                    <UserX size={18} color={colors.danger} />
+                                                <TouchableOpacity onPress={() => handleDecline(req.id)} style={[styles.iconBtn, { marginLeft: scale(8) }]} activeOpacity={0.60}>
+                                                    <UserX size={20} color={colors.danger} />
                                                 </TouchableOpacity>
                                             </View>
                                         </View>
@@ -296,19 +368,16 @@ export default function FriendsScreen() {
 
                         {requests.sent.length > 0 && (
                             <View>
-                                <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Sent</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>SENT</Text>
                                 {requests.sent.map(req => (
-                                    <View key={req.id} style={[styles.friendCard, {
-                                        backgroundColor: colors.surface,
-                                        borderColor: isDark ? 'rgba(255,255,255,0.09)' : 'rgba(0,0,0,0.06)',
-                                    }]}>
+                                    <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface }]}>
                                         <View style={styles.friendTop}>
                                             <View style={[styles.clockAvatar, { backgroundColor: colors.accentBg }]}>
                                                 <Clock size={20} color={colors.secondaryText} />
                                             </View>
                                             <View style={{ marginLeft: scale(12) }}>
                                                 <Text style={[styles.friendName, { color: colors.text }, T.semibold]}>{req.receiver_email}</Text>
-                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>Pending acceptance...</Text>
+                                                <Text style={[styles.friendEmail, { color: colors.faintText }, T.regular]}>Waiting on them…</Text>
                                             </View>
                                         </View>
                                     </View>
@@ -328,6 +397,48 @@ export default function FriendsScreen() {
                     </>
                 )}
             </ScrollView>
+            <Modal
+                visible={groupPickerVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setGroupPickerVisible(false)}
+            >
+                <TouchableOpacity
+                    style={styles.pickerOverlay}
+                    activeOpacity={1}
+                    onPress={() => setGroupPickerVisible(false)}
+                >
+                    <View style={[styles.pickerSheet, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.pickerHandle, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.pickerTitle, { color: colors.text }, T.bold]}>
+                            Which group?
+                        </Text>
+                        {sharedGroups.map((g, i) => (
+                            <TouchableOpacity
+                                key={g.id}
+                                style={[
+                                    styles.pickerRow,
+                                    i < sharedGroups.length - 1 && {
+                                        borderBottomWidth: StyleSheet.hairlineWidth,
+                                        borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                    },
+                                ]}
+                                onPress={() => handlePickGroup(g.id, g.name)}
+                                disabled={!!pickerLoading}
+                                activeOpacity={0.75}
+                            >
+                                <Text style={[styles.pickerRowText, { color: colors.text }, T.semibold]}>
+                                    {g.name}
+                                </Text>
+                                {pickerLoading === g.id
+                                    ? <ActivityIndicator size="small" color={colors.accent} />
+                                    : <ChevronRight size={scale(18)} color={colors.faintText} />
+                                }
+                            </TouchableOpacity>
+                        ))}
+                    </View>
+                </TouchableOpacity>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -340,23 +451,19 @@ const styles = StyleSheet.create({
         paddingBottom: vs(16),
     },
     title: {
-        fontSize: ms(26),
-        letterSpacing: -0.6,
+        fontSize: ms(28),
+        letterSpacing: -0.8,
         marginBottom: vs(16),
     },
     segmentContainer: {
         flexDirection: 'row',
-        gap: vs(4),
         padding: scale(4),
         borderRadius: ms(12),
-        borderWidth: StyleSheet.hairlineWidth,
     },
     segment: {
         flex: 1,
-        flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        gap: vs(6),
         paddingVertical: vs(9),
         borderRadius: ms(8),
     },
@@ -364,30 +471,32 @@ const styles = StyleSheet.create({
         fontSize: ms(14),
     },
     container: {
-        paddingHorizontal: scale(16),
+        paddingHorizontal: scale(20),
         paddingTop: vs(8),
         paddingBottom: vs(140),
     },
     sectionTitle: {
-        fontSize: ms(16),
-        marginBottom: vs(12),
+        fontSize: ms(13),
+        letterSpacing: 0.2,
+        marginBottom: vs(8),
     },
 
     activityCard: {
         borderRadius: ms(16),
-        borderWidth: StyleSheet.hairlineWidth,
         overflow: 'hidden',
     },
     activityRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: vs(12),
-        padding: scale(14),
+        gap: scale(12),
+        paddingVertical: vs(12),
+        paddingHorizontal: scale(16),
+        minHeight: vs(44),
     },
     activityIcon: {
-        width: 44,
-        height: 44,
-        borderRadius: ms(16),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -405,7 +514,7 @@ const styles = StyleSheet.create({
     },
     inputRow: {
         flexDirection: 'row',
-        gap: vs(12),
+        gap: scale(12),
     },
     input: {
         flex: 1,
@@ -424,9 +533,8 @@ const styles = StyleSheet.create({
     },
     friendCard: {
         padding: scale(16),
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
-        marginBottom: vs(12),
+        borderRadius: ms(16),
+        marginBottom: vs(8),
     },
     friendTop: {
         flexDirection: 'row',
@@ -454,13 +562,11 @@ const styles = StyleSheet.create({
         fontSize: ms(12),
     },
     settleBtn: {
-        borderWidth: StyleSheet.hairlineWidth,
-        borderRadius: ms(10),
-        paddingHorizontal: scale(13),
-        paddingVertical: vs(7),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(8),
     },
     settleBtnText: {
-        fontSize: ms(13),
+        fontSize: ms(15),
     },
 
     actionBtns: {
@@ -497,18 +603,52 @@ const styles = StyleSheet.create({
     },
 
     emptyState: {
-        padding: scale(32),
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
+        paddingTop: vs(48),
+        paddingHorizontal: scale(40),
+        gap: vs(8),
     },
     emptyTitle: {
-        fontSize: ms(18),
+        fontSize: ms(17),
         marginBottom: vs(8),
     },
     emptyDesc: {
-        fontSize: ms(14),
+        fontSize: ms(15),
         textAlign: 'center',
-        lineHeight: 20,
+        lineHeight: 21,
+    },
+
+    pickerOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    pickerSheet: {
+        borderTopLeftRadius: ms(24),
+        borderTopRightRadius: ms(24),
+        paddingHorizontal: scale(24),
+        paddingTop: vs(16),
+        paddingBottom: vs(48),
+    },
+    pickerHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: ms(2),
+        alignSelf: 'center',
+        marginBottom: vs(20),
+    },
+    pickerTitle: {
+        fontSize: ms(20),
+        marginBottom: vs(8),
+    },
+    pickerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        paddingVertical: vs(16),
+        minHeight: vs(44),
+    },
+    pickerRowText: {
+        fontSize: ms(16),
     },
 });

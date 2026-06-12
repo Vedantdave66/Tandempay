@@ -1,9 +1,11 @@
-import React, { Fragment } from 'react';
+import React, { Fragment, useEffect, useRef } from 'react';
+import { Animated, Easing, View, StyleSheet } from 'react-native';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
+import { scale } from '../utils/responsive';
 
 import MainTabNavigator from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
@@ -27,12 +29,68 @@ import FriendsScreen from '../screens/FriendsScreen';
 
 const Stack = createNativeStackNavigator();
 
+/**
+ * Shown for the blink while the auth session resolves. One breathing
+ * green point — the same point of light the splash begins with — so
+ * the hold reads as part of the brand, not a gap in it.
+ */
+function AuthHoldScreen({ background }: { background: string }) {
+    const breath = useRef(new Animated.Value(0)).current;
+
+    useEffect(() => {
+        const loop = Animated.loop(Animated.sequence([
+            Animated.timing(breath, { toValue: 1, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(breath, { toValue: 0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+        ]));
+        loop.start();
+        return () => loop.stop();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    return (
+        <View style={[holdStyles.root, { backgroundColor: background }]}>
+            {/* Expanding halo */}
+            <Animated.View style={[holdStyles.halo, {
+                opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.22, 0] }),
+                transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [0.6, 1.8] }) }],
+            }]} />
+            {/* The point */}
+            <Animated.View style={[holdStyles.dot, {
+                opacity: breath.interpolate({ inputRange: [0, 1], outputRange: [0.65, 1] }),
+                transform: [{ scale: breath.interpolate({ inputRange: [0, 1], outputRange: [1, 1.15] }) }],
+            }]} />
+        </View>
+    );
+}
+
+const holdStyles = StyleSheet.create({
+    root: {
+        flex: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    halo: {
+        position: 'absolute',
+        width: scale(56),
+        height: scale(56),
+        borderRadius: scale(28),
+        borderWidth: 1.5,
+        borderColor: '#22C55E',
+    },
+    dot: {
+        width: scale(10),
+        height: scale(10),
+        borderRadius: scale(5),
+        backgroundColor: '#22C55E',
+    },
+});
+
 export default function RootNavigator() {
     const { user, loading } = useAuth();
     const { colors, isDark } = useTheme();
 
     if (loading) {
-        return null;
+        return <AuthHoldScreen background={colors.background} />;
     }
 
     const navigationTheme = {

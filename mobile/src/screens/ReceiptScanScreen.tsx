@@ -6,30 +6,43 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as ImagePicker from 'expo-image-picker';
 import * as Haptics from 'expo-haptics';
-import { Camera, ArrowLeft, Check, ReceiptText, ChevronRight, UserPlus } from 'lucide-react-native';
+import { Camera, ArrowLeft, Check, ReceiptText, ChevronRight, UserPlus, Users } from 'lucide-react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
-import { receiptsApi, ParsedReceiptItem } from '../services/api';
+import { receiptsApi, groupsApi, ParsedReceiptItem, GroupListItem, GroupMember } from '../services/api';
 import * as ImageManipulator from 'expo-image-manipulator';
 
-// Mock group members (replace with real group members from API later)
-const MOCK_MEMBERS = [
-  { id: 'm1', name: 'Lakshit', initial: 'L', color: '#6366F1' },
-  { id: 'm2', name: 'Arnav',   initial: 'A', color: '#F59E0B' },
-  { id: 'm3', name: 'Priya',   initial: 'P', color: '#EC4899' },
-];
+type Phase = 'group_picker' | 'idle' | 'parsing' | 'people' | 'items';
 
-type Phase = 'idle' | 'parsing' | 'people' | 'items';
-
-export default function ReceiptScanScreen({ navigation }: any) {
+export default function ReceiptScanScreen({ navigation, route }: any) {
   const { colors, isDark } = useTheme();
   const { user } = useAuth();
 
-  const [phase, setPhase]         = useState<Phase>('idle');
-  const [included, setIncluded]   = useState<Set<string>>(new Set(['me', ...MOCK_MEMBERS.map(m => m.id)]));
+  // If caller already provides group context (e.g. GroupDetailScreen), skip picker.
+  const paramsGroupId: string | undefined = route?.params?.groupId;
+  const paramsMembers: GroupMember[] | undefined = route?.params?.members;
+  const startedWithGroup = useRef(!!paramsGroupId);
+
+  const [phase, setPhase] = useState<Phase>(paramsGroupId ? 'idle' : 'group_picker');
+
+  // Group state
+  const [groupId, setGroupId]           = useState<string | null>(paramsGroupId ?? null);
+  const [groupMembers, setGroupMembers] = useState<GroupMember[]>(paramsMembers ?? []);
+
+  // Group picker state
+  const [pickerGroups, setPickerGroups]         = useState<GroupListItem[]>([]);
+  const [pickerLoading, setPickerLoading]       = useState(false);
+  const [selectingGroupId, setSelectingGroupId] = useState<string | null>(null);
+
+  // People & claims — seed included from real member user_ids when available
+  const [included, setIncluded] = useState<Set<string>>(
+    paramsMembers
+      ? new Set(['me', ...paramsMembers.map(m => m.user_id)])
+      : new Set(['me']),
+  );
   const [claimed, setClaimed]     = useState<Set<string>>(new Set());
   const [tipAmount, setTipAmount] = useState('');
   const [tipActive, setTipActive] = useState(false);
@@ -61,6 +74,16 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
   // People entrance
   const peopleAnim = useRef(new Animated.Value(0)).current;
+
+  // ── Load groups for picker ─────────────────────────────────────────────────
+  useEffect(() => {
+    if (phase !== 'group_picker') return;
+    setPickerLoading(true);
+    groupsApi.list()
+      .then(setPickerGroups)
+      .catch(() => Alert.alert('Error', 'Could not load groups.'))
+      .finally(() => setPickerLoading(false));
+  }, [phase]);
 
   useEffect(() => {
     if (phase === 'people') {
@@ -148,8 +171,9 @@ export default function ReceiptScanScreen({ navigation }: any) {
     }
   }, []);
 
-  // Auto-open camera on mount — 400ms delay ensures screen is fully mounted
+  // Auto-open camera on mount only when groupId was provided via route.params
   useEffect(() => {
+    if (!startedWithGroup.current) return;
     const timer = setTimeout(openCamera, 400);
     return () => clearTimeout(timer);
   }, [openCamera]);
@@ -195,6 +219,7 @@ export default function ReceiptScanScreen({ navigation }: any) {
 
   // ── Phase navigation ──────────────────────────────────────────────────────
   const goBack = () => {
+    if (phase === 'idle' && !startedWithGroup.current) { setPhase('group_picker'); return; }
     if (phase === 'people') { setPhase('idle'); setClaimed(new Set()); return; }
     if (phase === 'items')  { setPhase('people'); return; }
     navigation.goBack();
@@ -206,11 +231,86 @@ export default function ReceiptScanScreen({ navigation }: any) {
     navigation.navigate('MainTabs', { screen: 'Groups' });
   };
 
+  // ── GROUP PICKER ──────────────────────────────────────────────────────────
+  if (phase === 'group_picker') {
+    return (
+      <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <ArrowLeft size={22} color={colors.text} />
+        </TouchableOpacity>
+
+        <View style={styles.pickerHeader}>
+          <Text style={[styles.pickerTitle, T.extrabold, { color: colors.text }]}>Which group?</Text>
+          <Text style={[styles.pickerSub, T.regular, { color: colors.secondaryText }]}>
+            Choose the group to split this receipt with
+          </Text>
+        </View>
+
+        {pickerLoading ? (
+          <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: vs(48) }} />
+        ) : pickerGroups.length === 0 ? (
+          <View style={styles.pickerEmpty}>
+            <Users size={40} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(12) }} />
+            <Text style={[styles.pickerEmptyTitle, T.bold, { color: colors.text }]}>No groups yet</Text>
+            <Text style={[styles.pickerEmptySub, T.regular, { color: colors.secondaryText }]}>
+              Create a group first to split receipts.
+            </Text>
+          </View>
+        ) : (
+          <ScrollView contentContainerStyle={styles.pickerList} showsVerticalScrollIndicator={false}>
+            {pickerGroups.map(g => (
+              <TouchableOpacity
+                key={g.id}
+                style={[styles.pickerRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                activeOpacity={0.75}
+                disabled={!!selectingGroupId}
+                onPress={async () => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setSelectingGroupId(g.id);
+                  try {
+                    const full = await groupsApi.get(g.id);
+                    // Exclude the current user — they're represented by the 'me' slot in people phase
+                    const members = full.members.filter(m => m.user_id !== user?.id);
+                    setGroupId(g.id);
+                    setGroupMembers(members);
+                    setIncluded(new Set(['me', ...members.map(m => m.user_id)]));
+                    setPhase('idle');
+                    openCamera();
+                  } catch {
+                    Alert.alert('Error', 'Could not load group members. Try again.');
+                  } finally {
+                    setSelectingGroupId(null);
+                  }
+                }}
+              >
+                <View style={[styles.pickerRowIcon, {
+                  backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.04)',
+                }]}>
+                  <Users size={20} color={colors.accent} />
+                </View>
+                <View style={styles.pickerRowInfo}>
+                  <Text style={[styles.pickerRowName, T.semibold, { color: colors.text }]}>{g.name}</Text>
+                  <Text style={[styles.pickerRowMeta, T.regular, { color: colors.secondaryText }]}>
+                    {g.member_count} member{g.member_count !== 1 ? 's' : ''}
+                  </Text>
+                </View>
+                {selectingGroupId === g.id
+                  ? <ActivityIndicator size="small" color={colors.accent} />
+                  : <ChevronRight size={18} color={colors.secondaryText} />
+                }
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
+      </SafeAreaView>
+    );
+  }
+
   // ── IDLE ──────────────────────────────────────────────────────────────────
   if (phase === 'idle') {
     return (
       <SafeAreaView style={[styles.root, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} onPress={goBack}>
           <ArrowLeft size={22} color={colors.text} />
         </TouchableOpacity>
         <View style={styles.idleBody}>
@@ -279,7 +379,12 @@ export default function ReceiptScanScreen({ navigation }: any) {
         initial: (user?.character_nickname?.[0] ?? 'Y').toUpperCase(),
         color: user?.character_color ?? colors.accent,
       },
-      ...MOCK_MEMBERS,
+      ...groupMembers.map(m => ({
+        id: m.user_id,
+        name: m.name,
+        initial: (m.name?.[0] ?? '?').toUpperCase(),
+        color: m.avatar_color,
+      })),
     ];
 
     return (
@@ -492,6 +597,49 @@ const styles = StyleSheet.create({
   root: { flex: 1 },
   backBtn:       { padding: scale(16), alignSelf: 'flex-start' },
   backBtnInline: { padding: scale(16) },
+
+  // ── Group picker
+  pickerHeader: {
+    paddingHorizontal: scale(24),
+    paddingTop: vs(4),
+    paddingBottom: vs(20),
+  },
+  pickerTitle: { fontSize: ms(28), letterSpacing: -0.5 },
+  pickerSub:   { fontSize: ms(14), opacity: 0.65, marginTop: vs(6), lineHeight: 20 },
+  pickerList:  { paddingHorizontal: scale(20), paddingBottom: vs(48) },
+  pickerRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: ms(18),
+    borderWidth: 1,
+    padding: scale(16),
+    marginBottom: vs(10),
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  pickerRowIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: ms(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: scale(14),
+  },
+  pickerRowInfo:  { flex: 1 },
+  pickerRowName:  { fontSize: ms(15), marginBottom: vs(2) },
+  pickerRowMeta:  { fontSize: ms(12) },
+  pickerEmpty: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: scale(36),
+    marginTop: -vs(44),
+  },
+  pickerEmptyTitle: { fontSize: ms(17), marginBottom: vs(6) },
+  pickerEmptySub:   { fontSize: ms(14), textAlign: 'center', lineHeight: 20, opacity: 0.7 },
 
   // ── Idle
   idleBody:      { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: scale(36), gap: vs(14), marginTop: -vs(44) },

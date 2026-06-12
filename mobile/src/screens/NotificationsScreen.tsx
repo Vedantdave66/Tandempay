@@ -1,24 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-    View, 
-    Text, 
-    StyleSheet, 
-    SafeAreaView, 
-    FlatList, 
-    TouchableOpacity, 
+import {
+    View,
+    Text,
+    StyleSheet,
+    FlatList,
+    TouchableOpacity,
     ActivityIndicator,
-    RefreshControl
+    RefreshControl,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
-import { Bell, Receipt, Send, CheckCircle2, XCircle, Clock, CheckCheck } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
+import { Bell, Receipt, Send, CheckCircle2, XCircle, Clock } from 'lucide-react-native';
 import { notificationsApi, NotificationOut } from '../services/api';
+import { T } from '../utils/typography';
+import CharacterShape from '../components/CharacterShape';
+
+function timeAgo(d: string) {
+    const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
+    if (diff < 1)    return 'Just now';
+    if (diff < 60)   return `${diff}m ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return `${Math.floor(diff / 1440)}d ago`;
+}
 
 export default function NotificationsScreen() {
     const { colors, isDark } = useTheme();
     const { clearUnread } = useNotifications();
-    
+
     const [notifications, setNotifications] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
@@ -50,87 +61,98 @@ export default function NotificationsScreen() {
     };
 
     const handleMarkRead = async (id: string) => {
-        // Optimistic update
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
         try {
             await notificationsApi.markRead(id);
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // optimistic update already applied — swallow
         }
     };
 
     const handleMarkAllRead = async () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         clearUnread();
         try {
             await notificationsApi.markAllRead();
             loadData();
-        } catch (err) {
-            console.error(err);
+        } catch {
+            // optimistic update already applied — swallow
         }
     };
 
+    // Colour discipline: green for confirmed money, danger for declined, greyscale otherwise.
     const getIconForType = (type: string) => {
         switch (type) {
-            case 'expense_added':
-                return { Icon: Receipt, color: '#3B82F6', bgColor: 'rgba(59, 130, 246, 0.1)' };
-            case 'settlement_requested':
-                return { Icon: Send, color: '#F59E0B', bgColor: 'rgba(245, 158, 11, 0.1)' };
-            case 'payment_sent':
-                return { Icon: Clock, color: '#8B5CF6', bgColor: 'rgba(139, 92, 246, 0.1)' };
-            case 'payment_confirmed':
-                return { Icon: CheckCircle2, color: '#10B981', bgColor: 'rgba(16, 185, 129, 0.1)' };
-            case 'payment_declined':
-                return { Icon: XCircle, color: '#EF4444', bgColor: 'rgba(239, 68, 68, 0.1)' };
-            default:
-                return { Icon: Bell, color: '#6366F1', bgColor: 'rgba(99, 102, 241, 0.1)' };
+            case 'expense_added':       return { Icon: Receipt,      color: colors.secondaryText };
+            case 'settlement_requested':return { Icon: Send,         color: colors.secondaryText };
+            case 'payment_sent':        return { Icon: Clock,        color: colors.secondaryText };
+            case 'payment_confirmed':   return { Icon: CheckCircle2, color: colors.accent };
+            case 'payment_declined':    return { Icon: XCircle,      color: colors.danger };
+            default:                    return { Icon: Bell,         color: colors.secondaryText };
         }
     };
 
-    const renderNotification = ({ item }: { item: NotificationOut }) => {
-        const { Icon, color, bgColor } = getIconForType(item.type);
+    const separatorColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)';
+    const iconBg = isDark ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.05)';
+
+    const renderNotification = ({ item, index }: { item: NotificationOut; index: number }) => {
+        const { Icon, color } = getIconForType(item.type);
+        const isFirst = index === 0;
+        const isLast = index === notifications.length - 1;
 
         return (
-            <TouchableOpacity 
+            <TouchableOpacity
                 style={[
-                    styles.notificationCard, 
-                    { backgroundColor: item.read ? colors.background : colors.surface, borderColor: colors.border }
+                    styles.row,
+                    { backgroundColor: colors.surface },
+                    isFirst && { borderTopLeftRadius: ms(16), borderTopRightRadius: ms(16) },
+                    isLast
+                        ? { borderBottomLeftRadius: ms(16), borderBottomRightRadius: ms(16) }
+                        : { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: separatorColor },
                 ]}
                 onPress={() => !item.read && handleMarkRead(item.id)}
-                activeOpacity={item.read ? 1 : 0.7}
+                activeOpacity={item.read ? 1 : 0.85}
             >
-                <View style={[styles.iconBox, { backgroundColor: bgColor }]}>
-                    <Icon size={24} color={color} />
+                <View style={[styles.iconBox, { backgroundColor: iconBg }]}>
+                    <Icon size={20} color={color} />
                 </View>
                 <View style={styles.contentBox}>
                     <View style={styles.titleRow}>
-                        <Text style={[styles.cardTitle, { color: colors.text, fontWeight: item.read ? 'normal' : 'bold' }]}>
+                        <Text
+                            style={[styles.rowTitle, { color: colors.text }, item.read ? T.regular : T.semibold]}
+                            numberOfLines={1}
+                        >
                             {item.title}
                         </Text>
                         {!item.read && <View style={[styles.unreadDot, { backgroundColor: colors.accent }]} />}
                     </View>
-                    <Text style={[styles.cardMessage, { color: colors.secondaryText }]}>
+                    <Text style={[styles.rowMessage, { color: colors.secondaryText }, T.regular]} numberOfLines={2}>
                         {item.message}
                     </Text>
-                    <Text style={[styles.timeText, { color: colors.secondaryText }]}>
-                        {new Date(item.created_at).toLocaleDateString()} at {new Date(item.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                    <Text style={[styles.timeText, { color: colors.faintText }, T.regular]}>
+                        {timeAgo(item.created_at)}
                     </Text>
                 </View>
             </TouchableOpacity>
         );
     };
 
+    const unreadCount = notifications.filter(n => !n.read).length;
+
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <SafeAreaView edges={['top']} style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
                 <View style={{ flex: 1 }}>
-                    <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
-                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>Notifications & alerts</Text>
+                    <Text style={[styles.title, { color: colors.text }, T.bold]}>Notifications</Text>
+                    <Text style={[styles.subtitle, { color: colors.secondaryText }, T.regular]}>
+                        {unreadCount > 0 ? `${unreadCount} unread` : 'All caught up'}
+                    </Text>
                 </View>
-                {notifications.some(n => !n.read) && (
-                    <TouchableOpacity style={styles.clearAllBtn} onPress={handleMarkAllRead}>
-                        <CheckCheck size={16} color={colors.accent} />
-                        <Text style={[styles.clearAllText, { color: colors.accent }]}>Mark All Read</Text>
+                {unreadCount > 0 && (
+                    <TouchableOpacity onPress={handleMarkAllRead} activeOpacity={0.75} style={styles.markAllBtn}>
+                        <Text style={[styles.markAllText, { color: colors.accent }, T.semibold]}>Mark All Read</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -140,12 +162,12 @@ export default function NotificationsScreen() {
                     <ActivityIndicator size="large" color={colors.accent} />
                 </View>
             ) : notifications.length === 0 ? (
-                <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <View style={[styles.emptyIconContainer, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                        <Bell size={40} color="#F59E0B" />
-                    </View>
-                    <Text style={[styles.emptyTitle, { color: colors.text }]}>No new notifications</Text>
-                    <Text style={[styles.emptyDesc, { color: colors.secondaryText }]}>You're all caught up! Activity will show here.</Text>
+                <View style={styles.emptyState}>
+                    <CharacterShape shape="semi" color={colors.accent} variant="mini" />
+                    <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Quiet in here</Text>
+                    <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
+                        When your squads get moving, you'll hear about it here first.
+                    </Text>
                 </View>
             ) : (
                 <FlatList
@@ -165,49 +187,43 @@ const styles = StyleSheet.create({
     header: {
         flexDirection: 'row',
         justifyContent: 'space-between',
-        alignItems: 'center',
-        paddingHorizontal: scale(24),
-        paddingTop: vs(24),
+        alignItems: 'flex-end',
+        paddingHorizontal: scale(20),
+        paddingTop: vs(16),
         paddingBottom: vs(16),
     },
     title: {
-        fontSize: ms(32),
-        fontWeight: '900',
-        marginBottom: vs(4),
+        fontSize: ms(28),
+        letterSpacing: -0.8,
     },
     subtitle: {
-        fontSize: ms(16),
+        fontSize: ms(13),
+        marginTop: vs(2),
     },
-    clearAllBtn: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        padding: scale(8),
-        backgroundColor: 'rgba(99, 102, 241, 0.1)',
-        borderRadius: ms(8),
-        gap: vs(4),
+    markAllBtn: {
+        paddingVertical: vs(8),
+        paddingLeft: scale(12),
     },
-    clearAllText: {
-        fontSize: ms(12),
-        fontWeight: 'bold',
+    markAllText: {
+        fontSize: ms(15),
     },
     listContainer: {
-        paddingHorizontal: scale(24),
-        paddingBottom: vs(140), // Space for custom tab bar
+        paddingHorizontal: scale(20),
+        paddingBottom: vs(140),
     },
-    notificationCard: {
+    row: {
         flexDirection: 'row',
-        padding: scale(16),
-        borderRadius: ms(16),
-        borderWidth: StyleSheet.hairlineWidth,
-        marginBottom: vs(12),
+        paddingVertical: vs(12),
+        paddingHorizontal: scale(16),
+        minHeight: vs(44),
     },
     iconBox: {
-        width: 48,
-        height: 48,
-        borderRadius: ms(16),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: scale(16),
+        marginRight: scale(12),
     },
     contentBox: {
         flex: 1,
@@ -217,51 +233,39 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: vs(4),
+        marginBottom: vs(2),
     },
-    cardTitle: {
-        fontSize: ms(16),
+    rowTitle: {
+        fontSize: ms(15),
         flex: 1,
         marginRight: scale(8),
     },
     unreadDot: {
-        width: 10,
-        height: 10,
-        borderRadius: ms(5),
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
     },
-    cardMessage: {
+    rowMessage: {
         fontSize: ms(14),
-        marginBottom: vs(8),
-        lineHeight: 20,
+        lineHeight: 19,
     },
     timeText: {
-        fontSize: ms(11),
-        opacity: 0.7,
+        fontSize: ms(12),
+        marginTop: vs(4),
     },
     emptyState: {
-        padding: scale(40),
-        borderRadius: ms(24),
-        borderWidth: StyleSheet.hairlineWidth,
         alignItems: 'center',
-        marginHorizontal: scale(24),
-        marginTop: vs(40),
-    },
-    emptyIconContainer: {
-        width: 80,
-        height: 80,
-        borderRadius: ms(40),
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: vs(24),
+        paddingTop: vs(64),
+        paddingHorizontal: scale(40),
+        gap: vs(8),
     },
     emptyTitle: {
-        fontSize: ms(20),
-        fontWeight: 'bold',
-        marginBottom: vs(12),
+        fontSize: ms(17),
+        marginTop: vs(8),
     },
     emptyDesc: {
-        fontSize: ms(14),
+        fontSize: ms(15),
         textAlign: 'center',
-        lineHeight: 22,
+        lineHeight: 21,
     },
 });

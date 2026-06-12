@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    ActivityIndicator, RefreshControl, ScrollView, Animated, Easing, Alert, Modal,
+    RefreshControl, ScrollView, Animated, Easing, Alert, Modal,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { LinearGradient } from 'expo-linear-gradient';
+
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import {
@@ -15,10 +15,13 @@ import {
 import {
     Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake, ChevronRight, X,
 } from 'lucide-react-native';
+import * as Haptics from 'expo-haptics';
 import { useNotifications } from '../context/NotificationContext';
 import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
+import PressableScale from '../components/PressableScale';
+import SkeletonBlock from '../components/SkeletonBlock';
 import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 
@@ -47,6 +50,16 @@ function greeting(): string {
     return 'Good evening';
 }
 
+// The balance widget speaks like a friend, not a ledger.
+function balanceVoice(owed: number, owing: number): string {
+    const isOwed = owed > 0.005;
+    const isOwing = owing > 0.005;
+    if (isOwed && isOwing) return 'Some owed, some owing';
+    if (isOwed)            return 'People owe you';
+    if (isOwing)           return 'A tab or two to close';
+    return 'Nothing hanging over anyone';
+}
+
 interface BreakdownRow { groupName: string; amount: number; }
 
 interface NetBreakdownModalProps {
@@ -67,12 +80,12 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
         if (visible) {
             setRendered(true);
             Animated.parallel([
-                Animated.spring(slideAnim, { toValue: 0, damping: 22, stiffness: 200, useNativeDriver: true }),
-                Animated.timing(backdropOpacity, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.spring(slideAnim, { toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true }),
+                Animated.timing(backdropOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
             ]).start();
         } else if (rendered) {
             Animated.parallel([
-                Animated.timing(slideAnim, { toValue: 500, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+                Animated.timing(slideAnim, { toValue: 500, duration: 240, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
                 Animated.timing(backdropOpacity, { toValue: 0, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
             ]).start(() => setRendered(false));
         }
@@ -96,7 +109,7 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
         <Modal visible={rendered} transparent animationType="none" onRequestClose={onClose}>
             <View style={{ flex: 1 }}>
                 <Animated.View
-                    style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.5)', opacity: backdropOpacity }]}
+                    style={[StyleSheet.absoluteFill, { backgroundColor: isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.3)', opacity: backdropOpacity }]}
                 >
                     <TouchableOpacity style={{ flex: 1 }} activeOpacity={1} onPress={onClose} />
                 </Animated.View>
@@ -105,10 +118,10 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
                     backgroundColor: isDark ? colors.surface : '#FFFFFF',
                     transform: [{ translateY: slideAnim }],
                 }]}>
-                    <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.18)' : 'rgba(0,0,0,0.18)' }]} />
+                    <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }]} />
 
                     <View style={styles.modalHeader}>
-                        <Text style={[styles.modalTitle, T.extrabold, { color: colors.text }]}>Balance breakdown</Text>
+                        <Text style={[styles.modalTitle, T.semibold, { color: colors.text }]}>Balance Breakdown</Text>
                         <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn} activeOpacity={0.70}>
                             <X size={18} color={colors.secondaryText} />
                         </TouchableOpacity>
@@ -123,22 +136,22 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
                             <>
                                 {owedRows.length > 0 && (
                                     <>
-                                        <Text style={[styles.modalSectionLabel, T.bold, { color: colors.accent }]}>They owe you</Text>
+                                        <Text style={[styles.modalSectionLabel, T.semibold, { color: colors.secondaryText }]}>They owe you</Text>
                                         {owedRows.map((row, i) => (
-                                            <View key={i} style={[styles.modalRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                                                <Text style={[styles.modalRowName, T.semibold, { color: colors.text }]}>{row.groupName}</Text>
-                                                <Text style={[styles.modalRowAmount, T.extrabold, { color: colors.accent }]}>${formatCurrency(row.amount)}</Text>
+                                            <View key={i} style={[styles.modalRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+                                                <Text style={[styles.modalRowName, T.regular, { color: colors.text }]}>{row.groupName}</Text>
+                                                <Text style={[styles.modalRowAmount, T.semibold, { color: colors.accent, fontVariant: ['tabular-nums'] }]}>${formatCurrency(row.amount)}</Text>
                                             </View>
                                         ))}
                                     </>
                                 )}
                                 {owingRows.length > 0 && (
                                     <>
-                                        <Text style={[styles.modalSectionLabel, T.bold, { color: colors.gold }]}>You owe them</Text>
+                                        <Text style={[styles.modalSectionLabel, T.semibold, { color: colors.secondaryText }]}>You owe them</Text>
                                         {owingRows.map((row, i) => (
-                                            <View key={i} style={[styles.modalRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)' }]}>
-                                                <Text style={[styles.modalRowName, T.semibold, { color: colors.text }]}>{row.groupName}</Text>
-                                                <Text style={[styles.modalRowAmount, T.extrabold, { color: colors.gold }]}>${formatCurrency(row.amount)}</Text>
+                                            <View key={i} style={[styles.modalRow, { borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]}>
+                                                <Text style={[styles.modalRowName, T.regular, { color: colors.text }]}>{row.groupName}</Text>
+                                                <Text style={[styles.modalRowAmount, T.semibold, { color: colors.gold, fontVariant: ['tabular-nums'] }]}>${formatCurrency(row.amount)}</Text>
                                             </View>
                                         ))}
                                     </>
@@ -169,6 +182,16 @@ export default function DashboardScreen({ navigation }: any) {
     const activityAnims = useRef(
         Array.from({ length: 5 }, () => new Animated.Value(0))
     ).current;
+
+    // Your character rises into frame on arrival — it's you showing up, not an icon loading.
+    const characterRise = useRef(new Animated.Value(0)).current;
+    useEffect(() => {
+        if (!loading) {
+            Animated.spring(characterRise, {
+                toValue: 1, damping: 18, stiffness: 220, useNativeDriver: true,
+            }).start();
+        }
+    }, [loading]);
 
     const loadGroups = async () => {
         try {
@@ -213,7 +236,7 @@ export default function DashboardScreen({ navigation }: any) {
                 })
                 .catch(() => {});
         } catch (err) {
-            console.log('[Dashboard] Failed to load groups:', err);
+            console.error('[Dashboard] Failed to load groups:', err);
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -263,7 +286,7 @@ export default function DashboardScreen({ navigation }: any) {
         if (recentActivity.length === 0) return;
         const count = Math.min(recentActivity.length, 5);
         activityAnims.forEach(a => a.setValue(0));
-        Animated.stagger(40,
+        Animated.stagger(30,
             activityAnims.slice(0, count).map(anim =>
                 Animated.timing(anim, {
                     toValue: 1,
@@ -277,17 +300,48 @@ export default function DashboardScreen({ navigation }: any) {
 
     const firstName = user?.name?.split(' ')[0] ?? '';
     const netBalance = owedToMe - iOwe;
+    const allSquare = owedToMe < 0.005 && iOwe < 0.005;
     const netColor = netBalance > 0.005
         ? colors.accent
         : netBalance < -0.005
             ? colors.gold
-            : colors.secondaryText;
+            : colors.accent;
 
     if (loading && !refreshing) {
+        // Skeleton — the dashboard's silhouette breathing while data arrives.
+        // Mirrors the real layout rhythm so content lands without a jump.
         return (
             <SafeAreaView edges={['top']} style={[styles.screen, { backgroundColor: colors.background }]}>
-                <View style={styles.center}>
-                    <ActivityIndicator color={colors.accent} size="large" />
+                {/* Header: logo + bell */}
+                <View style={styles.headerRow}>
+                    <SkeletonBlock width={scale(96)} height={vs(18)} radius={ms(6)} />
+                    <SkeletonBlock width={scale(44)} height={scale(44)} radius={ms(12)} delay={120} />
+                </View>
+
+                {/* Greeting */}
+                <View style={styles.greetingRow}>
+                    <View style={{ gap: vs(8) }}>
+                        <SkeletonBlock width={scale(90)} height={vs(12)} radius={ms(6)} delay={240} />
+                        <SkeletonBlock width={scale(150)} height={vs(22)} radius={ms(8)} delay={240} />
+                    </View>
+                    <SkeletonBlock width={scale(52)} height={vs(64)} radius={ms(12)} delay={360} />
+                </View>
+
+                {/* Net balance widget */}
+                <View style={{ paddingHorizontal: scale(20) }}>
+                    <SkeletonBlock width={'100%'} height={vs(84)} radius={ms(20)} delay={480} />
+                </View>
+
+                {/* Section header */}
+                <View style={{ paddingHorizontal: scale(20), paddingTop: vs(28), paddingBottom: vs(12) }}>
+                    <SkeletonBlock width={'42%'} height={vs(18)} radius={ms(8)} delay={600} />
+                </View>
+
+                {/* Activity rows */}
+                <View style={{ paddingHorizontal: scale(20), gap: vs(8) }}>
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={720} />
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={840} />
+                    <SkeletonBlock width={'100%'} height={vs(64)} radius={ms(16)} delay={960} />
                 </View>
             </SafeAreaView>
         );
@@ -312,74 +366,79 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Bell color={colors.secondaryText} size={20} />
                         {unreadCount > 0 && (
-                            <View style={[styles.bellDot, { borderColor: colors.background }]} />
+                            <View style={[styles.bellDot, { borderColor: colors.background, backgroundColor: colors.danger }]} />
                         )}
                     </TouchableOpacity>
                 </View>
 
-                {/* Hero card */}
-                <LinearGradient
-                    colors={isDark ? ['#1A1015', '#141019', '#0D1410'] : ['#FBEDE8', '#F4EFF7', '#E9F6EE']}
-                    style={styles.heroCard}
-                >
-                    <View style={styles.heroTop}>
-                        <View style={styles.heroLeft}>
-                            <Text style={[styles.heroGreeting, { color: colors.secondaryText }, T.semibold]}>{greeting()}</Text>
-                            <Text style={[styles.heroName, { color: colors.text }, T.extrabold]}>{firstName} 👋</Text>
-                        </View>
+                {/* Greeting row — inline, no card */}
+                <View style={styles.greetingRow}>
+                    <View>
+                        <Text style={[styles.greetingLabel, { color: colors.secondaryText }, T.regular]}>{greeting()}</Text>
+                        <Text style={[styles.greetingName, { color: colors.text }, T.bold]}>{firstName}</Text>
+                    </View>
+                    <Animated.View style={{
+                        opacity: characterRise,
+                        transform: [
+                            { scale: 0.72 },
+                            { translateY: characterRise.interpolate({ inputRange: [0, 1], outputRange: [vs(16), 0] }) },
+                        ],
+                    }}>
                         <CharacterShape
                             shape={user?.character_shape ?? 'rect'}
                             color={user?.character_color ?? '#34D399'}
                             variant="hero"
                         />
-                    </View>
+                    </Animated.View>
+                </View>
 
-                    {/* Net Balance pill */}
-                    <TouchableOpacity
-                        style={[styles.netBalanceBtn, {
-                            backgroundColor: isDark ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.82)',
-                        }]}
-                        activeOpacity={0.70}
-                        onPress={() => setShowNetModal(true)}
-                    >
-                        <View style={{ flex: 1 }}>
-                            <Text style={[styles.netBalanceLabel, { color: colors.secondaryText }, T.bold]}>NET BALANCE</Text>
+                {/* Net balance — the widget speaks, the number answers */}
+                <PressableScale
+                    haptic="light"
+                    scaleTo={0.98}
+                    style={[styles.netBalanceBtn, {
+                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : colors.surface,
+                    }]}
+                    onPress={() => setShowNetModal(true)}
+                >
+                    <View style={{ flex: 1 }}>
+                        <Text style={[styles.netBalanceLabel, { color: colors.secondaryText }, T.regular]}>
+                            {balanceVoice(owedToMe, iOwe)}
+                        </Text>
+                        {allSquare ? (
+                            <Text style={[styles.netBalanceValue, { color: netColor }, T.extrabold]}>
+                                All square
+                            </Text>
+                        ) : (
                             <Text style={[styles.netBalanceValue, { color: netColor, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                 {netBalance >= 0 ? '+' : '-'}${formatCurrency(Math.abs(netBalance))}
                             </Text>
-                        </View>
-                        <ChevronRight size={18} color={colors.secondaryText} strokeWidth={2} />
-                    </TouchableOpacity>
-                </LinearGradient>
+                        )}
+                    </View>
+                    <ChevronRight size={16} color={colors.faintText} strokeWidth={2} />
+                </PressableScale>
 
                 {/* Your squads */}
                 <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
-                        <Text style={[styles.sectionTitle, { color: colors.text }, T.extrabold]}>Your squads</Text>
+                        <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Your squads</Text>
                         <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
-                            <Text style={[styles.countBadgeText, { color: colors.secondaryText }, T.bold]}>{groups.length}</Text>
+                            <Text style={[styles.countBadgeText, { color: colors.secondaryText }, T.semibold]}>{groups.length}</Text>
                         </View>
                     </View>
                     <TouchableOpacity
                         onPress={() => navigation.navigate('CreateGroup')}
-                        style={[styles.newButton, {
-                            backgroundColor: colors.accent,
-                            shadowColor: colors.accent,
-                            shadowOpacity: 0.22,
-                            shadowRadius: 8,
-                            shadowOffset: { width: 0, height: 8 },
-                            elevation: 6,
-                        }]}
+                        style={[styles.newButton, { backgroundColor: colors.accentBg }]}
                         activeOpacity={0.70}
                     >
-                        <Text style={[styles.newButtonText, T.bold]}>+ New</Text>
+                        <Text style={[styles.newButtonText, { color: colors.accent }, T.semibold]}>+ New</Text>
                     </TouchableOpacity>
                 </View>
 
                 {groups.length === 0 ? (
                     <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
-                            No squads yet — create one to get started.
+                            Your squads live here. Make one and stop doing tab math in the group chat.
                         </Text>
                     </View>
                 ) : (
@@ -408,45 +467,52 @@ export default function DashboardScreen({ navigation }: any) {
                     </ScrollView>
                 )}
 
-                {/* Recent activity — individual floating rows, no card wrapper */}
-                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(36), marginBottom: vs(16) }, T.extrabold]}>
+                {/* Recent activity — inset grouped list */}
+                <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(36), marginBottom: vs(16) }, T.bold]}>
                     Recent activity
                 </Text>
 
-                {recentActivity.length === 0 ? (
-                    <Text style={[styles.emptyText, { color: colors.secondaryText, marginHorizontal: scale(20), textAlign: 'center' }, T.regular]}>
-                        No activity yet
-                    </Text>
-                ) : (
-                    recentActivity.map((n, i) => {
-                        const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
-                        const IconComp = cfg.icon;
-                        return (
-                            <Animated.View key={n.id} style={{
-                                opacity: activityAnims[i] ?? 1,
-                                marginHorizontal: scale(20),
-                                marginBottom: vs(8),
-                            }}>
-                                <TouchableOpacity
-                                    style={[styles.activityRow, { backgroundColor: colors.surface }]}
-                                    onPress={() => n.group_id && navigation.navigate('Group', { groupId: n.group_id })}
-                                    activeOpacity={0.70}
-                                >
-                                    <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
-                                        <IconComp size={scale(18)} color={colors.accent} />
-                                    </View>
-                                    <View style={{ flex: 1, minWidth: 0 }}>
-                                        <Text style={{ fontSize: ms(15), ...T.semibold, color: colors.secondaryText, lineHeight: 22 }}
-                                            numberOfLines={2}>{n.message}</Text>
-                                        <Text style={{ fontSize: ms(12), ...T.regular, color: colors.faintText, marginTop: vs(2) }}>
-                                            {timeAgo(n.created_at)}
-                                        </Text>
-                                    </View>
-                                </TouchableOpacity>
-                            </Animated.View>
-                        );
-                    })
-                )}
+                <View style={[styles.activityGroup, { backgroundColor: colors.surface }]}>
+                    {recentActivity.length === 0 ? (
+                        <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }, T.regular]}>
+                            Nothing yet — expenses and payments from your squads will land here.
+                        </Text>
+                    ) : (
+                        recentActivity.map((n, i) => {
+                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
+                            const IconComp = cfg.icon;
+                            const isLast = i === recentActivity.length - 1;
+                            return (
+                                <Animated.View key={n.id} style={{ opacity: activityAnims[i] ?? 1 }}>
+                                    <TouchableOpacity
+                                        style={[styles.activityRow, !isLast && {
+                                            borderBottomWidth: StyleSheet.hairlineWidth,
+                                            borderBottomColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
+                                        }]}
+                                        onPress={() => {
+                                            if (!n.group_id) return;
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                                            navigation.navigate('Group', { groupId: n.group_id });
+                                        }}
+                                        activeOpacity={0.85}
+                                    >
+                                        <View style={[styles.activityIcon, { backgroundColor: colors.accentBg }]}>
+                                            <IconComp size={20} color={colors.accent} />
+                                        </View>
+                                        <View style={{ flex: 1, minWidth: 0 }}>
+                                            <Text style={{ fontSize: ms(15), ...T.regular, color: colors.text, lineHeight: 21 }}
+                                                numberOfLines={2}>{n.message}</Text>
+                                            <Text style={{ fontSize: ms(12), ...T.regular, color: colors.faintText, marginTop: vs(2) }}>
+                                                {timeAgo(n.created_at)}
+                                            </Text>
+                                        </View>
+                                        {n.group_id && <ChevronRight size={16} color={colors.faintText} />}
+                                    </TouchableOpacity>
+                                </Animated.View>
+                            );
+                        })
+                    )}
+                </View>
             </ScrollView>
 
             <NetBreakdownModal
@@ -486,48 +552,41 @@ const styles = StyleSheet.create({
         width: scale(8),
         height: scale(8),
         borderRadius: scale(4),
-        backgroundColor: '#E05252',
         borderWidth: 1.5,
     },
 
-    heroCard: {
-        marginHorizontal: scale(12),
-        borderRadius: ms(32),
-        padding: scale(26),
-    },
-    heroTop: {
+    greetingRow: {
         flexDirection: 'row',
-        alignItems: 'flex-start',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        gap: scale(12),
-        marginBottom: vs(20),
+        paddingHorizontal: scale(20),
+        paddingTop: vs(4),
+        paddingBottom: vs(20),
     },
-    heroLeft: { flexShrink: 1 },
-    heroGreeting: {
+    greetingLabel: {
         fontSize: ms(13),
         marginBottom: vs(2),
     },
-    heroName: {
-        fontSize: ms(34),
-        letterSpacing: -1.2,
+    greetingName: {
+        fontSize: ms(22),
+        letterSpacing: -0.6,
     },
 
     netBalanceBtn: {
         flexDirection: 'row',
         alignItems: 'center',
+        marginHorizontal: scale(20),
         borderRadius: ms(20),
-        padding: scale(16),
-        marginTop: vs(24),
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(16),
     },
     netBalanceLabel: {
-        fontSize: ms(11),
-        letterSpacing: 0.5,
-        textTransform: 'uppercase',
+        fontSize: ms(13),
         marginBottom: vs(3),
     },
     netBalanceValue: {
-        fontSize: ms(26),
-        letterSpacing: -0.8,
+        fontSize: ms(32),
+        letterSpacing: -1.2,
     },
 
     sectionHeader: {
@@ -535,7 +594,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(20),
-        paddingTop: vs(32),
+        paddingTop: vs(28),
         paddingBottom: vs(12),
     },
     sectionTitleRow: {
@@ -559,13 +618,12 @@ const styles = StyleSheet.create({
         fontSize: ms(12),
     },
     newButton: {
-        borderRadius: ms(12),
+        borderRadius: 999,
         paddingHorizontal: scale(14),
-        paddingVertical: vs(9),
+        paddingVertical: vs(8),
     },
     newButtonText: {
-        fontSize: ms(13),
-        color: '#fff',
+        fontSize: ms(14),
     },
     squadsRow: {
         paddingHorizontal: scale(20),
@@ -584,19 +642,24 @@ const styles = StyleSheet.create({
         lineHeight: ms(20),
     },
 
-    // Activity — individual floating rows
+    // Activity — inset grouped list
+    activityGroup: {
+        marginHorizontal: scale(20),
+        borderRadius: ms(16),
+        overflow: 'hidden',
+    },
     activityRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(12),
-        padding: scale(14),
+        paddingVertical: vs(12),
         paddingHorizontal: scale(16),
-        borderRadius: ms(16),
+        minHeight: vs(44),
     },
     activityIcon: {
-        width: scale(40),
-        height: scale(40),
-        borderRadius: ms(16),
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
     },
@@ -607,15 +670,15 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        borderTopLeftRadius: ms(28),
-        borderTopRightRadius: ms(28),
+        borderTopLeftRadius: ms(20),
+        borderTopRightRadius: ms(20),
         paddingTop: vs(12),
         maxHeight: '75%',
     },
     modalHandle: {
         width: scale(36),
         height: vs(4),
-        borderRadius: ms(4),
+        borderRadius: ms(2),
         alignSelf: 'center',
         marginBottom: vs(12),
     },
@@ -627,8 +690,8 @@ const styles = StyleSheet.create({
         marginBottom: vs(16),
     },
     modalTitle: {
-        fontSize: ms(20),
-        letterSpacing: -0.4,
+        fontSize: ms(17),
+        letterSpacing: -0.3,
     },
     modalCloseBtn: {
         width: scale(36),
@@ -645,7 +708,7 @@ const styles = StyleSheet.create({
     },
     modalSectionLabel: {
         fontSize: ms(13),
-        letterSpacing: 0.4,
+        letterSpacing: 0.2,
         textTransform: 'uppercase',
         paddingHorizontal: scale(20),
         marginTop: vs(16),
@@ -656,15 +719,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(20),
-        paddingVertical: vs(14),
+        paddingVertical: vs(12),
+        minHeight: vs(44),
         borderBottomWidth: StyleSheet.hairlineWidth,
     },
     modalRowName: {
-        fontSize: ms(15),
+        fontSize: ms(17),
         flex: 1,
     },
     modalRowAmount: {
-        fontSize: ms(16),
+        fontSize: ms(17),
         letterSpacing: -0.4,
     },
 });

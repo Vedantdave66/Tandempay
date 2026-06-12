@@ -7,22 +7,22 @@ import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
 import { notificationsApi, NotificationOut } from '../services/api';
+import * as Haptics from 'expo-haptics';
 import { Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
+import { T } from '../utils/typography';
+import CharacterShape from '../components/CharacterShape';
 
-// ─── Icon colour map ──────────────────────────────────────────────────────────
-const TYPE_CONFIG: Record<string, { icon: any; color: string }> = {
-    expense_added:        { icon: Receipt,    color: '#A8D5A2' },
-    settlement_requested: { icon: Handshake,  color: '#818CF8' },
-    payment_sent:         { icon: Send,       color: '#F59E0B' },
-    payment_confirmed:    { icon: CheckCheck, color: '#A8D5A2' },
-    payment_declined:     { icon: ShieldAlert, color: '#E05252' },
-    friend_request:       { icon: UserPlus,   color: '#A8D5A2' },
-    friend_accepted:      { icon: Check,      color: '#A8D5A2' },
+// Icon per type; colour stays disciplined — green for confirmed money,
+// danger for declined, greyscale for everything else.
+const TYPE_ICONS: Record<string, any> = {
+    expense_added:        Receipt,
+    settlement_requested: Handshake,
+    payment_sent:         Send,
+    payment_confirmed:    CheckCheck,
+    payment_declined:     ShieldAlert,
+    friend_request:       UserPlus,
+    friend_accepted:      Check,
 };
-
-function getConfig(type: string) {
-    return TYPE_CONFIG[type] || { icon: Bell, color: '#888' };
-}
 
 // ─── Date grouping ────────────────────────────────────────────────────────────
 function getGroup(d: string): string {
@@ -75,8 +75,8 @@ export default function ActivityScreen({ navigation }: any) {
         try {
             const data = await notificationsApi.list();
             setNotifications(data || []);
-        } catch (err) {
-            console.log(err);
+        } catch {
+            // notifications unavailable — show empty state
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -95,12 +95,14 @@ export default function ActivityScreen({ navigation }: any) {
     }, [load]);
 
     const handleMarkAllRead = async () => {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
         await notificationsApi.markAllRead();
         setNotifications(prev => prev.map(n => ({ ...n, read: true })));
         clearUnread();
     };
 
     const handleTap = async (n: NotificationOut) => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         if (!n.read) {
             await notificationsApi.markRead(n.id);
             setNotifications(prev => prev.map(x => x.id === n.id ? { ...x, read: true } : x));
@@ -112,48 +114,48 @@ export default function ActivityScreen({ navigation }: any) {
     const hasUnread = notifications.some(n => !n.read);
     const rows = groupNotifications(notifications);
 
+    const iconTint = (type: string) => {
+        if (type === 'payment_confirmed') return colors.accent;
+        if (type === 'payment_declined')  return colors.danger;
+        return colors.secondaryText;
+    };
+
     const renderRow = ({ item }: { item: typeof rows[number] }) => {
         if (item.type === 'header') {
             return (
-                <Text style={[styles.groupLabel, { color: colors.secondaryText }]}>
+                <Text style={[styles.groupLabel, { color: colors.secondaryText }, T.semibold]}>
                     {item.label}
                 </Text>
             );
         }
 
         const n = item.data;
-        const cfg = getConfig(n.type);
-        const IconComp = cfg.icon;
+        const IconComp = TYPE_ICONS[n.type] ?? Bell;
 
         return (
             <TouchableOpacity
-                style={[
-                    styles.row,
-                    {
-                        backgroundColor: n.read
-                            ? colors.surface
-                            : (isDark ? `${cfg.color}12` : `${cfg.color}10`),
-                        borderLeftColor: n.read ? 'transparent' : cfg.color,
-                    },
-                ]}
+                style={[styles.row, { backgroundColor: colors.surface }]}
                 onPress={() => handleTap(n)}
-                activeOpacity={0.7}
+                activeOpacity={0.85}
             >
-                <View style={[styles.dot, { backgroundColor: cfg.color, opacity: n.read ? 0.3 : 1 }]} />
+                {!n.read
+                    ? <View style={[styles.dot, { backgroundColor: colors.accent }]} />
+                    : <View style={styles.dot} />
+                }
                 <View style={styles.rowBody}>
                     <View style={styles.rowTop}>
-                        <Text style={[styles.rowTitle, { color: n.read ? colors.secondaryText : colors.text }]}>
+                        <Text style={[styles.rowTitle, { color: colors.text }, n.read ? T.regular : T.semibold]}>
                             {n.title}
                         </Text>
-                        <Text style={[styles.rowTime, { color: colors.faintText }]}>
+                        <Text style={[styles.rowTime, { color: colors.faintText }, T.regular]}>
                             {timeAgo(n.created_at)}
                         </Text>
                     </View>
-                    <Text style={[styles.rowMsg, { color: colors.secondaryText }]} numberOfLines={2}>
+                    <Text style={[styles.rowMsg, { color: colors.secondaryText }, T.regular]} numberOfLines={2}>
                         {n.message}
                     </Text>
                 </View>
-                <IconComp size={16} color={cfg.color} style={{ opacity: n.read ? 0.4 : 1 }} />
+                <IconComp size={20} color={iconTint(n.type)} style={{ opacity: n.read ? 0.5 : 1 }} />
             </TouchableOpacity>
         );
     };
@@ -163,19 +165,16 @@ export default function ActivityScreen({ navigation }: any) {
             {/* Header */}
             <View style={styles.header}>
                 <View>
-                    <Text style={[styles.title, { color: colors.text }]}>Activity</Text>
-                    <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
+                    <Text style={[styles.title, { color: colors.text }, T.bold]}>Activity</Text>
+                    <Text style={[styles.subtitle, { color: colors.secondaryText }, T.regular]}>
                         {notifications.filter(n => !n.read).length > 0
                             ? `${notifications.filter(n => !n.read).length} unread`
                             : 'All caught up'}
                     </Text>
                 </View>
                 {hasUnread && (
-                    <TouchableOpacity
-                        onPress={handleMarkAllRead}
-                        style={[styles.markAllBtn, { backgroundColor: `${colors.accent}18` }]}
-                    >
-                        <Text style={[styles.markAllText, { color: colors.accent }]}>Mark all read</Text>
+                    <TouchableOpacity onPress={handleMarkAllRead} activeOpacity={0.75} style={styles.markAllBtn}>
+                        <Text style={[styles.markAllText, { color: colors.accent }, T.semibold]}>Mark all read</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -202,14 +201,14 @@ export default function ActivityScreen({ navigation }: any) {
                         />
                     }
                     ItemSeparatorComponent={() => (
-                        <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                        <View style={[styles.separator, { backgroundColor: isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)' }]} />
                     )}
                     ListEmptyComponent={
-                        <View style={[styles.empty, { backgroundColor: colors.surface }]}>
-                            <Bell color={colors.secondaryText} size={36} />
-                            <Text style={[styles.emptyTitle, { color: colors.text }]}>No activity yet</Text>
-                            <Text style={[styles.emptyText, { color: colors.secondaryText }]}>
-                                Notifications will appear here.
+                        <View style={styles.empty}>
+                            <CharacterShape shape="semi" color={colors.accent} variant="mini" />
+                            <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Quiet in here</Text>
+                            <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
+                                When your squads add expenses or settle up, you'll see it here first.
                             </Text>
                         </View>
                     }
@@ -224,27 +223,25 @@ const styles = StyleSheet.create({
     safe: { flex: 1 },
     header: {
         flexDirection: 'row',
-        alignItems: 'center',
+        alignItems: 'flex-end',
         justifyContent: 'space-between',
-        paddingHorizontal: scale(24),
-        paddingTop: vs(28),
+        paddingHorizontal: scale(20),
+        paddingTop: vs(16),
         paddingBottom: vs(16),
     },
-    title: { fontSize: ms(26), fontWeight: '700', letterSpacing: -0.3 },
-    subtitle: { fontSize: ms(13), marginTop: vs(3) },
+    title: { fontSize: ms(28), letterSpacing: -0.8 },
+    subtitle: { fontSize: ms(13), marginTop: vs(2) },
     markAllBtn: {
-        paddingHorizontal: scale(14),
         paddingVertical: vs(8),
-        borderRadius: ms(20),
+        paddingLeft: scale(12),
     },
-    markAllText: { fontSize: ms(13), fontWeight: '600' },
+    markAllText: { fontSize: ms(15) },
     divider: { height: StyleSheet.hairlineWidth, marginBottom: vs(8) },
     center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingBottom: vs(120) },
     groupLabel: {
-        fontSize: ms(11),
-        fontWeight: '700',
-        letterSpacing: 0.8,
+        fontSize: ms(13),
+        letterSpacing: 0.2,
         textTransform: 'uppercase',
         paddingHorizontal: scale(20),
         paddingTop: vs(20),
@@ -253,15 +250,15 @@ const styles = StyleSheet.create({
     row: {
         flexDirection: 'row',
         alignItems: 'center',
-        paddingVertical: vs(14),
+        paddingVertical: vs(12),
         paddingHorizontal: scale(20),
-        borderLeftWidth: 3,
-        gap: vs(12),
+        minHeight: vs(44),
+        gap: scale(12),
     },
     dot: {
-        width: 8,
-        height: 8,
-        borderRadius: ms(4),
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
         flexShrink: 0,
     },
     rowBody: { flex: 1 },
@@ -271,22 +268,16 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         marginBottom: vs(3),
     },
-    rowTitle: { fontSize: ms(14), fontWeight: '600', flex: 1, marginRight: scale(8) },
-    rowTime:  { fontSize: ms(11), fontWeight: '500' },
-    rowMsg:   { fontSize: ms(13), lineHeight: 18 },
-    separator: { height: StyleSheet.hairlineWidth, marginLeft: scale(44) },
+    rowTitle: { fontSize: ms(15), flex: 1, marginRight: scale(8) },
+    rowTime:  { fontSize: ms(12) },
+    rowMsg:   { fontSize: ms(14), lineHeight: 19 },
+    separator: { height: StyleSheet.hairlineWidth, marginLeft: scale(40) },
     empty: {
-        margin: scale(24),
-        padding: scale(40),
-        borderRadius: ms(20),
         alignItems: 'center',
-        gap: vs(10),
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 8,
-        elevation: 2,
+        paddingTop: vs(64),
+        paddingHorizontal: scale(40),
+        gap: vs(8),
     },
-    emptyTitle: { fontSize: ms(16), fontWeight: '700' },
-    emptyText: { fontSize: ms(13), textAlign: 'center' },
+    emptyTitle: { fontSize: ms(17), marginTop: vs(8) },
+    emptyText: { fontSize: ms(15), textAlign: 'center', lineHeight: 21 },
 });
