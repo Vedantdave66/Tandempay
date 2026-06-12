@@ -39,8 +39,7 @@ export default function RecurringScreen({ navigation }: any) {
 
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [frequency, setFrequency] = useState<'weekly' | 'biweekly' | 'monthly'>('monthly');
-    const [startDate, setStartDate] = useState(new Date().toISOString().split('T')[0]);
+    const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly');
     const [groupId, setGroupId] = useState<string | null>(null);
     const [groups, setGroups] = useState<GroupListItem[]>([]);
 
@@ -73,7 +72,6 @@ export default function RecurringScreen({ navigation }: any) {
         setDescription('');
         setAmount('');
         setFrequency('monthly');
-        setStartDate(new Date().toISOString().split('T')[0]);
         setGroupId(null);
     };
 
@@ -88,10 +86,11 @@ export default function RecurringScreen({ navigation }: any) {
             return;
         }
 
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || isNaN(Date.parse(startDate))) {
-            Alert.alert('Invalid date', 'Enter a start date in YYYY-MM-DD format.');
-            return;
-        }
+        const today = new Date();
+        const next = new Date(today);
+        if (frequency === 'weekly') next.setDate(today.getDate() + 7);
+        else next.setMonth(today.getMonth() + 1);
+        const nextRunDate = next.toISOString().split('T')[0];
 
         setSubmitting(true);
         try {
@@ -99,7 +98,7 @@ export default function RecurringScreen({ navigation }: any) {
                 description: description.trim(),
                 amount: parsedAmount,
                 frequency,
-                next_run_date: startDate,
+                next_run_date: nextRunDate,
                 ...(groupId ? { group_id: groupId } : {}),
             });
             setShowForm(false);
@@ -248,7 +247,7 @@ export default function RecurringScreen({ navigation }: any) {
 
                         <Text style={[styles.fieldLabel, { color: colors.secondaryText }, T.semibold]}>FREQUENCY</Text>
                         <View style={styles.toggleRow}>
-                            {(['weekly', 'biweekly', 'monthly'] as const).map(f => (
+                            {(['weekly', 'monthly'] as const).map(f => (
                                 <TouchableOpacity
                                     key={f}
                                     style={[
@@ -264,21 +263,11 @@ export default function RecurringScreen({ navigation }: any) {
                                         { color: frequency === f ? '#1A1A1A' : colors.secondaryText },
                                         T.semibold,
                                     ]}>
-                                        {f === 'biweekly' ? 'Biweekly' : f.charAt(0).toUpperCase() + f.slice(1)}
+                                        {f.charAt(0).toUpperCase() + f.slice(1)}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
-
-                        <Text style={[styles.fieldLabel, { color: colors.secondaryText }, T.semibold]}>START DATE</Text>
-                        <TextInput
-                            style={[styles.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
-                            placeholder="YYYY-MM-DD"
-                            placeholderTextColor={colors.secondaryText}
-                            value={startDate}
-                            onChangeText={setStartDate}
-                            keyboardType="numeric"
-                        />
 
                         {groups.length > 0 && (
                             <>
