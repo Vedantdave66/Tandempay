@@ -365,6 +365,7 @@ export interface ParsedReceiptItem {
     id: string;
     name: string;
     price: number;
+    is_discount?: boolean;
 }
 
 export interface ReceiptParseResponse {
@@ -375,6 +376,7 @@ export interface ReceiptParseResponse {
     tip_detected: number;
     total: number;
     currency: string;
+    merchant?: string;
 }
 
 export const receiptsApi = {

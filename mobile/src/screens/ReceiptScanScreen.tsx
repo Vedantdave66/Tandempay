@@ -55,6 +55,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
   const [parseResult, setParseResult] = useState<{
     items: ParsedReceiptItem[]; subtotal: number; tax: number;
     tax_rate: number; tip_detected: number; total: number; currency: string;
+    merchant?: string;
   } | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
 
@@ -206,8 +207,10 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
       const participantIds = allMembers.map(m => m.user_id === 'me' ? user.id : m.user_id);
+      const merchant = parseResult.merchant;
+      const title = merchant && merchant !== 'Receipt' ? merchant : 'Shared Receipt';
       await expensesApi.create(groupId, {
-        title: 'Shared Receipt',
+        title,
         amount: parseResult.total,
         paid_by: user.id,
         participant_ids: participantIds,
@@ -495,11 +498,18 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
         </View>
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.resultScroll}>
-          {/* Total */}
+          {/* Merchant + Total */}
           <View style={{ marginBottom: vs(18) }}>
-            <Text style={[styles.receiptLabel, T.regular, { color: colors.secondaryText }]}>
-              RECEIPT TOTAL
-            </Text>
+            {parseResult?.merchant && parseResult.merchant !== 'Receipt' && (
+              <Text style={[styles.receiptLabel, T.regular, { color: colors.secondaryText }]}>
+                {parseResult.merchant.toUpperCase()}
+              </Text>
+            )}
+            {(!parseResult?.merchant || parseResult.merchant === 'Receipt') && (
+              <Text style={[styles.receiptLabel, T.regular, { color: colors.secondaryText }]}>
+                RECEIPT TOTAL
+              </Text>
+            )}
             <Text style={[styles.receiptTotal, T.extrabold, { color: colors.text }]}>
               ${parseResult?.total.toFixed(2)}
               <Text style={[{ fontSize: ms(15), color: colors.secondaryText }, T.semibold]}>
@@ -566,13 +576,46 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
                   No individual items detected — using total only.
                 </Text>
               ) : (parseResult?.items ?? []).map(item => {
-                const isClaimed = claimed.has(item.id);
+                const isDiscount = item.price < 0 || item.is_discount === true;
+                const isTaxLine  = /\b(tax|hst|gst|tip|gratuity)\b/i.test(item.name);
+                const isClaimed  = claimed.has(item.id);
+                const claimable  = !isDiscount && !isTaxLine;
+
+                if (isDiscount) {
+                  return (
+                    <View key={item.id} style={[styles.itemRow, { borderBottomColor: colors.border }]}>
+                      <View style={styles.itemCheckPlaceholder} />
+                      <Text style={[styles.itemName, T.regular, { color: colors.faintText, flex: 1 }]} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      <Text style={[styles.itemPrice, T.semibold, { color: '#F59E0B' }]}>
+                        −${Math.abs(item.price).toFixed(2)}
+                      </Text>
+                    </View>
+                  );
+                }
+
+                if (isTaxLine) {
+                  return (
+                    <View key={item.id} style={[styles.itemRow, { borderBottomColor: colors.border }]}>
+                      <View style={styles.itemCheckPlaceholder} />
+                      <Text style={[{ fontSize: ms(13), color: colors.faintText, flex: 1 }, T.regular]} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      <Text style={[{ fontSize: ms(13), color: colors.faintText }, T.regular]}>
+                        ${item.price.toFixed(2)}
+                      </Text>
+                    </View>
+                  );
+                }
+
                 return (
                   <TouchableOpacity
                     key={item.id}
                     style={[styles.itemRow, { borderBottomColor: colors.border }]}
                     activeOpacity={0.7}
                     onPress={() => {
+                      if (!claimable) return;
                       Haptics.selectionAsync();
                       setClaimed(prev => {
                         const next = new Set(prev);
@@ -724,7 +767,8 @@ const styles = StyleSheet.create({
   customizeLabel: { fontSize: ms(14) },
   itemsList:     { borderWidth: StyleSheet.hairlineWidth, borderRadius: ms(14), overflow: 'hidden', marginBottom: vs(4) },
   itemRow:       { flexDirection: 'row', alignItems: 'center', gap: scale(12), padding: scale(13), borderBottomWidth: StyleSheet.hairlineWidth, minHeight: scale(48) },
-  itemCheck:     { width: scale(22), height: scale(22), borderRadius: scale(11), borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  itemCheck:            { width: scale(22), height: scale(22), borderRadius: scale(11), borderWidth: 1.5, alignItems: 'center', justifyContent: 'center', flexShrink: 0 },
+  itemCheckPlaceholder: { width: scale(22), flexShrink: 0 },
   itemName:      { fontSize: ms(14) },
   itemPrice:     { fontSize: ms(14), letterSpacing: -0.2 },
   myShareRow:    { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: scale(14) },

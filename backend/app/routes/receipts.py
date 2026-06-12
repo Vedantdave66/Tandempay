@@ -1,5 +1,6 @@
 import base64
 import json
+import re
 import httpx
 import os
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,35 +18,39 @@ GEMINI_URL = (
     "gemini-2.5-flash:generateContent"
 )
 
-PROMPT = """You are a receipt parser. Extract line items and totals from this receipt image.
+PROMPT = """You are a receipt parser. Extract every single line item from this receipt exactly as it appears — do not skip, filter, or summarise anything.
 
-Return ONLY valid JSON — no markdown, no explanation:
-{
-  "items": [
-    {"id": "1", "name": "Item name", "price": 12.50}
-  ],
-  "subtotal": 59.50,
-  "tax": 7.74,
-  "tax_rate": 0.13,
-  "tip_detected": 0.00,
-  "total": 67.24,
-  "currency": "CAD"
+RULES:
+- Include ALL lines: food, drinks, discounts, modifications, tax, tip, gratuity, promotions, service charges, rounding adjustments — everything.
+- Negative prices are valid — keep them exactly as negative numbers.
+- Prices may have $ symbols or not — strip any currency symbol and return a plain decimal number either way (e.g. $5.99 → 5.99, 5.99 → 5.99).
+- If a price is truly unreadable, use 0.0.
+- For total: use TOTAL DUE or ROUNDED TOTAL if present, otherwise the largest total shown.
+- item name: use the exact text from the receipt, cleaned up for readability (expand obvious abbreviations if clear, e.g. 'REG-CAESAR.SALAD' → 'Caesar Salad').
+- Merchant: restaurant or store name from the header. Use 'Receipt' if not visible.
+- is_discount: set to true when price is negative or the item is clearly a discount, promotion, or promo line.
+- Do not wrap in markdown or add explanations. Pure JSON only."""
+
+_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "merchant": {"type": "string"},
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "name": {"type": "string"},
+                    "price": {"type": "number"},
+                    "is_discount": {"type": "boolean"},
+                },
+                "required": ["name", "price"],
+            },
+        },
+        "total": {"type": "number"},
+    },
+    "required": ["items", "total"],
 }
-
-Rules:
-- items: food/product lines only — exclude subtotal, tax, tip, total, discounts
-- Ignore any line items with negative prices — these are discounts or modifications, not real items
-- Ignore TAX, PROMO, and TIP lines — extract food and drink items only
-- Combine quantity into name: "Garlic Naan x2" not two separate lines
-- price: line total (quantity × unit price)
-- subtotal: sum of items before tax/tip
-- tax: actual dollar amount from the receipt
-- tax_rate: tax / subtotal to 4 decimal places; use 0.13 if unreadable
-- tip_detected: tip amount if on receipt, else 0
-- total: use TOTAL DUE or ROUNDED TOTAL if present, never SUBTOTAL
-- currency: "CAD" if Canadian or ambiguous, else "USD"
-- Estimate illegible values from context
-- Always return all fields"""
 
 
 class ParseReceiptRequest(BaseModel):
@@ -56,16 +61,18 @@ class ParsedItem(BaseModel):
     id: str
     name: str
     price: float
+    is_discount: bool = False
 
 
 class ReceiptParseResponse(BaseModel):
     items: List[ParsedItem]
-    subtotal: float
-    tax: float
-    tax_rate: float
-    tip_detected: float
+    subtotal: float = 0.0
+    tax: float = 0.0
+    tax_rate: float = 0.13
+    tip_detected: float = 0.0
     total: float
-    currency: str
+    currency: str = "CAD"
+    merchant: str = "Receipt"
 
 
 @router.post("/parse", response_model=ReceiptParseResponse)
@@ -106,6 +113,7 @@ async def parse_receipt(
             "temperature": 0.1,
             "maxOutputTokens": 1024,
             "response_mime_type": "application/json",
+            "response_schema": _RESPONSE_SCHEMA,
         },
     }
 
@@ -128,6 +136,11 @@ async def parse_receipt(
                 raw = raw[4:]
         raw = raw.strip()
 
+        # Sanitise currency symbols Gemini may embed in JSON values
+        raw = re.sub(r':\s*-\$?([\d.]+)', r': -\1', raw)       # negative: -$5.99 → -5.99
+        raw = re.sub(r':\s*"\$?([\d.]+)"', r': \1', raw)        # quoted:  "$5.99" → 5.99
+        raw = re.sub(r':\s*\$?([\d.]+)', r': \1', raw)          # unquoted: $5.99  → 5.99
+
         data = json.loads(raw)
 
     except json.JSONDecodeError as e:
@@ -139,11 +152,17 @@ async def parse_receipt(
 
     items = []
     for i, item in enumerate(data.get("items", []), start=1):
+        price = float(item.get("price", 0))
+        is_discount = bool(item.get("is_discount", False)) or price < 0
         items.append(ParsedItem(
             id=str(item.get("id", i)),
             name=str(item.get("name", "Item")),
-            price=float(item.get("price", 0)),
+            price=price,
+            is_discount=is_discount,
         ))
+
+    raw_merchant = str(data.get("merchant", "")).strip()
+    merchant = raw_merchant if raw_merchant and raw_merchant != "Receipt" else "Receipt"
 
     return ReceiptParseResponse(
         items=items,
@@ -153,4 +172,5 @@ async def parse_receipt(
         tip_detected=float(data.get("tip_detected", 0)),
         total=float(data.get("total", 0)),
         currency=str(data.get("currency", "CAD")),
+        merchant=merchant,
     )
