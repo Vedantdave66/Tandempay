@@ -8,10 +8,12 @@ import {
     Easing,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import { useTheme } from '../context/ThemeContext';
+import { ACCENT_PRESETS } from '../constants/Colors';
 import Logo from '../components/Logo';
 import CharacterShape from '../components/CharacterShape';
 
@@ -20,25 +22,27 @@ interface OnboardingCharacter {
     character_color: string;
 }
 
-// Background crew — loose scatter across the screen. Shapes use the valid
-// CharacterShape set (rect/tall/semi/round); duration stagger keeps the
-// breathing out of sync.
+// Background texture, not content: five characters at whisper opacity,
+// barely breathing. Colors come from the accent presets so they always
+// belong to the brand palette in both modes.
 const FLOATERS = [
-    { shape: 'round', color: '#16A34A', duration: 1600, pos: { top: '12%', left: '8%' } },
-    { shape: 'rect',  color: '#3B82F6', duration: 1750, pos: { top: '15%', right: '10%' } },
-    { shape: 'semi',  color: '#F59E0B', duration: 1900, pos: { top: '44%', left: '6%' } },
-    { shape: 'tall',  color: '#EC4899', duration: 2050, pos: { top: '47%', right: '8%' } },
-    { shape: 'round', color: '#8B5CF6', duration: 2200, pos: { bottom: '20%', alignSelf: 'center' } },
+    { key: 'forest', shape: 'round', size: 1.25, duration: 1800, pos: { top: '14%', left: '8%' } },
+    { key: 'ocean',  shape: 'rect',  size: 1.0,  duration: 2400, pos: { top: '17%', right: '10%' } },
+    { key: 'sunset', shape: 'semi',  size: 1.0,  duration: 2000, pos: { top: '46%', left: '6%' } },
+    { key: 'candy',  shape: 'tall',  size: 1.0,  duration: 2200, pos: { top: '44%', right: '9%' } },
+    { key: 'grape',  shape: 'round', size: 1.25, duration: 1900, pos: { bottom: '26%', alignSelf: 'center' } },
 ] as const;
 
-function FloatingCharacter({ shape, color, duration, pos }: {
-    shape: string; color: string; duration: number; pos: object;
+function FloatingCharacter({ shape, color, size, duration, opacity, pos }: {
+    shape: string; color: string; size: number; duration: number; opacity: number; pos: object;
 }) {
     const breath = useRef(new Animated.Value(1)).current;
+    const fade = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
+        Animated.timing(fade, { toValue: 1, duration: 600, easing: Easing.out(Easing.ease), useNativeDriver: true }).start();
         const loop = Animated.loop(Animated.sequence([
-            Animated.timing(breath, { toValue: 1.06, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            Animated.timing(breath, { toValue: 1.03, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
             Animated.timing(breath, { toValue: 1.0, duration, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
         ]));
         loop.start();
@@ -49,9 +53,11 @@ function FloatingCharacter({ shape, color, duration, pos }: {
     return (
         <Animated.View
             pointerEvents="none"
-            style={[{ position: 'absolute', opacity: 0.7, transform: [{ scale: breath }] }, pos]}
+            style={[{ position: 'absolute', opacity: Animated.multiply(fade, opacity), transform: [{ scale: breath }] }, pos]}
         >
-            <CharacterShape variant="card" shape={shape} color={color} eyeStyle="ball" />
+            <View style={{ transform: [{ scale: size }] }}>
+                <CharacterShape variant="card" shape={shape} color={color} eyeStyle="ball" />
+            </View>
         </Animated.View>
     );
 }
@@ -62,14 +68,11 @@ export default function LandingScreen({ navigation }: any) {
 
     const [onboardingChar, setOnboardingChar] = useState<OnboardingCharacter | null>(null);
 
-    // Sequential entry: logo → hero → sub → CTAs
+    // One spring per element, staggered 80ms apart: logo, hero, sub, CTAs
     const logoAnim = useRef(new Animated.Value(0)).current;
     const heroAnim = useRef(new Animated.Value(0)).current;
     const subAnim  = useRef(new Animated.Value(0)).current;
     const ctaAnim  = useRef(new Animated.Value(0)).current;
-
-    // The picked character breathes while it waits for you
-    const breathAnim = useRef(new Animated.Value(1)).current;
 
     useEffect(() => {
         AsyncStorage.getItem('@onboarding_character')
@@ -84,105 +87,62 @@ export default function LandingScreen({ navigation }: any) {
     }, []);
 
     useEffect(() => {
+        const spring = (v: Animated.Value) =>
+            Animated.spring(v, { toValue: 1, damping: 26, stiffness: 200, useNativeDriver: true });
         Animated.parallel([
-            Animated.timing(logoAnim, { toValue: 1, duration: 320, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            Animated.sequence([
-                Animated.delay(400),
-                Animated.timing(heroAnim, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            ]),
-            Animated.sequence([
-                Animated.delay(740),
-                Animated.timing(subAnim, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            ]),
-            Animated.sequence([
-                Animated.delay(1020),
-                Animated.timing(ctaAnim, { toValue: 1, duration: 200, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-            ]),
+            spring(logoAnim),
+            Animated.sequence([Animated.delay(80), spring(heroAnim)]),
+            Animated.sequence([Animated.delay(160), spring(subAnim)]),
+            Animated.sequence([Animated.delay(240), spring(ctaAnim)]),
         ]).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
-    useEffect(() => {
-        if (!onboardingChar) return;
-        const loop = Animated.loop(Animated.sequence([
-            Animated.timing(breathAnim, { toValue: 1.04, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            Animated.timing(breathAnim, { toValue: 1.0, duration: 1800, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-        ]));
-        loop.start();
-        return () => loop.stop();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [onboardingChar]);
+    const rise = (v: Animated.Value) => ({
+        opacity: v,
+        transform: [{ translateY: v.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
+    });
 
     const handleGetStarted = () => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         navigation.navigate('Register', onboardingChar ?? {});
+    };
+
+    const handleLogin = () => {
+        Haptics.selectionAsync();
+        navigation.navigate('Login');
     };
 
     return (
         <View style={{ flex: 1, backgroundColor: colors.background }}>
-            {/* Floating background crew */}
             {FLOATERS.map(f => (
-                <FloatingCharacter key={f.color} shape={f.shape} color={f.color} duration={f.duration} pos={f.pos} />
+                <FloatingCharacter
+                    key={f.key}
+                    shape={f.shape}
+                    color={ACCENT_PRESETS[f.key][isDark ? 'dark' : 'light']}
+                    size={f.size}
+                    duration={f.duration}
+                    opacity={isDark ? 0.18 : 0.12}
+                    pos={f.pos}
+                />
             ))}
 
-            {/* Legibility overlay */}
-            <View
-                pointerEvents="none"
-                style={[StyleSheet.absoluteFillObject, { backgroundColor: isDark ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.3)' }]}
-            />
-
-            <View style={[styles.content, { paddingTop: insets.top + vs(72), paddingBottom: insets.bottom + vs(36) }]}>
-                {/* Logo wordmark */}
-                <Animated.View
-                    style={{
-                        opacity: logoAnim,
-                        transform: [{ scale: logoAnim.interpolate({ inputRange: [0, 1], outputRange: [0.8, 1] }) }],
-                    }}
-                >
-                    <Logo size={26} />
+            <View style={styles.content}>
+                <Animated.View style={[{ marginTop: insets.top + vs(24), alignItems: 'center' }, { opacity: logoAnim }]}>
+                    <Logo size={ms(24)} />
                 </Animated.View>
 
                 <View style={styles.heroBlock}>
-                    {/* Your character, waiting for you */}
-                    {onboardingChar && (
-                        <Animated.View
-                            style={{
-                                opacity: heroAnim,
-                                transform: [{ scale: breathAnim }],
-                                marginBottom: vs(20),
-                                alignItems: 'center',
-                            }}
-                        >
-                            <CharacterShape
-                                variant="card"
-                                shape={onboardingChar.character_shape}
-                                color={onboardingChar.character_color}
-                                eyeStyle="ball"
-                            />
-                        </Animated.View>
-                    )}
-
-                    <Animated.Text
-                        style={[styles.hero, T.extrabold, {
-                            opacity: heroAnim,
-                            transform: [{ translateY: heroAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }],
-                        }]}
-                    >
+                    <Animated.Text style={[styles.hero, T.extrabold, { color: colors.text }, rise(heroAnim)]}>
                         Split bills.{'\n'}Settle free.
                     </Animated.Text>
-
-                    <Animated.Text style={[styles.subtext, T.regular, { opacity: subAnim }]}>
-                        Free Interac settlement for{'\n'}Canadian roommates 🇨🇦
+                    <Animated.Text style={[styles.subtext, T.regular, { color: colors.faintText }, rise(subAnim)]}>
+                        Free Interac settlement for Canadian roommates.
                     </Animated.Text>
                 </View>
 
                 <Animated.View
-                    style={{
-                        width: '100%',
-                        alignItems: 'center',
-                        gap: vs(18),
-                        opacity: ctaAnim,
-                        transform: [{ translateY: ctaAnim.interpolate({ inputRange: [0, 1], outputRange: [16, 0] }) }],
-                    }}
+                    style={[styles.ctaBlock, { marginBottom: insets.bottom + vs(32) }, rise(ctaAnim)]}
                 >
                     <TouchableOpacity
                         style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
@@ -192,8 +152,10 @@ export default function LandingScreen({ navigation }: any) {
                         <Text style={[styles.ctaText, T.semibold]}>Get Started</Text>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => navigation.navigate('Login')} activeOpacity={0.7}>
-                        <Text style={[styles.loginLink, T.semibold]}>Log In</Text>
+                    <TouchableOpacity onPress={handleLogin} activeOpacity={0.7}>
+                        <Text style={[styles.loginLink, T.semibold, { color: colors.accent }]}>
+                            I already have an account
+                        </Text>
                     </TouchableOpacity>
                 </Animated.View>
             </View>
@@ -204,7 +166,6 @@ export default function LandingScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     content: {
         flex: 1,
-        alignItems: 'center',
         justifyContent: 'space-between',
         paddingHorizontal: scale(28),
     },
@@ -212,31 +173,38 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     hero: {
-        fontSize: ms(40),
-        letterSpacing: -1.6,
-        lineHeight: ms(46),
+        fontSize: ms(44),
+        letterSpacing: -2.0,
+        lineHeight: ms(50),
         textAlign: 'center',
-        color: '#FFFFFF',
-        marginBottom: vs(14),
+        marginHorizontal: scale(32),
+        marginBottom: vs(12),
     },
     subtext: {
-        fontSize: ms(15),
-        lineHeight: ms(22),
+        fontSize: ms(16),
+        letterSpacing: -0.3,
+        lineHeight: ms(16) * 1.5,
         textAlign: 'center',
-        color: 'rgba(255,255,255,0.75)',
+        marginHorizontal: scale(40),
+    },
+    ctaBlock: {
+        width: '100%',
+        alignItems: 'center',
+        gap: vs(12),
     },
     ctaBtn: {
         width: '100%',
-        borderRadius: 99,
-        paddingVertical: vs(16),
+        height: scale(56),
+        borderRadius: ms(14),
         alignItems: 'center',
+        justifyContent: 'center',
     },
     ctaText: {
         color: '#FFFFFF',
-        fontSize: ms(16),
+        fontSize: ms(17),
     },
     loginLink: {
-        fontSize: ms(15),
-        color: 'rgba(255,255,255,0.65)',
+        fontSize: ms(16),
+        paddingVertical: vs(8),
     },
 });

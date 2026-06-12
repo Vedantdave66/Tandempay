@@ -9,76 +9,69 @@ import {
     Easing,
     Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Check } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
+import { ACCENT_PRESETS } from '../constants/Colors';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 
 const { width: SCREEN_W } = Dimensions.get('window');
 
-// Same crew as CanvasModeView's demo mode — the story stays consistent
-// from onboarding through the landing canvas
-const CREW = [
-    { shape: 'rect',  color: '#16A34A', nickname: 'V', arcY: 18 },
-    { shape: 'tall',  color: '#3B82F6', nickname: 'S', arcY: 2 },
-    { shape: 'semi',  color: '#F59E0B', nickname: 'M', arcY: -12 },
-    { shape: 'round', color: '#EC4899', nickname: 'A', arcY: 2 },
-    { shape: 'semi',  color: '#8B5CF6', nickname: 'J', arcY: 18 },
+const SLIDE_COUNT = 3;
+
+// Mirrors CharacterSetupModal so the picked shape carries straight through
+// to the post-registration setup
+const SHAPES = ['rect', 'tall', 'semi', 'round'] as const;
+
+// Accent preset brand colors plus two neutrals. Light variants are stored:
+// they read correctly on both light and dark surfaces.
+const COLOR_PALETTE = [
+    { hex: '#16A34A', name: 'Green' },
+    { hex: '#2563EB', name: 'Blue' },
+    { hex: '#EA580C', name: 'Orange' },
+    { hex: '#DB2777', name: 'Pink' },
+    { hex: '#7C3AED', name: 'Purple' },
+    { hex: '#475569', name: 'Slate' },
+    { hex: '#94A3B8', name: 'Silver' },
+    { hex: '#1E293B', name: 'Charcoal' },
 ] as const;
 
-// Mirrors CharacterSetupModal exactly so the picked character carries
-// straight through to the post-registration setup
-const SHAPES = ['rect', 'tall', 'semi', 'round'] as const;
-const COLOR_PALETTE = [
-    '#3ECF8E', '#6366F1', '#F59E0B', '#EF4444',
-    '#EC4899', '#8B5CF6', '#14B8A6', '#F97316',
-];
+// ── Progress dot — active dot stretches into a pill ───────────────────────────
 
-const SLIDE_COUNT = 4;
-
-// ── Slide 1 — crew arc with staggered entrance ────────────────────────────────
-
-function CrewArc({ textColor }: { textColor: string }) {
-    const anims = useRef(CREW.map(() => new Animated.Value(0))).current;
+function Dot({ active, activeColor, inactiveColor }: {
+    active: boolean; activeColor: string; inactiveColor: string;
+}) {
+    const width = useRef(new Animated.Value(active ? scale(18) : scale(6))).current;
 
     useEffect(() => {
-        Animated.stagger(40, anims.map(a =>
-            Animated.timing(a, { toValue: 1, duration: 280, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        )).start();
+        Animated.spring(width, {
+            toValue: active ? scale(18) : scale(6),
+            damping: 26,
+            stiffness: 200,
+            useNativeDriver: false,
+        }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, []);
+    }, [active]);
 
     return (
-        <View style={styles.arcRow}>
-            {CREW.map((c, i) => (
-                <Animated.View
-                    key={c.nickname}
-                    style={{
-                        alignItems: 'center',
-                        opacity: anims[i],
-                        transform: [
-                            { translateY: Animated.add(anims[i].interpolate({ inputRange: [0, 1], outputRange: [16, 0] }), new Animated.Value(c.arcY)) },
-                        ],
-                    }}
-                >
-                    <View style={styles.arcCharWrap}>
-                        <CharacterShape variant="card" shape={c.shape} color={c.color} eyeStyle="ball" />
-                    </View>
-                    <Text style={[styles.arcNickname, { color: textColor }, T.semibold]}>{c.nickname}</Text>
-                </Animated.View>
-            ))}
-        </View>
+        <Animated.View
+            style={{
+                width,
+                height: scale(6),
+                borderRadius: scale(3),
+                backgroundColor: active ? activeColor : inactiveColor,
+            }}
+        />
     );
 }
 
-// ── Slide 3 — animated settle arrow ───────────────────────────────────────────
+// ── Slide 2 — settle arrow, a quiet nudge to the right ────────────────────────
 
-function SettleArrow() {
+function SettleArrow({ color }: { color: string }) {
     const slide = useRef(new Animated.Value(0)).current;
 
     useEffect(() => {
@@ -92,13 +85,27 @@ function SettleArrow() {
     }, []);
 
     return (
-        <Animated.Text
-            style={[styles.settleArrow, T.extrabold, {
-                transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 8] }) }],
-            }]}
+        <Animated.View
+            style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                transform: [{ translateX: slide.interpolate({ inputRange: [0, 1], outputRange: [0, 6] }) }],
+            }}
         >
-            →
-        </Animated.Text>
+            <View style={{ width: scale(32), height: StyleSheet.hairlineWidth * 2, backgroundColor: color }} />
+            <View
+                style={{
+                    width: 0,
+                    height: 0,
+                    borderTopWidth: scale(4),
+                    borderBottomWidth: scale(4),
+                    borderLeftWidth: scale(6),
+                    borderTopColor: 'transparent',
+                    borderBottomColor: 'transparent',
+                    borderLeftColor: color,
+                }}
+            />
+        </Animated.View>
     );
 }
 
@@ -110,16 +117,23 @@ export default function OnboardingScreen({ navigation }: any) {
     const listRef = useRef<FlatList>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
-    const [selectedShape, setSelectedShape] = useState<typeof SHAPES[number]>('semi');
-    const [selectedColor, setSelectedColor] = useState<string>(colors.accent);
+    const [selectedShape, setSelectedShape] = useState<typeof SHAPES[number]>('round');
+    const [selectedColor, setSelectedColor] = useState<string>(COLOR_PALETTE[0].hex);
 
-    // Scale pop on the big preview whenever the selection changes
+    const mode = isDark ? 'dark' : 'light';
+    const crewColors = {
+        forest: ACCENT_PRESETS.forest[mode],
+        ocean: ACCENT_PRESETS.ocean[mode],
+        sunset: ACCENT_PRESETS.sunset[mode],
+    };
+
+    // Spring pop on the preview whenever the selection changes
     const popAnim = useRef(new Animated.Value(1)).current;
     const firstRender = useRef(true);
     useEffect(() => {
         if (firstRender.current) { firstRender.current = false; return; }
-        popAnim.setValue(0.88);
-        Animated.spring(popAnim, { toValue: 1, damping: 15, stiffness: 300, useNativeDriver: true }).start();
+        popAnim.setValue(0.9);
+        Animated.spring(popAnim, { toValue: 1, damping: 14, stiffness: 280, useNativeDriver: true }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedShape, selectedColor]);
 
@@ -129,10 +143,11 @@ export default function OnboardingScreen({ navigation }: any) {
     const viewConfig = useRef({ viewAreaCoveragePercentThreshold: 50 }).current;
 
     const skipToPicker = () => {
+        Haptics.selectionAsync();
         listRef.current?.scrollToIndex({ index: SLIDE_COUNT - 1 });
     };
 
-    const handleLetsGo = async () => {
+    const handleContinue = async () => {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
             await AsyncStorage.multiSet([
@@ -145,115 +160,110 @@ export default function OnboardingScreen({ navigation }: any) {
         navigation.replace('Landing');
     };
 
-    const renderSlide = ({ item: index }: { item: number }) => {
-        // ── Slide 1: Your bills, handled ──
-        if (index === 0) {
-            return (
-                <View style={{ width: SCREEN_W, flex: 1 }}>
-                    <LinearGradient colors={colors.heroGradient} style={StyleSheet.absoluteFillObject} />
-                    <View style={[styles.slideInner, { paddingTop: insets.top + vs(60) }]}>
-                        <CrewArc textColor={colors.text} />
-                        <Text style={[styles.headline, { color: colors.text }, T.extrabold]}>
-                            Your bills,{'\n'}handled.
-                        </Text>
-                        <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                            Add expenses, split fairly, settle{'\n'}for free. Built for Canadian roommates.
-                        </Text>
-                    </View>
-                </View>
-            );
-        }
+    const selectedColorName = COLOR_PALETTE.find(c => c.hex === selectedColor)?.name ?? '';
 
-        // ── Slide 2: Your crew. Your way ──
-        if (index === 1) {
-            const crewRow = [
-                { ...CREW[0], chip: '🦁 Vedant', balance: '+$34', owed: true },
-                { ...CREW[1], chip: '🌊 Sarah',  balance: '−$21', owed: false },
-                { ...CREW[2], chip: '🌅 Mike',   balance: '+$12', owed: true },
+    const renderSlide = ({ item: index }: { item: number }) => {
+        // ── Slide 1: Split anything, instantly ──
+        if (index === 0) {
+            const crew = [
+                { shape: 'rect', color: crewColors.forest, name: 'Vedant' },
+                { shape: 'semi', color: crewColors.ocean, name: 'Sarah' },
+                { shape: 'round', color: crewColors.sunset, name: 'Mike' },
             ];
             return (
-                <View style={{ width: SCREEN_W, flex: 1, backgroundColor: colors.background }}>
-                    <View style={[styles.slideInner, { paddingTop: insets.top + vs(60) }]}>
+                <View style={[styles.slide, { backgroundColor: colors.background }]}>
+                    <View style={styles.visualBlock}>
                         <View style={styles.crewRow}>
-                            {crewRow.map(c => (
-                                <View key={c.chip} style={{ alignItems: 'center', gap: vs(8) }}>
-                                    <View style={[styles.nicknameChip, { backgroundColor: colors.accentBg }]}>
-                                        <Text style={[styles.nicknameChipText, { color: colors.accent }, T.semibold]}>{c.chip}</Text>
-                                    </View>
-                                    <View style={styles.arcCharWrap}>
+                            {crew.map(c => (
+                                <View key={c.name} style={styles.crewCol}>
+                                    <View style={styles.crewCharWrap}>
                                         <CharacterShape variant="card" shape={c.shape} color={c.color} eyeStyle="ball" />
                                     </View>
-                                    <Text style={[styles.balanceLabel, { color: c.owed ? colors.accent : '#F59E0B' }, T.bold]}>
-                                        {c.balance}
-                                    </Text>
+                                    <View style={[styles.nameChip, { backgroundColor: colors.accentBg }]}>
+                                        <Text style={[styles.nameChipText, T.semibold, { color: colors.accent }]}>{c.name}</Text>
+                                    </View>
                                 </View>
                             ))}
                         </View>
-                        <View style={[styles.expenseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Text style={[styles.expenseCardText, { color: colors.text }, T.semibold]}>
-                                🍕 Pizza Night · Split 3 ways · $48.00
+                        <View style={[styles.expenseRow, { backgroundColor: colors.surface }]}>
+                            <Text style={[styles.expenseName, T.semibold, { color: colors.text }]}>Pizza Night</Text>
+                            <Text style={[styles.expenseAmount, T.semibold, { color: colors.accent }]}>$48.00</Text>
+                        </View>
+                    </View>
+                    <View style={styles.textBlock}>
+                        <Text style={[styles.headline, T.extrabold, { color: colors.text }]}>
+                            Split anything,{'\n'}instantly.
+                        </Text>
+                        <Text style={[styles.sub, T.regular, { color: colors.faintText }]}>
+                            Add an expense in seconds.{'\n'}Everyone sees their share.
+                        </Text>
+                    </View>
+                </View>
+            );
+        }
+
+        // ── Slide 2: Settle free. Every time ──
+        if (index === 1) {
+            return (
+                <View style={[styles.slide, { backgroundColor: colors.background }]}>
+                    <View style={styles.visualBlock}>
+                        <View style={[styles.settleCard, { backgroundColor: colors.surface }]}>
+                            <View style={styles.settlePair}>
+                                <View style={styles.settleCol}>
+                                    <View style={styles.settleCharWrap}>
+                                        <CharacterShape variant="card" shape="rect" color={crewColors.forest} eyeStyle="ball" />
+                                    </View>
+                                    <Text style={[styles.settleLabel, T.semibold, { color: colors.faintText }]}>You</Text>
+                                </View>
+                                <SettleArrow color={colors.accent} />
+                                <View style={styles.settleCol}>
+                                    <View style={styles.settleCharWrap}>
+                                        <CharacterShape variant="card" shape="round" color={crewColors.sunset} eyeStyle="ball" />
+                                    </View>
+                                    <Text style={[styles.settleLabel, T.semibold, { color: colors.faintText }]}>Mike</Text>
+                                </View>
+                            </View>
+                            <View style={[styles.interacBadge, { backgroundColor: colors.accentBg }]}>
+                                <View style={[styles.badgeDot, { backgroundColor: colors.accent }]} />
+                                <Text style={[styles.interacBadgeText, T.semibold, { color: colors.accent }]}>
+                                    Auto-confirmed via Interac
+                                </Text>
+                            </View>
+                            <Text style={[styles.settleCaption, T.regular, { color: colors.faintText }]}>
+                                Free · Instant · Automatic
                             </Text>
                         </View>
-                        <Text style={[styles.headline, { color: colors.text }, T.extrabold]}>
-                            Your crew.{'\n'}Your way.
+                    </View>
+                    <View style={styles.textBlock}>
+                        <Text style={[styles.headline, T.extrabold, { color: colors.text }]}>
+                            Settle free.{'\n'}Every time.
                         </Text>
-                        <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                            Everyone gets their own character.{'\n'}Nicknames, colors, shapes — all yours.
+                        <Text style={[styles.sub, T.regular, { color: colors.faintText }]}>
+                            Interac e-Transfer confirmation emails{'\n'}auto-match your payments. 🇨🇦
                         </Text>
                     </View>
                 </View>
             );
         }
 
-        // ── Slide 3: Settle free. Automatically ──
-        if (index === 2) {
-            return (
-                <View style={{ width: SCREEN_W, flex: 1 }}>
-                    <LinearGradient colors={['#0A3020', '#062B16', '#0A0D0B']} style={StyleSheet.absoluteFillObject} />
-                    <View style={[styles.slideInner, { paddingTop: insets.top + vs(60) }]}>
-                        <View style={styles.settleRow}>
-                            <View style={styles.arcCharWrap}>
-                                <CharacterShape variant="card" shape="rect" color="#16A34A" eyeStyle="ball" />
-                            </View>
-                            <SettleArrow />
-                            <View style={styles.arcCharWrap}>
-                                <CharacterShape variant="card" shape="tall" color="#3B82F6" eyeStyle="ball" />
-                            </View>
-                        </View>
-                        <View style={styles.interacPill}>
-                            <Text style={[styles.interacPillText, T.semibold]}>Auto-confirmed via Interac ✓</Text>
-                        </View>
-                        <Text style={[styles.settleCaption, T.regular]}>
-                            🇨🇦 Free · ~30 seconds · No fees
-                        </Text>
-                        <Text style={[styles.headline, { color: '#FFFFFF' }, T.extrabold]}>
-                            Settle free.{'\n'}Automatically.
-                        </Text>
-                        <Text style={[styles.sub, { color: 'rgba(255,255,255,0.70)' }, T.regular]}>
-                            Interac e-Transfer is free and instant.{'\n'}We confirm it for you.
-                        </Text>
-                    </View>
-                </View>
-            );
-        }
-
-        // ── Slide 4: Pick your character ──
+        // ── Slide 3: Character picker ──
         return (
-            <View style={{ width: SCREEN_W, flex: 1, backgroundColor: colors.background }}>
-                <View style={[styles.slideInner, { paddingTop: insets.top + vs(48) }]}>
-                    <Text style={[styles.pickerHeadline, { color: colors.text }, T.extrabold]}>
-                        First, pick your{'\n'}character.
+            <View style={[styles.slide, { backgroundColor: colors.background }]}>
+                <View style={{ flex: 1, alignItems: 'center', paddingTop: insets.top + vs(48) }}>
+                    <Text style={[styles.pickerHeadline, T.extrabold, { color: colors.text }]}>
+                        Make it yours.
                     </Text>
-                    <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                        You can always change it later.
+                    <Text style={[styles.pickerSub, T.regular, { color: colors.faintText }]}>
+                        Pick a character. You can change it any time.
                     </Text>
 
-                    {/* Big preview — hero variant, pops on every selection change */}
                     <Animated.View style={[styles.previewWrap, { transform: [{ scale: popAnim }] }]}>
                         <CharacterShape variant="hero" shape={selectedShape} color={selectedColor} eyeStyle="ball" />
                     </Animated.View>
+                    <Text style={[styles.colorName, T.semibold, { color: colors.faintText }]}>
+                        {selectedColorName}
+                    </Text>
 
-                    {/* Shape picker */}
                     <View style={styles.shapeRow}>
                         {SHAPES.map(s => {
                             const selected = selectedShape === s;
@@ -261,13 +271,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                 <TouchableOpacity
                                     key={s}
                                     onPress={() => { Haptics.selectionAsync(); setSelectedShape(s); }}
-                                    style={[
-                                        styles.shapeTile,
-                                        {
-                                            backgroundColor: colors.surface,
-                                            borderColor: selected ? colors.accent : 'transparent',
-                                        },
-                                    ]}
+                                    style={[styles.shapeTile, { borderColor: selected ? colors.accent : 'transparent' }]}
                                     activeOpacity={0.8}
                                 >
                                     <CharacterShape variant="mini" shape={s} color={selectedColor} />
@@ -276,29 +280,30 @@ export default function OnboardingScreen({ navigation }: any) {
                         })}
                     </View>
 
-                    {/* Color picker */}
                     <View style={styles.colorRow}>
                         {COLOR_PALETTE.map(c => {
-                            const selected = selectedColor === c;
+                            const selected = selectedColor === c.hex;
                             return (
                                 <TouchableOpacity
-                                    key={c}
-                                    onPress={() => { Haptics.selectionAsync(); setSelectedColor(c); }}
-                                    style={[styles.swatch, { backgroundColor: c }]}
+                                    key={c.hex}
+                                    onPress={() => { Haptics.selectionAsync(); setSelectedColor(c.hex); }}
+                                    style={[styles.swatch, { backgroundColor: c.hex }]}
                                     activeOpacity={0.8}
                                 >
-                                    {selected && <Check size={18} color="#FFFFFF" strokeWidth={3} />}
+                                    {selected && <Check size={scale(14)} color="#FFFFFF" strokeWidth={3} />}
                                 </TouchableOpacity>
                             );
                         })}
                     </View>
+                </View>
 
+                <View style={[styles.ctaWrap, { marginBottom: insets.bottom + vs(32) }]}>
                     <TouchableOpacity
                         style={[styles.ctaBtn, { backgroundColor: colors.accent }]}
-                        onPress={handleLetsGo}
+                        onPress={handleContinue}
                         activeOpacity={0.85}
                     >
-                        <Text style={[styles.ctaText, T.semibold]}>Let's go →</Text>
+                        <Text style={[styles.ctaText, T.semibold]}>Continue</Text>
                     </TouchableOpacity>
                 </View>
             </View>
@@ -311,7 +316,7 @@ export default function OnboardingScreen({ navigation }: any) {
         <View style={{ flex: 1, backgroundColor: colors.background }}>
             <FlatList
                 ref={listRef}
-                data={[0, 1, 2, 3]}
+                data={[0, 1, 2]}
                 renderItem={renderSlide}
                 keyExtractor={i => String(i)}
                 horizontal
@@ -323,7 +328,7 @@ export default function OnboardingScreen({ navigation }: any) {
                 getItemLayout={(_, index) => ({ length: SCREEN_W, offset: SCREEN_W * index, index })}
             />
 
-            {/* Skip — slides 1–3 only, jumps to the character picker */}
+            {/* Skip — always lands on the picker, never past it */}
             {!onPicker && (
                 <TouchableOpacity
                     style={[styles.skipBtn, { top: insets.top + vs(12) }]}
@@ -331,24 +336,18 @@ export default function OnboardingScreen({ navigation }: any) {
                     activeOpacity={0.7}
                     hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
                 >
-                    <Text style={[styles.skipText, { color: currentIndex === 2 ? 'rgba(255,255,255,0.55)' : colors.faintText }, T.regular]}>
-                        Skip
-                    </Text>
+                    <Text style={[styles.skipText, T.semibold, { color: colors.faintText }]}>Skip</Text>
                 </TouchableOpacity>
             )}
 
-            {/* Dots — slides 1–3 only */}
             {!onPicker && (
                 <View style={[styles.dotsRow, { bottom: insets.bottom + vs(32) }]}>
                     {Array.from({ length: SLIDE_COUNT }).map((_, i) => (
-                        <View
+                        <Dot
                             key={i}
-                            style={[
-                                styles.dot,
-                                { backgroundColor: i === currentIndex
-                                    ? colors.accent
-                                    : currentIndex === 2 ? 'rgba(255,255,255,0.30)' : colors.faintText },
-                            ]}
+                            active={i === currentIndex}
+                            activeColor={colors.accent}
+                            inactiveColor={colors.faintText}
                         />
                     ))}
                 </View>
@@ -358,181 +357,201 @@ export default function OnboardingScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    slideInner: {
+    slide: {
+        width: SCREEN_W,
         flex: 1,
-        alignItems: 'center',
-        paddingHorizontal: scale(28),
     },
 
-    // Slide 1 — crew arc
-    arcRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
+    // Slides 1–2: visual in the top 55%, text in the bottom 45%
+    visualBlock: {
+        flex: 55,
+        alignItems: 'center',
         justifyContent: 'center',
-        gap: scale(12),
-        marginTop: vs(48),
-        marginBottom: vs(48),
-        height: vs(130),
     },
-    arcCharWrap: {
-        height: 84,
-        justifyContent: 'flex-end',
+    textBlock: {
+        flex: 45,
         alignItems: 'center',
+        paddingTop: vs(8),
+        marginHorizontal: scale(32),
     },
-    arcNickname: {
-        fontSize: ms(11),
-        marginTop: vs(6),
-    },
-
     headline: {
-        fontSize: ms(40),
-        letterSpacing: -1.6,
+        fontSize: ms(38),
+        letterSpacing: -1.8,
+        lineHeight: ms(44),
         textAlign: 'center',
-        lineHeight: ms(46),
         marginBottom: vs(14),
     },
     sub: {
-        fontSize: ms(15),
+        fontSize: ms(16),
+        letterSpacing: -0.3,
+        lineHeight: ms(16) * 1.55,
         textAlign: 'center',
-        lineHeight: ms(22),
     },
 
-    // Slide 2 — crew row
+    // Slide 1 — crew + expense row
     crewRow: {
         flexDirection: 'row',
         alignItems: 'flex-end',
-        justifyContent: 'center',
-        gap: scale(26),
-        marginTop: vs(28),
-        marginBottom: vs(22),
+        gap: scale(16),
+        marginBottom: vs(28),
     },
-    nicknameChip: {
-        borderRadius: 99,
+    crewCol: {
+        alignItems: 'center',
+        gap: vs(8),
+    },
+    crewCharWrap: {
+        height: scale(72),
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    nameChip: {
+        borderRadius: ms(20),
         paddingHorizontal: scale(10),
         paddingVertical: vs(4),
     },
-    nicknameChipText: { fontSize: ms(11) },
-    balanceLabel: {
-        fontSize: ms(14),
-        letterSpacing: -0.3,
-    },
-    expenseCard: {
-        borderRadius: ms(16),
-        borderWidth: StyleSheet.hairlineWidth,
-        paddingHorizontal: scale(18),
-        paddingVertical: vs(14),
-        marginBottom: vs(40),
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.10,
-        shadowRadius: 14,
-        elevation: 4,
-    },
-    expenseCardText: { fontSize: ms(14) },
-
-    // Slide 3 — settle
-    settleRow: {
+    nameChipText: { fontSize: ms(12) },
+    expenseRow: {
         flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'center',
-        gap: scale(22),
-        marginTop: vs(40),
-        marginBottom: vs(24),
+        alignItems: 'center',
+        gap: scale(24),
+        borderRadius: ms(14),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(12),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+        elevation: 2,
     },
-    settleArrow: {
-        fontSize: ms(30),
-        color: '#3ECF8E',
-        marginBottom: vs(24),
-    },
-    interacPill: {
-        backgroundColor: 'rgba(62,207,142,0.16)',
-        borderWidth: 1,
-        borderColor: 'rgba(62,207,142,0.40)',
-        borderRadius: 99,
-        paddingHorizontal: scale(14),
-        paddingVertical: vs(7),
-        marginBottom: vs(12),
-    },
-    interacPillText: {
-        fontSize: ms(13),
-        color: '#3ECF8E',
-    },
-    settleCaption: {
-        fontSize: ms(13),
-        color: 'rgba(255,255,255,0.55)',
-        marginBottom: vs(36),
-    },
+    expenseName: { fontSize: ms(15) },
+    expenseAmount: { fontSize: ms(15) },
 
-    // Slide 4 — picker
-    pickerHeadline: {
-        fontSize: ms(34),
-        letterSpacing: -1.2,
-        textAlign: 'center',
-        lineHeight: ms(40),
-        marginBottom: vs(10),
+    // Slide 2 — settlement card
+    settleCard: {
+        alignItems: 'center',
+        borderRadius: ms(20),
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(20),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 12,
+        elevation: 3,
     },
-    previewWrap: {
-        height: 140,
+    settlePair: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(16),
+        marginBottom: vs(16),
+    },
+    settleCol: {
+        alignItems: 'center',
+        gap: vs(6),
+    },
+    settleCharWrap: {
+        height: scale(56),
         justifyContent: 'flex-end',
         alignItems: 'center',
-        marginTop: vs(24),
-        marginBottom: vs(28),
+        transform: [{ scale: 0.8 }],
+    },
+    settleLabel: { fontSize: ms(12) },
+    interacBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(6),
+        borderRadius: ms(20),
+        paddingHorizontal: scale(12),
+        paddingVertical: vs(6),
+        marginBottom: vs(8),
+    },
+    badgeDot: {
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
+    },
+    interacBadgeText: { fontSize: ms(12) },
+    settleCaption: {
+        fontSize: ms(12),
+        letterSpacing: 0.4,
+    },
+
+    // Slide 3 — picker
+    pickerHeadline: {
+        fontSize: ms(34),
+        letterSpacing: -1.6,
+        textAlign: 'center',
+        marginBottom: vs(8),
+    },
+    pickerSub: {
+        fontSize: ms(15),
+        textAlign: 'center',
+        marginBottom: vs(40),
+    },
+    previewWrap: {
+        height: 120,
+        justifyContent: 'flex-end',
+        alignItems: 'center',
+    },
+    colorName: {
+        fontSize: ms(13),
+        marginTop: vs(8),
+        marginBottom: vs(32),
     },
     shapeRow: {
         flexDirection: 'row',
         justifyContent: 'center',
-        gap: scale(12),
-        marginBottom: vs(22),
+        gap: scale(16),
+        marginBottom: vs(20),
     },
     shapeTile: {
-        padding: scale(10),
-        borderRadius: ms(16),
+        width: scale(64),
+        height: scale(80),
+        borderRadius: ms(14),
         borderWidth: 2,
         alignItems: 'center',
         justifyContent: 'flex-end',
-        minHeight: 88,
-        minWidth: scale(64),
+        paddingBottom: vs(6),
     },
     colorRow: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'center',
         gap: scale(12),
-        marginBottom: vs(30),
+        paddingHorizontal: scale(28),
     },
     swatch: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
         alignItems: 'center',
         justifyContent: 'center',
     },
+    ctaWrap: {
+        paddingHorizontal: scale(28),
+    },
     ctaBtn: {
         width: '100%',
-        borderRadius: 99,
-        paddingVertical: vs(16),
+        height: scale(56),
+        borderRadius: ms(14),
         alignItems: 'center',
+        justifyContent: 'center',
     },
     ctaText: {
         color: '#FFFFFF',
-        fontSize: ms(16),
+        fontSize: ms(17),
     },
 
     // Chrome
     skipBtn: {
         position: 'absolute',
-        right: scale(24),
+        right: scale(28),
     },
-    skipText: { fontSize: ms(14) },
+    skipText: { fontSize: ms(15) },
     dotsRow: {
         position: 'absolute',
         alignSelf: 'center',
         flexDirection: 'row',
+        alignItems: 'center',
         gap: scale(8),
-    },
-    dot: {
-        width: ms(8),
-        height: ms(8),
-        borderRadius: ms(4),
     },
 });
