@@ -1,12 +1,13 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
-    TouchableOpacity,
     Alert,
     Share,
+    Animated,
+    Easing,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
@@ -14,23 +15,60 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
+import {
+    Crown, Check, ChevronRight, Bell, UserPlus, FileDown,
+    RefreshCw, Palette, Users, BookOpen, LogOut,
+} from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
+import PressableScale from '../components/PressableScale';
+import { T } from '../utils/typography';
+
+type SectionRow = {
+    icon: React.ComponentType<any>;
+    label: string;
+    nav?: string;
+    special?: string;
+    danger?: boolean;
+    noChevron?: boolean;
+};
 
 const PRO_FEATURES = [
-    'Recurring Expenses — auto-split monthly bills on a schedule',
-    'Export Data — download your full expense history as CSV or PDF',
-    'AI Parsing — scan receipts and split itemized expenses instantly',
-    'Multi-currency — track expenses in any currency, auto-converted',
+    'AI Receipt Scanning — itemized splits instantly',
+    'Recurring Expenses — auto-split on a schedule',
+    'Export Data — CSV & PDF history',
+    'Priority Support — dedicated queue',
 ];
 
-const SETTINGS_ROWS = [
-    { icon: Users2,      label: 'Friends' },
-    { icon: ShieldCheck, label: 'Privacy & Security' },
-    { icon: Bell,        label: 'Notifications' },
-    { icon: UserPlus,    label: 'Invite a friend' },
-    { icon: Sun,         label: 'Appearance' },
+const SECTIONS: { title: string; rows: SectionRow[] }[] = [
+    {
+        title: 'Account',
+        rows: [
+            { icon: FileDown,  label: 'Export',    nav: 'Export' },
+            { icon: RefreshCw, label: 'Recurring', nav: 'Recurring' },
+        ],
+    },
+    {
+        title: 'Preferences',
+        rows: [
+            { icon: Palette, label: 'Appearance',    nav: 'Appearance' },
+            { icon: Bell,    label: 'Notifications', nav: 'Notifications' },
+        ],
+    },
+    {
+        title: 'Social',
+        rows: [
+            { icon: Users,    label: 'Friends',        nav: 'FriendsHub' },
+            { icon: UserPlus, label: 'Invite a Friend', special: 'invite' },
+        ],
+    },
+    {
+        title: 'Support',
+        rows: [
+            { icon: BookOpen, label: 'Tutorial',  special: 'tutorial' },
+            { icon: LogOut,   label: 'Sign Out',  special: 'signout', danger: true, noChevron: true },
+        ],
+    },
 ];
 
 export default function ProHubScreen({ navigation }: any) {
@@ -38,13 +76,22 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
+    const shimmerAnim = useRef(new Animated.Value(0.7)).current;
 
-    const handleSettingsTap = (label: string) => {
-        Alert.alert('Coming soon', `${label} is on our roadmap.`);
-    };
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(shimmerAnim, { toValue: 1.0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(shimmerAnim, { toValue: 0.7, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
 
-    const handleProAction = () => {
-        navigation.navigate('Subscription');
+    const handleRowPress = (row: SectionRow) => {
+        if (row.special === 'invite') return handleInvite();
+        if (row.special === 'tutorial') return Alert.alert('Tutorial', 'Guided tutorial coming soon!');
+        if (row.special === 'signout') return handleSignOut();
+        if (row.nav) navigation.navigate(row.nav);
     };
 
     const handleInvite = async () => {
@@ -53,10 +100,6 @@ export default function ProHubScreen({ navigation }: any) {
             Alert.alert('Permission needed', 'Allow contacts access to invite friends.');
             return;
         }
-        const { data } = await Contacts.getContactsAsync({
-            fields: [Contacts.Fields.Name, Contacts.Fields.PhoneNumbers, Contacts.Fields.Emails],
-        });
-        if (!data.length) { Alert.alert('No contacts found'); return; }
         await Share.share({
             message: `Hey! I'm using TandemPay to split expenses with roommates. Join me: https://tandempay.ca/invite`,
             title: 'Join me on TandemPay',
@@ -72,100 +115,119 @@ export default function ProHubScreen({ navigation }: any) {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
-            <ScrollView contentContainerStyle={{ paddingBottom: vs(120) }} showsVerticalScrollIndicator={false}>
-                {/* Hero */}
+            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+                {/* Hero card */}
                 <LinearGradient
                     colors={colors.heroGradient}
                     locations={[0, 0.35, 1]}
-                    style={styles.hero}
+                    style={styles.heroCard}
                 >
                     <CharacterShape
                         shape={user?.character_shape ?? 'rect'}
                         color={user?.character_color ?? '#34D399'}
                         variant="hero"
                     />
-                    <Text style={[styles.heroName, { color: colors.text }]}>{user?.name}</Text>
-                    <Text style={[styles.heroEmail, { color: colors.faintText }]}>{user?.email}</Text>
-                    <TouchableOpacity
-                        style={[styles.customiseChip, { backgroundColor: colors.accentBg }]}
+                    <Text style={[styles.heroName, { color: colors.text }, T.bold]}>{user?.name}</Text>
+                    <Text style={[styles.heroEmail, { color: colors.secondaryText }, T.regular]}>{user?.email}</Text>
+                    <PressableScale
+                        scaleTo={0.97}
+                        haptic="light"
                         onPress={() => setShowCharModal(true)}
-                        activeOpacity={0.8}
+                        style={[styles.customiseChip, { backgroundColor: colors.accentBg }]}
                     >
-                        <Text style={[styles.customiseChipText, { color: colors.accent }]}>✏ Customise character</Text>
-                    </TouchableOpacity>
+                        <Text style={[styles.customiseChipText, { color: colors.accent }, T.semibold]}>✏ Customise character</Text>
+                    </PressableScale>
                 </LinearGradient>
 
-                <View style={styles.body}>
-                    {/* Pro card */}
-                    <View style={[styles.proCard, { borderColor: colors.border }]}>
-                        <LinearGradient colors={[colors.accentDark, colors.accent]} style={styles.proHeader}>
-                            <View style={styles.proHeaderRow}>
+                {/* Pro card */}
+                <View style={styles.proSection}>
+                    <LinearGradient
+                        colors={colors.cardGradient as any}
+                        style={[styles.proCard, { borderColor: colors.accent + '50' }]}
+                    >
+                        <View style={styles.proCardTop}>
+                            <View style={styles.proTitleRow}>
                                 <Crown size={20} color="#fff" />
-                                <Text style={styles.proTitle}>TandemPay Pro</Text>
+                                <Text style={[styles.proTitle, T.extrabold]}>TandemPay Pro</Text>
                             </View>
-                            <View style={styles.priceChip}>
-                                <Text style={[styles.priceChipText, { color: colors.accent }]}>$4.99/mo</Text>
-                            </View>
-                        </LinearGradient>
-                        <View style={[styles.proBody, { backgroundColor: colors.surface }]}>
-                            {PRO_FEATURES.map(feature => (
-                                <View key={feature} style={styles.featureRow}>
-                                    <Check size={16} color={colors.accent} />
-                                    <Text style={[styles.featureText, { color: colors.text }]}>{feature}</Text>
+                            <Animated.View style={[styles.priceChip, { opacity: shimmerAnim }]}>
+                                <Text style={[styles.priceChipText, { color: colors.accent }, T.extrabold]}>$4.99/mo</Text>
+                            </Animated.View>
+                        </View>
+
+                        <View style={styles.proFeatures}>
+                            {PRO_FEATURES.map(f => (
+                                <View key={f} style={styles.featureRow}>
+                                    <Check size={14} color="rgba(255,255,255,0.9)" strokeWidth={2.5} />
+                                    <Text style={[styles.featureText, T.semibold]}>{f}</Text>
                                 </View>
                             ))}
-                            <TouchableOpacity style={[styles.upgradeBtn, { backgroundColor: colors.accent }]} onPress={handleProAction} activeOpacity={0.85}>
-                                <Text style={[styles.upgradeBtnText, { color: isDark ? '#0D2B12' : '#0A5F30' }]}>
+                        </View>
+
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="light"
+                            onPress={() => navigation.navigate('Subscription')}
+                            style={styles.upgradeBtn}
+                        >
+                            <View style={[styles.upgradeBtnInner, { borderColor: 'rgba(255,255,255,0.25)' }]}>
+                                <Text style={[styles.upgradeBtnText, T.bold]}>
                                     {isPro ? 'Manage subscription →' : 'Upgrade to Pro →'}
                                 </Text>
-                            </TouchableOpacity>
+                            </View>
+                        </PressableScale>
+                    </LinearGradient>
+                </View>
+
+                {/* Settings sections */}
+                {SECTIONS.map(section => (
+                    <View key={section.title} style={styles.sectionWrap}>
+                        <Text style={[styles.sectionHeader, { color: colors.secondaryText }, T.semibold]}>
+                            {section.title}
+                        </Text>
+                        <View style={[styles.sectionCard, { backgroundColor: colors.surface }]}>
+                            {section.rows.map((row, index) => {
+                                const Icon = row.icon;
+                                const isLast = index === section.rows.length - 1;
+                                return (
+                                    <PressableScale
+                                        key={row.label}
+                                        scaleTo={0.97}
+                                        haptic="light"
+                                        onPress={() => handleRowPress(row)}
+                                        style={[
+                                            styles.settingsRow,
+                                            !isLast && { borderBottomWidth: 1, borderBottomColor: colors.border },
+                                        ]}
+                                    >
+                                        <View style={[
+                                            styles.rowIconWrap,
+                                            { backgroundColor: row.danger ? colors.dangerBg : colors.accentBg },
+                                        ]}>
+                                            <Icon size={20} color={row.danger ? colors.danger : colors.accent} />
+                                        </View>
+                                        <Text style={[
+                                            styles.rowLabel,
+                                            { color: row.danger ? colors.danger : colors.text },
+                                            T.semibold,
+                                        ]}>
+                                            {row.label}
+                                        </Text>
+                                        {!row.noChevron && <ChevronRight size={16} color={colors.tertiaryText} />}
+                                    </PressableScale>
+                                );
+                            })}
                         </View>
                     </View>
+                ))}
 
-                    {/* Settings list */}
-                    <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        {SETTINGS_ROWS.map((row, index) => {
-                            const Icon = row.icon;
-                            return (
-                                <TouchableOpacity
-                                    key={row.label}
-                                    style={[
-                                        styles.settingsRow,
-                                        index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                                    ]}
-                                    onPress={() => {
-                                        if (row.label === 'Friends') return navigation.navigate('FriendsHub');
-                                        if (row.label === 'Invite a friend') return handleInvite();
-                                        if (row.label === 'Appearance') return navigation.navigate('Appearance');
-                                        handleSettingsTap(row.label);
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={[styles.settingsIconWrap, { backgroundColor: colors.accentBg }]}>
-                                        <Icon size={17} color={colors.accent} />
-                                    </View>
-                                    <Text style={[styles.settingsLabel, { color: colors.text }]}>{row.label}</Text>
-                                    <ChevronRight size={16} color={colors.faintText} />
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {/* Sign out */}
-                    <TouchableOpacity
-                        style={[styles.signOutBtn, { backgroundColor: colors.surface }]}
-                        onPress={handleSignOut}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={[styles.signOutText, { color: colors.danger }]}>Sign out</Text>
-                    </TouchableOpacity>
-                </View>
             </ScrollView>
+
             <CharacterSetupModal
                 visible={showCharModal}
                 onClose={() => setShowCharModal(false)}
             />
-
         </SafeAreaView>
     );
 }
@@ -173,58 +235,62 @@ export default function ProHubScreen({ navigation }: any) {
 const styles = StyleSheet.create({
     safe: { flex: 1 },
 
-    hero: {
+    scroll: {
+        paddingBottom: vs(100),
+    },
+
+    // Hero
+    heroCard: {
         alignItems: 'center',
         paddingVertical: vs(32),
         paddingHorizontal: scale(20),
+        borderRadius: ms(28),
+        marginHorizontal: scale(20),
+        marginTop: vs(16),
         gap: vs(4),
     },
     heroName: {
         fontSize: ms(22),
-        fontWeight: '800',
         letterSpacing: -0.3,
         marginTop: vs(12),
     },
     heroEmail: {
-        fontSize: ms(14),
+        fontSize: ms(13),
     },
     customiseChip: {
-        marginTop: vs(12),
+        marginTop: vs(10),
         borderRadius: 999,
         paddingHorizontal: scale(16),
         paddingVertical: vs(8),
     },
     customiseChipText: {
         fontSize: ms(13),
-        fontWeight: '700',
-    },
-
-    body: {
-        paddingHorizontal: scale(16),
-        paddingTop: vs(16),
-        gap: vs(14),
     },
 
     // Pro card
-    proCard: {
-        borderRadius: ms(22),
-        borderWidth: StyleSheet.hairlineWidth,
-        overflow: 'hidden',
+    proSection: {
+        paddingHorizontal: scale(20),
+        paddingTop: vs(20),
     },
-    proHeader: {
+    proCard: {
+        borderRadius: ms(24),
+        borderWidth: 1.5,
+        overflow: 'hidden',
+        padding: scale(20),
+        gap: vs(16),
+    },
+    proCardTop: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        padding: scale(20),
     },
-    proHeaderRow: {
+    proTitleRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: vs(8),
+        gap: scale(8),
     },
     proTitle: {
         fontSize: ms(18),
-        fontWeight: '800',
         color: '#fff',
         letterSpacing: -0.2,
     },
@@ -236,68 +302,68 @@ const styles = StyleSheet.create({
     },
     priceChipText: {
         fontSize: ms(12),
-        fontWeight: '800',
-        color: '#16A34A',
     },
-    proBody: {
-        padding: scale(20),
-        gap: vs(12),
+    proFeatures: {
+        gap: vs(10),
     },
     featureRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: vs(10),
+        gap: scale(10),
     },
     featureText: {
         flex: 1,
         fontSize: ms(13),
-        fontWeight: '500',
+        color: 'rgba(255,255,255,0.9)',
         lineHeight: 18,
     },
     upgradeBtn: {
-        marginTop: vs(4),
-        borderRadius: ms(16),
-        paddingVertical: vs(15),
+        borderRadius: ms(14),
+        overflow: 'hidden',
+    },
+    upgradeBtnInner: {
+        paddingVertical: vs(14),
         alignItems: 'center',
+        borderRadius: ms(14),
+        borderWidth: 1,
+        backgroundColor: 'rgba(255,255,255,0.14)',
     },
     upgradeBtnText: {
         fontSize: ms(15),
-        fontWeight: '700',
+        color: '#fff',
     },
 
     // Settings
-    settingsCard: {
-        borderRadius: ms(16),
-        borderWidth: StyleSheet.hairlineWidth,
+    sectionWrap: {
+        paddingHorizontal: scale(20),
+        paddingTop: vs(20),
+    },
+    sectionHeader: {
+        fontSize: ms(13),
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        marginBottom: vs(8),
+    },
+    sectionCard: {
+        borderRadius: ms(20),
         overflow: 'hidden',
     },
     settingsRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: vs(12),
-        padding: scale(14),
+        minHeight: vs(56),
+        paddingHorizontal: scale(16),
+        gap: scale(14),
     },
-    settingsIconWrap: {
-        width: 36,
-        height: 36,
+    rowIconWrap: {
+        width: scale(36),
+        height: scale(36),
         borderRadius: ms(10),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    settingsLabel: {
+    rowLabel: {
         flex: 1,
         fontSize: ms(15),
-        fontWeight: '500',
-    },
-
-    // Sign out
-    signOutBtn: {
-        borderRadius: ms(16),
-        padding: scale(18),
-        alignItems: 'center',
-    },
-    signOutText: {
-        fontSize: ms(16),
-        fontWeight: '600',
     },
 });
