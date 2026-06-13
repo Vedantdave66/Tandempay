@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import Constants from 'expo-constants';
 import { useFonts } from 'expo-font';
@@ -62,6 +62,17 @@ export default function App() {
     PlusJakartaSans_800ExtraBold,
   });
   const [splashDone, setSplashDone] = useState(false);
+
+  // TEMP — dev-only onboarding reset for testing. Remove after testing.
+  useEffect(() => {
+    (async () => {
+      if (__DEV__) {
+        const AsyncStorage = require('@react-native-async-storage/async-storage').default;
+        await AsyncStorage.removeItem('@onboarding_seen');
+        await AsyncStorage.removeItem('@onboarding_character');
+      }
+    })();
+  }, []);
 
   if (!fontsLoaded) return null;
 

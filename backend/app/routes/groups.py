@@ -1,3 +1,4 @@
+import secrets
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func, literal
@@ -6,7 +7,7 @@ from decimal import Decimal
 import logging
 
 from app.database import get_db
-from app.models import User, Group, GroupMember, Expense
+from app.models import User, Group, GroupMember, Expense, Notification
 from app.schemas import GroupCreate, GroupOut, GroupListOut, MemberAdd, JoinGroup, GroupMemberOut, PaginatedResponse
 from app.routes.auth import get_current_user
 from app.services.balance_service import _compute_balances
@@ -96,6 +97,64 @@ async def list_groups(
     return PaginatedResponse(total=total, limit=limit, offset=offset, items=out)
 
 
+@router.get("/join/{token}")
+async def preview_invite(token: str, db: AsyncSession = Depends(get_db)):
+    """Unauthenticated endpoint — returns a group preview for the invite landing page."""
+    result = await db.execute(
+        select(Group)
+        .where(Group.invite_token == token)
+        .options(selectinload(Group.members))
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Invite link is invalid or expired")
+
+    creator_result = await db.execute(select(User).where(User.id == group.created_by))
+    creator = creator_result.scalar_one_or_none()
+
+    return {
+        "group_name": group.name,
+        "member_count": len(group.members),
+        "creator_name": creator.name if creator else "Unknown",
+        "token": token,
+    }
+
+
+@router.post("/join/{token}")
+async def join_by_token(token: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Join a group using only the invite token from the URL."""
+    result = await db.execute(
+        select(Group)
+        .where(Group.invite_token == token)
+        .options(selectinload(Group.members))
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Invite link is invalid or expired")
+
+    # Idempotent: already a member
+    already = any(m.user_id == current_user.id for m in group.members)
+    if already:
+        return {"group_id": group.id}
+
+    member = GroupMember(group_id=group.id, user_id=current_user.id)
+    db.add(member)
+
+    if group.created_by != current_user.id:
+        notification = Notification(
+            user_id=group.created_by,
+            type="member_added",
+            title="New member joined",
+            message=f"{current_user.name} joined your group via invite link.",
+            reference_id=group.id,
+            group_id=group.id,
+        )
+        db.add(notification)
+
+    await db.flush()
+    return {"group_id": group.id}
+
+
 @router.get("/{group_id}", response_model=GroupOut)
 async def get_group(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
     result = await db.execute(
@@ -180,6 +239,41 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
         character_color=user_to_add.character_color,
         character_nickname=user_to_add.character_nickname,
     )
+
+
+@router.post("/{group_id}/invite/generate")
+async def generate_invite(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Idempotent: returns existing token or generates a new one. Creator only."""
+    result = await db.execute(select(Group).where(Group.id == group_id))
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    if group.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the group creator can generate invite links")
+
+    if not group.invite_token:
+        group.invite_token = secrets.token_urlsafe(12)
+        await db.flush()
+
+    return {
+        "invite_url": f"https://tandempay.ca/join/{group.invite_token}",
+        "token": group.invite_token,
+    }
+
+
+@router.delete("/{group_id}/invite", status_code=204)
+async def revoke_invite(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
+    """Revoke the invite link by clearing the token. Creator only."""
+    result = await db.execute(select(Group).where(Group.id == group_id))
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    if group.created_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the group creator can revoke invite links")
+
+    group.invite_token = None
+    await db.flush()
+    return None
 
 
 @router.post("/{group_id}/join", response_model=GroupMemberOut)
