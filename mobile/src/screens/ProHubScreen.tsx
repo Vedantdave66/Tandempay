@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     Alert,
     Share,
+    Animated,
+    Easing,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
@@ -14,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
+import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 
@@ -29,6 +31,8 @@ const SETTINGS_ROWS = [
     { icon: Users2,      label: 'Friends' },
     { icon: ShieldCheck, label: 'Privacy & Security' },
     { icon: Bell,        label: 'Notifications' },
+    { icon: FileDown,    label: 'Export' },
+    { icon: RefreshCw,   label: 'Recurring' },
     { icon: UserPlus,    label: 'Invite a friend' },
     { icon: Sun,         label: 'Appearance' },
 ];
@@ -38,6 +42,16 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
+    const shimmerAnim = useRef(new Animated.Value(0.7)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(shimmerAnim, { toValue: 1.0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(shimmerAnim, { toValue: 0.7, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
 
     const handleSettingsTap = (label: string) => {
         Alert.alert('Coming soon', `${label} is on our roadmap.`);
@@ -103,9 +117,9 @@ export default function ProHubScreen({ navigation }: any) {
                                 <Crown size={20} color="#fff" />
                                 <Text style={styles.proTitle}>TandemPay Pro</Text>
                             </View>
-                            <View style={styles.priceChip}>
+                            <Animated.View style={[styles.priceChip, { opacity: shimmerAnim }]}>
                                 <Text style={[styles.priceChipText, { color: colors.accent }]}>$4.99/mo</Text>
-                            </View>
+                            </Animated.View>
                         </LinearGradient>
                         <View style={[styles.proBody, { backgroundColor: colors.surface }]}>
                             {PRO_FEATURES.map(feature => (
@@ -135,6 +149,8 @@ export default function ProHubScreen({ navigation }: any) {
                                     ]}
                                     onPress={() => {
                                         if (row.label === 'Friends') return navigation.navigate('FriendsHub');
+                                        if (row.label === 'Export') return navigation.navigate('Export');
+                                        if (row.label === 'Recurring') return navigation.navigate('Recurring');
                                         if (row.label === 'Invite a friend') return handleInvite();
                                         if (row.label === 'Appearance') return navigation.navigate('Appearance');
                                         handleSettingsTap(row.label);

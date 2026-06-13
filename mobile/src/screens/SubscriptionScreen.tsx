@@ -8,7 +8,6 @@ import {
     Alert,
     Animated,
     Dimensions,
-    Platform,
     Linking,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -43,10 +42,10 @@ const FREE_FEATURES = [
 ];
 
 const PRO_FEATURES = [
-    { Icon: RefreshCw, label: 'Recurring Expenses', sub: 'Auto-split bills on a schedule' },
-    { Icon: FileDown,  label: 'CSV & PDF Export',   sub: 'Download your full expense history' },
-    { Icon: Camera,    label: 'Receipt Scanning',   sub: 'AI-parsed itemized receipts instantly' },
-    { Icon: Headphones, label: 'Priority Support',  sub: 'Faster replies, dedicated queue' },
+    { Icon: Camera,     label: 'Receipt Scanning',   sub: 'AI-parsed itemized receipts instantly' },
+    { Icon: RefreshCw,  label: 'Recurring Expenses', sub: 'Auto-split bills on a schedule' },
+    { Icon: FileDown,   label: 'CSV & PDF Export',   sub: 'Download your full expense history' },
+    { Icon: Headphones, label: 'Priority Support',   sub: 'Faster replies, dedicated queue' },
 ];
 
 function purchasePro() {
@@ -253,6 +252,9 @@ export default function SubscriptionScreen({ navigation }: any) {
                                     <Check size={13} color={colors.accent} strokeWidth={2.5} />
                                 </View>
                             ))}
+                            <Text style={[styles.socialProof, { color: colors.secondaryText }]}>
+                                Trusted by roommates across Canada 🇨🇦
+                            </Text>
                         </View>
                     </View>
                 </View>
@@ -270,7 +272,7 @@ export default function SubscriptionScreen({ navigation }: any) {
                     activeOpacity={0.85}
                 >
                     <Text style={[styles.ctaBtnText, { color: isDark ? '#064E3B' : '#FFFFFF' }]}>
-                        {Platform.OS === 'ios' ? 'Continue with Apple Pay' : 'Continue with Google Pay'}
+                        {isAnnual ? `Go Pro — ${ANNUAL_MONTHLY_EQUIV}/mo` : `Go Pro — ${MONTHLY_PRICE}/mo`}
                     </Text>
                 </TouchableOpacity>
 
@@ -513,7 +515,14 @@ const styles = StyleSheet.create({
     },
     proCardBody: {
         padding: scale(20),
+        paddingTop: vs(24),
         gap: vs(14),
+    },
+    socialProof: {
+        fontSize: ms(12),
+        fontWeight: '500',
+        textAlign: 'center',
+        marginTop: vs(4),
     },
     proFeatureRow: {
         flexDirection: 'row',
