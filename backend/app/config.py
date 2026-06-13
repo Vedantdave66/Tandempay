@@ -33,6 +33,9 @@ class Settings(BaseSettings):
     # SendGrid Inbound Parse — set in Vercel backend env vars as SENDGRID_WEBHOOK_SECRET
     SENDGRID_WEBHOOK_SECRET: str = ""
 
+    # Gemini — used by receipt scanning route
+    GEMINI_API_KEY: str = ""
+
     # Sentry — leave empty to disable monitoring entirely (safe for local dev)
     SENTRY_DSN: str = ""
     ENVIRONMENT: str = "development"  # override to "production" on Vercel

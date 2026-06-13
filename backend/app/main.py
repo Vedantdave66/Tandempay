@@ -18,6 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 import sentry_sdk
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -166,6 +167,7 @@ async def lifespan(app: FastAPI):
         if not is_serverless:
             from app.services.payment_reconciliation import run_payment_reconciliation
             from app.scheduler import process_due_recurring_expenses
+            from app.services.nudge_service import run_nudge_job
             scheduler = AsyncIOScheduler()
             scheduler.add_job(
                 process_due_reminders,
@@ -188,8 +190,15 @@ async def lifespan(app: FastAPI):
                 name="Process due recurring expenses",
                 replace_existing=True,
             )
+            scheduler.add_job(
+                run_nudge_job,
+                trigger=CronTrigger(hour=9, minute=0, timezone="America/Toronto"),
+                id="nudge_tick",
+                name="Send escalating nudges for pending settlements",
+                replace_existing=True,
+            )
             scheduler.start()
-            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m, Recurring 24h).")
+            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m, Recurring 24h, Nudges 9AM ET).")
     except Exception as e:
         logger.error(f"Lifespan startup error (non-fatal): {e}")
 
