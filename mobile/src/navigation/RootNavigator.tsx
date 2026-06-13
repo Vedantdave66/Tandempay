@@ -1,12 +1,13 @@
 import React, { Fragment, useEffect, useRef, useState } from 'react';
-import { Animated, Easing, View, StyleSheet } from 'react-native';
+import { Animated, Easing, View, StyleSheet, Linking, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CharacterSetupModal from '../components/CharacterSetupModal';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { scale } from '../utils/responsive';
+import { groupsApi } from '../services/api';
 
 import MainTabNavigator from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
@@ -90,6 +91,7 @@ const holdStyles = StyleSheet.create({
 export default function RootNavigator() {
     const { user, loading } = useAuth();
     const { colors, isDark } = useTheme();
+    const navRef = useRef<NavigationContainerRef<any>>(null);
 
     // First-run check — unseen onboarding routes new users to the carousel
     const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
@@ -98,6 +100,39 @@ export default function RootNavigator() {
             .then(v => setOnboardingSeen(v === 'true'))
             .catch(() => setOnboardingSeen(true));
     }, []);
+
+    // Deep link handler: tandempay://join/{token} or https://tandempay.ca/join/{token}
+    useEffect(() => {
+        if (loading) return;
+
+        const handleURL = async (url: string) => {
+            const match = url.match(/\/join\/([A-Za-z0-9_-]+)/);
+            if (!match) return;
+            const token = match[1];
+
+            if (user) {
+                try {
+                    const result = await groupsApi.joinByToken(token);
+                    const tryNav = () => {
+                        if (navRef.current?.isReady()) {
+                            navRef.current.navigate('Group' as never, { groupId: result.group_id } as never);
+                        } else {
+                            setTimeout(tryNav, 100);
+                        }
+                    };
+                    tryNav();
+                } catch (err: any) {
+                    Alert.alert('Could not join group', err.message || 'Invalid invite link.');
+                }
+            } else {
+                await AsyncStorage.setItem('@pending_invite_token', token);
+            }
+        };
+
+        Linking.getInitialURL().then(url => { if (url) handleURL(url); });
+        const sub = Linking.addEventListener('url', ({ url }) => handleURL(url));
+        return () => sub.remove();
+    }, [user, loading]);
 
     if (loading || (!user && onboardingSeen === null)) {
         return <AuthHoldScreen background={colors.background} />;
@@ -117,7 +152,7 @@ export default function RootNavigator() {
 
     return (
         <Fragment>
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer ref={navRef} theme={navigationTheme}>
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,
