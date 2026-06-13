@@ -18,6 +18,7 @@ When in doubt, the code is authoritative; this doc should be updated to match.
 8. [Screen Layout Rules](#8-screen-layout-rules)
 9. [Icon Library](#9-icon-library)
 10. [Fable-Originated Design Decisions](#10-fable-originated-design-decisions)
+11. [Product Interaction Philosophy](#11-product-interaction-philosophy)
 
 ---
 
@@ -671,4 +672,236 @@ The slash between "Tandem" and "Pay" is a thin rectangle (width 2, height `fontS
 
 ---
 
-*Last updated: 2026-06-13. Regenerate this document by reading all files in `mobile/src/screens/`, `mobile/src/components/`, `mobile/src/constants/Colors.ts`, `mobile/src/context/ThemeContext.tsx`, and `mobile/src/utils/`.* 
+## 11. Product Interaction Philosophy
+
+This section documents the interaction principles that appear consistently across TandemPay's screens. Every rule below is derived from code or copy already present in the codebase — nothing is invented.
+
+---
+
+### 11.1 No Spinners During Page Load — Skeleton Only
+
+No screen uses `ActivityIndicator` for its initial loading state. Instead, every screen that loads remote data renders a **skeleton layout** that mirrors the real content structure.
+
+**Evidence — `DashboardScreen.tsx`:**
+
+```tsx
+// Skeleton — the dashboard's silhouette breathing while data arrives.
+// Mirrors the real layout rhythm so content lands without a jump.
+return (
+    <SafeAreaView ...>
+        <View style={styles.headerRow}>
+            <SkeletonBlock width={scale(96)} height={vs(18)} radius={ms(6)} />
+            <SkeletonBlock width={scale(44)} height={scale(44)} radius={ms(12)} delay={120} />
+        </View>
+        {/* greeting, balance widget, section header, activity rows — all skeletonized */}
+    </SafeAreaView>
+);
+```
+
+Each skeleton block matches the real element's position, size, and border radius exactly. Delays are staggered by 120ms per row so the shimmer reads as cascading arrival, not a static grey state.
+
+`ActivityIndicator` appears only for **in-flight actions** (e.g. the export download button in `ExportScreen`) — never for page-level loading. The rule: the page's silhouette is always visible; the data fills in.
+
+---
+
+### 11.2 Copy Tone — Conversational, Not Transactional
+
+User-facing strings are written in a friendly first-person or second-person voice. Formal ledger language is avoided throughout.
+
+**Evidence from `DashboardScreen.tsx` — `balanceVoice()` function:**
+
+```tsx
+function balanceVoice(owed: number, owing: number): string {
+    if (isOwed && isOwing) return 'Some owed, some owing';
+    if (isOwed)            return 'People owe you';
+    if (isOwing)           return 'A tab or two to close';
+    return 'Nothing hanging over anyone';
+}
+```
+
+The code comment explicitly documents the intent: *"The balance widget speaks like a friend, not a ledger."*
+
+**Evidence from `LandingScreen.tsx`:**
+- Hero: `"Split bills.\nSettle free."` — not "Expense Splitting Application"
+- Sub: `"Free Interac settlement for\nCanadian roommates 🇨🇦"` — colloquial, audience-specific
+
+**Evidence from `SettleUpScreen.tsx`:**
+- CTA: `"I've sent it · $X"` — first-person action confirmation, not "Confirm Payment"
+- Method detail: `"Arrives in ~30 seconds"` — concrete, not "Processing time varies"
+- Manual option: `"I already settled this another way"` — conversational, not "Mark as Settled (Other)"
+- Completion: `"You're squared up with {name}"` — warm, not "Settlement Completed"
+- Auto-confirm instruction: `"Forward your bank confirmation email to confirm@tandempay.ca and we'll auto-confirm your payment"` — "we'll" not "the system will"
+
+**Evidence from `DashboardScreen.tsx` modal:**
+- All-settled: `"You're all settled up 🎉"` — not "Net balance: $0.00"
+
+**Pattern:** Copy addresses the user as a person with context ("a tab or two to close"), uses contractions ("you're"), and gives concrete details ("~30 seconds") rather than hedged system language.
+
+---
+
+### 11.3 Empty States — Character Present, Copy Actionable
+
+Empty states are never blank. They carry a short message that tells the user what will live there and what to do about it. Where the character system applies, the user's character is visible.
+
+**Evidence from `DashboardScreen.tsx`:**
+
+Groups empty state:
+```tsx
+<Text style={[styles.emptyText, { color: colors.secondaryText }]}>
+    Your squads live here. Make one and stop doing tab math in the group chat.
+</Text>
+```
+
+Activity empty state:
+```tsx
+<Text style={[styles.emptyText, { color: colors.secondaryText, textAlign: 'center' }]}>
+    Nothing yet — expenses and payments from your squads will land here.
+</Text>
+```
+
+The character is present in the greeting row even when groups are empty — the `CharacterShape` renders regardless of data state, animated with a spring rise after the skeleton resolves:
+
+```tsx
+// Your character rises into frame on arrival — it's you showing up, not an icon loading.
+const characterRise = useRef(new Animated.Value(0)).current;
+useEffect(() => {
+    if (!loading) {
+        Animated.spring(characterRise, { toValue: 1, damping: 18, stiffness: 220, useNativeDriver: true }).start();
+    }
+}, [loading]);
+```
+
+**Pattern:** Empty states describe what fills the space ("expenses and payments from your squads") and optionally what to do ("Make one"). They never say "No data" or "Empty".
+
+---
+
+### 11.4 Error States — Inline for Background Errors, Modal Only for Destructive or Financial
+
+The app uses a tiered error strategy. The type of error determines where it surfaces:
+
+| Scenario | Treatment |
+|---|---|
+| Balance fetch failure (background, non-critical) | `catch { /* silent */ }` — swallowed entirely |
+| API error on a routine navigation action | `console.error(...)` — logged only |
+| Destructive action failure (delete group, leave group) | `Alert.alert('Error', e.message \|\| 'Could not delete group.')` |
+| Financial operation failure (payment, export) | `Alert.alert(...)` with explicit message |
+| Inline state toggle (copy confirmation) | `isCopied` state — in-row feedback, no modal |
+| Optimistic delete rollback (recurring expenses) | `Alert.alert('Error', ...)` + reload — user sees rollback |
+
+**Evidence from `DashboardScreen.tsx`:**
+```tsx
+try {
+    await balancesApi.getBalances(g.id)
+} catch {
+    // silent — balance data failing doesn't warrant blocking the user
+}
+```
+
+**Evidence from `SettleUpScreen.tsx`:**
+```tsx
+} catch (err: any) {
+    Alert.alert('Error', err.message || 'Something went wrong.');
+}
+```
+
+**Pattern:** Errors that the user cannot act on are silenced. Errors that require user acknowledgement (payment failed, delete failed, export failed) surface as `Alert`. Inline state transitions (copy button, toggle) use local state, never a modal.
+
+---
+
+### 11.5 The Role of Haptics — Every Significant Action Has a Response
+
+Every meaningful tap in the app produces a haptic response. The intensity is calibrated to the weight of the action.
+
+**Haptic map derived from code:**
+
+| Haptic | Action type | Evidence |
+|---|---|---|
+| `Haptics.selectionAsync()` | Preference changes (accent color, theme toggle) | `AppearanceScreen.tsx` — `handleAccent`, `handleTheme` |
+| `ImpactFeedbackStyle.Light` | Navigational taps, copy-to-clipboard confirmation | `DashboardScreen.tsx` activity row tap; `SettleUpScreen.tsx` copy button |
+| `ImpactFeedbackStyle.Medium` | Consequential send actions | `SettleUpScreen.tsx` — Interac send CTA |
+| `PressableScale haptic="light"` | Interactive cards (net balance widget) | `DashboardScreen.tsx` — `PressableScale haptic="light"` on net balance |
+
+**Pattern from `SettleUpScreen.tsx`:**
+- Copying the Interac email → `Light` (informational confirmation)
+- Tapping "I've sent it" (Interac send) → `Medium` (consequential, money is moving)
+
+The escalation: selection → light impact → medium impact tracks exactly the stakes of the action. No notification-level haptics are used for routine flows; `NotificationFeedbackType.Success/Error` is reserved for settlement/payment completion (documented in Section 10.9).
+
+---
+
+### 11.6 Pro Upsells — Contextual, Value-First, Non-Blocking
+
+Pro upsells appear where the feature would live, show what the user would get, and do not prevent navigation or interaction elsewhere on the screen.
+
+**Pattern: Show the feature, then the gate.**
+
+`ExportScreen.tsx` renders both export format cards (dimmed at 40% opacity) and a small upsell card below them. The user sees the feature before they see the paywall:
+
+```tsx
+{EXPORT_OPTIONS.map((option) => (
+    <TouchableOpacity
+        style={[styles.exportCard, !isPro && styles.cardDimmed]}
+        onPress={() => handleExport(option.key)}
+    >
+        ...
+    </TouchableOpacity>
+))}
+
+{!isPro && (
+    <View style={[styles.upsellCard, ...]}>
+        <Crown size={15} color={colors.accent} />
+        <Text>Export your full history with Pro</Text>
+        <Text style={{ color: colors.accent }}>Learn more →</Text>
+    </View>
+)}
+```
+
+`RecurringScreen.tsx` shows a clean upsell card with a full "Upgrade to Pro" button navigating to `SubscriptionScreen`, not a link to an external URL.
+
+`ProHubScreen.tsx` lists all four Pro features with checkmarks before showing the upgrade button — the value is front-loaded.
+
+**Navigation target:** All "Upgrade to Pro" actions route to `SubscriptionScreen` (internal), never to `tandempay.ca/pricing` (external). This keeps the purchase flow in-app and preserves context.
+
+**Tone:** Upsell copy is descriptive, not urgent — `"Export your full history with Pro"`, `"Recurring Expenses — auto-split monthly bills on a schedule"`. No scarcity language, no countdown timers.
+
+---
+
+### 11.7 The Settle Screen as a High-Stakes Moment
+
+`SettleUpScreen` is the only screen in the app that overrides the global theme with hardcoded colors. This is a deliberate design decision documented in the code.
+
+**Evidence:**
+
+```tsx
+// Local token override — settle screen owns its own palette.
+// This is intentional: the settle flow is a high-stakes moment and
+// needs visual isolation from the ambient app chrome.
+function tok(isDark: boolean) {
+    return {
+        bg:   isDark ? '#0A0D0B' : '#E9F2EB',
+        gold: isDark ? '#F2C200' : '#B07E00',
+        // ...
+    };
+}
+```
+
+- Background `'#0A0D0B'` (dark) / `'#E9F2EB'` (light) — not `colors.background`
+- Hero amount in gold `'#F2C200'` / `'#B07E00'` — not `colors.accent`
+- Payment amount is `ms(52)` extrabold — the largest text in the app
+
+**What this achieves:**
+
+The settle screen signals to the user that something different is happening. The deep near-black background and gold hero amount create visual focus around the single number that matters: what is owed. The rest of the UI recedes.
+
+The sequential confirmation flow reinforces the weight:
+1. "You owe {name} · ${amount}" — state the fact
+2. Choose method (Interac free / card with fee)
+3. For Interac: "Send the transfer from your bank, then tap to confirm" — two-step, manual
+4. "I've sent it · $X" — first-person confirmation
+5. Post-send: "to {name} · waiting for them to confirm" / "You're squared up with {name}" — human resolution
+
+The app's tagline appears in the settle screen copy indirectly: the Interac method is labeled `"FREE"` with a pill badge, and the landing screen hero reads `"Settle free."` These reinforce each other across the funnel.
+
+---
+
+*Last updated: 2026-06-13. Regenerate this document by reading all files in `mobile/src/screens/`, `mobile/src/components/`, `mobile/src/constants/Colors.ts`, `mobile/src/context/ThemeContext.tsx`, and `mobile/src/utils/`.*
