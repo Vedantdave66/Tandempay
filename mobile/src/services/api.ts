@@ -374,6 +374,7 @@ export const recurringApi = {
         method: 'POST',
         body: JSON.stringify({ currency: 'CAD', ...data }),
     }),
+    delete: (id: string) => request<void>(`/recurring/${id}`, { method: 'DELETE' }),
 };
 
 // --- Receipts ---
