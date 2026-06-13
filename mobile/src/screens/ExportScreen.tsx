@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Alert,
-    Linking,
     ActivityIndicator,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -52,14 +51,7 @@ export default function ExportScreen({ navigation }: any) {
 
     const handleExport = async (format: string) => {
         if (!isPro) {
-            Alert.alert(
-                'Pro feature',
-                'Export is a Pro feature. Upgrade at tandempay.ca/pricing',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Learn more', onPress: () => Linking.openURL('https://tandempay.ca/pricing') },
-                ],
-            );
+            navigation.navigate('Subscription');
             return;
         }
 
@@ -147,10 +139,10 @@ export default function ExportScreen({ navigation }: any) {
                                 Export your full history with Pro
                             </Text>
                             <TouchableOpacity
-                                onPress={() => Linking.openURL('https://tandempay.ca/pricing')}
+                                onPress={() => navigation.navigate('Subscription')}
                                 activeOpacity={0.7}
                             >
-                                <Text style={[styles.learnMore, { color: colors.accent }]}>Learn more →</Text>
+                                <Text style={[styles.learnMore, { color: colors.accent }]}>Upgrade to Pro →</Text>
                             </TouchableOpacity>
                         </View>
                     </View>

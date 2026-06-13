@@ -7,7 +7,6 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Alert,
-    Linking,
     Modal,
     TextInput,
     ActivityIndicator,
@@ -198,10 +197,10 @@ export default function RecurringScreen({ navigation }: any) {
                                     Set it once, TandemPay handles the rest.
                                 </Text>
                                 <TouchableOpacity
-                                    onPress={() => Linking.openURL('https://tandempay.ca/pricing')}
+                                    onPress={() => navigation.navigate('Subscription')}
                                     activeOpacity={0.7}
                                 >
-                                    <Text style={[styles.learnMore, { color: colors.accent }]}>Learn more →</Text>
+                                    <Text style={[styles.learnMore, { color: colors.accent }]}>Upgrade to Pro →</Text>
                                 </TouchableOpacity>
                             </View>
                         </View>
