@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-10
+**Last updated:** 2026-06-13
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -14,8 +14,9 @@
 - **R1–R5 of the post-launch roadmap are all merged into `main`** — Settle Up redesign, Interac email auto-confirm, Pro subscription billing, recurring expenses, and CSV/PDF export are live in production. See "Roadmap status" below; the table that previously listed these as remaining is now stale.
 - **Mobile UI revamp (Dashboard/Groups/GroupDetail/Friends/Profile/TabBar/AddExpense + LimelightNav tab bar) shipped 2026-06-06** via PRs #123, #124, #125 — all merged into `main`.
 - **Mobile polish pass (2026-06-07/08) shipped via PRs #132–#141** — PaymentsScreen rewrite, GroupCard/GroupDetail/SettleUp fixes, ToastBanner artifact fix, Dashboard dark-mode label fix, notifications array guard, ProHub character modal + invite + accent theming. See section below.
-- **Canvas Mode + Apple HIG polish session (2026-06-08/09) shipped via PRs #142–#149** — splash animation, gradient tokens, hardcoded-green audit, CanvasModeView redesign, HIG pass across all 14 screens, floating liquid glass tab bar, AppearanceScreen, accent color fix (accentBg/accentBgFaint/accentLight now dynamic), CanvasModeView carousel dock with direct-drag. All merged into `main`. No open PRs.
-- **Latest Alembic head: `a107c01bd8f1`** (`add_auto_confirmed_to_settlement_records`, chained on `7af805ecb0e7` interac_email_logs ← `20d7c91bb5df` revoked_tokens). Confirm these have been run against prod Supabase before relying on the Interac auto-confirm flow in production.
+- **Canvas Mode + Apple HIG polish session (2026-06-08/09) shipped via PRs #142–#149** — splash animation, gradient tokens, hardcoded-green audit, CanvasModeView redesign, HIG pass across all 14 screens, floating liquid glass tab bar, AppearanceScreen, accent color fix (accentBg/accentBgFaint/accentLight now dynamic), CanvasModeView carousel dock with direct-drag. All merged into `main`.
+- **June 13 sprint shipped via PRs #184–#195** — P0 fixes, receipt scanner rebuilt on Gemini 2.5 Flash, onboarding/landing redesign, group invite links, and escalating nudge system. See section below.
+- **Latest Alembic head: `20260613_add_nudge_fields_to_settlement_records`** (chain: `... → a107c01bd8f1` → `20260612_add_push_token_to_users` → `20260613_add_invite_token_to_groups` → `20260613_add_nudge_fields_to_settlement_records`). Both new migrations have been run against prod Supabase.
 
 ---
 
@@ -189,6 +190,49 @@ All PRs are **merged** into `main`.
 
 ---
 
+## June 13 sprint — PRs #184–#195
+
+All PRs listed below are **merged** into `main` unless otherwise noted.
+
+### P0 fixes (PRs #184–#190) — all merged
+Six quick-hit production bugs fixed and shipped:
+1. Gemini receipt prompt improved to handle negative modifiers and multiple total lines (PR #184)
+2. Non-ASCII characters stripped from `receipts.py` (PR #188 hotfix, direct to main)
+3–6. Additional P0 fixes — see individual PR descriptions on GitHub for details.
+
+### PR #189 — feat: characters-first onboarding carousel + cinematic landing + pre-registration character picker *(merged)*
+- **LandingScreen** rebuilt: cinematic `LinearGradient` hero, `Animated` entrance sequence, characters displayed as interactive preview row. Live canvas behind the CTA. "Join free" routes to character picker before registration.
+- **Onboarding carousel**: characters-first flow — user picks Kai/Max/Rue/Zo on first launch before creating account. Animated dot indicators, swipe-through slides.
+- **Pre-registration character picker**: character selection persisted via `AsyncStorage` and applied on `POST /api/auth/register`, so the chosen character is set from account creation.
+
+### PR #190 — fix: bulletproof camera open timing, permission guard, cancel handling, and group picker error states in ReceiptScanScreen *(merged)*
+- **`ReceiptScanScreen.tsx`**: camera launch deferred with `setTimeout(open, 150)` to avoid race between navigator transition and native camera init; permission check added before open; cancel handling gracefully dismisses without error toast; group picker error state surfaced.
+- **`receipts.py`** (backend): receipt scanner fully rebuilt on **Gemini 2.5 Flash** (`gemini-2.5-flash-preview-05-20`). Multi-step JSON extraction with aggressive fallback chain — tries full parse, then `json.repair`, then regex extraction of individual fields. Merchant name returned as expense title. Indestructible parser: never returns a 500 regardless of Gemini output shape.
+- Alembic: no schema changes — receipt scan is a stateless route.
+
+### PR #192 — feat: group invite links (backend + mobile + web) *(merged)*
+- **Backend** — 4 new routes on `backend/app/routes/groups.py`:
+  - `GET /api/groups/join/{token}` — unauthenticated preview (group name, member count, creator name)
+  - `POST /api/groups/join/{token}` — authenticated join; idempotent (returns existing membership); notifies creator
+  - `POST /api/groups/{group_id}/invite/generate` — creator only; idempotent (returns existing token)
+  - `DELETE /api/groups/{group_id}/invite` — creator only; nulls `invite_token`
+- **Alembic migration** `20260613_add_invite_token_to_groups` — `IF NOT EXISTS` column + unique index on `groups.invite_token`.
+- **Mobile** — `GroupDetailScreen`: "Invite" ghost button (creator only) calls `generateInvite` then opens native Share sheet with `tandempay://join/{token}` deep link. `RootNavigator`: `Linking` deep link handler reads `/join/:token`, joins if authed, stores token in `AsyncStorage` if not. `LoginScreen` + `RegisterScreen`: post-auth check consumes stored pending token. `app.json`: `"scheme": "tandempay"` added.
+- **Web** — `frontend/src/pages/JoinPage.tsx`: public landing at `/join/:token` showing group preview with App Store CTA and "Open in App" deep link button.
+
+### PR #193 — feat: escalating nudge system *(merged)*
+- **`backend/app/services/nudge_service.py`** (new file):
+  - `send_nudge(settlement, session)` — fetches debtor/creditor/group, sends push via `push_for_user()` + email via `send_notification_email()`, increments `nudge_count`, sets `last_nudged_at`. Fire-and-forget; never raises.
+  - `run_nudge_job()` — queries all `pending` settlements with `nudge_count < 3` matching the timing windows (count 0: `created_at ≤ now − 3d`; count 1: `last_nudged_at ≤ now − 4d`; count 2: `last_nudged_at ≤ now − 7d`). Sends nudge per record and logs total.
+- **Copy**: count 0 — "Friendly reminder 👋 / You owe {creditor} ${amount} in {group}"; count 1 — "Still outstanding 💸 / {creditor} is waiting on ${amount}"; count 2 — "Final reminder / Don't forget — you owe {creditor} ${amount}".
+- **`backend/app/main.py`**: `run_nudge_job` registered with `CronTrigger(hour=9, minute=0, timezone="America/Toronto")`, id `"nudge_tick"`.
+- **Alembic migration** `20260613_add_nudge_fields_to_settlement_records` — adds `nudge_count INTEGER NOT NULL DEFAULT 0` and `last_nudged_at TIMESTAMP WITH TIME ZONE` to `settlement_records` (both `IF NOT EXISTS`). **Confirmed applied to prod** — `nudge_count` incrementing in production verified manually.
+
+### PR #194 + PR #195 — temp debug endpoint added then removed *(both merged)*
+- `POST /api/debug/run-nudge-job` added to manually trigger `run_nudge_job()` for testing, then removed once the nudge system was verified in production. No net code change.
+
+---
+
 ## R2 — Interac Email Parsing — ✅ DONE (merged 2026-06-03, PRs #104, #105, #106)
 
 ### Infrastructure (DONE)
@@ -272,18 +316,20 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 - **GitHub:** `github.com/Vedantdave66/Tandempay`
 - **Vercel projects:** `tandempay-api` (backend), `tandempay` (frontend)
 - **Database:** Supabase Postgres via Transaction Pooler. `DATABASE_URL` uses `postgresql+asyncpg://` on port 6543.
-- **Alembic baseline:** `1a2b3c4d5e6f_initial_schema.py`. Latest head: `a107c01bd8f1_add_auto_confirmed_to_settlement_records.py` (chain: `... → 20d7c91bb5df_add_revoked_tokens_table → 534d32e54b2b_merge_heads → 7af805ecb0e7_add_interac_email_logs_table → a107c01bd8f1_add_auto_confirmed_to_settlement_records`). Verify this has been run against prod.
+- **Alembic baseline:** `1a2b3c4d5e6f_initial_schema.py`. Latest head: `20260613_add_nudge_fields_to_settlement_records` (chain: `... → 20d7c91bb5df → 534d32e54b2b → 7af805ecb0e7 → a107c01bd8f1_add_auto_confirmed → 20260612_add_push_token_to_users → 20260613_add_invite_token_to_groups → 20260613_add_nudge_fields_to_settlement_records`). All migrations confirmed run against prod Supabase.
 - **SendGrid:** Domain `tandempay.ca` authenticated. Inbound Parse on `inbound.tandempay.ca`.
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), and the full Apple HIG + canvas carousel pass are all merged into `main`. There are **no open PRs**. Run `gh pr list` to confirm, then verify Alembic migrations are current on prod (head is `a107c01bd8f1`). The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist. If starting new feature work, define R6+ first — the roadmap table is fully done."
+> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the full Apple HIG + canvas carousel pass, and the June 13 sprint (P0 fixes, receipt scanner on Gemini 2.5 Flash, group invite links, escalating nudge system) are all merged into `main`. There are **no open PRs**. Run `gh pr list` to confirm. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. The nudge system is live and `nudge_count` is incrementing in production. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist. If starting new feature work, define R6+ first — the roadmap table is fully done."
 
 ## Open items / things to double-check next session
 
 1. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
-2. **Prod migration check** — confirm `a107c01bd8f1` (and `7af805ecb0e7` before it) have actually run against prod Supabase.
-3. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-4. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-5. **Define R6+** — the roadmap table is fully done; no documented next phase.
-6. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`. Hardcoded forest-green values in `Colors.ts` no longer bleed through on accent change.
+2. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+3. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+4. **Define R6+** — the roadmap table is fully done; no documented next phase.
+5. **Nudge job on Vercel (serverless)** — `run_nudge_job` is registered via APScheduler which only runs on long-lived servers. On Vercel (serverless), the `is_serverless` guard skips the scheduler entirely. If prod runs on Vercel, the nudge cron needs an external trigger (e.g. Vercel Cron, GitHub Actions schedule hitting `POST /api/debug/run-nudge-job` — but that endpoint was deleted in PR #195). Decide: add a lightweight authenticated cron endpoint, or move to a Render/Railway worker.
+6. **Invite link deep link on iOS** — `tandempay://join/{token}` requires the app to be installed. Universal links (`https://tandempay.ca/join/{token}`) would fall back to the web `JoinPage`. Not yet wired.
+7. ~~**Prod migration check**~~ — ✅ Confirmed. All migrations through `20260613_add_nudge_fields_to_settlement_records` applied to prod Supabase.
+8. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`.
