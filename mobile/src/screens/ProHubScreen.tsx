@@ -119,9 +119,9 @@ export default function ProHubScreen({ navigation }: any) {
 
                 {/* Hero card */}
                 <LinearGradient
-                    colors={colors.heroGradient}
+                    colors={isDark ? colors.heroGradient : [colors.surface, colors.surface] as any}
                     locations={[0, 0.35, 1]}
-                    style={styles.heroCard}
+                    style={[styles.heroCard, !isDark && { borderWidth: 1, borderColor: colors.border }]}
                 >
                     <CharacterShape
                         shape={user?.character_shape ?? 'rect'}
@@ -143,23 +143,23 @@ export default function ProHubScreen({ navigation }: any) {
                 {/* Pro card */}
                 <View style={styles.proSection}>
                     <LinearGradient
-                        colors={colors.cardGradient as any}
+                        colors={['#0D2B18', '#0F3320', '#0A1F12'] as any}
                         style={[styles.proCard, { borderColor: colors.accent + '50' }]}
                     >
                         <View style={styles.proCardTop}>
                             <View style={styles.proTitleRow}>
-                                <Crown size={20} color="#fff" />
+                                <Crown size={20} color="#F2C200" />
                                 <Text style={[styles.proTitle, T.extrabold]}>TandemPay Pro</Text>
                             </View>
                             <Animated.View style={[styles.priceChip, { opacity: shimmerAnim }]}>
-                                <Text style={[styles.priceChipText, { color: colors.accent }, T.extrabold]}>$4.99/mo</Text>
+                                <Text style={[styles.priceChipText, { color: isDark ? colors.accent : '#0D2B18' }, T.extrabold]}>$4.99/mo</Text>
                             </Animated.View>
                         </View>
 
                         <View style={styles.proFeatures}>
                             {PRO_FEATURES.map(f => (
                                 <View key={f} style={styles.featureRow}>
-                                    <Check size={14} color="rgba(255,255,255,0.9)" strokeWidth={2.5} />
+                                    <Check size={14} color={colors.accent} strokeWidth={2.5} />
                                     <Text style={[styles.featureText, T.semibold]}>{f}</Text>
                                 </View>
                             ))}
