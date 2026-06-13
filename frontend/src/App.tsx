@@ -10,6 +10,7 @@ import TutorialPage from './pages/TutorialPage';
 import DashboardPage from './pages/DashboardPage';
 import GroupPage from './pages/GroupPage';
 import InvitePage from './pages/InvitePage';
+import JoinPage from './pages/JoinPage';
 import PaymentsPage from './pages/PaymentsPage';
 import FriendsPage from './pages/FriendsPage';
 import RecurringPage from './pages/RecurringPage';
@@ -78,6 +79,7 @@ export default function App() {
                             <Route path="/groups/:groupId" element={<ProtectedRoute><Layout><GroupPage /></Layout></ProtectedRoute>} />
                             <Route path="/groups/:groupId/split" element={<ProtectedRoute><SplitCanvas /></ProtectedRoute>} />
                             <Route path="/invite/:groupId" element={<ProtectedRoute><InvitePage /></ProtectedRoute>} />
+                            <Route path="/join/:token" element={<JoinPage />} />
                             <Route path="/pricing" element={<PricingPage />} />
                             <Route path="/pro-success" element={<ProtectedRoute><ProSuccessPage /></ProtectedRoute>} />
                             <Route path="/settings/character" element={<ProtectedRoute><CharacterCustomizerPage /></ProtectedRoute>} />

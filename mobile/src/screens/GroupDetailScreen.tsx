@@ -15,6 +15,7 @@ import {
   StatusBar,
   Animated,
   Easing,
+  Share,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -23,7 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2 } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2 } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -68,6 +69,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [addingFriendId, setAddingFriendId] = useState<string | null>(null);
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [shareLoading, setShareLoading] = useState(false);
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -215,6 +217,23 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 },
             ]
         );
+    };
+
+    const handleShareInvite = async () => {
+        if (!group) return;
+        setShareLoading(true);
+        try {
+            const result = await groupsApi.generateInvite(groupId);
+            await Share.share({
+                message: `Join ${group.name} on TandemPay! Split bills and settle free via Interac. ${result.invite_url}`,
+            });
+        } catch (err: any) {
+            if (err.message !== 'The user did not share') {
+                Alert.alert('Error', err.message || 'Could not generate invite link.');
+            }
+        } finally {
+            setShareLoading(false);
+        }
     };
 
     const handleInviteByEmail = async () => {
@@ -396,6 +415,25 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         <Send size={15} color={colors.gold} />
                         <Text style={[styles.ghostBtnText, { color: colors.gold }, T.bold]}>Settle up</Text>
                     </TouchableOpacity>
+                    {user?.id === group?.created_by && (
+                        <TouchableOpacity
+                            style={[styles.ghostBtn, { borderColor: colors.accent, opacity: shareLoading ? 0.6 : 1 }]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                handleShareInvite();
+                            }}
+                            disabled={shareLoading}
+                            activeOpacity={0.82}
+                        >
+                            {shareLoading
+                                ? <ActivityIndicator size="small" color={colors.accent} />
+                                : <Share2 size={15} color={colors.accent} />
+                            }
+                            {!shareLoading && (
+                                <Text style={[styles.ghostBtnText, { color: colors.accent }, T.bold]}>Invite</Text>
+                            )}
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <View style={styles.tabRow}>
