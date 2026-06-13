@@ -6,7 +6,6 @@ import {
     ScrollView,
     TouchableOpacity,
     Alert,
-    Linking,
     Share,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
@@ -45,8 +44,7 @@ export default function ProHubScreen({ navigation }: any) {
     };
 
     const handleProAction = () => {
-        // TODO: route to a dedicated subscription-management screen once one exists
-        Linking.openURL('https://tandempay.ca/pricing');
+        navigation.navigate('Subscription');
     };
 
     const handleInvite = async () => {
