@@ -8,6 +8,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     ChevronLeft, ChevronRight, Users, Check, Sparkles,
 } from 'lucide-react-native';
@@ -16,7 +17,7 @@ import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import {
-    groupsApi, expensesApi, smartSplitApi,
+    groupsApi, expensesApi, smartSplitApi, BASE_URL,
     GroupListItem, GroupMember,
 } from '../services/api';
 import CharacterShape from '../components/CharacterShape';
@@ -170,11 +171,22 @@ export default function SmartSplitScreen({ navigation }: any) {
         if (user?.id && !memberIds.includes(user.id)) memberIds.push(user.id);
 
         try {
+            const token = await AsyncStorage.getItem('token');
+            const requestBody = { description, group_id: groupId, member_ids: memberIds };
+            console.log('[SmartSplit] PRE-REQUEST', {
+                url: `${BASE_URL}/smart-split`,
+                hasToken: !!token,
+                tokenSnippet: token ? `${token.slice(0, 20)}...` : null,
+                body: requestBody,
+            });
+
             const result = await smartSplitApi.parse({
                 description,
                 group_id: groupId,
                 member_ids: memberIds,
             });
+
+            console.log('[SmartSplit] RESPONSE OK', result);
 
             if (result.parse_failed) {
                 setPhase('error');
@@ -197,7 +209,13 @@ export default function SmartSplitScreen({ navigation }: any) {
             setNeedsTotal(!!result.needs_total);
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
             setPhase('review');
-        } catch {
+        } catch (err: any) {
+            console.log('[SmartSplit] ERROR', {
+                message: err?.message,
+                status: err?.status,
+                response: err?.response,
+                raw: String(err),
+            });
             setPhase('error');
         } finally {
             setParsing(false);
