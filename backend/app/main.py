@@ -30,6 +30,7 @@ from app.database import engine  # used by APScheduler-started services via app.
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments, interac_routes
 from app.routes import reminders
 from app.routes.receipts import router as receipts_router
+from app.routes.smart_split import router as smart_split_router
 from app.routes import audit_log
 from app.routes import subscription_routes
 from app.routes import recurring_routes
@@ -340,6 +341,7 @@ app.include_router(recurring_routes.router)
 app.include_router(export_routes.router)
 app.include_router(interac_routes.router)
 app.include_router(receipts_router)
+app.include_router(smart_split_router)
 
 @app.get("/")
 async def root():

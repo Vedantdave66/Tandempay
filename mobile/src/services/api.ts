@@ -405,6 +405,29 @@ export const receiptsApi = {
         }),
 };
 
+// --- Smart Split ---
+export interface SmartSplitEntry {
+    user_id: string;
+    amount: number;
+    note: string;
+}
+
+export interface SmartSplitResponse {
+    title: string;
+    total: number;
+    splits: SmartSplitEntry[];
+    needs_total?: boolean;
+    parse_failed?: boolean;
+}
+
+export const smartSplitApi = {
+    parse: (data: { description: string; group_id: string; member_ids: string[] }) =>
+        request<SmartSplitResponse>('/smart-split', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+};
+
 // --- Stripe Payments ---
 export interface CreatePaymentIntentResponse {
     client_secret: string;
