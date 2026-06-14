@@ -14,7 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, ShieldCheck, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
+import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 
@@ -27,7 +27,6 @@ const PRO_FEATURES = [
 
 const SETTINGS_ROWS = [
     { icon: Users2,      label: 'Friends' },
-    { icon: ShieldCheck, label: 'Privacy & Security' },
     { icon: Bell,        label: 'Notifications' },
     { icon: UserPlus,    label: 'Invite a friend' },
     { icon: Sun,         label: 'Appearance' },
@@ -38,10 +37,6 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
-
-    const handleSettingsTap = (label: string) => {
-        Alert.alert('Coming soon', `${label} is on our roadmap.`);
-    };
 
     const handleProAction = () => {
         navigation.navigate('Subscription');
@@ -135,9 +130,9 @@ export default function ProHubScreen({ navigation }: any) {
                                     ]}
                                     onPress={() => {
                                         if (row.label === 'Friends') return navigation.navigate('FriendsHub');
+                                        if (row.label === 'Notifications') return navigation.navigate('Notifications');
                                         if (row.label === 'Invite a friend') return handleInvite();
                                         if (row.label === 'Appearance') return navigation.navigate('Appearance');
-                                        handleSettingsTap(row.label);
                                     }}
                                     activeOpacity={0.7}
                                 >
