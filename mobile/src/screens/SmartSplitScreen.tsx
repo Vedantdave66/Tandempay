@@ -8,16 +8,19 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Audio } from 'expo-av';
 import {
     ChevronLeft, ChevronRight, Users, Check, Sparkles,
+    Mic, MicOff, X, MessageCircle,
 } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import {
-    groupsApi, expensesApi, smartSplitApi,
-    GroupListItem, GroupMember,
+    groupsApi, expensesApi, smartSplitApi, BASE_URL,
+    GroupListItem, GroupMember, SmartSplitResponse,
 } from '../services/api';
 import CharacterShape from '../components/CharacterShape';
 import PressableScale from '../components/PressableScale';
@@ -39,16 +42,30 @@ interface ReviewSplit {
     note: string;
     character_shape: string;
     character_color: string;
+    included: boolean;
+}
+
+interface ActionSheetData {
+    type: 'add_to_group' | 'create_group' | 'remove_from_group';
+    name: string;
+    message?: string;
+    userId?: string;
 }
 
 const { height: SCREEN_H } = Dimensions.get('window');
 const SHEET_H = SCREEN_H * 0.55;
+const ACTION_SHEET_H = SCREEN_H * 0.32;
 
 const PLACEHOLDERS = [
     'Thai for 4, Lakshit skipped drinks — $85 total',
     'Groceries $120, Maya got extra items',
     'Uber $34 split 3 ways, I paid',
 ];
+
+const MIME_MAP: Record<string, string> = {
+    m4a: 'audio/mp4', mp4: 'audio/mp4', wav: 'audio/wav',
+    mp3: 'audio/mpeg', ogg: 'audio/ogg',
+};
 
 export default function SmartSplitScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
@@ -57,20 +74,41 @@ export default function SmartSplitScreen({ navigation }: any) {
     const [phase, setPhase] = useState<Phase>('input');
 
     // ── Group picker ──────────────────────────────────────────────────────────
-    const [pickerVisible, setPickerVisible]     = useState(false);
-    const [pickerGroups, setPickerGroups]       = useState<GroupListItem[]>([]);
-    const [pickerLoading, setPickerLoading]     = useState(false);
-    const [pickerError, setPickerError]         = useState(false);
+    const [pickerVisible, setPickerVisible]       = useState(false);
+    const [pickerGroups, setPickerGroups]         = useState<GroupListItem[]>([]);
+    const [pickerLoading, setPickerLoading]       = useState(false);
+    const [pickerError, setPickerError]           = useState(false);
     const [selectingGroupId, setSelectingGroupId] = useState<string | null>(null);
-    const [groupId, setGroupId]                 = useState<string | null>(null);
-    const [groupName, setGroupName]             = useState('');
-    const [groupMembers, setGroupMembers]       = useState<GroupMember[]>([]);
+    const [groupId, setGroupId]                   = useState<string | null>(null);
+    const [groupName, setGroupName]               = useState('');
+    const [groupMembers, setGroupMembers]         = useState<GroupMember[]>([]);
 
     // ── Input ─────────────────────────────────────────────────────────────────
-    const [description, setDescription] = useState('');
+    const [description, setDescription]   = useState('');
     const [inputFocused, setInputFocused] = useState(false);
-    const [parsing, setParsing] = useState(false);
-    const [includedIds, setIncludedIds] = useState<Set<string>>(new Set());
+    const [parsing, setParsing]           = useState(false);
+    const [includedIds, setIncludedIds]   = useState<Set<string>>(new Set());
+
+    // ── Voice recording ───────────────────────────────────────────────────────
+    const [isRecording, setIsRecording]       = useState(false);
+    const [voiceProcessing, setVoiceProcessing] = useState(false);
+    const recordingRef = useRef<Audio.Recording | null>(null);
+    const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const recordingPulse = useRef(new Animated.Value(1)).current;
+    const recordingPulseAnim = useRef<Animated.CompositeAnimation | null>(null);
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const toastAnim = useRef(new Animated.Value(0)).current;
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    // ── Clarify card ──────────────────────────────────────────────────────────
+    const [clarifyMsg, setClarifyMsg]     = useState<string | null>(null);
+    const [clarifyInput, setClarifyInput] = useState('');
+
+    // ── Action sheet (add/create group, remove from group) ────────────────────
+    const [actionSheet, setActionSheet] = useState<ActionSheetData | null>(null);
+    const actionSheetAnim = useRef(new Animated.Value(ACTION_SHEET_H)).current;
 
     // ── Review ────────────────────────────────────────────────────────────────
     const [reviewTitle, setReviewTitle]   = useState('');
@@ -105,12 +143,11 @@ export default function SmartSplitScreen({ navigation }: any) {
         ];
     }, [groupMembers, user, colors.accent]);
 
-    // Initialize included IDs whenever the group changes
     useEffect(() => {
         setIncludedIds(new Set(allMembers.map(m => m.user_id)));
     }, [allMembers.length]);
 
-    // Cycling placeholder animation
+    // Placeholder cycling
     useEffect(() => {
         const interval = setInterval(() => {
             Animated.timing(placeholderOpacity, {
@@ -124,6 +161,209 @@ export default function SmartSplitScreen({ navigation }: any) {
         }, 3000);
         return () => clearInterval(interval);
     }, []);
+
+    // Cleanup recording on unmount
+    useEffect(() => {
+        return () => {
+            if (recordingTimer.current) clearTimeout(recordingTimer.current);
+            recordingPulseAnim.current?.stop();
+            recordingRef.current?.stopAndUnloadAsync().catch(() => {});
+        };
+    }, []);
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    const showToast = useCallback((msg: string) => {
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        setToastMsg(msg);
+        toastAnim.setValue(0);
+        Animated.timing(toastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        toastTimer.current = setTimeout(() => {
+            Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+                .start(() => setToastMsg(null));
+        }, 2500);
+    }, [toastAnim]);
+
+    // ── Action sheet ──────────────────────────────────────────────────────────
+    const openActionSheet = useCallback((data: ActionSheetData) => {
+        setActionSheet(data);
+        actionSheetAnim.setValue(ACTION_SHEET_H);
+        Animated.spring(actionSheetAnim, {
+            toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true,
+        }).start();
+    }, [actionSheetAnim]);
+
+    const closeActionSheet = useCallback(() => {
+        Animated.spring(actionSheetAnim, {
+            toValue: ACTION_SHEET_H, damping: 24, stiffness: 220, useNativeDriver: true,
+        }).start(() => setActionSheet(null));
+    }, [actionSheetAnim]);
+
+    // ── Intent handler ────────────────────────────────────────────────────────
+    const handleIntentResult = useCallback((result: SmartSplitResponse) => {
+        if (result.parse_failed) { setPhase('error'); return; }
+
+        switch (result.intent) {
+            case 'parse_expense': {
+                const memberMap = new Map(allMembers.map(m => [m.user_id, m]));
+                const splits: ReviewSplit[] = (result.splits ?? []).map(s => ({
+                    user_id: s.user_id,
+                    name: s.name || memberMap.get(s.user_id)?.name || 'Member',
+                    amount: s.amount > 0 ? s.amount.toFixed(2) : '0.00',
+                    note: s.note ?? '',
+                    character_shape: memberMap.get(s.user_id)?.character_shape ?? 'rect',
+                    character_color: memberMap.get(s.user_id)?.character_color ?? colors.accent,
+                    included: s.included !== false,
+                }));
+
+                // Sync excluded members back to input-phase chips
+                const nowExcluded = (result.splits ?? [])
+                    .filter(s => s.included === false)
+                    .map(s => s.user_id);
+                if (nowExcluded.length > 0) {
+                    setIncludedIds(prev => {
+                        const next = new Set(prev);
+                        nowExcluded.forEach(id => next.delete(id));
+                        return next;
+                    });
+                }
+
+                setReviewTitle(result.title ?? '');
+                setReviewTotal(result.total > 0 ? result.total.toFixed(2) : '');
+                setReviewSplits(splits);
+                setNeedsTotal(!!result.needs_total);
+                Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                setPhase('review');
+                break;
+            }
+
+            case 'exclude_member': {
+                const hint = (result.member_name ?? '').toLowerCase();
+                const found = allMembers.find(
+                    m => m.name.toLowerCase().includes(hint) || hint.includes(m.name.toLowerCase())
+                );
+                if (found && found.user_id !== user?.id) {
+                    setIncludedIds(prev => {
+                        const next = new Set(prev);
+                        next.delete(found.user_id);
+                        return next;
+                    });
+                }
+                showToast(result.message || `Removed ${result.member_name ?? 'member'} from this split`);
+                break;
+            }
+
+            case 'add_to_group':
+                openActionSheet({
+                    type: 'add_to_group',
+                    name: result.member_name ?? '',
+                    message: result.message ?? '',
+                });
+                break;
+
+            case 'create_group':
+                openActionSheet({
+                    type: 'create_group',
+                    name: result.group_name_suggestion ?? '',
+                    message: result.message ?? '',
+                });
+                break;
+
+            case 'adjust_split':
+                showToast(result.message || `Updated ${result.member_name ?? ''}'s share`);
+                break;
+
+            case 'clarify':
+                setClarifyMsg(result.message || 'Could you be more specific?');
+                break;
+
+            default:
+                setPhase('error');
+        }
+    }, [allMembers, colors.accent, user?.id, showToast, openActionSheet]);
+
+    // ── Voice recording ───────────────────────────────────────────────────────
+    const stopAndSendVoice = useCallback(async () => {
+        if (recordingTimer.current) { clearTimeout(recordingTimer.current); recordingTimer.current = null; }
+        recordingPulseAnim.current?.stop();
+        recordingPulseAnim.current = null;
+        recordingPulse.setValue(1);
+
+        let uri: string | null = null;
+        try {
+            await recordingRef.current?.stopAndUnloadAsync();
+            uri = recordingRef.current?.getURI() ?? null;
+        } catch (err) {
+            console.log('[SmartSplit] stop recording error', err);
+        }
+        recordingRef.current = null;
+        setIsRecording(false);
+
+        if (!uri || !groupId) return;
+        setVoiceProcessing(true);
+        try {
+            const memberIds = [...includedIds].filter(Boolean);
+            if (user?.id && !memberIds.includes(user.id)) memberIds.push(user.id);
+            const result = await smartSplitApi.parseVoice({
+                audioUri: uri,
+                group_id: groupId,
+                group_name: groupName,
+                member_ids: memberIds,
+            });
+            console.log('[SmartSplit] voice result', result);
+            handleIntentResult(result);
+        } catch (err: any) {
+            console.log('[SmartSplit] voice send error', err?.message);
+            Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
+        } finally {
+            setVoiceProcessing(false);
+        }
+    }, [groupId, groupName, includedIds, user, recordingPulse, handleIntentResult]);
+
+    const handleVoicePress = useCallback(async () => {
+        if (voiceProcessing) return;
+
+        if (isRecording) {
+            await stopAndSendVoice();
+            return;
+        }
+
+        if (!groupId) {
+            Alert.alert('Select a group first', 'Choose a group before recording.');
+            return;
+        }
+
+        try {
+            const { status } = await Audio.requestPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Microphone needed', 'Allow microphone access to use voice input.');
+                return;
+            }
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+            const recording = new Audio.Recording();
+            await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+            await recording.startAsync();
+            recordingRef.current = recording;
+            setIsRecording(true);
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
+            // Pulse animation loop
+            const pulse = () => {
+                const anim = Animated.sequence([
+                    Animated.spring(recordingPulse, { toValue: 1.08, damping: 20, stiffness: 320, useNativeDriver: true }),
+                    Animated.spring(recordingPulse, { toValue: 1.0, damping: 20, stiffness: 320, useNativeDriver: true }),
+                ]);
+                recordingPulseAnim.current = anim;
+                anim.start(({ finished }) => { if (finished) pulse(); });
+            };
+            pulse();
+
+            // Auto-stop after 30s
+            recordingTimer.current = setTimeout(() => { stopAndSendVoice(); }, 30000);
+        } catch (err) {
+            console.log('[SmartSplit] recording start error', err);
+            Alert.alert('Error', 'Could not start recording.');
+        }
+    }, [isRecording, voiceProcessing, groupId, recordingPulse, stopAndSendVoice]);
 
     // ── Group picker logic ────────────────────────────────────────────────────
     const loadGroups = useCallback(() => {
@@ -160,9 +400,9 @@ export default function SmartSplitScreen({ navigation }: any) {
         });
     }, [sheetAnim]);
 
-    // ── Parse ─────────────────────────────────────────────────────────────────
-    const handleParse = useCallback(async () => {
-        if (!description.trim() || !groupId || parsing) return;
+    // ── Parse (text) ──────────────────────────────────────────────────────────
+    const _runParse = useCallback(async (text: string) => {
+        if (!groupId) return;
         setParsing(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
@@ -170,39 +410,116 @@ export default function SmartSplitScreen({ navigation }: any) {
         if (user?.id && !memberIds.includes(user.id)) memberIds.push(user.id);
 
         try {
+            const token = await AsyncStorage.getItem('token');
+            console.log('[SmartSplit] PRE-REQUEST', {
+                url: `${BASE_URL}/smart-split`,
+                hasToken: !!token,
+                tokenSnippet: token ? `${token.slice(0, 20)}...` : null,
+                body: { description: text, group_id: groupId, group_name: groupName, member_ids: memberIds },
+            });
+
             const result = await smartSplitApi.parse({
-                description,
+                description: text,
                 group_id: groupId,
+                group_name: groupName,
                 member_ids: memberIds,
             });
 
-            if (result.parse_failed) {
-                setPhase('error');
-                return;
-            }
-
-            const memberMap = new Map(allMembers.map(m => [m.user_id, m]));
-            const splits: ReviewSplit[] = (result.splits ?? []).map(s => ({
-                user_id: s.user_id,
-                name: memberMap.get(s.user_id)?.name ?? 'Member',
-                amount: s.amount > 0 ? s.amount.toFixed(2) : '0.00',
-                note: s.note ?? '',
-                character_shape: memberMap.get(s.user_id)?.character_shape ?? 'rect',
-                character_color: memberMap.get(s.user_id)?.character_color ?? colors.accent,
-            }));
-
-            setReviewTitle(result.title ?? '');
-            setReviewTotal(result.total > 0 ? result.total.toFixed(2) : '');
-            setReviewSplits(splits);
-            setNeedsTotal(!!result.needs_total);
-            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-            setPhase('review');
-        } catch {
+            console.log('[SmartSplit] RESPONSE OK', result);
+            handleIntentResult(result);
+        } catch (err: any) {
+            console.log('[SmartSplit] ERROR', {
+                message: err?.message,
+                status: err?.status,
+                response: err?.response,
+                raw: String(err),
+            });
             setPhase('error');
         } finally {
             setParsing(false);
         }
-    }, [description, groupId, parsing, includedIds, user, allMembers, colors.accent]);
+    }, [groupId, groupName, includedIds, user, handleIntentResult]);
+
+    const handleParse = useCallback(async () => {
+        if (!description.trim() || !groupId || parsing) return;
+        setClarifyMsg(null);
+        setClarifyInput('');
+        await _runParse(description.trim());
+    }, [description, groupId, parsing, _runParse]);
+
+    const handleClarifySubmit = useCallback(async () => {
+        if (!clarifyInput.trim() || !groupId || parsing) return;
+        const combined = `${description}\n\nAdditional context: ${clarifyInput.trim()}`;
+        setClarifyMsg(null);
+        setClarifyInput('');
+        await _runParse(combined);
+    }, [clarifyInput, description, groupId, parsing, _runParse]);
+
+    // ── Long press member chip ────────────────────────────────────────────────
+    const handleMemberLongPress = useCallback((m: MemberChip) => {
+        if (m.user_id === user?.id) return;
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+        openActionSheet({ type: 'remove_from_group', name: m.name, userId: m.user_id });
+    }, [user?.id, openActionSheet]);
+
+    // ── Action sheet handlers ─────────────────────────────────────────────────
+    const handleActionSheetConfirm = useCallback(async () => {
+        if (!actionSheet) return;
+
+        if (actionSheet.type === 'add_to_group') {
+            closeActionSheet();
+            Alert.prompt(
+                `Add ${actionSheet.name}`,
+                `Enter their email to invite them to ${groupName}.`,
+                async (email) => {
+                    if (!email?.trim() || !groupId) return;
+                    try {
+                        await groupsApi.addMember(groupId, email.trim());
+                        showToast(`Invited ${actionSheet.name} to ${groupName}`);
+                    } catch (err: any) {
+                        Alert.alert('Error', err.message || 'Could not add member.');
+                    }
+                },
+                'plain-text',
+            );
+            return;
+        }
+
+        if (actionSheet.type === 'create_group') {
+            closeActionSheet();
+            try {
+                await groupsApi.create(actionSheet.name);
+                showToast(`Created group "${actionSheet.name}"`);
+                navigation.navigate('Groups');
+            } catch (err: any) {
+                Alert.alert('Error', err.message || 'Could not create group.');
+            }
+            return;
+        }
+
+        if (actionSheet.type === 'remove_from_group' && actionSheet.userId && groupId) {
+            closeActionSheet();
+            Alert.alert(
+                `Remove ${actionSheet.name}?`,
+                `This will remove them from ${groupName}. This cannot be undone.`,
+                [
+                    { text: 'Cancel', style: 'cancel' },
+                    {
+                        text: 'Remove', style: 'destructive',
+                        onPress: async () => {
+                            try {
+                                await groupsApi.removeMember(groupId, actionSheet.userId!);
+                                setGroupMembers(prev => prev.filter(m => m.user_id !== actionSheet.userId));
+                                showToast(`Removed ${actionSheet.name} from ${groupName}`);
+                            } catch (err: any) {
+                                Alert.alert('Error', err.message || 'Could not remove member.');
+                            }
+                        },
+                    },
+                ],
+            );
+        }
+    }, [actionSheet, groupId, groupName, closeActionSheet, showToast, navigation]);
 
     // ── Add Expense ───────────────────────────────────────────────────────────
     const handleAddExpense = useCallback(async () => {
@@ -215,7 +532,9 @@ export default function SmartSplitScreen({ navigation }: any) {
         setAdding(true);
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         try {
-            const participantIds = reviewSplits.map(s => s.user_id);
+            const participantIds = reviewSplits
+                .filter(s => s.included)
+                .map(s => s.user_id);
             await expensesApi.create(groupId, {
                 title: reviewTitle.trim() || 'Shared Expense',
                 amount: total,
@@ -232,11 +551,87 @@ export default function SmartSplitScreen({ navigation }: any) {
     }, [groupId, user, adding, reviewTotal, reviewSplits, reviewTitle, navigation]);
 
     // ── Review derived ────────────────────────────────────────────────────────
-    const splitsSum = reviewSplits.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
-    const totalNum  = parseFloat(reviewTotal) || 0;
-    const remaining = totalNum > 0 ? parseFloat((totalNum - splitsSum).toFixed(2)) : 0;
+    const includedSplits = reviewSplits.filter(s => s.included);
+    const splitsSum  = includedSplits.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
+    const totalNum   = parseFloat(reviewTotal) || 0;
+    const remaining  = totalNum > 0 ? parseFloat((totalNum - splitsSum).toFixed(2)) : 0;
 
-    // ── Group picker modal ────────────────────────────────────────────────────
+    // ── Render helpers ────────────────────────────────────────────────────────
+    const renderToast = () => {
+        if (!toastMsg) return null;
+        return (
+            <Animated.View
+                style={[
+                    styles.toast,
+                    { backgroundColor: colors.accent, opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }] },
+                ]}
+                pointerEvents="none"
+            >
+                <Check size={14} color="#fff" strokeWidth={2.5} />
+                <Text style={[styles.toastText, T.semibold]}>{toastMsg}</Text>
+            </Animated.View>
+        );
+    };
+
+    const renderActionSheet = () => {
+        if (!actionSheet) return null;
+
+        let title = '';
+        let subtitle = '';
+        let confirmLabel = 'Confirm';
+        let confirmDanger = false;
+
+        if (actionSheet.type === 'add_to_group') {
+            title = `Add ${actionSheet.name}?`;
+            subtitle = actionSheet.message || `Invite ${actionSheet.name} to ${groupName}`;
+            confirmLabel = 'Add member';
+        } else if (actionSheet.type === 'create_group') {
+            title = `Create "${actionSheet.name}"?`;
+            subtitle = actionSheet.message || `Make a new group called ${actionSheet.name}`;
+            confirmLabel = 'Create group';
+        } else if (actionSheet.type === 'remove_from_group') {
+            title = `Remove ${actionSheet.name}?`;
+            subtitle = `Remove from ${groupName}`;
+            confirmLabel = 'Remove';
+            confirmDanger = true;
+        }
+
+        return (
+            <Modal visible transparent animationType="none" onRequestClose={closeActionSheet}>
+                <View style={{ flex: 1 }}>
+                    <TouchableOpacity
+                        style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.45)' }]}
+                        activeOpacity={1}
+                        onPress={closeActionSheet}
+                    />
+                    <Animated.View style={[
+                        styles.actionSheet,
+                        { backgroundColor: colors.surface, transform: [{ translateY: actionSheetAnim }] },
+                    ]}>
+                        <View style={styles.handleRow}>
+                            <View style={[styles.handlePill, { backgroundColor: colors.border }]} />
+                        </View>
+                        <View style={styles.actionSheetBody}>
+                            <Text style={[styles.actionSheetTitle, T.bold, { color: colors.text }]}>{title}</Text>
+                            <Text style={[styles.actionSheetSub, T.regular, { color: colors.secondaryText }]}>{subtitle}</Text>
+                            <PressableScale
+                                scaleTo={0.97}
+                                haptic="medium"
+                                style={[styles.actionSheetBtn, { backgroundColor: confirmDanger ? colors.danger : colors.accent }]}
+                                onPress={handleActionSheetConfirm}
+                            >
+                                <Text style={[styles.actionSheetBtnText, T.semibold]}>{confirmLabel}</Text>
+                            </PressableScale>
+                            <TouchableOpacity onPress={closeActionSheet} activeOpacity={0.7} style={{ marginTop: vs(8) }}>
+                                <Text style={[{ fontSize: ms(14), color: colors.secondaryText }, T.regular]}>Cancel</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </Animated.View>
+                </View>
+            </Modal>
+        );
+    };
+
     const renderPicker = () => (
         <Modal
             visible={pickerVisible}
@@ -355,8 +750,7 @@ export default function SmartSplitScreen({ navigation }: any) {
             <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
                 <View style={styles.header}>
                     <PressableScale
-                        scaleTo={0.97}
-                        haptic="light"
+                        scaleTo={0.97} haptic="light"
                         onPress={() => setPhase('input')}
                         style={[styles.backBtn, { backgroundColor: colors.surface }]}
                     >
@@ -365,7 +759,6 @@ export default function SmartSplitScreen({ navigation }: any) {
                     <Text style={[styles.screenTitle, T.bold, { color: colors.text }]}>Smart Split</Text>
                     <View style={styles.headerSpacer} />
                 </View>
-
                 <View style={styles.errorBody}>
                     <View style={[styles.errorCard, { backgroundColor: colors.surface }]}>
                         <CharacterShape shape="round" color="#F59E0B" variant="hero" />
@@ -374,8 +767,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                             Try being more specific — mention amounts and who's included.
                         </Text>
                         <PressableScale
-                            scaleTo={0.97}
-                            haptic="medium"
+                            scaleTo={0.97} haptic="medium"
                             style={[styles.retryBtn, { backgroundColor: colors.accent }]}
                             onPress={() => setPhase('input')}
                         >
@@ -386,9 +778,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                             activeOpacity={0.7}
                             style={{ marginTop: vs(10) }}
                         >
-                            <Text style={[{ fontSize: ms(14), color: colors.secondaryText }, T.regular]}>
-                                Start over
-                            </Text>
+                            <Text style={[{ fontSize: ms(14), color: colors.secondaryText }, T.regular]}>Start over</Text>
                         </TouchableOpacity>
                     </View>
                 </View>
@@ -402,8 +792,7 @@ export default function SmartSplitScreen({ navigation }: any) {
             <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
                 <View style={styles.header}>
                     <PressableScale
-                        scaleTo={0.97}
-                        haptic="light"
+                        scaleTo={0.97} haptic="light"
                         onPress={() => setPhase('input')}
                         style={[styles.backBtn, { backgroundColor: colors.surface }]}
                     >
@@ -412,11 +801,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                     <Text style={[styles.screenTitle, T.bold, { color: colors.text }]}>Review Split</Text>
                     <View style={styles.headerSpacer} />
                 </View>
-
-                <KeyboardAvoidingView
-                    behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                    style={{ flex: 1 }}
-                >
+                <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
                     <ScrollView
                         contentContainerStyle={styles.reviewScroll}
                         showsVerticalScrollIndicator={false}
@@ -435,11 +820,8 @@ export default function SmartSplitScreen({ navigation }: any) {
                             <View style={[
                                 styles.totalRow,
                                 needsTotal && {
-                                    borderWidth: 1.5,
-                                    borderColor: colors.warning,
-                                    borderRadius: ms(12),
-                                    padding: scale(8),
-                                    marginTop: vs(4),
+                                    borderWidth: 1.5, borderColor: colors.warning,
+                                    borderRadius: ms(12), padding: scale(8), marginTop: vs(4),
                                 },
                             ]}>
                                 <Text style={[styles.dollarSign, T.extrabold, { color: colors.accent }]}>$</Text>
@@ -469,19 +851,18 @@ export default function SmartSplitScreen({ navigation }: any) {
                                     key={s.user_id}
                                     style={[
                                         styles.splitRow,
+                                        !s.included && { opacity: 0.38 },
                                         i < reviewSplits.length - 1 && {
-                                            borderBottomWidth: 1,
-                                            borderBottomColor: colors.border,
+                                            borderBottomWidth: 1, borderBottomColor: colors.border,
                                         },
                                     ]}
                                 >
-                                    <CharacterShape
-                                        shape={s.character_shape}
-                                        color={s.character_color}
-                                        variant="mini"
-                                    />
+                                    <CharacterShape shape={s.character_shape} color={s.character_color} variant="mini" />
                                     <View style={styles.splitRowInfo}>
-                                        <Text style={[styles.splitName, T.semibold, { color: colors.text }]}>
+                                        <Text style={[
+                                            styles.splitName, T.semibold, { color: colors.text },
+                                            !s.included && { textDecorationLine: 'line-through' },
+                                        ]}>
                                             {s.name}
                                         </Text>
                                         {!!s.note && (
@@ -489,24 +870,28 @@ export default function SmartSplitScreen({ navigation }: any) {
                                                 {s.note}
                                             </Text>
                                         )}
+                                        {!s.included && (
+                                            <Text style={[styles.splitNote, T.regular, { color: colors.tertiaryText }]}>excluded</Text>
+                                        )}
                                     </View>
-                                    <View style={[styles.amountPill, { backgroundColor: colors.accentBg }]}>
-                                        <Text style={[styles.dollarSignSmall, T.extrabold, { color: colors.accent }]}>$</Text>
-                                        <TextInput
-                                            value={s.amount}
-                                            onChangeText={val => {
-                                                setReviewSplits(prev =>
-                                                    prev.map((r, j) => j === i ? { ...r, amount: val } : r)
-                                                );
-                                            }}
-                                            style={[styles.amountInput, T.extrabold, { color: colors.accent }]}
-                                            keyboardType="decimal-pad"
-                                        />
-                                    </View>
+                                    {s.included && (
+                                        <View style={[styles.amountPill, { backgroundColor: colors.accentBg }]}>
+                                            <Text style={[styles.dollarSignSmall, T.extrabold, { color: colors.accent }]}>$</Text>
+                                            <TextInput
+                                                value={s.amount}
+                                                onChangeText={val => {
+                                                    setReviewSplits(prev =>
+                                                        prev.map((r, j) => j === i ? { ...r, amount: val } : r)
+                                                    );
+                                                }}
+                                                style={[styles.amountInput, T.extrabold, { color: colors.accent }]}
+                                                keyboardType="decimal-pad"
+                                            />
+                                        </View>
+                                    )}
                                 </View>
                             ))}
 
-                            {/* Remaining warning */}
                             {totalNum > 0 && Math.abs(remaining) > 0.01 && (
                                 <View style={[styles.remainingRow, { backgroundColor: colors.dangerBg }]}>
                                     <Text style={[styles.remainingText, T.semibold, { color: colors.danger }]}>
@@ -517,14 +902,9 @@ export default function SmartSplitScreen({ navigation }: any) {
                             )}
                         </View>
 
-                        {/* Add Expense button */}
                         <PressableScale
-                            scaleTo={0.97}
-                            haptic="medium"
-                            style={[styles.submitBtn, {
-                                backgroundColor: colors.accent,
-                                opacity: adding ? 0.75 : 1,
-                            }]}
+                            scaleTo={0.97} haptic="medium"
+                            style={[styles.submitBtn, { backgroundColor: colors.accent, opacity: adding ? 0.75 : 1 }]}
                             onPress={handleAddExpense}
                             disabled={adding}
                         >
@@ -545,6 +925,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         </TouchableOpacity>
                     </ScrollView>
                 </KeyboardAvoidingView>
+                {renderToast()}
             </SafeAreaView>
         );
     }
@@ -556,11 +937,9 @@ export default function SmartSplitScreen({ navigation }: any) {
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                 style={{ flex: 1 }}
             >
-                {/* Header */}
                 <View style={styles.header}>
                     <PressableScale
-                        scaleTo={0.97}
-                        haptic="light"
+                        scaleTo={0.97} haptic="light"
                         onPress={() => navigation.goBack()}
                         style={[styles.backBtn, { backgroundColor: colors.surface }]}
                     >
@@ -582,12 +961,8 @@ export default function SmartSplitScreen({ navigation }: any) {
                     {/* Group selector */}
                     {!groupId ? (
                         <PressableScale
-                            scaleTo={0.97}
-                            haptic="light"
-                            style={[styles.groupPickerBtn, {
-                                backgroundColor: colors.surface,
-                                borderColor: colors.border,
-                            }]}
+                            scaleTo={0.97} haptic="light"
+                            style={[styles.groupPickerBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
                             onPress={() => setPickerVisible(true)}
                         >
                             <Users size={18} color={colors.accent} />
@@ -611,39 +986,121 @@ export default function SmartSplitScreen({ navigation }: any) {
                         </View>
                     )}
 
-                    {/* Text input with animated fake placeholder */}
-                    <View style={styles.inputWrap}>
-                        <TextInput
-                            multiline
-                            value={description}
-                            onChangeText={setDescription}
-                            onFocus={() => setInputFocused(true)}
-                            onBlur={() => setInputFocused(false)}
-                            style={[
-                                styles.textInput,
-                                T.regular,
-                                {
-                                    backgroundColor: colors.surface,
-                                    borderColor: inputFocused ? colors.accent : colors.border,
-                                    color: colors.text,
-                                },
-                            ]}
-                            textAlignVertical="top"
-                        />
-                        {!description ? (
-                            <View style={styles.fakePlaceholderWrap} pointerEvents="none">
-                                <Animated.Text
-                                    style={[
-                                        styles.fakePlaceholder,
-                                        T.regular,
-                                        { color: colors.tertiaryText, opacity: placeholderOpacity },
-                                    ]}
-                                >
-                                    {PLACEHOLDERS[placeholderIdx]}
-                                </Animated.Text>
-                            </View>
-                        ) : null}
+                    {/* Text input + voice button row */}
+                    <View style={styles.inputRow}>
+                        <View style={[styles.inputWrap, { flex: 1 }]}>
+                            <TextInput
+                                multiline
+                                value={description}
+                                onChangeText={setDescription}
+                                onFocus={() => setInputFocused(true)}
+                                onBlur={() => setInputFocused(false)}
+                                style={[
+                                    styles.textInput,
+                                    T.regular,
+                                    {
+                                        backgroundColor: colors.surface,
+                                        borderColor: inputFocused ? colors.accent : colors.border,
+                                        color: colors.text,
+                                    },
+                                ]}
+                                textAlignVertical="top"
+                                editable={!isRecording && !voiceProcessing}
+                            />
+                            {/* Fake placeholder / recording indicator */}
+                            {!description ? (
+                                <View style={styles.fakePlaceholderWrap} pointerEvents="none">
+                                    {isRecording ? (
+                                        <View style={styles.recordingIndicator}>
+                                            <View style={[styles.recordingDot, { backgroundColor: colors.danger }]} />
+                                            <Text style={[styles.fakePlaceholder, T.regular, { color: colors.danger }]}>
+                                                Listening...
+                                            </Text>
+                                        </View>
+                                    ) : voiceProcessing ? (
+                                        <View style={styles.recordingIndicator}>
+                                            <SkeletonBlock width={scale(80)} height={vs(12)} radius={ms(6)} />
+                                            <Text style={[styles.fakePlaceholder, T.regular, { color: colors.secondaryText }]}>
+                                                Processing...
+                                            </Text>
+                                        </View>
+                                    ) : (
+                                        <Animated.Text
+                                            style={[styles.fakePlaceholder, T.regular, { color: colors.tertiaryText, opacity: placeholderOpacity }]}
+                                        >
+                                            {PLACEHOLDERS[placeholderIdx]}
+                                        </Animated.Text>
+                                    )}
+                                </View>
+                            ) : null}
+                        </View>
+
+                        {/* Voice / stop button */}
+                        <Animated.View style={{ transform: [{ scale: recordingPulse }] }}>
+                            <PressableScale
+                                scaleTo={0.96}
+                                haptic="light"
+                                style={[
+                                    styles.voiceBtn,
+                                    {
+                                        backgroundColor: isRecording ? colors.dangerBg : colors.surface,
+                                        borderColor: isRecording ? colors.danger : colors.border,
+                                    },
+                                ]}
+                                onPress={handleVoicePress}
+                                disabled={voiceProcessing}
+                            >
+                                {voiceProcessing ? (
+                                    <ActivityIndicator size="small" color={colors.accent} />
+                                ) : isRecording ? (
+                                    <MicOff size={ms(20)} color={colors.danger} />
+                                ) : (
+                                    <Mic size={ms(20)} color={colors.secondaryText} />
+                                )}
+                            </PressableScale>
+                        </Animated.View>
                     </View>
+
+                    {/* Clarify card */}
+                    {clarifyMsg ? (
+                        <View style={[styles.clarifyCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <View style={styles.clarifyHeader}>
+                                <MessageCircle size={16} color={colors.accent} />
+                                <Text style={[styles.clarifyQuestion, T.semibold, { color: colors.text }]}>
+                                    {clarifyMsg}
+                                </Text>
+                                <TouchableOpacity
+                                    onPress={() => { setClarifyMsg(null); setClarifyInput(''); }}
+                                    hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                                >
+                                    <X size={14} color={colors.tertiaryText} />
+                                </TouchableOpacity>
+                            </View>
+                            <View style={styles.clarifyInputRow}>
+                                <TextInput
+                                    value={clarifyInput}
+                                    onChangeText={setClarifyInput}
+                                    placeholder="Type your answer..."
+                                    placeholderTextColor={colors.tertiaryText}
+                                    style={[styles.clarifyInput, T.regular, { color: colors.text, borderColor: colors.border }]}
+                                    returnKeyType="send"
+                                    onSubmitEditing={handleClarifySubmit}
+                                />
+                                <PressableScale
+                                    scaleTo={0.95}
+                                    haptic="light"
+                                    style={[
+                                        styles.clarifySend,
+                                        { backgroundColor: clarifyInput.trim() ? colors.accent : colors.surface },
+                                    ]}
+                                    onPress={handleClarifySubmit}
+                                    disabled={!clarifyInput.trim() || parsing}
+                                >
+                                    <ChevronRight size={16} color={clarifyInput.trim() ? '#fff' : colors.tertiaryText} />
+                                </PressableScale>
+                            </View>
+                        </View>
+                    ) : null}
 
                     {/* Member chips */}
                     {groupId && allMembers.length > 0 && (
@@ -668,6 +1125,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                                 {
                                                     backgroundColor: included ? colors.accentBg : colors.surface,
                                                     borderColor: included ? colors.accent : colors.border,
+                                                    opacity: included ? 1 : 0.38,
                                                 },
                                             ]}
                                             onPress={() =>
@@ -681,6 +1139,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                                     return next;
                                                 })
                                             }
+                                            onLongPress={() => handleMemberLongPress(m)}
                                         >
                                             <CharacterShape
                                                 shape={m.character_shape}
@@ -690,7 +1149,10 @@ export default function SmartSplitScreen({ navigation }: any) {
                                             <Text style={[
                                                 styles.chipName,
                                                 T.semibold,
-                                                { color: included ? colors.accent : colors.secondaryText },
+                                                {
+                                                    color: included ? colors.accent : colors.secondaryText,
+                                                    textDecorationLine: included ? 'none' : 'line-through',
+                                                },
                                             ]}>
                                                 {m.name}
                                             </Text>
@@ -712,11 +1174,11 @@ export default function SmartSplitScreen({ navigation }: any) {
                             styles.submitBtn,
                             {
                                 backgroundColor: colors.accent,
-                                opacity: (!description.trim() || !groupId || parsing) ? 0.5 : 1,
+                                opacity: (!description.trim() || !groupId || parsing || isRecording || voiceProcessing) ? 0.5 : 1,
                             },
                         ]}
                         onPress={handleParse}
-                        disabled={!description.trim() || !groupId || parsing}
+                        disabled={!description.trim() || !groupId || parsing || isRecording || voiceProcessing}
                     >
                         {parsing ? (
                             <View style={styles.parsingRow}>
@@ -734,6 +1196,8 @@ export default function SmartSplitScreen({ navigation }: any) {
             </KeyboardAvoidingView>
 
             {renderPicker()}
+            {renderActionSheet()}
+            {renderToast()}
         </SafeAreaView>
     );
 }
@@ -768,9 +1232,7 @@ const styles = StyleSheet.create({
         paddingBottom: vs(100),
         gap: vs(14),
     },
-    subtitle: {
-        fontSize: ms(14),
-    },
+    subtitle: { fontSize: ms(14) },
     groupPickerBtn: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -780,10 +1242,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(16),
         paddingVertical: vs(14),
     },
-    groupPickerText: {
-        flex: 1,
-        fontSize: ms(15),
-    },
+    groupPickerText: { flex: 1, fontSize: ms(15) },
     groupChip: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -795,6 +1254,12 @@ const styles = StyleSheet.create({
     },
     groupChipText: { fontSize: ms(13) },
 
+    // Input row with voice button
+    inputRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        gap: scale(8),
+    },
     inputWrap: { position: 'relative' },
     textInput: {
         minHeight: vs(140),
@@ -812,6 +1277,64 @@ const styles = StyleSheet.create({
     fakePlaceholder: {
         fontSize: ms(16),
         lineHeight: ms(24),
+    },
+    recordingIndicator: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(8),
+    },
+    recordingDot: {
+        width: scale(8),
+        height: scale(8),
+        borderRadius: 4,
+    },
+
+    voiceBtn: {
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(14),
+        borderWidth: 1,
+        alignItems: 'center',
+        justifyContent: 'center',
+        alignSelf: 'flex-end',
+    },
+
+    // Clarify card
+    clarifyCard: {
+        borderRadius: ms(16),
+        borderWidth: 1,
+        padding: scale(14),
+        gap: vs(10),
+    },
+    clarifyHeader: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(8),
+    },
+    clarifyQuestion: {
+        flex: 1,
+        fontSize: ms(14),
+        lineHeight: 20,
+    },
+    clarifyInputRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(8),
+    },
+    clarifyInput: {
+        flex: 1,
+        height: vs(40),
+        borderRadius: ms(10),
+        borderWidth: 1,
+        paddingHorizontal: scale(12),
+        fontSize: ms(14),
+    },
+    clarifySend: {
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
     chipsSection: { gap: vs(8) },
@@ -847,10 +1370,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: scale(8),
     },
-    submitBtnText: {
-        fontSize: 17,
-        color: '#FFFFFF',
-    },
+    submitBtnText: { fontSize: 17, color: '#FFFFFF' },
     parsingRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -863,40 +1383,14 @@ const styles = StyleSheet.create({
         paddingBottom: vs(100),
         gap: vs(14),
     },
-    titleCard: {
-        borderRadius: ms(20),
-        padding: scale(20),
-        gap: vs(6),
-    },
-    titleInput: {
-        fontSize: ms(18),
-        letterSpacing: -0.3,
-        padding: 0,
-    },
-    totalRow: {
-        flexDirection: 'row',
-        alignItems: 'baseline',
-    },
-    dollarSign: {
-        fontSize: ms(22),
-        letterSpacing: -0.5,
-        marginRight: scale(2),
-    },
-    totalInput: {
-        fontSize: ms(32),
-        letterSpacing: -1.2,
-        flex: 1,
-        padding: 0,
-    },
-    totalHint: {
-        fontSize: ms(12),
-        marginTop: vs(2),
-    },
+    titleCard: { borderRadius: ms(20), padding: scale(20), gap: vs(6) },
+    titleInput: { fontSize: ms(18), letterSpacing: -0.3, padding: 0 },
+    totalRow: { flexDirection: 'row', alignItems: 'baseline' },
+    dollarSign: { fontSize: ms(22), letterSpacing: -0.5, marginRight: scale(2) },
+    totalInput: { fontSize: ms(32), letterSpacing: -1.2, flex: 1, padding: 0 },
+    totalHint: { fontSize: ms(12), marginTop: vs(2) },
 
-    splitsCard: {
-        borderRadius: ms(20),
-        overflow: 'hidden',
-    },
+    splitsCard: { borderRadius: ms(20), overflow: 'hidden' },
     splitsHeader: {
         fontSize: ms(11),
         letterSpacing: 0.5,
@@ -922,67 +1416,82 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(10),
         paddingVertical: vs(6),
     },
-    dollarSignSmall: {
-        fontSize: ms(14),
-        marginRight: scale(1),
-    },
-    amountInput: {
-        fontSize: ms(15),
-        minWidth: scale(48),
-        padding: 0,
-    },
-    remainingRow: {
-        paddingHorizontal: scale(16),
-        paddingVertical: vs(10),
-    },
+    dollarSignSmall: { fontSize: ms(14), marginRight: scale(1) },
+    amountInput: { fontSize: ms(15), minWidth: scale(48), padding: 0 },
+    remainingRow: { paddingHorizontal: scale(16), paddingVertical: vs(10) },
     remainingText: { fontSize: ms(13) },
-
-    startOverBtn: {
-        alignItems: 'center',
-        paddingVertical: vs(8),
-    },
+    startOverBtn: { alignItems: 'center', paddingVertical: vs(8) },
     startOverText: { fontSize: ms(14) },
 
     // ── Error ─────────────────────────────────────────────────────────────────
     errorBody: {
-        flex: 1,
-        alignItems: 'center',
-        justifyContent: 'center',
+        flex: 1, alignItems: 'center', justifyContent: 'center',
         paddingHorizontal: scale(28),
     },
     errorCard: {
-        width: '100%',
+        width: '100%', alignItems: 'center', padding: scale(28),
+        borderRadius: ms(28), gap: vs(10),
+        shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
+        shadowOpacity: 0.10, shadowRadius: 20, elevation: 8,
+    },
+    errorTitle: { fontSize: ms(20), letterSpacing: -0.3, marginTop: vs(8) },
+    errorMsg: { fontSize: ms(14), textAlign: 'center', lineHeight: 20, opacity: 0.8 },
+    retryBtn: {
+        borderRadius: ms(14), paddingVertical: vs(13),
+        paddingHorizontal: scale(32), marginTop: vs(8),
+    },
+    retryBtnText: { fontSize: ms(15), color: '#fff' },
+
+    // ── Toast ─────────────────────────────────────────────────────────────────
+    toast: {
+        position: 'absolute',
+        top: vs(12),
+        alignSelf: 'center',
+        flexDirection: 'row',
         alignItems: 'center',
-        padding: scale(28),
-        borderRadius: ms(28),
-        gap: vs(10),
+        gap: scale(6),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(9),
+        borderRadius: 999,
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.10,
-        shadowRadius: 20,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.18,
+        shadowRadius: 12,
         elevation: 8,
     },
-    errorTitle: {
-        fontSize: ms(20),
-        letterSpacing: -0.3,
-        marginTop: vs(8),
+    toastText: { fontSize: ms(13), color: '#fff' },
+
+    // ── Action sheet ──────────────────────────────────────────────────────────
+    actionSheet: {
+        position: 'absolute',
+        bottom: 0, left: 0, right: 0,
+        height: ACTION_SHEET_H,
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 24,
     },
-    errorMsg: {
-        fontSize: ms(14),
-        textAlign: 'center',
-        lineHeight: 20,
-        opacity: 0.8,
+    actionSheetBody: {
+        flex: 1,
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(20),
+        alignItems: 'center',
+        gap: vs(6),
     },
-    retryBtn: {
-        borderRadius: ms(14),
-        paddingVertical: vs(13),
-        paddingHorizontal: scale(32),
-        marginTop: vs(8),
+    actionSheetTitle: { fontSize: ms(18), letterSpacing: -0.3, textAlign: 'center' },
+    actionSheetSub: { fontSize: ms(13), textAlign: 'center', opacity: 0.7, lineHeight: 20 },
+    actionSheetBtn: {
+        width: '100%',
+        height: vs(50),
+        borderRadius: 99,
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: vs(10),
     },
-    retryBtnText: {
-        fontSize: ms(15),
-        color: '#fff',
-    },
+    actionSheetBtnText: { fontSize: ms(15), color: '#fff' },
 
     // ── Picker sheet ──────────────────────────────────────────────────────────
     pickerSheet: {
