@@ -11,7 +11,7 @@ from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User
+from app.models import User, GroupMember
 from app.database import get_db
 from app.routes.auth import get_current_user
 
@@ -51,6 +51,7 @@ class SmartSplitResponse(BaseModel):
     group_name_suggestion: Optional[str] = None
     adjustment: Optional[float] = None
     message: Optional[str] = None
+    transcription: Optional[str] = None
 
 
 def _build_intent_prompt(members: dict, group_name: str, description: str) -> str:
@@ -350,20 +351,12 @@ async def smart_split_voice(
     audio: UploadFile = File(...),
     group_id: str = Form(...),
     group_name: str = Form(""),
-    member_ids: str = Form(...),
+    member_ids: str = Form(""),  # kept for API compatibility; members fetched via group_id
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
     if not GEMINI_API_KEY:
         raise HTTPException(status_code=500, detail="GEMINI_API_KEY not configured")
-
-    try:
-        member_ids_list: List[str] = json.loads(member_ids)
-    except (json.JSONDecodeError, ValueError):
-        raise HTTPException(status_code=400, detail="member_ids must be a JSON array string")
-
-    if not member_ids_list:
-        raise HTTPException(status_code=400, detail="member_ids is required")
 
     audio_bytes = await audio.read()
     if not audio_bytes:
@@ -387,18 +380,47 @@ async def smart_split_voice(
         current_user.id, group_id, len(audio_bytes), content_type,
     )
 
-    users_by_id = await _fetch_members(db, member_ids_list, current_user)
+    # Fetch group members by group_id so user_ids are always accurate
+    gm_result = await db.execute(
+        select(GroupMember.user_id).where(GroupMember.group_id == group_id)
+    )
+    member_ids_from_group = [row[0] for row in gm_result.all()]
+    users_by_id = await _fetch_members(db, member_ids_from_group, current_user)
+
     member_list = ", ".join(f'"{name}" (id: {uid})' for uid, name in users_by_id.items())
+    voice_prompt = f"""You are a smart expense assistant for a bill-splitting app called TandemPay.
+Transcribe the audio, then detect the user's intent.
 
-    voice_prompt = f"""Transcribe this audio, then process it as a TandemPay expense description.
-
-Group members: {member_list}
-Group name: {group_name}
+Current group members: {member_list}
+Current group name: {group_name}
 
 Detect the intent and return JSON only. Never return explanations or markdown.
-If the audio describes an expense, return intent "parse_expense" with title, total, needs_total, and splits for every member.
-For any other intent use the same shapes as the text endpoint.
-ALWAYS return valid JSON."""
+Always include "transcription" with the verbatim text you heard.
+
+If the audio describes an expense (any bill, purchase, meal, or cost):
+{{"intent": "parse_expense", "transcription": "<verbatim audio text>", "title": "short name max 40 chars", "total": <number, 0 if not mentioned>, "needs_total": <true if total not mentioned>, "splits": [{{"user_id": "<EXACT id from member list>", "name": "<member name>", "amount": <number>, "note": "<reason or empty>", "included": <true unless excluded>}}]}}
+
+For excluding a member ("don't include X", "X isn't coming"):
+{{"intent": "exclude_member", "transcription": "<verbatim text>", "member_name": "<name>", "message": "<friendly confirmation>"}}
+
+For adding to group:
+{{"intent": "add_to_group", "transcription": "<verbatim text>", "member_name": "<name>", "message": "<friendly message>"}}
+
+For creating a group:
+{{"intent": "create_group", "transcription": "<verbatim text>", "group_name": "<suggested name>", "message": "<friendly message>"}}
+
+For adjusting a split:
+{{"intent": "adjust_split", "transcription": "<verbatim text>", "member_name": "<name>", "adjustment": <number>, "message": "<confirmation>"}}
+
+For unclear audio:
+{{"intent": "clarify", "transcription": "<verbatim text>", "message": "<clarifying question>"}}
+
+Rules:
+- Default to parse_expense for ANY mention of a bill, cost, meal, item, price, or split
+- ALWAYS return valid JSON — never markdown fences, never plain text
+- EVERY member must appear in splits for parse_expense using their EXACT user_id from the member list
+- included: false only for explicitly excluded members
+- needs_total: true if total not mentioned"""
 
     raw: Optional[str] = None
     data: Optional[dict] = None
@@ -428,5 +450,8 @@ ALWAYS return valid JSON."""
         return SmartSplitResponse(parse_failed=True)
 
     result = _build_response(data, users_by_id)
-    logger.info("smart_split_voice result | intent=%s", result.intent)
+    transcription = str(data.get("transcription", "")).strip()
+    if transcription:
+        result.transcription = transcription
+    logger.info("smart_split_voice result | intent=%s transcription=%r", result.intent, transcription)
     return result

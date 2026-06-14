@@ -310,12 +310,27 @@ export default function SmartSplitScreen({ navigation }: any) {
                 member_ids: memberIds,
             });
             console.log('[SmartSplit] voice result', result);
-            handleIntentResult(result);
+
+            // Populate text input with transcription so user can review/correct what was heard
+            if (result.transcription) {
+                setDescription(result.transcription);
+            }
+            setVoiceProcessing(false);
+
+            if (!result.parse_failed && result.intent === 'parse_expense' && result.total > 0) {
+                // High confidence: give user 800ms to see the transcription, then auto-submit
+                await new Promise<void>(resolve => setTimeout(resolve, 800));
+                handleIntentResult(result);
+            } else if (result.intent === 'parse_expense') {
+                // needs_total or zero amount — leave transcription in input for user to fill in total
+            } else {
+                // Other intents (exclude, clarify, etc.) — handle immediately
+                handleIntentResult(result);
+            }
         } catch (err: any) {
             console.log('[SmartSplit] voice send error', err?.message);
-            Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
-        } finally {
             setVoiceProcessing(false);
+            Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
         }
     }, [groupId, groupName, includedIds, user, recordingPulse, handleIntentResult]);
 
@@ -848,7 +863,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                             </Text>
                             {reviewSplits.map((s, i) => (
                                 <View
-                                    key={s.user_id}
+                                    key={`${s.user_id}-${i}`}
                                     style={[
                                         styles.splitRow,
                                         !s.included && { opacity: 0.38 },
@@ -1021,7 +1036,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                         <View style={styles.recordingIndicator}>
                                             <SkeletonBlock width={scale(80)} height={vs(12)} radius={ms(6)} />
                                             <Text style={[styles.fakePlaceholder, T.regular, { color: colors.secondaryText }]}>
-                                                Processing...
+                                                Transcribing...
                                             </Text>
                                         </View>
                                     ) : (
