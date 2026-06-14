@@ -446,11 +446,23 @@ Rules:
         logger.error("smart_split_voice unexpected_error | %s", e, exc_info=True)
         raise HTTPException(status_code=502, detail=f"AI service error: {str(e)}")
 
+    # Try to salvage transcription from raw text even when full JSON parsing failed
+    partial_transcription = ""
+    if raw:
+        m = re.search(r'"transcription"\s*:\s*"((?:[^"\\]|\\.)*)"', raw)
+        partial_transcription = m.group(1) if m else ""
+
     if data is None:
-        return SmartSplitResponse(parse_failed=True)
+        logger.warning(
+            "smart_split_voice parse_failed | partial_transcription=%r", partial_transcription
+        )
+        return SmartSplitResponse(
+            parse_failed=True,
+            transcription=partial_transcription or None,
+        )
 
     result = _build_response(data, users_by_id)
-    transcription = str(data.get("transcription", "")).strip()
+    transcription = str(data.get("transcription", "")).strip() or partial_transcription
     if transcription:
         result.transcription = transcription
     logger.info("smart_split_voice result | intent=%s transcription=%r", result.intent, transcription)

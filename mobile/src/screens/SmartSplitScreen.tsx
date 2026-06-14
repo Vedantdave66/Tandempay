@@ -311,18 +311,23 @@ export default function SmartSplitScreen({ navigation }: any) {
             });
             console.log('[SmartSplit] voice result', result);
 
-            // Populate text input with transcription so user can review/correct what was heard
+            // Always show transcription first, before any intent handling
             if (result.transcription) {
                 setDescription(result.transcription);
             }
             setVoiceProcessing(false);
 
-            if (!result.parse_failed && result.intent === 'parse_expense' && result.total > 0) {
-                // High confidence: give user 800ms to see the transcription, then auto-submit
+            // Parse failed — transcription is already visible for user to edit and retry
+            if (result.parse_failed) {
+                return;
+            }
+
+            if (result.intent === 'parse_expense' && result.total > 0) {
+                // High confidence: 800ms preview so user can see transcription, then auto-submit
                 await new Promise<void>(resolve => setTimeout(resolve, 800));
                 handleIntentResult(result);
             } else if (result.intent === 'parse_expense') {
-                // needs_total or zero amount — leave transcription in input for user to fill in total
+                // needs_total — leave transcription in input for user to add total then tap Submit
             } else {
                 // Other intents (exclude, clarify, etc.) — handle immediately
                 handleIntentResult(result);
