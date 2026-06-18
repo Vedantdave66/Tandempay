@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-13
+**Last updated:** 2026-06-17
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -16,6 +16,8 @@
 - **Mobile polish pass (2026-06-07/08) shipped via PRs #132–#141** — PaymentsScreen rewrite, GroupCard/GroupDetail/SettleUp fixes, ToastBanner artifact fix, Dashboard dark-mode label fix, notifications array guard, ProHub character modal + invite + accent theming. See section below.
 - **Canvas Mode + Apple HIG polish session (2026-06-08/09) shipped via PRs #142–#149** — splash animation, gradient tokens, hardcoded-green audit, CanvasModeView redesign, HIG pass across all 14 screens, floating liquid glass tab bar, AppearanceScreen, accent color fix (accentBg/accentBgFaint/accentLight now dynamic), CanvasModeView carousel dock with direct-drag. All merged into `main`.
 - **June 13 sprint shipped via PRs #184–#195** — P0 fixes, receipt scanner rebuilt on Gemini 2.5 Flash, onboarding/landing redesign, group invite links, and escalating nudge system. See section below.
+- **Pro screens + design spec session (2026-06-13) shipped via PRs #197–#204** — `DESIGN_SPEC.md` added, `SubscriptionScreen` built, `ExportScreen` and `RecurringScreen` fully wired to real API endpoints, all "Coming Soon" alerts replaced with proper states/upsell cards, light-mode Pro card and hero card border fixes. PRs #202 and #203 are still **open**. See section below.
+- **Smart Split shipped via PRs #205–#207** — Gemini NLP backend route, full 3-phase mobile UI (input → review → error), logging/retry robustness, conversational intents, and voice input via Gemini multimodal. All merged. See section below.
 - **Latest Alembic head: `20260613_add_nudge_fields_to_settlement_records`** (chain: `... → a107c01bd8f1` → `20260612_add_push_token_to_users` → `20260613_add_invite_token_to_groups` → `20260613_add_nudge_fields_to_settlement_records`). Both new migrations have been run against prod Supabase.
 
 ---
@@ -294,6 +296,75 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 
 ---
 
+## Pro screens + design spec session (2026-06-13) — PRs #197–#204
+
+All PRs listed below are **merged** into `main` unless otherwise noted.
+
+### PR #197 — docs: add DESIGN_SPEC.md *(merged)*
+- `DESIGN_SPEC.md` added at repo root as source-of-truth for the TandemPay design language. 10 sections covering the color system (all semantic tokens + 6 accent presets), typography, spacing scale, border radii, animation/motion configs, character system, component patterns, screen layout rules, icon library, and 13 Fable-originated design decisions with rationale. Intended as the reference for all future code changes and AI agents — replaces guessing at design values.
+
+### PR #198 — feat: add SubscriptionScreen UI with stubbed IAP (RevenueCat TODO) *(merged)*
+- **`SubscriptionScreen.tsx`** (new): Monthly/Annual toggle with `Animated.spring` pill; Free plan card; Pro card with `LinearGradient` header; "Save 40%" badge + `$2.92/mo` with crossed-out `$4.99` in annual mode; CTA detects `Platform.OS` to show "Continue with Apple Pay" or "Continue with Google Pay"; `purchasePro()` stub logs `TODO: wire RevenueCat`; Restore purchases link; Terms/Privacy footer; already-Pro confirmation state with crown icon.
+- `RootNavigator`: `Subscription` screen registered with `slide_from_right` animation.
+- `ProHubScreen`: "Upgrade to Pro →" button now navigates to `SubscriptionScreen` (was opening a web URL).
+
+### PR #199 — feat: wire ExportScreen to real CSV and PDF export endpoints *(merged)*
+- Removed the Pro-gate `Alert` that redirected non-Pro users to the web. Non-Pro users now see a full upsell card with "Upgrade to Pro" CTA → `navigation.navigate('Subscription')`.
+- Pro users see CSV and PDF export cards with per-button loading spinners. Export flow (`FileSystem.downloadAsync` → `Sharing.shareAsync`) was already correct — no changes to download logic.
+
+### PR #200 — feat: wire RecurringScreen create and delete for Pro users *(merged)*
+- **`api.ts`**: added `recurringApi.delete(id)` → `DELETE /api/recurring/{id}`.
+- **`RecurringScreen.tsx`**: Frequency options expanded to include `biweekly`; start date is now user-entered (YYYY-MM-DD TextInput, validated before submit); swipe-to-delete on each row (core RN `PanResponder` + `Animated`, no new deps) — swipe left > `scale(48)` reveals red Delete button, confirms via Alert, optimistic remove with rollback on error; non-Pro upsell now navigates to `SubscriptionScreen` instead of `Linking.openURL`.
+
+### PR #201 — fix: replace all Coming Soon alerts with proper states or upsell cards *(merged)*
+- Batch cleanup across multiple screens:
+  - `ProHubScreen`: Notifications row now navigates to `NotificationsScreen`; Privacy and Security row removed (unbuilt); `handleProAction` navigates to `SubscriptionScreen`.
+  - `ExportScreen` + `RecurringScreen` + `ProUpgradeScreen`: all `Linking.openURL` Pro-gate redirects replaced with `navigation.navigate('Subscription')`.
+  - `PaymentsScreen`: Stripe Connect Alert replaced with `Linking.openURL` to `tandempay.ca/account`.
+
+### PR #202 — fix: add Export/Recurring to ProHub nav, polish SubscriptionScreen Pro card *(OPEN)*
+- `ProHubScreen`: Export and Recurring rows added between Notifications and Invite a friend (FileDown/RefreshCw icons); price pill gets shimmer animation (opacity 0.7→1.0 loop, 1800ms).
+- `SubscriptionScreen` Pro card: feature order rewritten (AI Receipt Scanning → Recurring → Export → Priority Support); CTA label shows price (`Go Pro at $4.99/mo`); social proof line ("Trusted by roommates across Canada") added below features.
+
+### PR #203 — feat: redesign Me section screens to Apple HIG + DESIGN_SPEC standard *(OPEN)*
+Full redesign of all five Me-section screens (`ProHubScreen`, `AppearanceScreen`, `ExportScreen`, `RecurringScreen`, `SubscriptionScreen`) to share the same primitives as `DashboardScreen`/`GroupDetailScreen`:
+- `ProHubScreen`: `LinearGradient(heroGradient)` hero card, shimmer price pill, four labeled settings sections (Account / Preferences / Social / Support) in `ms(20)` surface cards with row dividers, `PressableScale` on every row.
+- `AppearanceScreen`: 3×2 spring-animated accent swatch grid, two-option Light/Dark pill cards, live preview card showing heroGradient + cardGradient + tab bar mock.
+- `ExportScreen` + `RecurringScreen` + `SubscriptionScreen`: DESIGN_SPEC-compliant spacing, `SafeAreaView` from `react-native-safe-area-context`, `SkeletonBlock` loading states, FAB for RecurringScreen, `PressableScale` on all primary actions.
+
+### PR #204 — fix: Pro card always dark background, character card border in light mode *(merged)*
+- `SubscriptionScreen` Pro card gradient hardcoded to `['#0D2B18','#0F3320','#0A1F12']` — always dark regardless of theme (was using `colors.cardGradient` which is near-white in light mode, making white text invisible).
+- Crown icon changed from `#fff` to `#F2C200` (gold). Feature check icons changed to `colors.accent` (readable on always-dark background).
+- Price pill text: `isDark ? colors.accent : '#0D2B18'` — dark ink on white pill in light mode.
+- Hero card in light mode: collapses gradient to `colors.surface` + adds `1px borderColor: colors.border` for definition against light background.
+
+---
+
+## Smart Split session (2026-06-13/14) — PRs #205–#207
+
+All PRs are **merged** into `main`.
+
+### PR #205 — feat: build Smart Split with Gemini NLP parsing and full review UI *(merged)*
+- **Backend** — `POST /api/smart-split`: accepts `description`, `group_id`, `member_ids`; fetches member names from DB; sends to Gemini 2.5 Flash; returns `{ title, total, splits[], needs_total }` or `{ parse_failed: true }`. Same four-step JSON extraction pipeline as `receipts.py` (direct → strip fences → regex → `ast.literal_eval`).
+- **`api.ts`**: `SmartSplitApi` added with typed request/response interfaces.
+- **`SmartSplitScreen.tsx`** (full rewrite) — three phases:
+  - **Input**: group picker bottom sheet (spring animation, `ms(28)` border radius), animated cycling placeholder on `TextInput` (fade 300ms, 3s interval), member chips with include/exclude toggle, `PressableScale` "Split it →" CTA, `SkeletonBlock` loading state.
+  - **Review**: editable title and total (`ms(32) T.extrabold letterSpacing -1.2 colors.accent`), `colors.warning` border + helper text when `needs_total: true`, per-member editable amount pills, live remaining-amount warning when splits ≠ total, Add Expense CTA → `POST /api/groups/{id}/expenses` → `navigation.goBack()`.
+  - **Error**: amber `round` CharacterShape, "Couldn't parse that", retry + start-over links.
+
+### PR #206 — fix: make smart split parsing more robust with logging and retry *(merged)*
+- Structured logging via `logger = logging.getLogger("tandempay.smart_split")` — every request emits `smart_split request/prompt/gemini_raw/parsed_ok/first_attempt_failed/result` log lines through the existing `JsonFormatter` → Vercel logs.
+- Prompt hardened: explicit JSON-only instruction, amount format examples (`$85`, `85.00`, `"eighty-five dollars"`), vague-split guidance (`"split evenly"` → divide equally).
+- Retry logic: if all four extraction steps fail, a simpler fallback prompt is tried once (`extract title + total only`). On fallback success, zero-amount splits are synthesized for all members so the review screen renders and the user can fill in amounts. `parse_failed: true` only returned if both Gemini calls produce complete garbage.
+
+### PR #207 — feat: Smart Split conversational intents + voice input *(merged)*
+- **Backend** — `POST /api/smart-split` expanded with 6-intent detection prompt: `parse_expense`, `exclude_member`, `add_to_group`, `create_group`, `adjust_split`, `clarify`. New `POST /api/smart-split/voice` accepts multipart audio and sends to Gemini 2.5 Flash multimodal API as base64 `inline_data`.
+- **`api.ts`**: `SmartSplitEntry` updated (added `name`, `included`), `SmartSplitResponse` expanded with all intent fields, `smartSplitApi.parseVoice()` added using raw `fetch` for multipart form-data.
+- **`SmartSplitScreen.tsx`**: Full intent dispatch via `handleIntentResult`; voice recording via `expo-av` (30s auto-stop, spring pulse animation, red dot + "Listening..." indicator); inline clarify card with follow-up `TextInput`; action sheets for `add_to_group`/`create_group`/`remove_from_group` (long-press chips); member chips show `opacity 0.38` + strikethrough when excluded; green toast for conversational confirmations.
+- **`expo-av`** installed as new dependency.
+
+---
+
 ## Pre-Launch Checklist (non-code)
 
 1. Register Canadian business entity
@@ -321,15 +392,18 @@ The table below previously listed these as "remaining roadmap after R2." That wa
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the full Apple HIG + canvas carousel pass, and the June 13 sprint (P0 fixes, receipt scanner on Gemini 2.5 Flash, group invite links, escalating nudge system) are all merged into `main`. There are **no open PRs**. Run `gh pr list` to confirm. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. The nudge system is live and `nudge_count` is incrementing in production. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist. If starting new feature work, define R6+ first — the roadmap table is fully done."
+> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the June 13 sprint (PRs #184–#195), the Pro screens + design spec session (PRs #197–#207), and Smart Split (PRs #205–#207) are all merged into `main`. Two PRs are currently **open**: PR #202 (add Export/Recurring to ProHub nav, polish Subscription Pro card) and PR #203 (full Me-section redesign to Apple HIG + DESIGN_SPEC). Run `gh pr list` to confirm current state. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. Smart Split is live with voice input via Gemini multimodal. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist."
 
 ## Open items / things to double-check next session
 
-1. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
-2. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-3. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-4. **Define R6+** — the roadmap table is fully done; no documented next phase.
-5. **Nudge job on Vercel (serverless)** — `run_nudge_job` is registered via APScheduler which only runs on long-lived servers. On Vercel (serverless), the `is_serverless` guard skips the scheduler entirely. If prod runs on Vercel, the nudge cron needs an external trigger (e.g. Vercel Cron, GitHub Actions schedule hitting `POST /api/debug/run-nudge-job` — but that endpoint was deleted in PR #195). Decide: add a lightweight authenticated cron endpoint, or move to a Render/Railway worker.
-6. **Invite link deep link on iOS** — `tandempay://join/{token}` requires the app to be installed. Universal links (`https://tandempay.ca/join/{token}`) would fall back to the web `JoinPage`. Not yet wired.
-7. ~~**Prod migration check**~~ — ✅ Confirmed. All migrations through `20260613_add_nudge_fields_to_settlement_records` applied to prod Supabase.
-8. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`.
+1. **PR #202 + PR #203 need review/merge** — #202 adds Export/Recurring to ProHub nav and polishes the Subscription Pro card; #203 is the full Me-section redesign to Apple HIG + DESIGN_SPEC. Both are open on the `fix/prohub-nav-subscription-polish` and `feat/me-section-redesign` branches.
+2. **RevenueCat IAP** — `SubscriptionScreen` CTA is stubbed (`purchasePro()` logs TODO). Wire RevenueCat before launching Pro billing in production.
+3. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
+4. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+5. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+6. **Define R6+** — the roadmap table is fully done; no documented next phase.
+7. **Nudge job on Vercel (serverless)** — `run_nudge_job` is registered via APScheduler which only runs on long-lived servers. On Vercel (serverless), the `is_serverless` guard skips the scheduler entirely. If prod runs on Vercel, the nudge cron needs an external trigger (e.g. Vercel Cron, GitHub Actions schedule hitting `POST /api/debug/run-nudge-job` — but that endpoint was deleted in PR #195). Decide: add a lightweight authenticated cron endpoint, or move to a Render/Railway worker.
+8. **Invite link deep link on iOS** — `tandempay://join/{token}` requires the app to be installed. Universal links (`https://tandempay.ca/join/{token}`) would fall back to the web `JoinPage`. Not yet wired.
+9. **Smart Split voice on device** — `expo-av` recording and the Gemini multimodal voice pipeline are untested on a physical device. Verify mic permissions, 30s auto-stop, and that transcription preview appears in the input field before the result is processed.
+10. ~~**Prod migration check**~~ — ✅ Confirmed. All migrations through `20260613_add_nudge_fields_to_settlement_records` applied to prod Supabase.
+11. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`.
