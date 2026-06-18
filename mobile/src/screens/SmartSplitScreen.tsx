@@ -310,32 +310,12 @@ export default function SmartSplitScreen({ navigation }: any) {
                 member_ids: memberIds,
             });
             console.log('[SmartSplit] voice result', result);
-
-            // Always show transcription first, before any intent handling
-            if (result.transcription) {
-                setDescription(result.transcription);
-            }
-            setVoiceProcessing(false);
-
-            // Parse failed — transcription is already visible for user to edit and retry
-            if (result.parse_failed) {
-                return;
-            }
-
-            if (result.intent === 'parse_expense' && result.total > 0) {
-                // High confidence: 800ms preview so user can see transcription, then auto-submit
-                await new Promise<void>(resolve => setTimeout(resolve, 800));
-                handleIntentResult(result);
-            } else if (result.intent === 'parse_expense') {
-                // needs_total — leave transcription in input for user to add total then tap Submit
-            } else {
-                // Other intents (exclude, clarify, etc.) — handle immediately
-                handleIntentResult(result);
-            }
+            handleIntentResult(result);
         } catch (err: any) {
             console.log('[SmartSplit] voice send error', err?.message);
-            setVoiceProcessing(false);
             Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
+        } finally {
+            setVoiceProcessing(false);
         }
     }, [groupId, groupName, includedIds, user, recordingPulse, handleIntentResult]);
 
@@ -1041,7 +1021,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                         <View style={styles.recordingIndicator}>
                                             <SkeletonBlock width={scale(80)} height={vs(12)} radius={ms(6)} />
                                             <Text style={[styles.fakePlaceholder, T.regular, { color: colors.secondaryText }]}>
-                                                Transcribing...
+                                                Processing...
                                             </Text>
                                         </View>
                                     ) : (

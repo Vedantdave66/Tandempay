@@ -425,7 +425,6 @@ export interface SmartSplitResponse {
     group_name_suggestion?: string;
     adjustment?: number;
     message?: string;
-    transcription?: string;
 }
 
 export const smartSplitApi = {
