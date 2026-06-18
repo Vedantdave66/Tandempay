@@ -848,7 +848,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                             </Text>
                             {reviewSplits.map((s, i) => (
                                 <View
-                                    key={s.user_id}
+                                    key={`${s.user_id}-${i}`}
                                     style={[
                                         styles.splitRow,
                                         !s.included && { opacity: 0.38 },
