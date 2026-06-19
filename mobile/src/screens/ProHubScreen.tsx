@@ -8,6 +8,7 @@ import {
     Share,
     Animated,
     Easing,
+    TouchableOpacity,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
@@ -15,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2 } from 'lucide-react-native';
+import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import PressableScale from '../components/PressableScale';
@@ -148,7 +149,7 @@ export default function ProHubScreen({ navigation }: any) {
                                 </Text>
                             </View>
                         </PressableScale>
-                    </LinearGradient>
+                    </View>
                 </View>
 
                     {/* Settings list */}
@@ -179,7 +180,6 @@ export default function ProHubScreen({ navigation }: any) {
                             );
                         })}
                     </View>
-                ))}
 
             </ScrollView>
 
@@ -322,6 +322,43 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     rowLabel: {
+        flex: 1,
+        fontSize: ms(15),
+    },
+
+    body: {
+        paddingHorizontal: scale(20),
+        paddingTop: vs(20),
+        gap: vs(16),
+    },
+    proHeader: {
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(14),
+        borderRadius: ms(16),
+    },
+    proHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
+    proBody: {
+        paddingHorizontal: scale(4),
+        paddingVertical: vs(4),
+        gap: vs(10),
+    },
+    settingsCard: {
+        borderRadius: ms(20),
+        overflow: 'hidden',
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    settingsIconWrap: {
+        width: scale(36),
+        height: scale(36),
+        borderRadius: ms(10),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    settingsLabel: {
         flex: 1,
         fontSize: ms(15),
     },

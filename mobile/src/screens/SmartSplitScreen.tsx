@@ -53,8 +53,8 @@ interface ActionSheetData {
 }
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_HEIGHT_HALFEIGHT_HALF = SCREEN_H * 0.55;
-const SHEET_HEIGHT_HALFEIGHT_THIRD = SCREEN_H * 0.32;
+const SHEET_HEIGHT_HALF = SCREEN_H * 0.55;
+const SHEET_HEIGHT_THIRD = SCREEN_H * 0.32;
 
 const PLACEHOLDERS = [
     'Thai for 4, Lakshit skipped drinks — $85 total',
@@ -97,7 +97,7 @@ export default function SmartSplitScreen({ navigation }: any) {
     const [clarifyInput, setClarifyInput] = useState('');
 
     const [actionSheet, setActionSheet] = useState<ActionSheetData | null>(null);
-    const actionSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_THIRDEIGHT_HALF)).current;
+    const actionSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_THIRD)).current;
 
     const [reviewTitle, setReviewTitle]   = useState('');
     const [reviewTotal, setReviewTotal]   = useState('');
@@ -157,7 +157,7 @@ export default function SmartSplitScreen({ navigation }: any) {
     // ── Action sheet ──────────────────────────────────────────────────────────
     const openActionSheet = useCallback((data: ActionSheetData) => {
         setActionSheet(data);
-        actionSheetAnim.setValue(SHEET_HEIGHT_THIRDEIGHT_HALF);
+        actionSheetAnim.setValue(SHEET_HEIGHT_THIRD);
         Animated.spring(actionSheetAnim, {
             toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start();
@@ -165,7 +165,7 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     const closeActionSheet = useCallback(() => {
         Animated.spring(actionSheetAnim, {
-            toValue: SHEET_HEIGHT_THIRDEIGHT_HALF, damping: 24, stiffness: 220, useNativeDriver: true,
+            toValue: SHEET_HEIGHT_THIRD, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start(() => setActionSheet(null));
     }, [actionSheetAnim]);
 
@@ -1417,7 +1417,7 @@ const styles = StyleSheet.create({
     actionSheet: {
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        height: SHEET_HEIGHT_THIRDEIGHT_HALF,
+        height: SHEET_HEIGHT_THIRD,
         borderTopLeftRadius: ms(28),
         borderTopRightRadius: ms(28),
         shadowColor: '#000',

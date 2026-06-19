@@ -54,7 +54,7 @@ export default function ExportScreen({ navigation }: any) {
             const token = await AsyncStorage.getItem('token');
             const url = `${BASE_URL}/export/${format}`;
             const option = EXPORT_OPTIONS.find(o => o.key === format)!;
-            const localUri = `${FileSystem.cacheDirectory}tandempay-export.${option.ext}`;
+            const localUri = `${(FileSystem as any).cacheDirectory}tandempay-export.${option.ext}`;
 
             const result = await FileSystem.downloadAsync(url, localUri, {
                 headers: { Authorization: `Bearer ${token}` },

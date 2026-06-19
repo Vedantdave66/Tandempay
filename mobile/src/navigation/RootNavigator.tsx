@@ -116,7 +116,7 @@ export default function RootNavigator() {
                     const result = await groupsApi.joinByToken(token);
                     const tryNav = () => {
                         if (navRef.current?.isReady()) {
-                            navRef.current.navigate('Group' as never, { groupId: result.group_id } as never);
+                            (navRef.current as any).navigate('Group', { groupId: result.group_id });
                         } else {
                             setTimeout(tryNav, 100);
                         }

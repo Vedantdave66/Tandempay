@@ -62,7 +62,7 @@ class ReceiptParseResponse(BaseModel):
     items: List[ParsedItem]
     subtotal: float = 0.0
     tax: float = 0.0
-    tax_rate: float = 0.13
+    tax_rate: float = DEFAULT_TAX_RATE
     tip_detected: float = 0.0
     total: float
     currency: str

@@ -180,7 +180,7 @@ export default function SubscriptionScreen({ navigation }: any) {
                         {/* ── Pro plan card ── */}
                         <View style={[styles.planCard, { backgroundColor: colors.surface, borderColor: colors.accent, borderWidth: 1.5 }]}>
                             <LinearGradient
-                                colors={colors.cardGradient as [string, string]}
+                                colors={colors.cardGradient as unknown as [string, string]}
                                 style={styles.proCardHeader}
                             >
                                 <View style={styles.proCardTitleRow}>
