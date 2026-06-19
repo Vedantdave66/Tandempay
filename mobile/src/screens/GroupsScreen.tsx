@@ -11,6 +11,7 @@ import { groupsApi, balancesApi, GroupListItem, UserBalance } from '../services/
 import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
+import { toArray } from '../utils/helpers';
 
 export default function GroupsScreen({ navigation }: any) {
     const { colors } = useTheme();
@@ -23,13 +24,7 @@ export default function GroupsScreen({ navigation }: any) {
     const load = async () => {
         try {
             const raw = await groupsApi.list();
-            const data: GroupListItem[] = Array.isArray(raw)
-                ? raw
-                : Array.isArray((raw as any)?.items)
-                    ? (raw as any).items
-                    : Array.isArray((raw as any)?.groups)
-                        ? (raw as any).groups
-                        : [];
+            const data: GroupListItem[] = toArray<GroupListItem>(raw);
             setGroups(data);
 
             try {

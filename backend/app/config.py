@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
+DEFAULT_TAX_RATE: float = 0.13  # Canadian HST
+
 
 class Settings(BaseSettings):
     # Required — no defaults. App will refuse to start if these are missing from env.

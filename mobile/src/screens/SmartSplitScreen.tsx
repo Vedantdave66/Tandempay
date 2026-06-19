@@ -8,7 +8,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Audio } from 'expo-av';
 import {
     ChevronLeft, ChevronRight, Users, Check, Sparkles,
@@ -19,12 +18,13 @@ import { useAuth } from '../context/AuthContext';
 import { scale, vs, ms } from '../utils/responsive';
 import { T } from '../utils/typography';
 import {
-    groupsApi, expensesApi, smartSplitApi, BASE_URL,
+    groupsApi, expensesApi, smartSplitApi,
     GroupListItem, GroupMember, SmartSplitResponse,
 } from '../services/api';
 import CharacterShape from '../components/CharacterShape';
 import PressableScale from '../components/PressableScale';
 import SkeletonBlock from '../components/SkeletonBlock';
+import { buildMembersList } from '../utils/helpers';
 
 type Phase = 'input' | 'review' | 'error';
 
@@ -53,8 +53,8 @@ interface ActionSheetData {
 }
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_H = SCREEN_H * 0.55;
-const ACTION_SHEET_H = SCREEN_H * 0.32;
+const SHEET_HEIGHT_HALFEIGHT_HALF = SCREEN_H * 0.55;
+const SHEET_HEIGHT_HALFEIGHT_THIRD = SCREEN_H * 0.32;
 
 const PLACEHOLDERS = [
     'Thai for 4, Lakshit skipped drinks — $85 total',
@@ -62,18 +62,12 @@ const PLACEHOLDERS = [
     'Uber $34 split 3 ways, I paid',
 ];
 
-const MIME_MAP: Record<string, string> = {
-    m4a: 'audio/mp4', mp4: 'audio/mp4', wav: 'audio/wav',
-    mp3: 'audio/mpeg', ogg: 'audio/ogg',
-};
-
 export default function SmartSplitScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const { user } = useAuth();
 
     const [phase, setPhase] = useState<Phase>('input');
 
-    // ── Group picker ──────────────────────────────────────────────────────────
     const [pickerVisible, setPickerVisible]       = useState(false);
     const [pickerGroups, setPickerGroups]         = useState<GroupListItem[]>([]);
     const [pickerLoading, setPickerLoading]       = useState(false);
@@ -83,13 +77,11 @@ export default function SmartSplitScreen({ navigation }: any) {
     const [groupName, setGroupName]               = useState('');
     const [groupMembers, setGroupMembers]         = useState<GroupMember[]>([]);
 
-    // ── Input ─────────────────────────────────────────────────────────────────
     const [description, setDescription]   = useState('');
     const [inputFocused, setInputFocused] = useState(false);
     const [parsing, setParsing]           = useState(false);
     const [includedIds, setIncludedIds]   = useState<Set<string>>(new Set());
 
-    // ── Voice recording ───────────────────────────────────────────────────────
     const [isRecording, setIsRecording]       = useState(false);
     const [voiceProcessing, setVoiceProcessing] = useState(false);
     const recordingRef = useRef<Audio.Recording | null>(null);
@@ -97,51 +89,30 @@ export default function SmartSplitScreen({ navigation }: any) {
     const recordingPulse = useRef(new Animated.Value(1)).current;
     const recordingPulseAnim = useRef<Animated.CompositeAnimation | null>(null);
 
-    // ── Toast ─────────────────────────────────────────────────────────────────
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const toastAnim = useRef(new Animated.Value(0)).current;
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    // ── Clarify card ──────────────────────────────────────────────────────────
     const [clarifyMsg, setClarifyMsg]     = useState<string | null>(null);
     const [clarifyInput, setClarifyInput] = useState('');
 
-    // ── Action sheet (add/create group, remove from group) ────────────────────
     const [actionSheet, setActionSheet] = useState<ActionSheetData | null>(null);
-    const actionSheetAnim = useRef(new Animated.Value(ACTION_SHEET_H)).current;
+    const actionSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_THIRDEIGHT_HALF)).current;
 
-    // ── Review ────────────────────────────────────────────────────────────────
     const [reviewTitle, setReviewTitle]   = useState('');
     const [reviewTotal, setReviewTotal]   = useState('');
     const [reviewSplits, setReviewSplits] = useState<ReviewSplit[]>([]);
     const [needsTotal, setNeedsTotal]     = useState(false);
     const [adding, setAdding]             = useState(false);
 
-    // ── Animations ────────────────────────────────────────────────────────────
     const [placeholderIdx, setPlaceholderIdx] = useState(0);
     const placeholderOpacity = useRef(new Animated.Value(1)).current;
-    const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
+    const sheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_HALF)).current;
 
-    // ── Derived ───────────────────────────────────────────────────────────────
-    const allMembers = useMemo<MemberChip[]>(() => {
-        const others = groupMembers
-            .filter(m => m.user_id !== user?.id)
-            .map(m => ({
-                user_id: m.user_id,
-                name: m.name,
-                character_shape: m.character_shape ?? 'rect',
-                character_color: m.character_color ?? colors.accent,
-            }));
-        return [
-            {
-                user_id: user?.id ?? '',
-                name: 'You',
-                character_shape: user?.character_shape ?? 'rect',
-                character_color: user?.character_color ?? colors.accent,
-            },
-            ...others,
-        ];
-    }, [groupMembers, user, colors.accent]);
+    const allMembers = useMemo<MemberChip[]>(
+        () => buildMembersList(groupMembers, user, colors.accent),
+        [groupMembers, user, colors.accent],
+    );
 
     useEffect(() => {
         setIncludedIds(new Set(allMembers.map(m => m.user_id)));
@@ -186,7 +157,7 @@ export default function SmartSplitScreen({ navigation }: any) {
     // ── Action sheet ──────────────────────────────────────────────────────────
     const openActionSheet = useCallback((data: ActionSheetData) => {
         setActionSheet(data);
-        actionSheetAnim.setValue(ACTION_SHEET_H);
+        actionSheetAnim.setValue(SHEET_HEIGHT_THIRDEIGHT_HALF);
         Animated.spring(actionSheetAnim, {
             toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start();
@@ -194,7 +165,7 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     const closeActionSheet = useCallback(() => {
         Animated.spring(actionSheetAnim, {
-            toValue: ACTION_SHEET_H, damping: 24, stiffness: 220, useNativeDriver: true,
+            toValue: SHEET_HEIGHT_THIRDEIGHT_HALF, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start(() => setActionSheet(null));
     }, [actionSheetAnim]);
 
@@ -292,8 +263,8 @@ export default function SmartSplitScreen({ navigation }: any) {
         try {
             await recordingRef.current?.stopAndUnloadAsync();
             uri = recordingRef.current?.getURI() ?? null;
-        } catch (err) {
-            console.log('[SmartSplit] stop recording error', err);
+        } catch {
+            // stop failure is non-fatal — URI may still be usable
         }
         recordingRef.current = null;
         setIsRecording(false);
@@ -309,10 +280,8 @@ export default function SmartSplitScreen({ navigation }: any) {
                 group_name: groupName,
                 member_ids: memberIds,
             });
-            console.log('[SmartSplit] voice result', result);
             handleIntentResult(result);
-        } catch (err: any) {
-            console.log('[SmartSplit] voice send error', err?.message);
+        } catch {
             Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
         } finally {
             setVoiceProcessing(false);
@@ -359,8 +328,7 @@ export default function SmartSplitScreen({ navigation }: any) {
 
             // Auto-stop after 30s
             recordingTimer.current = setTimeout(() => { stopAndSendVoice(); }, 30000);
-        } catch (err) {
-            console.log('[SmartSplit] recording start error', err);
+        } catch {
             Alert.alert('Error', 'Could not start recording.');
         }
     }, [isRecording, voiceProcessing, groupId, recordingPulse, stopAndSendVoice]);
@@ -393,10 +361,10 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     const closePicker = useCallback(() => {
         Animated.spring(sheetAnim, {
-            toValue: SHEET_H, damping: 24, stiffness: 220, useNativeDriver: true,
+            toValue: SHEET_HEIGHT_HALF, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start(() => {
             setPickerVisible(false);
-            sheetAnim.setValue(SHEET_H);
+            sheetAnim.setValue(SHEET_HEIGHT_HALF);
         });
     }, [sheetAnim]);
 
@@ -410,30 +378,14 @@ export default function SmartSplitScreen({ navigation }: any) {
         if (user?.id && !memberIds.includes(user.id)) memberIds.push(user.id);
 
         try {
-            const token = await AsyncStorage.getItem('token');
-            console.log('[SmartSplit] PRE-REQUEST', {
-                url: `${BASE_URL}/smart-split`,
-                hasToken: !!token,
-                tokenSnippet: token ? `${token.slice(0, 20)}...` : null,
-                body: { description: text, group_id: groupId, group_name: groupName, member_ids: memberIds },
-            });
-
             const result = await smartSplitApi.parse({
                 description: text,
                 group_id: groupId,
                 group_name: groupName,
                 member_ids: memberIds,
             });
-
-            console.log('[SmartSplit] RESPONSE OK', result);
             handleIntentResult(result);
-        } catch (err: any) {
-            console.log('[SmartSplit] ERROR', {
-                message: err?.message,
-                status: err?.status,
-                response: err?.response,
-                raw: String(err),
-            });
+        } catch {
             setPhase('error');
         } finally {
             setParsing(false);
@@ -1465,7 +1417,7 @@ const styles = StyleSheet.create({
     actionSheet: {
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        height: ACTION_SHEET_H,
+        height: SHEET_HEIGHT_THIRDEIGHT_HALF,
         borderTopLeftRadius: ms(28),
         borderTopRightRadius: ms(28),
         shadowColor: '#000',
@@ -1497,7 +1449,7 @@ const styles = StyleSheet.create({
     pickerSheet: {
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        height: SHEET_H,
+        height: SHEET_HEIGHT_HALF,
         borderTopLeftRadius: ms(28),
         borderTopRightRadius: ms(28),
         shadowColor: '#000',

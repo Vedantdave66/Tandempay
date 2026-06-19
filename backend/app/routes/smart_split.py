@@ -1,10 +1,7 @@
-import ast
 import base64
 import json
 import logging
-import re
 import httpx
-import os
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import List, Optional
@@ -14,15 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User, GroupMember
 from app.database import get_db
 from app.routes.auth import get_current_user
+from app.utils.gemini import GEMINI_API_KEY, GEMINI_URL, extract_json, coerce_amount
 
 router = APIRouter(prefix="/api/smart-split", tags=["smart-split"])
 logger = logging.getLogger("tandempay.smart_split")
-
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
-GEMINI_URL = (
-    "https://generativelanguage.googleapis.com/v1beta/models/"
-    "gemini-2.5-flash:generateContent"
-)
 
 
 class SmartSplitRequest(BaseModel):
@@ -99,42 +91,6 @@ def _build_fallback_prompt(description: str) -> str:
         f'Return JSON only: {{"intent": "parse_expense", "title": "string", "total": number}}'
     )
 
-
-def _extract_json(text: str) -> tuple:
-    """Return (parsed_dict, step_name). Raise ValueError when all steps fail."""
-    try:
-        return json.loads(text), "A_direct"
-    except (json.JSONDecodeError, ValueError):
-        logger.debug("JSON step A (direct parse) failed")
-
-    stripped = re.sub(r"```[a-z]*\n?", "", text).strip()
-    try:
-        return json.loads(stripped), "B_strip_fences"
-    except (json.JSONDecodeError, ValueError):
-        logger.debug("JSON step B (strip markdown fences) failed")
-
-    match = re.search(r"\{.*\}", stripped, re.DOTALL)
-    if match:
-        try:
-            return json.loads(match.group()), "C_regex_extract"
-        except (json.JSONDecodeError, ValueError):
-            logger.debug("JSON step C (regex first-block) failed")
-
-    try:
-        result = ast.literal_eval(text)
-        if isinstance(result, dict):
-            return result, "D_ast_literal_eval"
-    except (ValueError, SyntaxError):
-        logger.debug("JSON step D (ast.literal_eval) failed")
-
-    raise ValueError("All JSON extraction steps failed (A, B, C, D)")
-
-
-def _coerce_amount(raw) -> float:
-    try:
-        return float(str(raw).replace("$", "").replace(",", "").strip())
-    except (TypeError, ValueError):
-        return 0.0
 
 
 async def _call_gemini(prompt: str, client: httpx.AsyncClient) -> str:
@@ -221,7 +177,7 @@ def _build_response(data: dict, users_by_id: dict) -> SmartSplitResponse:
         return SmartSplitResponse(
             intent=intent,
             member_name=str(data.get("member_name", "")),
-            adjustment=_coerce_amount(data.get("adjustment", 0)),
+            adjustment=coerce_amount(data.get("adjustment", 0)),
             message=str(data.get("message", "")),
         )
 
@@ -239,12 +195,12 @@ def _build_response(data: dict, users_by_id: dict) -> SmartSplitResponse:
         splits.append(SplitEntry(
             user_id=uid,
             name=name,
-            amount=round(_coerce_amount(entry.get("amount", 0)), 2),
+            amount=round(coerce_amount(entry.get("amount", 0)), 2),
             note=str(entry.get("note", "")),
             included=bool(entry.get("included", True)),
         ))
 
-    total = round(_coerce_amount(data.get("total", 0)), 2)
+    total = round(coerce_amount(data.get("total", 0)), 2)
     needs_total = bool(data.get("needs_total", False)) or total == 0
 
     if not splits:
@@ -311,7 +267,7 @@ async def smart_split(
             try:
                 raw = await _call_gemini(prompt, client)
                 logger.info("smart_split gemini_raw | %r", raw)
-                data, step = _extract_json(raw)
+                data, step = extract_json(raw)
                 logger.info("smart_split parsed_ok | step=%s", step)
 
             except (ValueError, KeyError, IndexError) as first_err:
@@ -323,7 +279,7 @@ async def smart_split(
                 try:
                     raw = await _call_gemini(fallback_prompt, client)
                     logger.info("smart_split fallback_raw | %r", raw)
-                    data, step = _extract_json(raw)
+                    data, step = extract_json(raw)
                     logger.info("smart_split fallback_parsed_ok | step=%s", step)
                 except (ValueError, KeyError, IndexError) as retry_err:
                     logger.error("smart_split retry_failed | raw=%r error=%s", raw, retry_err)
@@ -408,7 +364,7 @@ ALWAYS return valid JSON."""
             try:
                 raw = await _call_gemini_voice(audio_bytes, content_type, voice_prompt, client)
                 logger.info("smart_split_voice gemini_raw | %r", raw)
-                data, step = _extract_json(raw)
+                data, step = extract_json(raw)
                 logger.info("smart_split_voice parsed_ok | step=%s", step)
             except (ValueError, KeyError, IndexError) as err:
                 logger.error("smart_split_voice parse_failed | raw=%r error=%s", raw, err)
