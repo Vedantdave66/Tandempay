@@ -382,6 +382,7 @@ export interface ParsedReceiptItem {
     id: string;
     name: string;
     price: number;
+    is_discount?: boolean;
 }
 
 export interface ReceiptParseResponse {
@@ -403,6 +404,64 @@ export const receiptsApi = {
             method: 'POST',
             body: JSON.stringify({ image_base64: imageBase64 }),
         }),
+};
+
+// --- Smart Split ---
+export interface SmartSplitEntry {
+    user_id: string;
+    name: string;
+    amount: number;
+    note: string;
+    included: boolean;
+}
+
+export interface SmartSplitResponse {
+    intent: string;
+    title: string;
+    total: number;
+    splits: SmartSplitEntry[];
+    needs_total?: boolean;
+    parse_failed?: boolean;
+    member_name?: string;
+    group_name_suggestion?: string;
+    adjustment?: number;
+    message?: string;
+}
+
+export const smartSplitApi = {
+    parse: (data: { description: string; group_id: string; group_name: string; member_ids: string[] }) =>
+        request<SmartSplitResponse>('/smart-split', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    parseVoice: async (data: {
+        audioUri: string;
+        group_id: string;
+        group_name: string;
+        member_ids: string[];
+    }): Promise<SmartSplitResponse> => {
+        const token = await AsyncStorage.getItem('token');
+        const formData = new FormData();
+        formData.append('audio', { uri: data.audioUri, name: 'recording.m4a', type: 'audio/mp4' } as any);
+        formData.append('group_id', data.group_id);
+        formData.append('group_name', data.group_name);
+        formData.append('member_ids', JSON.stringify(data.member_ids));
+
+        const res = await fetch(`${BASE_URL}/smart-split/voice`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let msg = `HTTP ${res.status}`;
+            try { msg = JSON.parse(text).detail || msg; } catch {}
+            throw new Error(msg);
+        }
+        return res.json();
+    },
 };
 
 // --- Stripe Payments ---
