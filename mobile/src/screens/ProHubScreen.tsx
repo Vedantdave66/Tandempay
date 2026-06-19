@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,6 +7,8 @@ import {
     TouchableOpacity,
     Alert,
     Share,
+    Animated,
+    Easing,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import { scale, vs, ms } from '../utils/responsive';
@@ -28,6 +30,8 @@ const PRO_FEATURES = [
 const SETTINGS_ROWS = [
     { icon: Users2,      label: 'Friends' },
     { icon: Bell,        label: 'Notifications' },
+    { icon: FileDown,    label: 'Export' },
+    { icon: RefreshCw,   label: 'Recurring' },
     { icon: UserPlus,    label: 'Invite a friend' },
     { icon: Sun,         label: 'Appearance' },
 ];
@@ -37,6 +41,16 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
+    const shimmerAnim = useRef(new Animated.Value(0.7)).current;
+
+    useEffect(() => {
+        Animated.loop(
+            Animated.sequence([
+                Animated.timing(shimmerAnim, { toValue: 1.0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+                Animated.timing(shimmerAnim, { toValue: 0.7, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
+            ])
+        ).start();
+    }, []);
 
     const handleProAction = () => {
         navigation.navigate('Subscription');
@@ -98,9 +112,9 @@ export default function ProHubScreen({ navigation }: any) {
                                 <Crown size={20} color="#fff" />
                                 <Text style={styles.proTitle}>TandemPay Pro</Text>
                             </View>
-                            <View style={styles.priceChip}>
+                            <Animated.View style={[styles.priceChip, { opacity: shimmerAnim }]}>
                                 <Text style={[styles.priceChipText, { color: colors.accent }]}>$4.99/mo</Text>
-                            </View>
+                            </Animated.View>
                         </LinearGradient>
                         <View style={[styles.proBody, { backgroundColor: colors.surface }]}>
                             {PRO_FEATURES.map(feature => (
