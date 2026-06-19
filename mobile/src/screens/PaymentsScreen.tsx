@@ -9,6 +9,7 @@ import {
     TouchableOpacity,
     ActivityIndicator,
     Alert,
+    Linking,
     RefreshControl,
     Modal,
     TextInput,
@@ -147,7 +148,7 @@ export default function PaymentsScreen() {
     };
 
     const handleStripeConnect = () => {
-        Alert.alert('Stripe Connect', 'Connect your bank with Stripe to receive instant payouts. Use the Web App at tandempay.ca to link securely.');
+        Linking.openURL('https://tandempay.ca/account');
     };
 
     const renderInitials = (name: string) => {

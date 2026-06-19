@@ -62,14 +62,15 @@ class ParsedItem(BaseModel):
     id: str
     name: str
     price: float
+    is_discount: bool = False
 
 
 class ReceiptParseResponse(BaseModel):
     items: List[ParsedItem]
-    subtotal: float
-    tax: float
-    tax_rate: float
-    tip_detected: float
+    subtotal: float = 0.0
+    tax: float = 0.0
+    tax_rate: float = 0.13
+    tip_detected: float = 0.0
     total: float
     currency: str
     merchant: str = "Receipt"
@@ -155,6 +156,7 @@ async def parse_receipt(
             "temperature": 0.1,
             "maxOutputTokens": 1024,
             "response_mime_type": "application/json",
+            "response_schema": _RESPONSE_SCHEMA,
         },
     }
 
