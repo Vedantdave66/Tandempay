@@ -78,6 +78,7 @@ export default function SubscriptionScreen({ navigation }: any) {
     const currentPrice = annual ? ANNUAL_PRICE : MONTHLY_PRICE;
     const billingNote = annual ? 'billed annually' : 'billed monthly';
 
+    // ── Upgrade flow ─────────────────────────────────────────────────────────
     return (
         <SafeAreaView edges={['top']} style={[styles.root, { backgroundColor: colors.background }]}>
             {/* Back button */}
@@ -306,7 +307,6 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         borderRadius: ms(16),
         padding: TOGGLE_PAD,
-        marginBottom: vs(20),
         position: 'relative',
         height: vs(54),
         alignItems: 'center',
@@ -416,6 +416,11 @@ const styles = StyleSheet.create({
     },
     manageLink: {
         fontSize: ms(14),
+        marginTop: vs(4),
+    },
+    socialProof: {
+        fontSize: ms(12),
+        textAlign: 'center',
         marginTop: vs(4),
     },
 

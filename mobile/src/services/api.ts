@@ -382,6 +382,7 @@ export interface ParsedReceiptItem {
     id: string;
     name: string;
     price: number;
+    is_discount?: boolean;
 }
 
 export interface ReceiptParseResponse {
