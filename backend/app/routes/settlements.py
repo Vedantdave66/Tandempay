@@ -213,8 +213,6 @@ async def update_settlement_status(
     """
     await _verify_membership(group_id, current_user.id, db)
 
-    # BEFORE: bare select then 2 separate User queries after the status update
-    # AFTER:  single JOIN loads payer + payee; captured in locals before flush expires them
     result = await db.execute(
         select(SettlementRecord)
         .where(
@@ -288,9 +286,6 @@ async def update_settlement_status(
     elif data.status in ("settled", "declined"):
         await push_for_user(payer, notif.title, notif.message, notif.id)
 
-    # Derive audit action from the new status value.
-    # "sent" is a payer-internal step; only payee-driven transitions
-    # (settled → confirmed, declined → rejected) produce audit entries.
     _AUDIT_STATUS_MAP = {
         "settled": AuditActions.SETTLEMENT_CONFIRMED,
         "declined": AuditActions.SETTLEMENT_REJECTED,

@@ -64,7 +64,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 const u = await authApi.me();
                 setUser(u);
             }
-        } catch (e) { }
+        } catch (e) { console.error('[Auth] Failed to restore session:', e); }
     };
 
     return (
