@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
-import { authApi } from '../services/api';
+import { authApi, groupsApi } from '../services/api';
 import { Wallet, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '../components/Logo';
 
-export default function RegisterScreen({ navigation }: any) {
+export default function RegisterScreen({ navigation, route }: any) {
     const { login } = useAuth();
     const { colors, isDark } = useTheme();
     const [name, setName] = useState('');
@@ -44,6 +45,23 @@ export default function RegisterScreen({ navigation }: any) {
         try {
             const res = await authApi.register(name.trim(), email.trim(), password);
             await login(res.access_token);
+            // Apply the character picked during onboarding — fire-and-forget
+            const { character_shape, character_color } = route?.params ?? {};
+            if (character_shape && character_color) {
+                authApi.updateProfile({ character_shape, character_color }).catch(() => {});
+            }
+
+            // Check for a pending invite from a deep link before registration
+            const pendingToken = await AsyncStorage.getItem('@pending_invite_token');
+            if (pendingToken) {
+                await AsyncStorage.removeItem('@pending_invite_token');
+                try {
+                    const joined = await groupsApi.joinByToken(pendingToken);
+                    navigation.navigate('Group', { groupId: joined.group_id });
+                } catch {
+                    // Silent — user is registered, just couldn't join the group
+                }
+            }
         } catch (err: any) {
             setError(err.message || 'Registration failed');
         } finally {

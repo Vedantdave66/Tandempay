@@ -152,6 +152,8 @@ class SettlementRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     auto_confirmed: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default="false")
+    nudge_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    last_nudged_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     group: Mapped["Group"] = relationship(back_populates="settlement_records")
     payer: Mapped["User"] = relationship(foreign_keys=[payer_id])

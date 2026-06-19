@@ -118,6 +118,18 @@ export interface GroupListItem {
     total_expenses: number;
 }
 
+export interface GroupInvite {
+    invite_url: string;
+    token: string;
+}
+
+export interface GroupPreview {
+    group_name: string;
+    member_count: number;
+    creator_name: string;
+    token: string;
+}
+
 export const groupsApi = {
     create: (name: string) =>
         request<Group>('/groups', { method: 'POST', body: JSON.stringify({ name }) }),
@@ -132,6 +144,10 @@ export const groupsApi = {
         request<GroupMember>(`/groups/${groupId}/join`, {
             method: 'POST',
         }),
+    generateInvite: (groupId: string) =>
+        request<GroupInvite>(`/groups/${groupId}/invite/generate`, { method: 'POST' }),
+    joinByToken: (token: string) =>
+        request<{ group_id: string }>(`/groups/join/${token}`, { method: 'POST' }),
     deleteGroup: (groupId: string) =>
         request<void>(`/groups/${groupId}`, { method: 'DELETE' }),
     removeMember: (groupId: string, userId: string) =>
@@ -358,6 +374,7 @@ export const recurringApi = {
         method: 'POST',
         body: JSON.stringify({ currency: 'CAD', ...data }),
     }),
+    delete: (id: string) => request<void>(`/recurring/${id}`, { method: 'DELETE' }),
 };
 
 // --- Receipts ---
@@ -377,6 +394,8 @@ export interface ReceiptParseResponse {
     total: number;
     currency: string;
     merchant?: string;
+    // Backend graceful fallback — true when Gemini output could not be parsed
+    parse_failed?: boolean;
 }
 
 export const receiptsApi = {
@@ -385,6 +404,64 @@ export const receiptsApi = {
             method: 'POST',
             body: JSON.stringify({ image_base64: imageBase64 }),
         }),
+};
+
+// --- Smart Split ---
+export interface SmartSplitEntry {
+    user_id: string;
+    name: string;
+    amount: number;
+    note: string;
+    included: boolean;
+}
+
+export interface SmartSplitResponse {
+    intent: string;
+    title: string;
+    total: number;
+    splits: SmartSplitEntry[];
+    needs_total?: boolean;
+    parse_failed?: boolean;
+    member_name?: string;
+    group_name_suggestion?: string;
+    adjustment?: number;
+    message?: string;
+}
+
+export const smartSplitApi = {
+    parse: (data: { description: string; group_id: string; group_name: string; member_ids: string[] }) =>
+        request<SmartSplitResponse>('/smart-split', {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+
+    parseVoice: async (data: {
+        audioUri: string;
+        group_id: string;
+        group_name: string;
+        member_ids: string[];
+    }): Promise<SmartSplitResponse> => {
+        const token = await AsyncStorage.getItem('token');
+        const formData = new FormData();
+        formData.append('audio', { uri: data.audioUri, name: 'recording.m4a', type: 'audio/mp4' } as any);
+        formData.append('group_id', data.group_id);
+        formData.append('group_name', data.group_name);
+        formData.append('member_ids', JSON.stringify(data.member_ids));
+
+        const res = await fetch(`${BASE_URL}/smart-split/voice`, {
+            method: 'POST',
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+            body: formData,
+        });
+
+        if (!res.ok) {
+            const text = await res.text();
+            let msg = `HTTP ${res.status}`;
+            try { msg = JSON.parse(text).detail || msg; } catch {}
+            throw new Error(msg);
+        }
+        return res.json();
+    },
 };
 
 // --- Stripe Payments ---

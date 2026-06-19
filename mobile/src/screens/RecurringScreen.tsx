@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
     View,
     Text,
@@ -7,25 +7,122 @@ import {
     TouchableOpacity,
     SafeAreaView,
     Alert,
-    Linking,
     Modal,
     TextInput,
     ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
+    Animated,
+    PanResponder,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { RefreshCw, Plus, Crown, X } from 'lucide-react-native';
+import { RefreshCw, Plus, Crown, X, Trash2 } from 'lucide-react-native';
 import { recurringApi, groupsApi, RecurringExpenseOut, GroupListItem } from '../services/api';
 import { T } from '../utils/typography';
 
-const PREVIEW_ROWS = [
-    { title: 'Rent', amount: '$800', frequency: 'Monthly', split: 'Split with 2 people' },
-    { title: 'Netflix', amount: '$18', frequency: 'Monthly', split: 'Split with 3 people' },
-    { title: 'Hydro', amount: '$95', frequency: 'Monthly', split: 'Split with 2 people' },
+type Frequency = 'weekly' | 'biweekly' | 'monthly';
+
+const FREQUENCIES: { key: Frequency; label: string }[] = [
+    { key: 'weekly',    label: 'Weekly' },
+    { key: 'biweekly',  label: 'Biweekly' },
+    { key: 'monthly',   label: 'Monthly' },
 ];
+
+const DELETE_WIDTH = scale(72);
+const SWIPE_THRESHOLD = scale(48);
+
+function todayISO() {
+    return new Date().toISOString().split('T')[0];
+}
+
+// ─── SwipeableRow ────────────────────────────────────────────────────────────
+// Reveals a red delete button when swiped left. Uses core RN PanResponder +
+// Animated so no extra deps are required.
+function SwipeableRow({ children, onDelete, colors }: {
+    children: React.ReactNode;
+    onDelete: () => void;
+    colors: any;
+}) {
+    const translateX = useRef(new Animated.Value(0)).current;
+    const isOpen = useRef(false);
+
+    const close = useCallback(() => {
+        Animated.spring(translateX, {
+            toValue: 0,
+            useNativeDriver: true,
+            damping: 20,
+            stiffness: 260,
+        }).start(() => { isOpen.current = false; });
+    }, [translateX]);
+
+    const open = useCallback(() => {
+        Animated.spring(translateX, {
+            toValue: -DELETE_WIDTH,
+            useNativeDriver: true,
+            damping: 20,
+            stiffness: 260,
+        }).start(() => { isOpen.current = true; });
+    }, [translateX]);
+
+    const panResponder = useRef(PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+            Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderGrant: () => {
+            translateX.extractOffset();
+        },
+        onPanResponderMove: (_, g) => {
+            const raw = g.dx;
+            // clamp: only allow left swipe, max = DELETE_WIDTH
+            const clamped = Math.min(0, Math.max(-DELETE_WIDTH, raw));
+            translateX.setValue(clamped);
+        },
+        onPanResponderRelease: (_, g) => {
+            translateX.flattenOffset();
+            const current = (translateX as any)._value as number;
+            if (current < -SWIPE_THRESHOLD) {
+                open();
+            } else {
+                close();
+            }
+        },
+        onPanResponderTerminate: () => {
+            translateX.flattenOffset();
+            close();
+        },
+    })).current;
+
+    const handleDeletePress = () => {
+        close();
+        onDelete();
+    };
+
+    return (
+        <View style={styles.swipeContainer}>
+            {/* Delete action — revealed behind the row */}
+            <View style={[styles.deleteAction, { backgroundColor: '#E05252', width: DELETE_WIDTH }]}>
+                <TouchableOpacity
+                    style={styles.deleteActionInner}
+                    onPress={handleDeletePress}
+                    activeOpacity={0.8}
+                >
+                    <Trash2 size={18} color="#fff" />
+                    <Text style={styles.deleteActionText}>Delete</Text>
+                </TouchableOpacity>
+            </View>
+            {/* Row slides left */}
+            <Animated.View
+                {...panResponder.panHandlers}
+                style={{ transform: [{ translateX }] }}
+            >
+                {children}
+            </Animated.View>
+        </View>
+    );
+}
+
+// ─── RecurringScreen ─────────────────────────────────────────────────────────
 
 export default function RecurringScreen({ navigation }: any) {
     const { user } = useAuth();
@@ -37,9 +134,11 @@ export default function RecurringScreen({ navigation }: any) {
     const [showForm, setShowForm] = useState(false);
     const [submitting, setSubmitting] = useState(false);
 
+    // Form state
     const [description, setDescription] = useState('');
     const [amount, setAmount] = useState('');
-    const [frequency, setFrequency] = useState<'weekly' | 'monthly'>('monthly');
+    const [frequency, setFrequency] = useState<Frequency>('monthly');
+    const [startDate, setStartDate] = useState(todayISO());
     const [groupId, setGroupId] = useState<string | null>(null);
     const [groups, setGroups] = useState<GroupListItem[]>([]);
 
@@ -72,6 +171,7 @@ export default function RecurringScreen({ navigation }: any) {
         setDescription('');
         setAmount('');
         setFrequency('monthly');
+        setStartDate(todayISO());
         setGroupId(null);
     };
 
@@ -85,12 +185,11 @@ export default function RecurringScreen({ navigation }: any) {
             Alert.alert('Invalid amount', 'Enter a valid positive number.');
             return;
         }
-
-        const today = new Date();
-        const next = new Date(today);
-        if (frequency === 'weekly') next.setDate(today.getDate() + 7);
-        else next.setMonth(today.getMonth() + 1);
-        const nextRunDate = next.toISOString().split('T')[0];
+        // Basic date validation: expect YYYY-MM-DD
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || isNaN(Date.parse(startDate))) {
+            Alert.alert('Invalid date', 'Enter a start date in YYYY-MM-DD format.');
+            return;
+        }
 
         setSubmitting(true);
         try {
@@ -98,7 +197,7 @@ export default function RecurringScreen({ navigation }: any) {
                 description: description.trim(),
                 amount: parsedAmount,
                 frequency,
-                next_run_date: nextRunDate,
+                next_run_date: startDate,
                 ...(groupId ? { group_id: groupId } : {}),
             });
             setShowForm(false);
@@ -111,12 +210,37 @@ export default function RecurringScreen({ navigation }: any) {
         }
     };
 
+    const handleDelete = (id: string, title: string) => {
+        Alert.alert(
+            'Delete recurring expense',
+            `Remove "${title}"? This will stop future auto-splits.`,
+            [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                    text: 'Delete',
+                    style: 'destructive',
+                    onPress: async () => {
+                        // Optimistic remove
+                        setItems(prev => prev.filter(i => i.id !== id));
+                        try {
+                            await recurringApi.delete(id);
+                        } catch (err: any) {
+                            Alert.alert('Error', err.message || 'Could not delete recurring expense.');
+                            // Restore list on failure
+                            loadItems();
+                        }
+                    },
+                },
+            ],
+        );
+    };
+
     return (
         <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
             <View style={styles.header}>
                 <View>
                     <Text style={[styles.pageTitle, { color: colors.text }]}>
-                        <RefreshCw size={20} color={colors.accent} /> Recurring Expenses
+                        Recurring Expenses
                     </Text>
                     <Text style={[styles.pageSubtitle, { color: colors.secondaryText }]}>
                         Auto-split bills on a schedule
@@ -140,20 +264,23 @@ export default function RecurringScreen({ navigation }: any) {
                         <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
                     ) : items.length > 0 ? (
                         items.map(item => (
-                            <View
+                            <SwipeableRow
                                 key={item.id}
-                                style={[styles.expenseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                colors={colors}
+                                onDelete={() => handleDelete(item.id, item.description)}
                             >
-                                <View style={[styles.rowIcon, { backgroundColor: isDark ? 'rgba(74,222,128,0.12)' : 'rgba(22,163,74,0.08)' }]}>
-                                    <RefreshCw size={18} color={colors.accent} />
+                                <View style={[styles.expenseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                    <View style={[styles.rowIcon, { backgroundColor: isDark ? 'rgba(74,222,128,0.12)' : 'rgba(22,163,74,0.08)' }]}>
+                                        <RefreshCw size={18} color={colors.accent} />
+                                    </View>
+                                    <View style={styles.rowInfo}>
+                                        <Text style={[styles.rowTitle, { color: colors.text }]}>{item.description}</Text>
+                                        <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
+                                            ${item.amount} · {item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)} · Next: {item.next_run_date}
+                                        </Text>
+                                    </View>
                                 </View>
-                                <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }]}>{item.description}</Text>
-                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
-                                        ${item.amount} · {item.frequency.charAt(0).toUpperCase() + item.frequency.slice(1)} · Next: {item.next_run_date}
-                                    </Text>
-                                </View>
-                            </View>
+                            </SwipeableRow>
                         ))
                     ) : (
                         <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -165,56 +292,40 @@ export default function RecurringScreen({ navigation }: any) {
                         </View>
                     )
                 ) : (
-                    <>
-                        <View pointerEvents="none" style={{ opacity: 0.4 }}>
-                            {PREVIEW_ROWS.map(row => (
-                                <View
-                                    key={row.title}
-                                    style={[styles.expenseRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
-                                >
-                                    <View style={[styles.rowIcon, { backgroundColor: isDark ? 'rgba(74,222,128,0.12)' : 'rgba(22,163,74,0.08)' }]}>
-                                        <RefreshCw size={18} color={colors.accent} />
-                                    </View>
-                                    <View style={styles.rowInfo}>
-                                        <Text style={[styles.rowTitle, { color: colors.text }]}>{row.title}</Text>
-                                        <Text style={[styles.rowMeta, { color: colors.secondaryText }]}>
-                                            {row.amount} · {row.frequency} · {row.split}
-                                        </Text>
-                                    </View>
-                                </View>
-                            ))}
-                        </View>
-
-                        <View style={[styles.upsellCard, {
-                            backgroundColor: isDark ? 'rgba(74,222,128,0.06)' : 'rgba(22,163,74,0.04)',
-                            borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.15)',
-                        }]}>
-                            <Crown size={16} color={colors.accent} />
-                            <View style={styles.upsellText}>
-                                <Text style={[styles.upsellTitle, { color: colors.text }]}>
-                                    Automate your monthly bills with Pro
+                    <View style={[styles.upsellCard, {
+                        backgroundColor: isDark ? 'rgba(74,222,128,0.06)' : 'rgba(22,163,74,0.04)',
+                        borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.15)',
+                    }]}>
+                        <Crown size={22} color={colors.accent} />
+                        <View style={styles.upsellText}>
+                            <Text style={[styles.upsellTitle, { color: colors.text }]}>
+                                Automate your monthly bills with Pro
+                            </Text>
+                            <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
+                                Set it once, TandemPay handles the rest.
+                            </Text>
+                            <TouchableOpacity
+                                onPress={() => navigation.navigate('Subscription')}
+                                activeOpacity={0.8}
+                                style={[styles.upgradeBtn, { backgroundColor: colors.accent }]}
+                            >
+                                <Text style={[styles.upgradeBtnText, { color: isDark ? '#064E3B' : '#FFFFFF' }]}>
+                                    Upgrade to Pro
                                 </Text>
-                                <Text style={[styles.upsellSub, { color: colors.secondaryText }]}>
-                                    Set it once, TandemPay handles the rest.
-                                </Text>
-                                <TouchableOpacity
-                                    onPress={() => Linking.openURL('https://tandempay.ca/pricing')}
-                                    activeOpacity={0.7}
-                                >
-                                    <Text style={[styles.learnMore, { color: colors.accent }]}>Learn more →</Text>
-                                </TouchableOpacity>
-                            </View>
+                            </TouchableOpacity>
                         </View>
-                    </>
+                    </View>
                 )}
             </ScrollView>
 
-            <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => setShowForm(false)}>
+            {/* ── Add Recurring Expense sheet ── */}
+            <Modal visible={showForm} animationType="slide" transparent onRequestClose={() => { setShowForm(false); resetForm(); }}>
                 <KeyboardAvoidingView
                     behavior={Platform.OS === 'ios' ? 'padding' : undefined}
                     style={styles.modalOverlay}
                 >
                     <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+                        <View style={styles.modalHandle} />
                         <View style={styles.modalHeader}>
                             <Text style={[styles.modalTitle, { color: colors.text }, T.bold]}>Add Recurring Expense</Text>
                             <TouchableOpacity
@@ -230,7 +341,7 @@ export default function RecurringScreen({ navigation }: any) {
                         <TextInput
                             style={[styles.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="e.g. Rent, Netflix, Hydro"
-                            placeholderTextColor={colors.secondaryText}
+                            placeholderTextColor={colors.faintText}
                             value={description}
                             onChangeText={setDescription}
                         />
@@ -239,7 +350,7 @@ export default function RecurringScreen({ navigation }: any) {
                         <TextInput
                             style={[styles.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="0.00"
-                            placeholderTextColor={colors.secondaryText}
+                            placeholderTextColor={colors.faintText}
                             value={amount}
                             onChangeText={setAmount}
                             keyboardType="decimal-pad"
@@ -247,27 +358,38 @@ export default function RecurringScreen({ navigation }: any) {
 
                         <Text style={[styles.fieldLabel, { color: colors.secondaryText }, T.semibold]}>FREQUENCY</Text>
                         <View style={styles.toggleRow}>
-                            {(['weekly', 'monthly'] as const).map(f => (
+                            {FREQUENCIES.map(({ key, label }) => (
                                 <TouchableOpacity
-                                    key={f}
+                                    key={key}
                                     style={[
                                         styles.toggleBtn,
                                         { borderColor: colors.border },
-                                        frequency === f && { backgroundColor: colors.accent, borderColor: colors.accent },
+                                        frequency === key && { backgroundColor: colors.accent, borderColor: colors.accent },
                                     ]}
-                                    onPress={() => setFrequency(f)}
+                                    onPress={() => setFrequency(key)}
                                     activeOpacity={0.75}
                                 >
                                     <Text style={[
                                         styles.toggleText,
-                                        { color: frequency === f ? '#1A1A1A' : colors.secondaryText },
+                                        { color: frequency === key ? '#1A1A1A' : colors.secondaryText },
                                         T.semibold,
                                     ]}>
-                                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                                        {label}
                                     </Text>
                                 </TouchableOpacity>
                             ))}
                         </View>
+
+                        <Text style={[styles.fieldLabel, { color: colors.secondaryText }, T.semibold]}>START DATE</Text>
+                        <TextInput
+                            style={[styles.formInput, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
+                            placeholder="YYYY-MM-DD"
+                            placeholderTextColor={colors.faintText}
+                            value={startDate}
+                            onChangeText={setStartDate}
+                            keyboardType="numbers-and-punctuation"
+                            maxLength={10}
+                        />
 
                         {groups.length > 0 && (
                             <>
@@ -357,13 +479,42 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(24),
         paddingBottom: vs(48),
     },
+
+    // Swipeable row
+    swipeContainer: {
+        position: 'relative',
+        marginBottom: vs(10),
+        borderRadius: ms(18),
+        overflow: 'hidden',
+    },
+    deleteAction: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        borderRadius: ms(18),
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    deleteActionInner: {
+        flex: 1,
+        width: DELETE_WIDTH,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: vs(4),
+    },
+    deleteActionText: {
+        color: '#fff',
+        fontSize: ms(11),
+        fontWeight: '700',
+    },
+
     expenseRow: {
         flexDirection: 'row',
         alignItems: 'center',
         borderRadius: ms(18),
         borderWidth: 1,
         padding: scale(16),
-        marginBottom: vs(10),
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.04,
@@ -388,6 +539,8 @@ const styles = StyleSheet.create({
         fontSize: ms(12),
         lineHeight: 17,
     },
+
+    // Upsell
     upsellCard: {
         flexDirection: 'row',
         alignItems: 'flex-start',
@@ -399,19 +552,26 @@ const styles = StyleSheet.create({
     },
     upsellText: { flex: 1 },
     upsellTitle: {
-        fontSize: ms(14),
+        fontSize: ms(15),
         fontWeight: '700',
-        marginBottom: vs(3),
-    },
-    upsellSub: {
-        fontSize: ms(12),
-        lineHeight: 17,
         marginBottom: vs(6),
     },
-    learnMore: {
+    upsellSub: {
         fontSize: ms(13),
-        fontWeight: '600',
+        lineHeight: 18,
+        marginBottom: vs(14),
     },
+    upgradeBtn: {
+        borderRadius: ms(13),
+        paddingVertical: vs(12),
+        alignItems: 'center',
+    },
+    upgradeBtnText: {
+        fontSize: ms(14),
+        fontWeight: '700',
+    },
+
+    // Empty state
     emptyState: {
         marginTop: vs(16),
         padding: scale(36),
@@ -429,16 +589,26 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 19,
     },
+
+    // Modal sheet
     modalOverlay: {
         flex: 1,
         justifyContent: 'flex-end',
         backgroundColor: 'rgba(0,0,0,0.45)',
     },
     modalSheet: {
-        borderTopLeftRadius: ms(24),
-        borderTopRightRadius: ms(24),
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
         padding: scale(24),
-        paddingBottom: vs(36),
+        paddingBottom: vs(40),
+    },
+    modalHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: 2,
+        backgroundColor: 'rgba(128,128,128,0.3)',
+        alignSelf: 'center',
+        marginBottom: vs(16),
     },
     modalHeader: {
         flexDirection: 'row',
@@ -464,7 +634,7 @@ const styles = StyleSheet.create({
     },
     toggleRow: {
         flexDirection: 'row',
-        gap: scale(10),
+        gap: scale(8),
         marginBottom: vs(16),
     },
     toggleBtn: {
@@ -475,7 +645,7 @@ const styles = StyleSheet.create({
         borderWidth: 1,
     },
     toggleText: {
-        fontSize: ms(14),
+        fontSize: ms(13),
     },
     groupChip: {
         paddingHorizontal: scale(14),

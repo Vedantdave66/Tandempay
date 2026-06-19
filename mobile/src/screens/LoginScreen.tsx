@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, KeyboardAvoidingView, Platform } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useAuth } from '../context/AuthContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
-import { authApi } from '../services/api';
+import { authApi, groupsApi } from '../services/api';
 import { Wallet, ArrowLeft, Eye, EyeOff } from 'lucide-react-native';
 import Logo from '../components/Logo';
 
@@ -29,6 +30,18 @@ export default function LoginScreen({ navigation }: any) {
         try {
             const res = await authApi.login(email.trim(), password);
             await login(res.access_token);
+
+            // Check for a pending invite from a deep link before login
+            const pendingToken = await AsyncStorage.getItem('@pending_invite_token');
+            if (pendingToken) {
+                await AsyncStorage.removeItem('@pending_invite_token');
+                try {
+                    const joined = await groupsApi.joinByToken(pendingToken);
+                    navigation.navigate('Group', { groupId: joined.group_id });
+                } catch {
+                    // Silent — user is logged in, just couldn't join the group
+                }
+            }
         } catch (err: any) {
             setError(err.message || 'Login failed');
         } finally {

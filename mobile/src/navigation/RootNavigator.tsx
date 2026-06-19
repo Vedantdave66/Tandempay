@@ -1,17 +1,20 @@
-import React, { Fragment, useEffect, useRef } from 'react';
-import { Animated, Easing, View, StyleSheet } from 'react-native';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
+import { Animated, Easing, View, StyleSheet, Linking, Alert } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import CharacterSetupModal from '../components/CharacterSetupModal';
-import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme, DarkTheme, NavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { scale } from '../utils/responsive';
+import { groupsApi } from '../services/api';
 
 import MainTabNavigator from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
 import LandingScreen from '../screens/LandingScreen';
+import OnboardingScreen from '../screens/OnboardingScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
 import AddExpenseScreen from '../screens/AddExpenseScreen';
 import AddFriendScreen from '../screens/AddFriendScreen';
@@ -26,6 +29,7 @@ import AppearanceScreen from '../screens/AppearanceScreen';
 import ReceiptScanScreen from '../screens/ReceiptScanScreen';
 import SmartSplitScreen from '../screens/SmartSplitScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -88,8 +92,50 @@ const holdStyles = StyleSheet.create({
 export default function RootNavigator() {
     const { user, loading } = useAuth();
     const { colors, isDark } = useTheme();
+    const navRef = useRef<NavigationContainerRef<any>>(null);
 
-    if (loading) {
+    // First-run check — unseen onboarding routes new users to the carousel
+    const [onboardingSeen, setOnboardingSeen] = useState<boolean | null>(null);
+    useEffect(() => {
+        AsyncStorage.getItem('@onboarding_seen')
+            .then(v => setOnboardingSeen(v === 'true'))
+            .catch(() => setOnboardingSeen(true));
+    }, []);
+
+    // Deep link handler: tandempay://join/{token} or https://tandempay.ca/join/{token}
+    useEffect(() => {
+        if (loading) return;
+
+        const handleURL = async (url: string) => {
+            const match = url.match(/\/join\/([A-Za-z0-9_-]+)/);
+            if (!match) return;
+            const token = match[1];
+
+            if (user) {
+                try {
+                    const result = await groupsApi.joinByToken(token);
+                    const tryNav = () => {
+                        if (navRef.current?.isReady()) {
+                            navRef.current.navigate('Group' as never, { groupId: result.group_id } as never);
+                        } else {
+                            setTimeout(tryNav, 100);
+                        }
+                    };
+                    tryNav();
+                } catch (err: any) {
+                    Alert.alert('Could not join group', err.message || 'Invalid invite link.');
+                }
+            } else {
+                await AsyncStorage.setItem('@pending_invite_token', token);
+            }
+        };
+
+        Linking.getInitialURL().then(url => { if (url) handleURL(url); });
+        const sub = Linking.addEventListener('url', ({ url }) => handleURL(url));
+        return () => sub.remove();
+    }, [user, loading]);
+
+    if (loading || (!user && onboardingSeen === null)) {
         return <AuthHoldScreen background={colors.background} />;
     }
 
@@ -107,7 +153,7 @@ export default function RootNavigator() {
 
     return (
         <Fragment>
-        <NavigationContainer theme={navigationTheme}>
+        <NavigationContainer ref={navRef} theme={navigationTheme}>
             <Stack.Navigator
                 screenOptions={{
                     headerShown: false,
@@ -118,6 +164,8 @@ export default function RootNavigator() {
             >
                 {!user ? (
                     <Stack.Group screenOptions={{ animation: 'fade' }}>
+                        {/* First screen in the group is the initial route */}
+                        {!onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />}
                         <Stack.Screen name="Landing" component={LandingScreen} />
                         <Stack.Screen name="Login" component={LoginScreen} />
                         <Stack.Screen name="Register" component={RegisterScreen} />
@@ -199,6 +247,11 @@ export default function RootNavigator() {
                         <Stack.Screen
                             name="FriendsHub"
                             component={FriendsScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="Subscription"
+                            component={SubscriptionScreen}
                             options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>
