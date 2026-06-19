@@ -1,10 +1,10 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
     View,
     Text,
     StyleSheet,
     ScrollView,
-    TouchableOpacity,
+    Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -13,14 +13,16 @@ import { ChevronLeft, Check, Sun, Moon } from 'lucide-react-native';
 import { useTheme } from '../context/ThemeContext';
 import { ACCENT_PRESETS, AccentKey } from '../constants/Colors';
 import { scale, vs, ms } from '../utils/responsive';
+import PressableScale from '../components/PressableScale';
+import { T } from '../utils/typography';
 
 const ACCENT_LABELS: Record<AccentKey, string> = {
     forest: 'Forest',
-    ocean: 'Ocean',
+    ocean:  'Ocean',
     sunset: 'Sunset',
-    candy: 'Candy',
-    grape: 'Grape',
-    slate: 'Slate',
+    candy:  'Candy',
+    grape:  'Grape',
+    slate:  'Slate',
 };
 
 const ACCENT_KEYS = Object.keys(ACCENT_PRESETS) as AccentKey[];
@@ -28,8 +30,18 @@ const ACCENT_KEYS = Object.keys(ACCENT_PRESETS) as AccentKey[];
 export default function AppearanceScreen({ navigation }: any) {
     const { colors, isDark, theme, setTheme, accentKey, setAccent } = useTheme();
 
+    // Per-swatch scale animated values — spring to 1.04 when selected
+    const scaleAnims = useRef(
+        ACCENT_KEYS.reduce((acc, key) => {
+            acc[key] = new Animated.Value(accentKey === key ? 1.04 : 1.0);
+            return acc;
+        }, {} as Record<AccentKey, Animated.Value>)
+    ).current;
+
     const handleAccent = (key: AccentKey) => {
         Haptics.selectionAsync();
+        Animated.spring(scaleAnims[accentKey], { toValue: 1.0, damping: 20, stiffness: 280, useNativeDriver: true }).start();
+        Animated.spring(scaleAnims[key],       { toValue: 1.04, damping: 20, stiffness: 280, useNativeDriver: true }).start();
         setAccent(key);
     };
 
@@ -41,103 +53,131 @@ export default function AppearanceScreen({ navigation }: any) {
 
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
+            {/* Header */}
             <View style={styles.header}>
-                <TouchableOpacity
-                    style={[styles.backBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                <PressableScale
+                    scaleTo={0.97}
+                    haptic="light"
                     onPress={() => navigation.goBack()}
-                    activeOpacity={0.8}
+                    style={[styles.backBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
                 >
-                    <ChevronLeft size={20} color={colors.text} />
-                </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>Appearance</Text>
-                <View style={styles.backBtnSpacer} />
+                    <ChevronLeft size={ms(20)} color={colors.text} />
+                </PressableScale>
+                <Text style={[styles.headerTitle, { color: colors.text }, T.bold]}>Appearance</Text>
+                <View style={{ width: scale(44) }} />
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: vs(40) }} showsVerticalScrollIndicator={false}>
-                {/* Live phone mock preview */}
-                <View style={styles.mockWrap}>
-                    <View style={[styles.mockPhone, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <LinearGradient colors={colors.heroGradient} locations={[0, 0.35, 1]} style={styles.mockHero}>
-                            <View style={[styles.mockAvatar, { backgroundColor: colors.accent + '40' }]} />
-                            <View style={[styles.mockName, { backgroundColor: colors.accent + '30' }]} />
-                        </LinearGradient>
-                        <LinearGradient colors={colors.cardGradient as any} style={styles.mockCard}>
-                            <View style={[styles.mockCardLine, { backgroundColor: 'rgba(255,255,255,0.5)' }]} />
-                            <View style={[styles.mockCardLine, { width: '60%', backgroundColor: 'rgba(255,255,255,0.3)' }]} />
-                        </LinearGradient>
-                        <View style={[styles.mockTabBar, {
-                            backgroundColor: isDark ? 'rgba(22,22,26,0.86)' : 'rgba(248,248,252,0.86)',
-                            borderTopColor: colors.border,
-                        }]}>
-                            {[0, 1, 2, 3, 4].map(i => (
-                                <View
-                                    key={i}
-                                    style={[styles.mockTabDot, { backgroundColor: i === 2 ? colors.accent : colors.tabIconDefault }]}
-                                />
-                            ))}
+            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+
+                {/* Live preview card */}
+                <View style={[styles.previewCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                    <LinearGradient colors={colors.heroGradient} locations={[0, 0.35, 1]} style={styles.previewHero}>
+                        <View style={[styles.previewAvatar, { backgroundColor: colors.accent + '50' }]} />
+                        <View style={[styles.previewName, { backgroundColor: colors.accent + '35' }]} />
+                        <View style={[styles.previewName, { width: '40%', backgroundColor: colors.accent + '20' }]} />
+                    </LinearGradient>
+                    <LinearGradient colors={colors.cardGradient as any} style={styles.previewGroupCard}>
+                        <View style={styles.previewCardRow}>
+                            <View style={[styles.previewDot, { backgroundColor: 'rgba(255,255,255,0.6)' }]} />
+                            <View style={[styles.previewLine, { backgroundColor: 'rgba(255,255,255,0.4)', width: '55%' }]} />
                         </View>
+                        <View style={styles.previewCardRow}>
+                            <View style={[styles.previewDot, { backgroundColor: 'rgba(255,255,255,0.3)' }]} />
+                            <View style={[styles.previewLine, { backgroundColor: 'rgba(255,255,255,0.25)', width: '35%' }]} />
+                        </View>
+                    </LinearGradient>
+                    <View style={[styles.previewTabBar, {
+                        backgroundColor: isDark ? 'rgba(22,22,26,0.86)' : 'rgba(248,248,252,0.86)',
+                        borderTopColor: colors.border,
+                    }]}>
+                        {[0, 1, 2, 3].map(i => (
+                            <View
+                                key={i}
+                                style={[styles.previewTabDot, { backgroundColor: i === 3 ? colors.accent : colors.tabIconDefault }]}
+                            />
+                        ))}
                     </View>
                 </View>
 
-                <View style={styles.body}>
-                    {/* Accent section */}
-                    <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>ACCENT COLOR</Text>
-                    <View style={styles.accentGrid}>
-                        {ACCENT_KEYS.map((key) => {
-                            const swatch = ACCENT_PRESETS[key][isDark ? 'dark' : 'light'];
-                            const selected = accentKey === key;
-                            return (
-                                <TouchableOpacity
-                                    key={key}
+                {/* Accent section */}
+                <Text style={[styles.sectionHeader, { color: colors.secondaryText }, T.semibold]}>
+                    Accent Color
+                </Text>
+                <View style={styles.accentGrid}>
+                    {ACCENT_KEYS.map(key => {
+                        const swatch = ACCENT_PRESETS[key][isDark ? 'dark' : 'light'];
+                        const selected = accentKey === key;
+                        return (
+                            <Animated.View
+                                key={key}
+                                style={[styles.accentItem, { transform: [{ scale: scaleAnims[key] }] }]}
+                            >
+                                <PressableScale
+                                    scaleTo={0.95}
+                                    haptic="light"
                                     onPress={() => handleAccent(key)}
-                                    activeOpacity={0.8}
-                                    style={styles.accentItem}
-                                >
-                                    <View style={[
-                                        styles.accentSwatch,
-                                        { backgroundColor: swatch },
-                                        selected && { borderWidth: 3, borderColor: '#fff' },
-                                    ]}>
-                                        {selected && <Check size={16} color="#fff" strokeWidth={3} />}
-                                    </View>
-                                    <Text style={[styles.accentLabel, { color: selected ? colors.accent : colors.secondaryText }]}>
-                                        {ACCENT_LABELS[key]}
-                                    </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
-
-                    {/* Color scheme section */}
-                    <Text style={[styles.sectionLabel, { color: colors.secondaryText }]}>COLOR SCHEME</Text>
-                    <View style={[styles.schemeRow, {
-                        backgroundColor: isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
-                        borderRadius: ms(16),
-                    }]}>
-                        {(['light', 'dark'] as const).map(t => {
-                            const active = theme === t;
-                            return (
-                                <TouchableOpacity
-                                    key={t}
-                                    onPress={() => handleTheme(t)}
-                                    activeOpacity={0.8}
                                     style={[
-                                        styles.schemeBtn,
-                                        active && { backgroundColor: colors.accent, borderRadius: ms(13) },
+                                        styles.accentCard,
+                                        { backgroundColor: colors.surface },
+                                        selected && { borderWidth: 2, borderColor: colors.accent },
                                     ]}
                                 >
-                                    {t === 'light'
-                                        ? <Sun size={16} color={active ? '#fff' : colors.secondaryText} />
-                                        : <Moon size={16} color={active ? '#fff' : colors.secondaryText} />
-                                    }
-                                    <Text style={[styles.schemeBtnText, { color: active ? '#fff' : colors.secondaryText }]}>
-                                        {t === 'light' ? 'Light' : 'Dark'}
+                                    <View style={[styles.accentSwatch, { backgroundColor: swatch }]}>
+                                        {selected && <Check size={14} color="#fff" strokeWidth={3} />}
+                                    </View>
+                                    <Text style={[
+                                        styles.accentLabel,
+                                        { color: selected ? colors.accent : colors.secondaryText },
+                                        T.semibold,
+                                    ]}>
+                                        {ACCENT_LABELS[key]}
                                     </Text>
-                                </TouchableOpacity>
-                            );
-                        })}
-                    </View>
+                                </PressableScale>
+                            </Animated.View>
+                        );
+                    })}
                 </View>
+
+                {/* Theme section */}
+                <Text style={[styles.sectionHeader, { color: colors.secondaryText }, T.semibold]}>
+                    Color Scheme
+                </Text>
+                <View style={styles.themeRow}>
+                    {(['light', 'dark'] as const).map(t => {
+                        const active = theme === t;
+                        return (
+                            <PressableScale
+                                key={t}
+                                scaleTo={0.97}
+                                haptic="light"
+                                onPress={() => handleTheme(t)}
+                                style={[
+                                    styles.themeCard,
+                                    { backgroundColor: colors.surface },
+                                    active && { borderWidth: 2, borderColor: colors.accent },
+                                ]}
+                            >
+                                <View style={[
+                                    styles.themeIconWrap,
+                                    { backgroundColor: active ? colors.accentBg : (isDark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)') },
+                                ]}>
+                                    {t === 'light'
+                                        ? <Sun size={22} color={active ? colors.accent : colors.secondaryText} />
+                                        : <Moon size={22} color={active ? colors.accent : colors.secondaryText} />
+                                    }
+                                </View>
+                                <Text style={[
+                                    styles.themeLabel,
+                                    { color: active ? colors.text : colors.secondaryText },
+                                    active ? T.bold : T.regular,
+                                ]}>
+                                    {t === 'light' ? 'Light' : 'Dark'}
+                                </Text>
+                            </PressableScale>
+                        );
+                    })}
+                </View>
+
             </ScrollView>
         </SafeAreaView>
     );
@@ -145,16 +185,18 @@ export default function AppearanceScreen({ navigation }: any) {
 
 const styles = StyleSheet.create({
     safe: { flex: 1 },
+
+    // Header
     header: {
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: scale(16),
+        paddingHorizontal: scale(20),
         paddingVertical: vs(12),
     },
     headerTitle: {
-        fontSize: ms(17),
-        fontWeight: '700',
+        fontSize: ms(20),
+        letterSpacing: -0.5,
     },
     backBtn: {
         width: scale(44),
@@ -164,115 +206,138 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         borderWidth: StyleSheet.hairlineWidth,
     },
-    backBtnSpacer: {
-        width: scale(44),
+
+    scroll: {
+        paddingHorizontal: scale(20),
+        paddingBottom: vs(48),
+        gap: vs(8),
     },
 
-    mockWrap: {
-        alignItems: 'center',
-        paddingVertical: vs(24),
-    },
-    mockPhone: {
-        width: scale(160),
+    // Preview card
+    previewCard: {
         borderRadius: ms(24),
         overflow: 'hidden',
         borderWidth: StyleSheet.hairlineWidth,
+        marginBottom: vs(12),
         shadowColor: '#000',
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.12,
-        shadowRadius: 16,
-        elevation: 6,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.10,
+        shadowRadius: 14,
+        elevation: 5,
     },
-    mockHero: {
-        padding: scale(12),
-        paddingBottom: scale(16),
+    previewHero: {
+        padding: scale(14),
         alignItems: 'center',
-        gap: vs(6),
+        gap: vs(5),
+        paddingBottom: scale(18),
     },
-    mockAvatar: {
-        width: scale(32),
-        height: scale(32),
-        borderRadius: scale(16),
+    previewAvatar: {
+        width: scale(36),
+        height: scale(36),
+        borderRadius: scale(18),
     },
-    mockName: {
-        width: scale(60),
+    previewName: {
+        width: '50%',
         height: vs(6),
         borderRadius: ms(4),
     },
-    mockCard: {
-        marginHorizontal: scale(10),
-        marginBottom: scale(10),
-        borderRadius: ms(12),
-        padding: scale(10),
-        gap: vs(4),
+    previewGroupCard: {
+        marginHorizontal: scale(12),
+        marginBottom: scale(12),
+        borderRadius: ms(14),
+        padding: scale(12),
+        gap: vs(5),
     },
-    mockCardLine: {
+    previewCardRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(6),
+    },
+    previewDot: {
+        width: scale(8),
+        height: scale(8),
+        borderRadius: scale(4),
+    },
+    previewLine: {
         height: vs(5),
-        width: '80%',
         borderRadius: ms(3),
     },
-    mockTabBar: {
+    previewTabBar: {
         flexDirection: 'row',
         justifyContent: 'space-around',
         alignItems: 'center',
-        paddingVertical: vs(8),
+        paddingVertical: vs(10),
         borderTopWidth: StyleSheet.hairlineWidth,
     },
-    mockTabDot: {
-        width: scale(6),
-        height: scale(6),
-        borderRadius: scale(3),
+    previewTabDot: {
+        width: scale(7),
+        height: scale(7),
+        borderRadius: scale(4),
     },
 
-    body: {
-        paddingHorizontal: scale(20),
-        gap: vs(16),
+    // Section header
+    sectionHeader: {
+        fontSize: ms(13),
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        paddingHorizontal: 0,
+        marginBottom: vs(8),
+        marginTop: vs(12),
     },
-    sectionLabel: {
-        fontSize: ms(11),
-        fontWeight: '700',
-        letterSpacing: 0.7,
-        marginBottom: vs(4),
-    },
+
+    // Accent grid: 3 columns
     accentGrid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
-        justifyContent: 'space-between',
-        rowGap: vs(12),
-        marginBottom: vs(8),
+        gap: scale(10),
+        marginBottom: vs(4),
     },
     accentItem: {
         width: '30%',
+        flexGrow: 1,
+    },
+    accentCard: {
+        borderRadius: ms(20),
         alignItems: 'center',
-        gap: vs(6),
+        padding: scale(12),
+        gap: vs(8),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'transparent',
     },
     accentSwatch: {
-        width: scale(52),
-        height: scale(52),
-        borderRadius: scale(26),
+        width: scale(44),
+        height: scale(44),
+        borderRadius: scale(22),
         alignItems: 'center',
         justifyContent: 'center',
     },
     accentLabel: {
         fontSize: ms(12),
-        fontWeight: '600',
     },
 
-    schemeRow: {
+    // Theme toggle
+    themeRow: {
         flexDirection: 'row',
-        padding: vs(4),
-        gap: scale(4),
+        gap: scale(12),
     },
-    schemeBtn: {
+    themeCard: {
         flex: 1,
-        flexDirection: 'row',
+        borderRadius: ms(20),
         alignItems: 'center',
         justifyContent: 'center',
-        gap: scale(6),
-        paddingVertical: vs(12),
+        paddingVertical: vs(20),
+        gap: vs(10),
+        borderWidth: StyleSheet.hairlineWidth,
+        borderColor: 'transparent',
     },
-    schemeBtnText: {
+    themeIconWrap: {
+        width: scale(48),
+        height: scale(48),
+        borderRadius: ms(14),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    themeLabel: {
         fontSize: ms(14),
-        fontWeight: '600',
     },
 });
