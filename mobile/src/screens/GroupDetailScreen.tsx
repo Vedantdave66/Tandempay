@@ -16,7 +16,9 @@ import {
   Animated,
   Easing,
   Share,
+  Keyboard,
 } from 'react-native';
+import PressableScale from '../components/PressableScale';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -24,7 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info, Pencil } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -70,6 +72,26 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [shareLoading, setShareLoading] = useState(false);
+
+    const [editTarget, setEditTarget] = useState<Expense | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editAmount, setEditAmount] = useState('');
+    const [editSaving, setEditSaving] = useState(false);
+
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const toastAnim = useRef(new Animated.Value(0)).current;
+    const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const showToast = useCallback((msg: string) => {
+        setToastMsg(msg);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastAnim.setValue(0);
+        Animated.timing(toastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        toastTimer.current = setTimeout(() => {
+            Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+                .start(() => setToastMsg(null));
+        }, 2500);
+    }, [toastAnim]);
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -233,6 +255,27 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             }
         } finally {
             setShareLoading(false);
+        }
+    };
+
+    const handleEditSave = async () => {
+        if (!editTarget) return;
+        const trimmedTitle = editTitle.trim();
+        const parsedAmount = parseFloat(editAmount);
+        if (!trimmedTitle) { Alert.alert('Name required', 'Please enter an expense name.'); return; }
+        if (isNaN(parsedAmount) || parsedAmount <= 0) { Alert.alert('Invalid amount', 'Please enter a valid amount greater than zero.'); return; }
+        Keyboard.dismiss();
+        setEditSaving(true);
+        try {
+            const updated = await expensesApi.patch(editTarget.id, { title: trimmedTitle, amount: parsedAmount });
+            setExpenses(prev => prev.map(e => e.id === editTarget.id ? { ...e, title: updated.title, amount: updated.amount } : e));
+            setEditTarget(null);
+            showToast('Expense updated');
+        } catch (err: any) {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+            Alert.alert('Error', err.message || 'Could not update expense. Try again.');
+        } finally {
+            setEditSaving(false);
         }
     };
 
@@ -503,20 +546,29 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         {new Date(expense.created_at).toLocaleDateString()}
                                     </Text>
                                     <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>${formatCurrency(each)} each</Text>
-                                    {paidByMe && (
+                                    <View style={{ flexDirection: 'row', gap: scale(12), marginTop: vs(4) }}>
                                         <TouchableOpacity
-                                            onPress={() => handleDeleteExpense(expense)}
-                                            disabled={deletingId === expense.id}
+                                            onPress={() => { setEditTarget(expense); setEditTitle(expense.title); setEditAmount(String(expense.amount)); }}
                                             hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
                                             activeOpacity={0.7}
-                                            style={{ marginTop: vs(4), opacity: deletingId === expense.id ? 0.4 : 1 }}
                                         >
-                                            {deletingId === expense.id
-                                                ? <ActivityIndicator size="small" color={colors.danger} />
-                                                : <Trash2 size={ms(15)} color={colors.danger} />
-                                            }
+                                            <Pencil size={ms(15)} color={colors.secondaryText} />
                                         </TouchableOpacity>
-                                    )}
+                                        {paidByMe && (
+                                            <TouchableOpacity
+                                                onPress={() => handleDeleteExpense(expense)}
+                                                disabled={deletingId === expense.id}
+                                                hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+                                                activeOpacity={0.7}
+                                                style={{ opacity: deletingId === expense.id ? 0.4 : 1 }}
+                                            >
+                                                {deletingId === expense.id
+                                                    ? <ActivityIndicator size="small" color={colors.danger} />
+                                                    : <Trash2 size={ms(15)} color={colors.danger} />
+                                                }
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
                                 </View>
                             </View>
                             </Animated.View>
@@ -783,6 +835,65 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
+            {/* Edit expense bottom sheet */}
+            <Modal visible={!!editTarget} animationType="slide" transparent onRequestClose={() => setEditTarget(null)}>
+                <TouchableOpacity style={styles.editOverlay} activeOpacity={1} onPress={() => setEditTarget(null)}>
+                    <TouchableOpacity activeOpacity={1} style={[styles.editSheet, { backgroundColor: colors.surface }]}>
+                        <View style={styles.editHandle} />
+                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>Edit expense</Text>
+
+                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Name</Text>
+                        <TextInput
+                            style={[styles.editInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            value={editTitle}
+                            onChangeText={setEditTitle}
+                            placeholder="Expense name"
+                            placeholderTextColor={colors.faintText}
+                            autoCapitalize="sentences"
+                            returnKeyType="next"
+                        />
+
+                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Amount</Text>
+                        <TextInput
+                            style={[styles.editInput, { color: colors.text, borderColor: colors.border, backgroundColor: colors.background }]}
+                            value={editAmount}
+                            onChangeText={setEditAmount}
+                            placeholder="0.00"
+                            placeholderTextColor={colors.faintText}
+                            keyboardType="decimal-pad"
+                            returnKeyType="done"
+                        />
+
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="light"
+                            onPress={handleEditSave}
+                            style={[styles.editSaveBtn, { backgroundColor: colors.accent, opacity: editSaving ? 0.7 : 1 }]}
+                        >
+                            {editSaving
+                                ? <ActivityIndicator color="#fff" />
+                                : <Text style={[styles.editSaveBtnText, T.bold]}>Save</Text>
+                            }
+                        </PressableScale>
+
+                        <TouchableOpacity onPress={() => setEditTarget(null)} style={styles.editCancelLink} activeOpacity={0.7}>
+                            <Text style={[styles.editCancelText, { color: colors.secondaryText }, T.regular]}>Cancel</Text>
+                        </TouchableOpacity>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Success toast */}
+            {toastMsg && (
+                <Animated.View style={[styles.toast, {
+                    backgroundColor: colors.accent,
+                    opacity: toastAnim,
+                    transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }],
+                }]}>
+                    <Text style={[styles.toastText, T.semibold]}>{toastMsg}</Text>
+                </Animated.View>
+            )}
+
             {canvasMode && (
                 <CanvasModeView
                     expenses={expenses}
@@ -1042,5 +1153,80 @@ const styles = StyleSheet.create({
         borderRadius: ms(26),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+
+    editOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    editSheet: {
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
+        padding: vs(16),
+        paddingBottom: vs(32),
+    },
+    editHandle: {
+        width: scale(40),
+        height: vs(4),
+        borderRadius: ms(2),
+        backgroundColor: 'rgba(128,128,128,0.35)',
+        alignSelf: 'center',
+        marginBottom: vs(16),
+    },
+    editSheetTitle: {
+        fontSize: ms(18),
+        marginBottom: vs(20),
+    },
+    editLabel: {
+        fontSize: ms(12),
+        marginBottom: vs(6),
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    editInput: {
+        borderWidth: 1.5,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(14),
+        height: vs(50),
+        fontSize: ms(15),
+        marginBottom: vs(16),
+    },
+    editSaveBtn: {
+        height: vs(52),
+        borderRadius: ms(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: vs(4),
+    },
+    editSaveBtnText: {
+        color: '#fff',
+        fontSize: ms(15),
+    },
+    editCancelLink: {
+        alignItems: 'center',
+        paddingVertical: vs(14),
+    },
+    editCancelText: {
+        fontSize: ms(14),
+    },
+
+    toast: {
+        position: 'absolute',
+        top: vs(60),
+        alignSelf: 'center',
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(10),
+        borderRadius: ms(20),
+        shadowColor: '#000',
+        shadowOpacity: 0.18,
+        shadowRadius: 8,
+        shadowOffset: { width: 0, height: 4 },
+        elevation: 8,
+        zIndex: 999,
+    },
+    toastText: {
+        color: '#fff',
+        fontSize: ms(13),
     },
 });

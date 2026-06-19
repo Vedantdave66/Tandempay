@@ -1,8 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from decimal import Decimal, ROUND_DOWN
+from typing import Optional
 
 from app.database import get_db
 from app.models import User, Group, GroupMember, Expense, ExpenseParticipant, Notification
@@ -376,3 +378,83 @@ async def delete_expense(
         },
     )
     return None
+
+
+# ── Standalone PATCH (no group_id in URL) ────────────────────────────────────
+# A separate router so the path is /api/expenses/{id} rather than
+# /api/groups/{group_id}/expenses/{id}.  Membership is verified by looking up
+# the expense's own group_id after the 404 check.
+
+patch_router = APIRouter(prefix="/api/expenses", tags=["expenses"])
+
+
+class ExpensePatch(BaseModel):
+    title: Optional[str] = None
+    amount: Optional[float] = None
+
+
+@patch_router.patch("/{expense_id}", response_model=ExpenseOut)
+async def patch_expense(
+    expense_id: str,
+    data: ExpensePatch,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    result = await db.execute(
+        select(Expense)
+        .where(Expense.id == expense_id)
+        .options(
+            selectinload(Expense.participants).selectinload(ExpenseParticipant.user),
+            selectinload(Expense.payer),
+        )
+    )
+    expense = result.scalar_one_or_none()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+
+    await _verify_membership(expense.group_id, current_user.id, db)
+
+    if data.title is not None:
+        stripped = data.title.strip()
+        if not stripped:
+            raise HTTPException(status_code=400, detail="Title cannot be empty")
+        expense.title = stripped
+
+    if data.amount is not None:
+        if data.amount <= 0:
+            raise HTTPException(status_code=400, detail="Amount must be greater than zero")
+        expense.amount = Decimal(str(data.amount))
+
+    await db.flush()
+
+    await log_action(
+        db=db,
+        actor_id=current_user.id,
+        action=AuditActions.EXPENSE_UPDATED,
+        entity_type="expense",
+        entity_id=expense.id,
+        group_id=expense.group_id,
+        action_metadata={"amount": float(expense.amount), "description": expense.title},
+    )
+
+    participant_outs = [
+        ExpenseParticipantOut(
+            user_id=p.user.id,
+            name=p.user.name,
+            share_amount=p.share_amount,
+            avatar_color=p.user.avatar_color,
+        )
+        for p in expense.participants
+    ]
+
+    return ExpenseOut(
+        id=expense.id,
+        title=expense.title,
+        amount=expense.amount,
+        paid_by=expense.paid_by,
+        payer_name=expense.payer.name,
+        payer_avatar_color=expense.payer.avatar_color,
+        split_type=expense.split_type,
+        created_at=expense.created_at,
+        participants=participant_outs,
+    )

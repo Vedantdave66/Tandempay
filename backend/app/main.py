@@ -28,6 +28,7 @@ from app.config import get_settings
 from app.context import request_id_var
 from app.database import engine  # used by APScheduler-started services via app.database
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments, interac_routes
+from app.routes.expenses import patch_router as expenses_patch_router
 from app.routes import reminders
 from app.routes.receipts import router as receipts_router
 from app.routes.smart_split import router as smart_split_router
@@ -322,6 +323,7 @@ app.include_router(auth.router)
 app.include_router(me.router)
 app.include_router(groups.router)
 app.include_router(expenses.router)
+app.include_router(expenses_patch_router)
 app.include_router(balance_service.router)
 app.include_router(settlements.router)
 app.include_router(notifications.router)
