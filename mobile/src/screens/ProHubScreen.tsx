@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -6,8 +6,6 @@ import {
     ScrollView,
     Alert,
     Share,
-    Animated,
-    Easing,
     TouchableOpacity,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
@@ -52,16 +50,6 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
-    const shimmerAnim = useRef(new Animated.Value(0.7)).current;
-
-    useEffect(() => {
-        Animated.loop(
-            Animated.sequence([
-                Animated.timing(shimmerAnim, { toValue: 1.0, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-                Animated.timing(shimmerAnim, { toValue: 0.7, duration: 900, easing: Easing.inOut(Easing.ease), useNativeDriver: true }),
-            ])
-        ).start();
-    }, []);
 
     const handleRowPress = (row: SectionRow) => {
         if (row.special === 'invite') return handleInvite();
@@ -119,14 +107,15 @@ export default function ProHubScreen({ navigation }: any) {
                 <View style={styles.body}>
                     {/* Pro card */}
                     <View style={[styles.proCard, { borderColor: colors.border }]}>
-                        <LinearGradient colors={[colors.accentDark, colors.accent]} style={styles.proHeader}>
+                        <LinearGradient colors={colors.heroGradient as any} style={styles.proHeader}>
+                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: ms(16) }]} pointerEvents="none" />
                             <View style={styles.proHeaderRow}>
                                 <Crown size={20} color="#fff" />
                                 <Text style={styles.proTitle}>TandemPay Pro</Text>
                             </View>
-                            <Animated.View style={[styles.priceChip, { opacity: shimmerAnim }]}>
-                                <Text style={[styles.priceChipText, { color: colors.accent }]}>$4.99/mo</Text>
-                            </Animated.View>
+                            <View style={[styles.priceChip, { backgroundColor: colors.accentBg }]}>
+                                <Text style={[styles.priceChipText, { color: colors.accent, fontWeight: '600' }, T.body]}>$4.99/mo</Text>
+                            </View>
                         </LinearGradient>
                         <View style={[styles.proBody, { backgroundColor: colors.surface }]}>
                             {PRO_FEATURES.map(feature => (
@@ -254,13 +243,12 @@ const styles = StyleSheet.create({
         letterSpacing: -0.2,
     },
     priceChip: {
-        backgroundColor: '#fff',
-        borderRadius: 999,
-        paddingHorizontal: scale(12),
-        paddingVertical: vs(5),
+        borderRadius: ms(20),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(6),
     },
     priceChipText: {
-        fontSize: ms(12),
+        fontSize: ms(14),
     },
     proFeatures: {
         gap: vs(10),
