@@ -46,6 +46,32 @@ _FALLBACK = dict(items=[], subtotal=0.0, tax=0.0, tax_rate=DEFAULT_TAX_RATE,
                  tip_detected=0.0, total=0.0, currency="CAD",
                  merchant="Receipt", parse_failed=True)
 
+_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "items": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "id":    {"type": "string"},
+                    "name":  {"type": "string"},
+                    "price": {"type": "number"},
+                },
+                "required": ["id", "name", "price"],
+            },
+        },
+        "subtotal":     {"type": "number"},
+        "tax":          {"type": "number"},
+        "tax_rate":     {"type": "number"},
+        "tip_detected": {"type": "number"},
+        "total":        {"type": "number"},
+        "currency":     {"type": "string"},
+        "merchant":     {"type": "string"},
+    },
+    "required": ["items", "subtotal", "tax", "tax_rate", "tip_detected", "total", "currency"],
+}
+
 
 class ParseReceiptRequest(BaseModel):
     image_base64: str
