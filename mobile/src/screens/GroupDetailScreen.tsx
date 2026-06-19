@@ -24,7 +24,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2 } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -582,40 +582,61 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 shadowRadius: isDark ? 14 : 10,
                                 shadowOffset: { width: 0, height: isDark ? 10 : 4 },
                                 elevation: isDark ? 6 : 4,
+                                flexDirection: 'column',
+                                alignItems: 'stretch',
+                                gap: vs(8),
                             }]}>
-                                <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
-                                <ArrowRight size={16} color={colors.faintText} />
-                                <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
-                                <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={2}>
-                                        Pay ${formatCurrency(s.amount)} via Interac e-Transfer
-                                    </Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: scale(12) }}>
+                                    <CharacterShape shape={fr?.character_shape ?? 'rect'} color={fr?.character_color ?? s.from_avatar_color ?? '#6B7280'} variant="mini" />
+                                    <ArrowRight size={16} color={colors.faintText} />
+                                    <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
+                                    <View style={styles.rowInfo}>
+                                        <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={2}>
+                                            Pay ${formatCurrency(s.amount)} via Interac e-Transfer
+                                        </Text>
+                                    </View>
+                                    <TouchableOpacity
+                                        style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
+                                        disabled={!isMine}
+                                        onPress={() => {
+                                            if (!isMine) return;
+                                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                            const toMember = group?.members?.find((m: any) => m.id === s.to_user_id || m.user_id === s.to_user_id);
+                                            navigation.navigate('SettleUp', {
+                                                payment: {
+                                                    payee_id:           s.to_user_id,
+                                                    payee_name:         toMember?.name ?? 'User',
+                                                    payee_email:        toMember?.email ?? '',
+                                                    payee_avatar_color: to?.character_color ?? s.to_avatar_color ?? '#6B7280',
+                                                    amount:             s.amount,
+                                                    group_id:           groupId,
+                                                    payer_id:           user?.id,
+                                                    id:                 (s as any).id ?? null,
+                                                    description:        group?.name ?? 'Expense',
+                                                }
+                                            });
+                                        }}
+                                        activeOpacity={0.82}
+                                    >
+                                        <Text style={[styles.settleBtnText, { color: colors.warningBright }, T.bold]}>Settle up</Text>
+                                    </TouchableOpacity>
                                 </View>
-                                <TouchableOpacity
-                                    style={[styles.settleBtn, { backgroundColor: colors.warningBg, opacity: isMine ? 1 : 0.5 }]}
-                                    disabled={!isMine}
-                                    onPress={() => {
-                                        if (!isMine) return;
-                                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                        const toMember = group?.members?.find((m: any) => m.id === s.to_user_id || m.user_id === s.to_user_id);
-                                        navigation.navigate('SettleUp', {
-                                            payment: {
-                                                payee_id:           s.to_user_id,
-                                                payee_name:         toMember?.name ?? 'User',
-                                                payee_email:        toMember?.email ?? '',
-                                                payee_avatar_color: to?.character_color ?? s.to_avatar_color ?? '#6B7280',
-                                                amount:             s.amount,
-                                                group_id:           groupId,
-                                                payer_id:           user?.id,
-                                                id:                 (s as any).id ?? null,
-                                                description:        group?.name ?? 'Expense',
-                                            }
-                                        });
-                                    }}
-                                    activeOpacity={0.82}
-                                >
-                                    <Text style={[styles.settleBtnText, { color: colors.warningBright }, T.bold]}>Settle up</Text>
-                                </TouchableOpacity>
+                                {s.amount > 0 && (
+                                    <View style={{
+                                        flexDirection: 'row',
+                                        alignItems: 'center',
+                                        gap: scale(6),
+                                        backgroundColor: colors.warningBg,
+                                        borderRadius: ms(10),
+                                        paddingVertical: vs(6),
+                                        paddingHorizontal: scale(10),
+                                    }}>
+                                        <Info size={14} color={colors.warning} />
+                                        <Text style={[{ color: colors.warning, flex: 1 }, T.caption]}>
+                                            {'Paying by card? Add $'}{(s.amount * 0.029 + 0.30).toFixed(2)}{' to cover processing fees'}
+                                        </Text>
+                                    </View>
+                                )}
                             </View>
                         );
                     })
