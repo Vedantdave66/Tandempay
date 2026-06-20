@@ -1,9 +1,9 @@
 """
 Interac e-Transfer confirmation email parser.
 
-Supports RBC, TD, Scotia, BMO, CIBC, NBC, and a generic credit-union
-fallback. Returns a ParsedInteracEmail dataclass or None if no pattern
-matches.
+Supports RBC, TD, Scotia, BMO, CIBC, NBC, Wealthsimple, Tangerine, and a
+generic credit-union fallback. Returns a ParsedInteracEmail dataclass or
+None if no pattern matches.
 
 Usage:
     subject, body = parse_email_body(raw_mime_string)
@@ -51,6 +51,17 @@ def _parse_amount(text: str) -> Optional[Decimal]:
 def _clean_name(raw: str) -> str:
     """Strip leading/trailing whitespace and punctuation from an extracted name."""
     return re.sub(r'[\s.,;:!?]+$', '', raw.strip())
+
+
+def _truncate_name(raw: str) -> str:
+    """Cut a captured name at line breaks or prose-boundary words, then clean.
+
+    Prevents greedy matches from bleeding into surrounding sentence text like
+    "John Smith\r\nhas been deposited" or "John Smith and Jane Doe sent you".
+    """
+    raw = re.split(r'[\r\n]', raw)[0]
+    raw = re.split(r'\b(?:and|has|from)\b', raw, maxsplit=1, flags=re.IGNORECASE)[0]
+    return _clean_name(raw)
 
 
 # ── MIME extraction ───────────────────────────────────────────────────────────
@@ -262,6 +273,78 @@ def _try_nbc(subject: str, body: str) -> Optional[ParsedInteracEmail]:
     )
 
 
+def _try_wealthsimple(subject: str, body: str) -> Optional[ParsedInteracEmail]:
+    """Wealthsimple (wealthsimple.com) Interac e-Transfer confirmations."""
+    if not re.search(r'interac e-transfer', subject, re.IGNORECASE):
+        return None
+
+    amount = _parse_amount(body) or _parse_amount(subject)
+    if not amount:
+        return None
+
+    # Received: "Your Interac e-Transfer of $X from [Name] has been deposited"
+    m_deposited = re.search(
+        r'interac e-transfer of \$[0-9,.]+ from ([A-Za-z][A-Za-z\s]+?) has been deposited',
+        body, re.IGNORECASE,
+    )
+    # Received: "[Name] sent you $X"
+    m_sent_you = re.search(
+        r'([A-Za-z][A-Za-z\s]+?) sent you \$[0-9,.]+',
+        body, re.IGNORECASE,
+    )
+    # Sent: "you sent $X to [Name]" / "you sent an interac e-transfer to [Name]"
+    m_sent = re.search(r'you sent .+? to ([A-Za-z][A-Za-z\s]+)', body, re.IGNORECASE)
+
+    if m_deposited:
+        name = _truncate_name(m_deposited.group(1))
+        direction = 'received'
+    elif m_sent_you:
+        name = _truncate_name(m_sent_you.group(1))
+        direction = 'received'
+    elif m_sent:
+        name = _truncate_name(m_sent.group(1))
+        direction = 'sent'
+    else:
+        return None
+
+    return ParsedInteracEmail(
+        bank='wealthsimple', direction=direction, amount=amount,
+        counterparty_name=name, confidence='high',
+    )
+
+
+def _try_tangerine(subject: str, body: str) -> Optional[ParsedInteracEmail]:
+    """Tangerine (tangerine.ca, owned by Scotiabank) Interac e-Transfer confirmations."""
+    if not re.search(r'interac e-transfer', subject, re.IGNORECASE):
+        return None
+
+    amount = _parse_amount(body) or _parse_amount(subject)
+    if not amount:
+        return None
+
+    # Received: "[Name] has sent you an Interac e-Transfer for $X"
+    m_received = re.search(
+        r'([A-Za-z][A-Za-z\s]+?) has sent you an interac e-transfer for \$[0-9,.]+',
+        body, re.IGNORECASE,
+    )
+    # Sent: "you sent an Interac e-Transfer to [Name]" / "you sent $X to [Name]"
+    m_sent = re.search(r'you sent .+? to ([A-Za-z][A-Za-z\s]+)', body, re.IGNORECASE)
+
+    if m_received:
+        name = _truncate_name(m_received.group(1))
+        direction = 'received'
+    elif m_sent:
+        name = _truncate_name(m_sent.group(1))
+        direction = 'sent'
+    else:
+        return None
+
+    return ParsedInteracEmail(
+        bank='tangerine', direction=direction, amount=amount,
+        counterparty_name=name, confidence='high',
+    )
+
+
 def _try_generic(subject: str, body: str) -> Optional[ParsedInteracEmail]:
     """Credit union / unknown sender fallback — low confidence."""
     if not re.search(r'interac', subject, re.IGNORECASE):
@@ -283,7 +366,7 @@ def _try_generic(subject: str, body: str) -> Optional[ParsedInteracEmail]:
 
     # Best-effort name: look for "to/from <name>" anywhere in body
     m = re.search(r'(?:to|from)\s+([A-Za-z][A-Za-z\s]{1,50})', body, re.IGNORECASE)
-    name = _clean_name(m.group(1)) if m else ''
+    name = _truncate_name(m.group(1)) if m else ''
 
     return ParsedInteracEmail(
         bank='other', direction=direction, amount=amount,
@@ -293,7 +376,7 @@ def _try_generic(subject: str, body: str) -> Optional[ParsedInteracEmail]:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-_PARSERS = [_try_rbc, _try_td, _try_scotia, _try_bmo, _try_cibc, _try_nbc, _try_generic]
+_PARSERS = [_try_rbc, _try_td, _try_scotia, _try_bmo, _try_cibc, _try_nbc, _try_wealthsimple, _try_tangerine, _try_generic]
 
 
 def parse_interac_email(subject: str, body_text: str) -> Optional[ParsedInteracEmail]:
