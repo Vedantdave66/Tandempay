@@ -259,6 +259,6 @@ export default function RootNavigator() {
             </Stack.Navigator>
         </NavigationContainer>
         <CharacterSetupModal visible={!!user && user.character_nickname === null} />
-        </Fragment>
+        </Animated.View>
     );
 }
