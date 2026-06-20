@@ -190,6 +190,11 @@ export const expensesApi = {
         request<void>(`/groups/${groupId}/expenses/${expenseId}`, {
             method: 'DELETE',
         }),
+    patch: (expenseId: string, data: { title?: string; amount?: number }) =>
+        request<Expense>(`/expenses/${expenseId}`, {
+            method: 'PATCH',
+            body: JSON.stringify(data),
+        }),
 };
 
 // --- Balances & Settlements ---

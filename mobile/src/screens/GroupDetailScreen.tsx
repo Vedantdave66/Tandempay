@@ -16,6 +16,7 @@ import {
   Animated,
   Easing,
   Share,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,11 +25,12 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2 } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Pencil } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
 import SkeletonBlock from '../components/SkeletonBlock';
+import PressableScale from '../components/PressableScale';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
 
@@ -70,6 +72,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [shareLoading, setShareLoading] = useState(false);
+
+    const [editTarget, setEditTarget] = useState<Expense | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editAmount, setEditAmount] = useState('');
+    const [editSaving, setEditSaving] = useState(false);
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const toastAnim = useRef(new Animated.Value(0)).current;
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -253,6 +262,36 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             Alert.alert('Error', err.message || 'Could not add member. Make sure they have a TandemPay account.');
         } finally {
             setInviteLoading(false);
+        }
+    };
+
+    const showToast = useCallback((msg: string) => {
+        setToastMsg(msg);
+        toastAnim.setValue(0);
+        Animated.sequence([
+            Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
+            Animated.delay(1800),
+            Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
+        ]).start(() => setToastMsg(null));
+    }, [toastAnim]);
+
+    const handleEditSave = async () => {
+        if (!editTarget) return;
+        const trimTitle = editTitle.trim();
+        const parsedAmount = parseFloat(editAmount);
+        if (!trimTitle) return void Alert.alert('Title required', 'Please enter a title.');
+        if (isNaN(parsedAmount) || parsedAmount <= 0) return void Alert.alert('Invalid amount', 'Enter a value greater than 0.');
+        setEditSaving(true);
+        Keyboard.dismiss();
+        try {
+            const updated = await expensesApi.patch(editTarget.id, { title: trimTitle, amount: parsedAmount });
+            setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
+            setEditTarget(null);
+            showToast('Expense updated');
+        } catch (err: any) {
+            Alert.alert('Error', err.message || 'Could not update expense.');
+        } finally {
+            setEditSaving(false);
         }
     };
 
@@ -517,6 +556,18 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                             }
                                         </TouchableOpacity>
                                     )}
+                                    <TouchableOpacity
+                                        onPress={() => {
+                                            setEditTarget(expense);
+                                            setEditTitle(expense.title);
+                                            setEditAmount(String(expense.amount));
+                                        }}
+                                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
+                                        activeOpacity={0.7}
+                                        style={{ marginTop: vs(4) }}
+                                    >
+                                        <Pencil size={ms(15)} color={colors.secondaryText} />
+                                    </TouchableOpacity>
                                 </View>
                             </View>
                             </Animated.View>
@@ -761,6 +812,60 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
             </Modal>
+
+            {/* Edit expense sheet */}
+            <Modal
+                visible={editTarget !== null}
+                animationType="slide"
+                transparent={true}
+                onRequestClose={() => setEditTarget(null)}
+            >
+                <View style={styles.editOverlay}>
+                    <View style={[styles.editSheet, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.editHandle, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>Edit Expense</Text>
+                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Title</Text>
+                        <TextInput
+                            style={[styles.editInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, T.regular]}
+                            value={editTitle}
+                            onChangeText={setEditTitle}
+                            placeholder="Expense title"
+                            placeholderTextColor={colors.faintText}
+                            autoCapitalize="sentences"
+                        />
+                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Amount</Text>
+                        <TextInput
+                            style={[styles.editInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, T.regular]}
+                            value={editAmount}
+                            onChangeText={setEditAmount}
+                            placeholder="0.00"
+                            placeholderTextColor={colors.faintText}
+                            keyboardType="decimal-pad"
+                        />
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="medium"
+                            onPress={handleEditSave}
+                            disabled={editSaving}
+                            style={[styles.editSaveBtn, { backgroundColor: colors.accent, opacity: editSaving ? 0.7 : 1 }]}
+                        >
+                            {editSaving
+                                ? <ActivityIndicator color="#fff" size="small" />
+                                : <Text style={[styles.editSaveBtnText, T.bold]}>Save changes</Text>
+                            }
+                        </PressableScale>
+                        <TouchableOpacity onPress={() => setEditTarget(null)} activeOpacity={0.7} style={styles.editCancelLink}>
+                            <Text style={[styles.editCancelText, { color: colors.secondaryText }, T.regular]}>Cancel</Text>
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </Modal>
+
+            {toastMsg && (
+                <Animated.View style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.border, opacity: toastAnim }]}>
+                    <Text style={[styles.toastText, { color: colors.text }, T.semibold]}>{toastMsg}</Text>
+                </Animated.View>
+            )}
 
             {canvasMode && (
                 <CanvasModeView
@@ -1021,5 +1126,74 @@ const styles = StyleSheet.create({
         borderRadius: ms(26),
         alignItems: 'center',
         justifyContent: 'center',
+    },
+
+    editOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    editSheet: {
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
+        padding: scale(20),
+        paddingBottom: vs(36),
+        gap: vs(10),
+    },
+    editHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: ms(2),
+        alignSelf: 'center',
+        marginBottom: vs(6),
+    },
+    editSheetTitle: {
+        fontSize: ms(20),
+        marginBottom: vs(4),
+    },
+    editLabel: {
+        fontSize: ms(12),
+        textTransform: 'uppercase',
+        letterSpacing: 0.4,
+    },
+    editInput: {
+        borderWidth: 1,
+        borderRadius: ms(14),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(12),
+        fontSize: ms(15),
+    },
+    editSaveBtn: {
+        borderRadius: ms(16),
+        paddingVertical: vs(15),
+        alignItems: 'center',
+        marginTop: vs(6),
+    },
+    editSaveBtnText: {
+        color: '#fff',
+        fontSize: ms(15),
+    },
+    editCancelLink: {
+        alignItems: 'center',
+        paddingVertical: vs(8),
+    },
+    editCancelText: {
+        fontSize: ms(14),
+    },
+    toast: {
+        position: 'absolute',
+        bottom: vs(32),
+        alignSelf: 'center',
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(10),
+        borderRadius: ms(20),
+        borderWidth: StyleSheet.hairlineWidth,
+        shadowColor: '#000',
+        shadowOpacity: 0.15,
+        shadowRadius: 10,
+        elevation: 6,
+    },
+    toastText: {
+        fontSize: ms(14),
     },
 });
