@@ -1,4 +1,4 @@
-import React, { Fragment, useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, StyleSheet, Linking, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CharacterSetupModal from '../components/CharacterSetupModal';
@@ -90,7 +90,7 @@ const holdStyles = StyleSheet.create({
 
 export default function RootNavigator() {
     const { user, loading } = useAuth();
-    const { colors, isDark } = useTheme();
+    const { colors, isDark, themeOpacity } = useTheme();
     const navRef = useRef<NavigationContainerRef<any>>(null);
 
     // First-run check — unseen onboarding routes new users to the carousel
@@ -151,7 +151,7 @@ export default function RootNavigator() {
     };
 
     return (
-        <Fragment>
+        <Animated.View style={{ flex: 1, opacity: themeOpacity }}>
         <NavigationContainer ref={navRef} theme={navigationTheme}>
             <Stack.Navigator
                 screenOptions={{
@@ -253,6 +253,6 @@ export default function RootNavigator() {
             </Stack.Navigator>
         </NavigationContainer>
         <CharacterSetupModal visible={!!user && user.character_nickname === null} />
-        </Fragment>
+        </Animated.View>
     );
 }

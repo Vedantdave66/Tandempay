@@ -1,5 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useColorScheme } from 'react-native';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { useColorScheme, Animated } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Colors, ACCENT_PRESETS, AccentKey } from '../constants/Colors';
 
@@ -27,6 +27,7 @@ interface ThemeContextType {
   isDark: boolean;
   accentKey: AccentKey;
   setAccent: (key: AccentKey) => void;
+  themeOpacity: Animated.Value;
 }
 
 const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
@@ -38,6 +39,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const systemColorScheme = useColorScheme();
   const [theme, setThemeState] = useState<Theme>(systemColorScheme === 'dark' ? 'dark' : 'light');
   const [accentKey, setAccentKey] = useState<AccentKey>('forest');
+  const themeOpacity = useRef(new Animated.Value(1)).current;
 
   // Load persisted theme and accent on mount
   useEffect(() => {
@@ -56,8 +58,16 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     load();
   }, []);
 
+  const fadeTransition = (callback: () => void) => {
+    Animated.sequence([
+      Animated.timing(themeOpacity, { toValue: 0, duration: 120, useNativeDriver: true }),
+      Animated.timing(themeOpacity, { toValue: 1, duration: 180, useNativeDriver: true }),
+    ]).start();
+    setTimeout(callback, 120);
+  };
+
   const setTheme = async (newTheme: Theme) => {
-    setThemeState(newTheme);
+    fadeTransition(() => setThemeState(newTheme));
     try {
       await AsyncStorage.setItem(THEME_STORAGE_KEY, newTheme);
     } catch (e) {
@@ -68,7 +78,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   const toggleTheme = () => setTheme(theme === 'light' ? 'dark' : 'light');
 
   const setAccent = async (key: AccentKey) => {
-    setAccentKey(key);
+    fadeTransition(() => setAccentKey(key));
     try {
       await AsyncStorage.setItem(ACCENT_STORAGE_KEY, key);
     } catch (e) {
@@ -96,7 +106,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   } as ColorPalette;
 
   return (
-    <ThemeContext.Provider value={{ theme, colors, toggleTheme, setTheme, isDark, accentKey, setAccent }}>
+    <ThemeContext.Provider value={{ theme, colors, toggleTheme, setTheme, isDark, accentKey, setAccent, themeOpacity }}>
       {children}
     </ThemeContext.Provider>
   );
