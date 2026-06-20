@@ -18,6 +18,7 @@ from slowapi.errors import RateLimitExceeded
 from app.limiter import limiter
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 import sentry_sdk
 from sentry_sdk.integrations.starlette import StarletteIntegration
 from sentry_sdk.integrations.fastapi import FastApiIntegration
@@ -29,6 +30,7 @@ from app.database import engine  # used by APScheduler-started services via app.
 from app.routes import auth, groups, expenses, settlements, notifications, me, friends, wallet, bank_links, requests, plaid_routes, stripe_routes, users, payments, interac_routes
 from app.routes import reminders
 from app.routes.receipts import router as receipts_router
+from app.routes.smart_split import router as smart_split_router
 from app.routes import audit_log
 from app.routes import subscription_routes
 from app.routes import recurring_routes
@@ -166,6 +168,7 @@ async def lifespan(app: FastAPI):
         if not is_serverless:
             from app.services.payment_reconciliation import run_payment_reconciliation
             from app.scheduler import process_due_recurring_expenses
+            from app.services.nudge_service import run_nudge_job
             scheduler = AsyncIOScheduler()
             scheduler.add_job(
                 process_due_reminders,
@@ -188,8 +191,15 @@ async def lifespan(app: FastAPI):
                 name="Process due recurring expenses",
                 replace_existing=True,
             )
+            scheduler.add_job(
+                run_nudge_job,
+                trigger=CronTrigger(hour=9, minute=0, timezone="America/Toronto"),
+                id="nudge_tick",
+                name="Send escalating nudges for pending settlements",
+                replace_existing=True,
+            )
             scheduler.start()
-            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m, Recurring 24h).")
+            logger.info("Schedulers started (Reminders 60m, Reconciliation 30m, Recurring 24h, Nudges 9AM ET).")
     except Exception as e:
         logger.error(f"Lifespan startup error (non-fatal): {e}")
 
@@ -331,6 +341,7 @@ app.include_router(recurring_routes.router)
 app.include_router(export_routes.router)
 app.include_router(interac_routes.router)
 app.include_router(receipts_router)
+app.include_router(smart_split_router)
 
 @app.get("/")
 async def root():

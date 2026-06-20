@@ -11,6 +11,7 @@ import * as Haptics from 'expo-haptics';
 import { Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
+import { timeAgo } from '../utils/helpers';
 
 // Icon per type; colour stays disciplined — green for confirmed money,
 // danger for declined, greyscale for everything else.
@@ -31,14 +32,6 @@ function getGroup(d: string): string {
     if (diff === 1) return 'Yesterday';
     if (diff < 7)  return 'This Week';
     return 'Earlier';
-}
-
-function timeAgo(d: string) {
-    const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
-    if (diff < 1)   return 'Just now';
-    if (diff < 60)  return `${diff}m ago`;
-    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-    return `${Math.floor(diff / 1440)}d ago`;
 }
 
 // Group and sort notifications

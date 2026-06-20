@@ -4,30 +4,29 @@ import {
     Text,
     StyleSheet,
     ScrollView,
-    TouchableOpacity,
-    SafeAreaView,
     Alert,
-    Linking,
     ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
 import * as Sharing from 'expo-sharing';
 import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Download, FileText, Sheet, Crown } from 'lucide-react-native';
+import { ChevronLeft, Download, FileText, Sheet, Crown } from 'lucide-react-native';
 import { BASE_URL } from '../services/api';
 import { T } from '../utils/typography';
+import PressableScale from '../components/PressableScale';
 
 const EXPORT_OPTIONS = [
     {
         key: 'csv',
         icon: Sheet,
         label: 'CSV Spreadsheet',
-        desc: 'Download your full expense history',
+        subtitle: 'All your expenses, groups, and splits in one sheet',
         iconColor: '#16a34a',
-        iconBg: 'rgba(22,163,74,0.1)',
+        iconBg: 'rgba(22,163,74,0.12)',
         ext: 'csv',
         mime: 'text/csv',
     },
@@ -35,9 +34,9 @@ const EXPORT_OPTIONS = [
         key: 'pdf',
         icon: FileText,
         label: 'PDF Report',
-        desc: 'Download your full expense history',
+        subtitle: 'Formatted summary with totals and settlement history',
         iconColor: '#6366F1',
-        iconBg: 'rgba(99,102,241,0.1)',
+        iconBg: 'rgba(99,102,241,0.12)',
         ext: 'pdf',
         mime: 'application/pdf',
     },
@@ -47,22 +46,9 @@ export default function ExportScreen({ navigation }: any) {
     const { user } = useAuth();
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
-
     const [loading, setLoading] = useState<string | null>(null);
 
     const handleExport = async (format: string) => {
-        if (!isPro) {
-            Alert.alert(
-                'Pro feature',
-                'Export is a Pro feature. Upgrade at tandempay.ca/pricing',
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    { text: 'Learn more', onPress: () => Linking.openURL('https://tandempay.ca/pricing') },
-                ],
-            );
-            return;
-        }
-
         setLoading(format);
         try {
             const token = await AsyncStorage.getItem('token');
@@ -74,9 +60,7 @@ export default function ExportScreen({ navigation }: any) {
                 headers: { Authorization: `Bearer ${token}` },
             });
 
-            if (result.status !== 200) {
-                throw new Error(`Server returned ${result.status}`);
-            }
+            if (result.status !== 200) throw new Error(`Server returned ${result.status}`);
 
             const canShare = await Sharing.isAvailableAsync();
             if (!canShare) {
@@ -97,69 +81,94 @@ export default function ExportScreen({ navigation }: any) {
     };
 
     return (
-        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
+            {/* Header */}
             <View style={styles.header}>
-                <Text style={[styles.pageTitle, { color: colors.text }]}>Export Data</Text>
-                <Text style={[styles.pageSubtitle, { color: colors.secondaryText }]}>
-                    Download your full expense history
-                </Text>
+                <PressableScale
+                    scaleTo={0.97}
+                    haptic="light"
+                    onPress={() => navigation.goBack()}
+                    style={[styles.backBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                >
+                    <ChevronLeft size={ms(20)} color={colors.text} />
+                </PressableScale>
+                <Text style={[styles.headerTitle, { color: colors.text }, T.bold]}>Export Data</Text>
+                <View style={{ width: scale(44) }} />
             </View>
 
-            <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {EXPORT_OPTIONS.map((option) => {
-                    const Icon = option.icon;
-                    const isLoading = loading === option.key;
-                    return (
-                        <TouchableOpacity
-                            key={option.key}
-                            style={[
-                                styles.exportCard,
-                                { backgroundColor: colors.surface, borderColor: colors.border },
-                                !isPro && styles.cardDimmed,
-                            ]}
-                            onPress={() => handleExport(option.key)}
-                            activeOpacity={0.75}
-                            disabled={isLoading}
-                        >
-                            <View style={[styles.cardIcon, { backgroundColor: option.iconBg }]}>
-                                <Icon size={24} color={option.iconColor} />
-                            </View>
-                            <View style={styles.cardText}>
-                                <Text style={[styles.cardLabel, { color: colors.text }, T.bold]}>{option.label}</Text>
-                                <Text style={[styles.cardDesc, { color: colors.secondaryText }]}>{option.desc}</Text>
-                            </View>
-                            {isLoading
-                                ? <ActivityIndicator size="small" color={colors.accent} />
-                                : <Download size={18} color={isPro ? colors.accent : colors.secondaryText} />
-                            }
-                        </TouchableOpacity>
-                    );
-                })}
+            <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
+                {isPro ? (
+                    <>
+                        <Text style={[styles.sectionHeader, { color: colors.secondaryText }, T.semibold]}>
+                            Download Format
+                        </Text>
 
-                {!isPro && (
-                    <View style={[styles.upsellCard, {
-                        backgroundColor: isDark ? 'rgba(74,222,128,0.06)' : 'rgba(22,163,74,0.04)',
-                        borderColor: isDark ? 'rgba(74,222,128,0.2)' : 'rgba(22,163,74,0.15)',
-                    }]}>
-                        <Crown size={15} color={colors.accent} />
-                        <View style={styles.upsellText}>
-                            <Text style={[styles.upsellTitle, { color: colors.text }]}>
-                                Export your full history with Pro
-                            </Text>
-                            <TouchableOpacity
-                                onPress={() => Linking.openURL('https://tandempay.ca/pricing')}
-                                activeOpacity={0.7}
-                            >
-                                <Text style={[styles.learnMore, { color: colors.accent }]}>Learn more →</Text>
-                            </TouchableOpacity>
+                        {EXPORT_OPTIONS.map(option => {
+                            const Icon = option.icon;
+                            const isLoading = loading === option.key;
+                            return (
+                                <View
+                                    key={option.key}
+                                    style={[styles.exportCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                                >
+                                    <View style={[styles.cardIconWrap, { backgroundColor: option.iconBg }]}>
+                                        <Icon size={24} color={option.iconColor} />
+                                    </View>
+                                    <View style={styles.cardText}>
+                                        <Text style={[styles.cardLabel, { color: colors.text }, T.bold]}>{option.label}</Text>
+                                        <Text style={[styles.cardSubtitle, { color: colors.secondaryText }, T.regular]}>
+                                            {option.subtitle}
+                                        </Text>
+                                    </View>
+                                    <PressableScale
+                                        scaleTo={0.92}
+                                        haptic="light"
+                                        onPress={() => handleExport(option.key)}
+                                        disabled={isLoading}
+                                        style={[styles.downloadBtn, { backgroundColor: colors.accentBg }]}
+                                    >
+                                        {isLoading
+                                            ? <ActivityIndicator size="small" color={colors.accent} />
+                                            : <Download size={18} color={colors.accent} />
+                                        }
+                                    </PressableScale>
+                                </View>
+                            );
+                        })}
+
+                        <Text style={[styles.proNote, { color: colors.tertiaryText }, T.regular]}>
+                            Includes all expenses where you are a participant, sorted newest first.
+                        </Text>
+                    </>
+                ) : (
+                    <>
+                        <Text style={[styles.sectionHeader, { color: colors.secondaryText }, T.semibold]}>
+                            Export Data
+                        </Text>
+                        <View style={[styles.upsellCard, { borderColor: colors.accent + '30' }]}>
+                            <View style={[styles.upsellIconWrap, { backgroundColor: colors.accentBg }]}>
+                                <Crown size={22} color={colors.accent} />
+                            </View>
+                            <View style={styles.upsellText}>
+                                <Text style={[styles.upsellTitle, { color: colors.text }, T.bold]}>
+                                    Export your full history with Pro
+                                </Text>
+                                <Text style={[styles.upsellDesc, { color: colors.secondaryText }, T.regular]}>
+                                    Download CSV spreadsheets and PDF reports of every expense you've been part of.
+                                </Text>
+                                <PressableScale
+                                    scaleTo={0.97}
+                                    haptic="light"
+                                    onPress={() => navigation.navigate('Subscription')}
+                                    style={[styles.upgradeBtn, { backgroundColor: colors.accent }]}
+                                >
+                                    <Text style={[styles.upgradeBtnText, { color: isDark ? '#064E3B' : '#FFFFFF' }, T.bold]}>
+                                        Upgrade to Pro
+                                    </Text>
+                                </PressableScale>
+                            </View>
                         </View>
-                    </View>
-                )}
-
-                {isPro && (
-                    <Text style={[styles.proNote, { color: colors.secondaryText }]}>
-                        Exports include all expenses where you are a participant, sorted newest first.
-                    </Text>
+                    </>
                 )}
             </ScrollView>
         </SafeAreaView>
@@ -167,81 +176,119 @@ export default function ExportScreen({ navigation }: any) {
 }
 
 const styles = StyleSheet.create({
-    safeArea: { flex: 1 },
+    safe: { flex: 1 },
+
     header: {
-        paddingHorizontal: scale(24),
-        paddingTop: vs(28),
-        paddingBottom: vs(20),
-    },
-    pageTitle: {
-        fontSize: ms(22),
-        fontWeight: '800',
-        letterSpacing: -0.3,
-        marginBottom: vs(3),
-    },
-    pageSubtitle: {
-        fontSize: ms(13),
-        fontWeight: '400',
-    },
-    scrollContent: {
-        paddingHorizontal: scale(24),
-        paddingBottom: vs(48),
-    },
-    exportCard: {
         flexDirection: 'row',
         alignItems: 'center',
-        borderRadius: ms(18),
-        borderWidth: 1,
-        padding: scale(16),
-        marginBottom: vs(12),
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.04,
-        shadowRadius: 8,
-        elevation: 2,
+        justifyContent: 'space-between',
+        paddingHorizontal: scale(20),
+        paddingVertical: vs(12),
     },
-    cardDimmed: {
-        opacity: 0.4,
+    headerTitle: {
+        fontSize: ms(20),
+        letterSpacing: -0.5,
     },
-    cardIcon: {
-        width: 48,
-        height: 48,
+    backBtn: {
+        width: scale(44),
+        height: scale(44),
         borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
-        marginRight: scale(14),
+        borderWidth: StyleSheet.hairlineWidth,
     },
-    cardText: { flex: 1 },
+
+    scroll: {
+        paddingHorizontal: scale(20),
+        paddingBottom: vs(48),
+    },
+
+    sectionHeader: {
+        fontSize: ms(13),
+        letterSpacing: 0.3,
+        textTransform: 'uppercase',
+        marginBottom: vs(12),
+        marginTop: vs(8),
+    },
+
+    // Export cards (Pro)
+    exportCard: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: ms(20),
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: scale(16),
+        marginBottom: vs(12),
+        gap: scale(14),
+    },
+    cardIconWrap: {
+        width: scale(52),
+        height: scale(52),
+        borderRadius: ms(14),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    cardText: {
+        flex: 1,
+        gap: vs(3),
+    },
     cardLabel: {
         fontSize: ms(15),
-        marginBottom: vs(3),
     },
-    cardDesc: {
+    cardSubtitle: {
         fontSize: ms(12),
+        lineHeight: 17,
     },
-    upsellCard: {
-        flexDirection: 'row',
-        alignItems: 'flex-start',
-        gap: vs(10),
-        borderRadius: ms(14),
-        borderWidth: 1,
-        padding: scale(14),
-        marginTop: vs(4),
-    },
-    upsellText: { flex: 1 },
-    upsellTitle: {
-        fontSize: ms(13),
-        fontWeight: '600',
-        marginBottom: vs(4),
-    },
-    learnMore: {
-        fontSize: ms(13),
-        fontWeight: '600',
+    downloadBtn: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: ms(12),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     proNote: {
         fontSize: ms(12),
         textAlign: 'center',
         marginTop: vs(8),
         lineHeight: 18,
+    },
+
+    // Upsell (free)
+    upsellCard: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(14),
+        borderRadius: ms(20),
+        borderWidth: 1,
+        padding: scale(18),
+        marginTop: vs(4),
+    },
+    upsellIconWrap: {
+        width: scale(44),
+        height: scale(44),
+        borderRadius: ms(12),
+        alignItems: 'center',
+        justifyContent: 'center',
+        flexShrink: 0,
+    },
+    upsellText: {
+        flex: 1,
+        gap: vs(6),
+    },
+    upsellTitle: {
+        fontSize: ms(15),
+    },
+    upsellDesc: {
+        fontSize: ms(13),
+        lineHeight: 18,
+    },
+    upgradeBtn: {
+        borderRadius: ms(13),
+        paddingVertical: vs(12),
+        alignItems: 'center',
+        marginTop: vs(8),
+    },
+    upgradeBtnText: {
+        fontSize: ms(14),
     },
 });

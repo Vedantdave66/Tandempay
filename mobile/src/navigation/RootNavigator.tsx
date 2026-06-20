@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { Fragment, useEffect, useRef, useState } from 'react';
 import { Animated, Easing, View, StyleSheet, Linking, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import CharacterSetupModal from '../components/CharacterSetupModal';
@@ -29,6 +29,7 @@ import AppearanceScreen from '../screens/AppearanceScreen';
 import ReceiptScanScreen from '../screens/ReceiptScanScreen';
 import SmartSplitScreen from '../screens/SmartSplitScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -90,7 +91,7 @@ const holdStyles = StyleSheet.create({
 
 export default function RootNavigator() {
     const { user, loading } = useAuth();
-    const { colors, isDark, themeOpacity } = useTheme();
+    const { colors, isDark } = useTheme();
     const navRef = useRef<NavigationContainerRef<any>>(null);
 
     // First-run check — unseen onboarding routes new users to the carousel
@@ -151,7 +152,7 @@ export default function RootNavigator() {
     };
 
     return (
-        <Animated.View style={{ flex: 1, opacity: themeOpacity }}>
+        <Fragment>
         <NavigationContainer ref={navRef} theme={navigationTheme}>
             <Stack.Navigator
                 screenOptions={{
@@ -246,6 +247,11 @@ export default function RootNavigator() {
                         <Stack.Screen
                             name="FriendsHub"
                             component={FriendsScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="Subscription"
+                            component={SubscriptionScreen}
                             options={{ animation: 'slide_from_right' }}
                         />
                     </Stack.Group>

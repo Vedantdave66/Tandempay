@@ -82,7 +82,6 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
 @limiter.limit("5/hour", error_message="Too many registration attempts. Please try again later.")
 async def register(request: Request, data: UserRegister, db: AsyncSession = Depends(get_db)):
     email_lower = data.email.lower()
-    # Check if email already exists
     result = await db.execute(select(User).where(User.email == email_lower))
     if result.scalar_one_or_none():
         raise HTTPException(status_code=400, detail="Email already registered")
@@ -150,7 +149,7 @@ async def logout(
             db.add(RevokedToken(jti=jti, user_id=current_user.id, expires_at=expires_at))
             await db.commit()
     except JWTError:
-        pass  # token already invalid — logout is still successful
+        logger.debug("JWT validation failed — treating as unauthenticated")
     return {"message": "Logged out successfully"}
 
 
@@ -160,20 +159,7 @@ async def update_me(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """
-    Partial update of the current user's profile.
-
-    Only the following fields may be patched:
-      - has_completed_payment  (bool)   — set after first Stripe payment to suppress trust screen
-      - interac_email          (str)    — Interac e-Transfer email address
-      - name                   (str)    — display name
-      - character_shape        (str)    — avatar shape; one of rect, tall, semi, round
-      - character_color        (str)    — avatar fill colour in #RRGGBB format
-      - character_nickname     (str)    — short nickname shown on avatar; empty string clears it
-
-    Explicitly forbidden: email, hashed_password, wallet_balance,
-    stripe_account_id, avatar_color, id, created_at.
-    """
+    """Partial update of the current user's profile."""
     _VALID_SHAPES = {'rect', 'tall', 'semi', 'round'}
     _HEX_COLOR_RE = __import__('re').compile(r'^#[0-9A-Fa-f]{6}$')
 
@@ -375,14 +361,7 @@ async def admin_reset_all_passwords(
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
-    """
-    Admin-only endpoint: sends a password reset email to every user in the database.
-    Protected by the X-Admin-Secret header.
-
-    Usage:
-        curl -X POST https://api.tandempay.ca/api/auth/admin/reset-all-passwords \
-             -H "X-Admin-Secret: <your-admin-secret>"
-    """
+    """Admin-only endpoint: sends a password reset email to every user in the database."""
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
 
@@ -469,10 +448,7 @@ async def admin_diagnose_hashes(
     db: AsyncSession = Depends(get_db),
     x_admin_secret: str = Header(..., alias="X-Admin-Secret"),
 ):
-    """
-    Admin-only endpoint: checks the integrity of all password hashes in the database.
-    Returns a diagnostic report without exposing any sensitive data.
-    """
+    """Admin-only endpoint: checks the integrity of all password hashes in the database."""
     if x_admin_secret != settings.ADMIN_SECRET:
         raise HTTPException(status_code=403, detail="Invalid admin secret")
 

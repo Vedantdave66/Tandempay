@@ -14,14 +14,15 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column('groups', sa.Column('invite_token', sa.String(32), nullable=True))
-    # Backfill existing rows with unique tokens (PostgreSQL only)
+    op.execute("ALTER TABLE groups ADD COLUMN IF NOT EXISTS invite_token VARCHAR(32)")
     op.execute(
         "UPDATE groups SET invite_token = md5(random()::text || id::text) WHERE invite_token IS NULL"
     )
-    op.create_index('uq_group_invite_token', 'groups', ['invite_token'], unique=True)
+    op.execute(
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_group_invite_token ON groups (invite_token)"
+    )
 
 
 def downgrade() -> None:
-    op.drop_index('uq_group_invite_token', table_name='groups')
-    op.drop_column('groups', 'invite_token')
+    op.execute("DROP INDEX IF EXISTS uq_group_invite_token")
+    op.execute("ALTER TABLE groups DROP COLUMN IF EXISTS invite_token")
