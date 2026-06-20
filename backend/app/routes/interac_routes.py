@@ -115,7 +115,7 @@ async def interac_inbound(
     )
 
     # Attempt to match against a pending settlement.
-    settlement = await match_settlement(parsed, recipient, db)
+    settlement = await match_settlement(parsed, sender, db)
 
     if settlement is None:
         log.failure_reason = "no_matching_settlement"

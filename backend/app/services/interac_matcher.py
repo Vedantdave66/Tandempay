@@ -1,12 +1,21 @@
 """
 Interac e-Transfer settlement matcher.
 
-Given a parsed Interac email and the recipient's email address, finds
-the best-matching SettlementRecord in the DB and optionally confirms it.
+Given a parsed Interac email and the raw From header, finds the best-matching
+SettlementRecord in the DB and optionally confirms it.
+
+Matching strategy:
+  1. Extract email from the From header (e.g. "Name <email@host>").
+  2. Look up the creditor (payee) by that email in the users table.
+  3. Fuzzy-match the parsed counterparty name against all TandemPay users
+     to identify the debtor (payer).
+  4. Find a pending/sent settlement where payee=creditor and amount matches
+     within $0.01 tolerance; prefer the row whose payer=debtor if multiple exist.
 """
 
 import difflib
 import logging
+import re
 from decimal import Decimal
 from typing import Optional
 
@@ -19,8 +28,10 @@ from app.services.email_service import email_for_notification
 
 logger = logging.getLogger("tandempay.interac_matcher")
 
-_AMOUNT_TOLERANCE = Decimal("0.10")
-_NAME_RATIO_THRESHOLD = 0.6
+_AMOUNT_TOLERANCE = Decimal("0.01")
+_NAME_RATIO_THRESHOLD = 0.7
+
+_EMAIL_RE = re.compile(r'[\w\.-]+@[\w\.-]+')
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -32,9 +43,9 @@ def _name_ratio(a: str, b: str) -> float:
     ).ratio()
 
 
-async def _resolve_user(recipient_email: str, db: AsyncSession) -> Optional[User]:
+async def _resolve_user_by_email(email: str, db: AsyncSession) -> Optional[User]:
     """Find a TandemPay user by interac_email or login email."""
-    email_lower = recipient_email.lower().strip()
+    email_lower = email.lower().strip()
     result = await db.execute(
         select(User).where(
             or_(
@@ -46,131 +57,106 @@ async def _resolve_user(recipient_email: str, db: AsyncSession) -> Optional[User
     return result.scalars().first()
 
 
-async def _fetch_candidates(
-    user: User,
-    parsed: ParsedInteracEmail,
-    db: AsyncSession,
-) -> list[SettlementRecord]:
-    """
-    Return active SettlementRecords that could match this email.
-
-    Direction mapping:
-      "received" → user is the payee (someone sent money to them)
-      "sent"     → user is the payer (they sent money out)
-      "unknown"  → check both roles
-    """
-    amount_low  = parsed.amount - _AMOUNT_TOLERANCE
-    amount_high = parsed.amount + _AMOUNT_TOLERANCE
-
-    base_q = (
-        select(SettlementRecord)
-        .where(
-            SettlementRecord.status.in_(["pending", "sent"]),
-            SettlementRecord.amount >= amount_low,
-            SettlementRecord.amount <= amount_high,
-        )
-    )
-
-    if parsed.direction == "received":
-        base_q = base_q.where(SettlementRecord.payee_id == user.id)
-    elif parsed.direction == "sent":
-        base_q = base_q.where(SettlementRecord.payer_id == user.id)
-    else:
-        base_q = base_q.where(
-            or_(
-                SettlementRecord.payer_id == user.id,
-                SettlementRecord.payee_id == user.id,
-            )
-        )
-
-    result = await db.execute(base_q)
-    return list(result.scalars().all())
-
-
-async def _fetch_other_party(
-    settlement: SettlementRecord,
-    user: User,
-    db: AsyncSession,
-) -> Optional[User]:
-    """Return the User on the opposite side of the settlement from `user`."""
-    other_id = (
-        settlement.payer_id
-        if settlement.payee_id == user.id
-        else settlement.payee_id
-    )
-    result = await db.execute(select(User).where(User.id == other_id))
-    return result.scalars().first()
-
-
 # ── Public: match ─────────────────────────────────────────────────────────────
 
 async def match_settlement(
     parsed: ParsedInteracEmail,
-    recipient_email: str,
+    from_email: str,
     db: AsyncSession,
 ) -> Optional[SettlementRecord]:
     """
     Find the SettlementRecord that best matches a parsed Interac email.
 
-    Returns None if:
-    - No TandemPay user found for recipient_email
-    - No active settlements match the amount within tolerance
-    - The best fuzzy name ratio is below the acceptance threshold
+    Returns None if the creditor cannot be resolved, the debtor name falls
+    below the fuzzy-match threshold, or no settlement matches by payee+amount.
     """
-    user = await _resolve_user(recipient_email, db)
-    if not user:
+    # Step 1: extract bare email address from the From header
+    m = _EMAIL_RE.search(from_email)
+    if not m:
         logger.info(
-            "interac_matcher: no user found for recipient=%s", recipient_email
+            "interac_matcher: could not extract email from from_email=%r", from_email
         )
         return None
+    creditor_email = m.group(0).lower().strip()
 
-    candidates = await _fetch_candidates(user, parsed, db)
-    if not candidates:
+    # Step 2: look up creditor (the person who received the Interac money)
+    creditor = await _resolve_user_by_email(creditor_email, db)
+    if not creditor:
         logger.info(
-            "interac_matcher: no amount-matching settlements for user=%s amount=%s",
-            user.id, parsed.amount,
+            "interac_matcher: creditor not found for email=%s", creditor_email
         )
         return None
+    logger.info(
+        "interac_matcher: creditor found user_id=%s email=%s", creditor.id, creditor_email
+    )
 
-    # Single candidate — skip fuzzy match if name is empty (low-confidence parse)
-    if len(candidates) == 1 and not parsed.counterparty_name:
-        logger.info(
-            "interac_matcher: single candidate, no name to compare — accepting user=%s",
-            user.id,
-        )
-        return candidates[0]
+    # Step 3: fuzzy-match parsed counterparty name against all users to find debtor
+    all_result = await db.execute(select(User))
+    all_users: list[User] = list(all_result.scalars().all())
 
-    # Score each candidate by counterparty name similarity
-    best_settlement: Optional[SettlementRecord] = None
+    debtor: Optional[User] = None
     best_ratio = 0.0
-
-    for settlement in candidates:
-        other = await _fetch_other_party(settlement, user, db)
-        if not other:
+    for u in all_users:
+        if u.id == creditor.id:
             continue
-
-        ratio = _name_ratio(parsed.counterparty_name, other.name)
+        ratio = _name_ratio(parsed.counterparty_name, u.name)
         logger.debug(
-            "interac_matcher: candidate settlement=%s other_name=%r parsed_name=%r ratio=%.2f",
-            settlement.id, other.name, parsed.counterparty_name, ratio,
+            "interac_matcher: name candidate user_id=%s name=%r parsed_name=%r ratio=%.2f",
+            u.id, u.name, parsed.counterparty_name, ratio,
         )
-
         if ratio > best_ratio:
             best_ratio = ratio
-            best_settlement = settlement
+            debtor = u
 
-    if best_ratio < _NAME_RATIO_THRESHOLD:
+    if debtor is None or best_ratio < _NAME_RATIO_THRESHOLD:
         logger.info(
-            "interac_matcher: best ratio %.2f below threshold %.2f for user=%s",
-            best_ratio, _NAME_RATIO_THRESHOLD, user.id,
+            "interac_matcher: debtor not found — best ratio=%.2f threshold=%.2f name=%r",
+            best_ratio, _NAME_RATIO_THRESHOLD, parsed.counterparty_name,
+        )
+        return None
+    logger.info(
+        "interac_matcher: debtor found user_id=%s ratio=%.2f name=%r",
+        debtor.id, best_ratio, parsed.counterparty_name,
+    )
+
+    # Step 4: find pending settlement where payee=creditor, amount within $0.01
+    amount_low  = parsed.amount - _AMOUNT_TOLERANCE
+    amount_high = parsed.amount + _AMOUNT_TOLERANCE
+
+    candidates_result = await db.execute(
+        select(SettlementRecord).where(
+            SettlementRecord.status.in_(["pending", "sent"]),
+            SettlementRecord.payee_id == creditor.id,
+            SettlementRecord.amount >= amount_low,
+            SettlementRecord.amount <= amount_high,
+        )
+    )
+    candidates = list(candidates_result.scalars().all())
+
+    if not candidates:
+        logger.info(
+            "interac_matcher: no settlement found for payee=%s amount=%s (±%s)",
+            creditor.id, parsed.amount, _AMOUNT_TOLERANCE,
         )
         return None
 
+    # Prefer the row whose payer matches the identified debtor
+    for settlement in candidates:
+        if settlement.payer_id == debtor.id:
+            logger.info(
+                "interac_matcher: settlement matched settlement_id=%s payee=%s payer=%s",
+                settlement.id, creditor.id, debtor.id,
+            )
+            return settlement
+
+    # Fallback: return first candidate when payer differs (best-effort)
+    settlement = candidates[0]
     logger.info(
-        "interac_matcher: matched settlement=%s ratio=%.2f user=%s",
-        best_settlement.id, best_ratio, user.id,
+        "interac_matcher: settlement matched (payer mismatch, best-effort) "
+        "settlement_id=%s payee=%s expected_payer=%s",
+        settlement.id, creditor.id, debtor.id,
     )
-    return best_settlement
+    return settlement
 
 
 # ── Public: confirm ───────────────────────────────────────────────────────────
