@@ -1,7 +1,7 @@
 import enum
 import uuid
 import secrets
-from datetime import datetime, date
+from datetime import datetime, date, timezone
 from typing import Optional
 from sqlalchemy import String, Float, Numeric, ForeignKey, DateTime, Boolean, func, Integer, UniqueConstraint, Index, Enum as SAEnum, Date, text
 from sqlalchemy.orm import Mapped, mapped_column, relationship

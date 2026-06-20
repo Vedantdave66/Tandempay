@@ -79,21 +79,24 @@ async def create_settlement(
     db: AsyncSession = Depends(get_db),
 ):
     """Initiate a settlement — payer starts the process."""
-    group = await _verify_membership(group_id, current_user.id, db)
+    await db.refresh(current_user)
+    user_id = current_user.id
+
+    group = await _verify_membership(group_id, user_id, db)
 
     # Verify payee is a member
     member_ids = {m.user_id for m in group.members}
     if data.payee_id not in member_ids:
         raise HTTPException(status_code=400, detail="Payee is not a group member")
 
-    if data.payee_id == current_user.id:
+    if data.payee_id == user_id:
         raise HTTPException(status_code=400, detail="Cannot settle with yourself")
 
     # Validate amount does not exceed actual debt
     balance_data = await _compute_balances(group_id, db)
-    paid = balance_data["total_paid"].get(current_user.id, Decimal("0"))
-    owed = balance_data["total_owed"].get(current_user.id, Decimal("0"))
-    adj  = balance_data["settlement_adjustments"].get(current_user.id, Decimal("0"))
+    paid = balance_data["total_paid"].get(user_id, Decimal("0"))
+    owed = balance_data["total_owed"].get(user_id, Decimal("0"))
+    adj  = balance_data["settlement_adjustments"].get(user_id, Decimal("0"))
     net  = paid - owed + adj
     max_settleable = abs(net) if net < Decimal("0") else Decimal("0")
     if max_settleable == Decimal("0"):
@@ -107,7 +110,7 @@ async def create_settlement(
     # Create the record
     record = SettlementRecord(
         group_id=group_id,
-        payer_id=current_user.id,
+        payer_id=user_id,
         payee_id=data.payee_id,
         amount=data.amount,
         method=data.method,
@@ -120,7 +123,7 @@ async def create_settlement(
         await db.rollback()
         logger.warning(
             "Duplicate active settlement blocked: group=%s payer=%s payee=%s",
-            group_id, current_user.id, data.payee_id,
+            group_id, user_id, data.payee_id,
         )
         raise HTTPException(
             status_code=409,
@@ -147,7 +150,7 @@ async def create_settlement(
 
     await log_action(
         db=db,
-        actor_id=current_user.id,
+        actor_id=user_id,
         action=AuditActions.SETTLEMENT_INITIATED,
         entity_type="settlement",
         entity_id=record.id,
