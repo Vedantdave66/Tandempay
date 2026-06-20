@@ -55,9 +55,9 @@ interface ActionSheetData {
     userId?: string;
 }
 
-const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_HEIGHT_HALF  = SCREEN_H * 0.55;
-const SHEET_HEIGHT_THIRD = SCREEN_H * 0.32;
+const SCREEN_HEIGHT = Dimensions.get('window').height;
+const SHEET_HEIGHT_HALF  = SCREEN_HEIGHT * 0.55;
+const SHEET_HEIGHT_THIRD = SCREEN_HEIGHT * 0.32;
 
 const PLACEHOLDERS = [
     'Thai for 4, Lakshit skipped drinks — $85 total',
@@ -93,7 +93,7 @@ export default function SmartSplitScreen({ navigation }: any) {
     const recordingPulseAnim = useRef<Animated.CompositeAnimation | null>(null);
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-    const toastAnim  = useRef(new Animated.Value(0)).current;
+    const toastAnim = useRef(new Animated.Value(0));
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [clarifyMsg, setClarifyMsg]     = useState<string | null>(null);
@@ -148,10 +148,10 @@ export default function SmartSplitScreen({ navigation }: any) {
     const showToast = useCallback((msg: string) => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToastMsg(msg);
-        toastAnim.setValue(0);
-        Animated.timing(toastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        toastAnim.current.setValue(0);
+        Animated.timing(toastAnim.current, { toValue: 1, duration: 280, useNativeDriver: true }).start();
         toastTimer.current = setTimeout(() => {
-            Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+            Animated.timing(toastAnim.current, { toValue: 0, duration: 280, useNativeDriver: true })
                 .start(() => setToastMsg(null));
         }, 2800);
     }, [toastAnim]);
@@ -522,8 +522,8 @@ export default function SmartSplitScreen({ navigation }: any) {
                     {
                         backgroundColor: colors.surface,
                         borderColor: colors.border,
-                        opacity: toastAnim,
-                        transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+                        opacity: toastAnim.current,
+                        transform: [{ translateY: toastAnim.current.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
                     },
                 ]}
                 pointerEvents="none"
