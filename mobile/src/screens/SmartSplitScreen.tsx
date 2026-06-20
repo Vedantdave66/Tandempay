@@ -523,7 +523,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         backgroundColor: colors.surface,
                         borderColor: colors.border,
                         opacity: toastAnim.current,
-                        transform: [{ translateY: toastAnim.current.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+                        transform: [{ translateY: toastAnim.current }],
                     },
                 ]}
                 pointerEvents="none"
