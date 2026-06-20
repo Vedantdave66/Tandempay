@@ -1,6 +1,8 @@
 from pydantic_settings import BaseSettings
 from functools import lru_cache
 
+DEFAULT_TAX_RATE: float = 0.13  # Canadian HST
+
 
 class Settings(BaseSettings):
     # Required — no defaults. App will refuse to start if these are missing from env.
@@ -32,6 +34,9 @@ class Settings(BaseSettings):
 
     # SendGrid Inbound Parse — set in Vercel backend env vars as SENDGRID_WEBHOOK_SECRET
     SENDGRID_WEBHOOK_SECRET: str = ""
+
+    # Gemini — used by receipt scanning route
+    GEMINI_API_KEY: str = ""
 
     # Sentry — leave empty to disable monitoring entirely (safe for local dev)
     SENTRY_DSN: str = ""

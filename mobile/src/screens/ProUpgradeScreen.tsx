@@ -6,7 +6,6 @@ import {
     ScrollView,
     TouchableOpacity,
     SafeAreaView,
-    Linking,
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useAuth } from '../context/AuthContext';
@@ -111,14 +110,14 @@ export default function ProUpgradeScreen({ navigation }: any) {
 
                 <TouchableOpacity
                     style={[styles.upgradeButton, { backgroundColor: colors.accent }]}
-                    onPress={() => Linking.openURL('https://tandempay.ca/pricing')}
+                    onPress={() => navigation.navigate('Subscription')}
                     activeOpacity={0.85}
                 >
                     <Text style={styles.upgradeButtonText}>Upgrade to Pro</Text>
                 </TouchableOpacity>
 
                 <Text style={[styles.disclaimer, { color: colors.secondaryText }]}>
-                    Manage your subscription on the web. Cancel anytime.
+                    Cancel anytime from your account settings.
                 </Text>
             </ScrollView>
         </SafeAreaView>

@@ -334,10 +334,10 @@ export default function SettleUpScreen() {
                             {cardOpen && (
                                 <View style={{ paddingTop: vs(16), gap: vs(10) }}>
                                     {([
-                                        { label: 'Amount',    value: `$${formatCurrency(amount)}`, bold: false },
-                                        { label: 'Card fee',  value: `$${fee}`,                    bold: false },
-                                        { label: "You'll pay", value: `$${cardTotal}`,              bold: true  },
-                                    ] as const).map(({ label, value, bold }, i) => (
+                                        { label: 'Subtotal',                  value: `$${formatCurrency(amount)}`, isFee: false, bold: false },
+                                        { label: 'Stripe fee (2.9% + $0.30)', value: `$${fee}`,                   isFee: true,  bold: false },
+                                        { label: 'Total charged',             value: `$${cardTotal}`,             isFee: false, bold: true  },
+                                    ] as const).map(({ label, value, isFee, bold }, i) => (
                                         <View
                                             key={label}
                                             style={[
@@ -345,8 +345,8 @@ export default function SettleUpScreen() {
                                                 i === 2 && { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: t.insetBorder, paddingTop: vs(10) },
                                             ]}
                                         >
-                                            <Text style={[styles.feeLabel, { color: t.sub }]}>{label}</Text>
-                                            <Text style={[styles.feeValue, { color: bold ? t.ink : t.sub, fontWeight: bold ? '800' : '600' }]}>
+                                            <Text style={[styles.feeLabel, { color: t.sub }, Font.body]}>{label}</Text>
+                                            <Text style={[styles.feeValue, { color: isFee ? colors.warning : bold ? t.ink : t.sub, fontWeight: bold ? '800' : '600', fontVariant: ['tabular-nums'] }, Font.body]}>
                                                 {value}
                                             </Text>
                                         </View>

@@ -29,6 +29,7 @@ import AppearanceScreen from '../screens/AppearanceScreen';
 import ReceiptScanScreen from '../screens/ReceiptScanScreen';
 import SmartSplitScreen from '../screens/SmartSplitScreen';
 import FriendsScreen from '../screens/FriendsScreen';
+import SubscriptionScreen from '../screens/SubscriptionScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -248,11 +249,16 @@ export default function RootNavigator() {
                             component={FriendsScreen}
                             options={{ animation: 'slide_from_right' }}
                         />
+                        <Stack.Screen
+                            name="Subscription"
+                            component={SubscriptionScreen}
+                            options={{ animation: 'slide_from_right' }}
+                        />
                     </Stack.Group>
                 )}
             </Stack.Navigator>
         </NavigationContainer>
         <CharacterSetupModal visible={!!user && user.character_nickname === null} />
-        </Fragment>
+        </Animated.View>
     );
 }

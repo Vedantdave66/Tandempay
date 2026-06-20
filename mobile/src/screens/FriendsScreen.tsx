@@ -20,6 +20,7 @@ import { Bell, Users, Clock, MailPlus, UserCheck, UserX, Receipt, Send, CheckChe
 import { friendsApi, groupsApi, balancesApi, notificationsApi, Friend, PendingRequests, NotificationOut } from '../services/api';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
+import { timeAgo, toArray } from '../utils/helpers';
 
 const TYPE_CONFIG: Record<string, { icon: any; tint: 'green' | 'neutral' }> = {
     expense_added:        { icon: Receipt,     tint: 'green' },
@@ -30,14 +31,6 @@ const TYPE_CONFIG: Record<string, { icon: any; tint: 'green' | 'neutral' }> = {
     friend_request:       { icon: UserPlus,    tint: 'green' },
     friend_accepted:      { icon: Check,       tint: 'green' },
 };
-
-function timeAgo(d: string) {
-    const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
-    if (diff < 1)    return 'Just now';
-    if (diff < 60)   return `${diff}m ago`;
-    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-    return `${Math.floor(diff / 1440)}d ago`;
-}
 
 export default function FriendsScreen() {
     const navigation = useNavigation<any>();
@@ -66,7 +59,7 @@ export default function FriendsScreen() {
                 friendsApi.getPendingRequests()
             ]);
             const fd: any = friendsData;
-            setFriends(Array.isArray(fd) ? fd : Array.isArray(fd?.items) ? fd.items : []);
+            setFriends(toArray<Friend>(fd));
             setRequests(requestsData);
 
             notificationsApi.list()

@@ -24,24 +24,17 @@ import PressableScale from '../components/PressableScale';
 import SkeletonBlock from '../components/SkeletonBlock';
 import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
+import { timeAgo, toArray } from '../utils/helpers';
 
-const TYPE_CONFIG: Record<string, { icon: any; color: string }> = {
-    expense_added:        { icon: Receipt,     color: '#A8D5A2' },
-    settlement_requested: { icon: Handshake,   color: '#818CF8' },
-    payment_sent:         { icon: Send,        color: '#F59E0B' },
-    payment_confirmed:    { icon: CheckCheck,  color: '#A8D5A2' },
-    payment_declined:     { icon: ShieldAlert, color: '#E05252' },
-    friend_request:       { icon: UserPlus,    color: '#A8D5A2' },
-    friend_accepted:      { icon: Check,       color: '#A8D5A2' },
+const TYPE_CONFIG: Record<string, { icon: any; colorKey: string }> = {
+    expense_added:        { icon: Receipt,     colorKey: 'accent' },
+    settlement_requested: { icon: Handshake,   colorKey: 'indigo' },
+    payment_sent:         { icon: Send,        colorKey: 'gold' },
+    payment_confirmed:    { icon: CheckCheck,  colorKey: 'accent' },
+    payment_declined:     { icon: ShieldAlert, colorKey: 'danger' },
+    friend_request:       { icon: UserPlus,    colorKey: 'accent' },
+    friend_accepted:      { icon: Check,       colorKey: 'accent' },
 };
-
-function timeAgo(d: string) {
-    const diff = Math.floor((Date.now() - new Date(d).getTime()) / 60000);
-    if (diff < 1)    return 'Just now';
-    if (diff < 60)   return `${diff}m ago`;
-    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
-    return `${Math.floor(diff / 1440)}d ago`;
-}
 
 function greeting(): string {
     const h = new Date().getHours();
@@ -50,7 +43,6 @@ function greeting(): string {
     return 'Good evening';
 }
 
-// The balance widget speaks like a friend, not a ledger.
 function balanceVoice(owed: number, owing: number): string {
     const isOwed = owed > 0.005;
     const isOwing = owing > 0.005;
@@ -196,13 +188,7 @@ export default function DashboardScreen({ navigation }: any) {
     const loadGroups = async () => {
         try {
             const raw = await groupsApi.list();
-            const data: GroupListItem[] = Array.isArray(raw)
-                ? raw
-                : Array.isArray((raw as any)?.items)
-                    ? (raw as any).items
-                    : Array.isArray((raw as any)?.groups)
-                        ? (raw as any).groups
-                        : [];
+            const data: GroupListItem[] = toArray<GroupListItem>(raw);
             setGroups(data);
 
             try {
@@ -231,7 +217,7 @@ export default function DashboardScreen({ navigation }: any) {
 
             notificationsApi.list()
                 .then(raw => {
-                    const data: NotificationOut[] = Array.isArray(raw) ? raw : Array.isArray((raw as any)?.items) ? (raw as any).items : [];
+                    const data: NotificationOut[] = toArray<NotificationOut>(raw);
                     setRecentActivity(data.slice(0, 3));
                 })
                 .catch(() => {});
@@ -479,7 +465,7 @@ export default function DashboardScreen({ navigation }: any) {
                         </Text>
                     ) : (
                         recentActivity.map((n, i) => {
-                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, color: '#888' };
+                            const cfg = TYPE_CONFIG[n.type] || { icon: Bell, colorKey: 'secondaryText' };
                             const IconComp = cfg.icon;
                             const isLast = i === recentActivity.length - 1;
                             return (

@@ -20,11 +20,12 @@ import {
 } from '../services/api';
 import CharacterShape from '../components/CharacterShape';
 import SkeletonBlock from '../components/SkeletonBlock';
+import { buildMembersList } from '../utils/helpers';
 
 type Phase = 'idle' | 'parsing' | 'result' | 'error';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_H = SCREEN_H * 0.55;
+const SHEET_HEIGHT_HALFEIGHT_HALF = SCREEN_H * 0.55;
 
 interface MemberEntry {
   user_id: string;
@@ -64,7 +65,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
   const [claimed, setClaimed]             = useState<Set<string>>(new Set());
   const [adding, setAdding]               = useState(false);
 
-  const sheetAnim = useRef(new Animated.Value(SHEET_H)).current;
+  const sheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_HALF)).current;
   const cardAnim  = useRef(new Animated.Value(SCREEN_H)).current;
 
   // Camera lifecycle guards: launching the camera while the picker Modal is
@@ -113,10 +114,10 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
 
   const closePicker = useCallback(() => {
     Animated.spring(sheetAnim, {
-      toValue: SHEET_H, damping: 20, stiffness: 200, useNativeDriver: true,
+      toValue: SHEET_HEIGHT_HALF, damping: 20, stiffness: 200, useNativeDriver: true,
     }).start(() => {
       setPickerVisible(false);
-      sheetAnim.setValue(SHEET_H);
+      sheetAnim.setValue(SHEET_HEIGHT_HALF);
     });
   }, [sheetAnim]);
 
@@ -220,23 +221,10 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
   }, [openCamera]);
 
   // ── Computed split values ─────────────────────────────────────────────────
-  const allMembers = useMemo<MemberEntry[]>(() => {
-    const others = groupMembers.filter(m => m.user_id !== user?.id).map(m => ({
-      user_id: m.user_id,
-      name: m.name,
-      character_shape: m.character_shape ?? 'rect',
-      character_color: m.character_color ?? m.avatar_color ?? colors.accent,
-    }));
-    return [
-      {
-        user_id: 'me',
-        name: 'You',
-        character_shape: user?.character_shape ?? 'rect',
-        character_color: user?.character_color ?? colors.accent,
-      },
-      ...others,
-    ];
-  }, [groupMembers, user, colors.accent]);
+  const allMembers = useMemo<MemberEntry[]>(
+    () => buildMembersList(groupMembers, user, colors.accent),
+    [groupMembers, user, colors.accent],
+  );
 
   const splitCount = allMembers.length;
   const total      = parseResult?.total ?? 0;
@@ -259,7 +247,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     setAdding(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
-      const participantIds = allMembers.map(m => m.user_id === 'me' ? user.id : m.user_id);
+      const participantIds = allMembers.map(m => m.user_id);
       await expensesApi.create(groupId, {
         title: 'Shared Receipt',
         amount: parseResult.total,
@@ -402,14 +390,14 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
         <View style={styles.idleBody}>
           <LinearGradient
             colors={isDark
-              ? ['rgba(16,185,129,0.22)', 'rgba(16,185,129,0.08)', 'rgba(16,185,129,0)']
-              : ['rgba(16,185,129,0.16)', 'rgba(16,185,129,0.05)', 'rgba(16,185,129,0)']}
+              ? [colors.accent + '38', colors.accent + '14', colors.accent + '00']
+              : [colors.accent + '29', colors.accent + '0D', colors.accent + '00']}
             style={styles.iconGlow}
           >
             <View style={[styles.iconCircle, {
-              backgroundColor: isDark ? 'rgba(16,185,129,0.18)' : 'rgba(16,185,129,0.14)',
+              backgroundColor: isDark ? colors.accent + '2E' : colors.accent + '24',
             }]}>
-              <Camera size={42} color="#10B981" strokeWidth={1.6} />
+              <Camera size={42} color={colors.accent} strokeWidth={1.6} />
             </View>
           </LinearGradient>
           <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a Receipt</Text>
@@ -728,7 +716,7 @@ const styles = StyleSheet.create({
   // ── Picker sheet
   pickerSheet: {
     position: 'absolute', bottom: 0, left: 0, right: 0,
-    height: SHEET_H,
+    height: SHEET_HEIGHT_HALF,
     borderTopLeftRadius: ms(28), borderTopRightRadius: ms(28),
     shadowColor: '#000', shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.18, shadowRadius: 24, elevation: 24,
