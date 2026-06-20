@@ -4,11 +4,14 @@ import React, {
 import {
     View, Text, StyleSheet, ScrollView, TextInput, Modal,
     TouchableOpacity, KeyboardAvoidingView, Platform, Animated,
-    Alert, Dimensions, ActivityIndicator,
+    Easing, Dimensions, ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { Audio } from 'expo-av';
+import {
+    useAudioRecorder, RecordingPresets,
+    requestRecordingPermissionsAsync, setAudioModeAsync,
+} from 'expo-audio';
 import {
     ChevronLeft, ChevronRight, Users, Check, Sparkles,
     Mic, MicOff, X, MessageCircle,
@@ -26,7 +29,7 @@ import PressableScale from '../components/PressableScale';
 import SkeletonBlock from '../components/SkeletonBlock';
 import { buildMembersList } from '../utils/helpers';
 
-type Phase = 'input' | 'review' | 'error';
+type Phase = 'input' | 'review';
 
 interface MemberChip {
     user_id: string;
@@ -53,8 +56,8 @@ interface ActionSheetData {
 }
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_HEIGHT_HALFEIGHT_HALF = SCREEN_H * 0.55;
-const SHEET_HEIGHT_HALFEIGHT_THIRD = SCREEN_H * 0.32;
+const SHEET_HEIGHT_HALF  = SCREEN_H * 0.55;
+const SHEET_HEIGHT_THIRD = SCREEN_H * 0.32;
 
 const PLACEHOLDERS = [
     'Thai for 4, Lakshit skipped drinks — $85 total',
@@ -82,22 +85,22 @@ export default function SmartSplitScreen({ navigation }: any) {
     const [parsing, setParsing]           = useState(false);
     const [includedIds, setIncludedIds]   = useState<Set<string>>(new Set());
 
-    const [isRecording, setIsRecording]       = useState(false);
+    const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
+    const [isRecording, setIsRecording]         = useState(false);
     const [voiceProcessing, setVoiceProcessing] = useState(false);
-    const recordingRef = useRef<Audio.Recording | null>(null);
-    const recordingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const recordingPulse = useRef(new Animated.Value(1)).current;
+    const recordingTimer   = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const recordingPulse   = useRef(new Animated.Value(1)).current;
     const recordingPulseAnim = useRef<Animated.CompositeAnimation | null>(null);
 
     const [toastMsg, setToastMsg] = useState<string | null>(null);
-    const toastAnim = useRef(new Animated.Value(0)).current;
+    const toastAnim  = useRef(new Animated.Value(0)).current;
     const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [clarifyMsg, setClarifyMsg]     = useState<string | null>(null);
     const [clarifyInput, setClarifyInput] = useState('');
 
     const [actionSheet, setActionSheet] = useState<ActionSheetData | null>(null);
-    const actionSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_THIRDEIGHT_HALF)).current;
+    const actionSheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_THIRD)).current;
 
     const [reviewTitle, setReviewTitle]   = useState('');
     const [reviewTotal, setReviewTotal]   = useState('');
@@ -107,7 +110,7 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     const [placeholderIdx, setPlaceholderIdx] = useState(0);
     const placeholderOpacity = useRef(new Animated.Value(1)).current;
-    const sheetAnim = useRef(new Animated.Value(SHEET_HEIGHT_HALF)).current;
+    const sheetAnim          = useRef(new Animated.Value(SHEET_HEIGHT_HALF)).current;
 
     const allMembers = useMemo<MemberChip[]>(
         () => buildMembersList(groupMembers, user, colors.accent),
@@ -133,12 +136,11 @@ export default function SmartSplitScreen({ navigation }: any) {
         return () => clearInterval(interval);
     }, []);
 
-    // Cleanup recording on unmount
+    // Cleanup on unmount
     useEffect(() => {
         return () => {
             if (recordingTimer.current) clearTimeout(recordingTimer.current);
             recordingPulseAnim.current?.stop();
-            recordingRef.current?.stopAndUnloadAsync().catch(() => {});
         };
     }, []);
 
@@ -151,13 +153,13 @@ export default function SmartSplitScreen({ navigation }: any) {
         toastTimer.current = setTimeout(() => {
             Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
                 .start(() => setToastMsg(null));
-        }, 2500);
+        }, 2800);
     }, [toastAnim]);
 
     // ── Action sheet ──────────────────────────────────────────────────────────
     const openActionSheet = useCallback((data: ActionSheetData) => {
         setActionSheet(data);
-        actionSheetAnim.setValue(SHEET_HEIGHT_THIRDEIGHT_HALF);
+        actionSheetAnim.setValue(SHEET_HEIGHT_THIRD);
         Animated.spring(actionSheetAnim, {
             toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start();
@@ -165,13 +167,16 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     const closeActionSheet = useCallback(() => {
         Animated.spring(actionSheetAnim, {
-            toValue: SHEET_HEIGHT_THIRDEIGHT_HALF, damping: 24, stiffness: 220, useNativeDriver: true,
+            toValue: SHEET_HEIGHT_THIRD, damping: 24, stiffness: 220, useNativeDriver: true,
         }).start(() => setActionSheet(null));
     }, [actionSheetAnim]);
 
     // ── Intent handler ────────────────────────────────────────────────────────
     const handleIntentResult = useCallback((result: SmartSplitResponse) => {
-        if (result.parse_failed) { setPhase('error'); return; }
+        if (result.parse_failed) {
+            showToast("Couldn't parse that — try being more specific");
+            return;
+        }
 
         switch (result.intent) {
             case 'parse_expense': {
@@ -186,7 +191,6 @@ export default function SmartSplitScreen({ navigation }: any) {
                     included: s.included !== false,
                 }));
 
-                // Sync excluded members back to input-phase chips
                 const nowExcluded = (result.splits ?? [])
                     .filter(s => s.included === false)
                     .map(s => s.user_id);
@@ -248,7 +252,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                 break;
 
             default:
-                setPhase('error');
+                showToast("Couldn't understand that — try rephrasing");
         }
     }, [allMembers, colors.accent, user?.id, showToast, openActionSheet]);
 
@@ -261,12 +265,11 @@ export default function SmartSplitScreen({ navigation }: any) {
 
         let uri: string | null = null;
         try {
-            await recordingRef.current?.stopAndUnloadAsync();
-            uri = recordingRef.current?.getURI() ?? null;
+            await audioRecorder.stop();
+            uri = audioRecorder.uri ?? null;
         } catch {
             // stop failure is non-fatal — URI may still be usable
         }
-        recordingRef.current = null;
         setIsRecording(false);
 
         if (!uri || !groupId) return;
@@ -282,11 +285,11 @@ export default function SmartSplitScreen({ navigation }: any) {
             });
             handleIntentResult(result);
         } catch {
-            Alert.alert('Voice failed', "Couldn't process audio. Try typing instead.");
+            showToast("Couldn't process audio — try typing instead");
         } finally {
             setVoiceProcessing(false);
         }
-    }, [groupId, groupName, includedIds, user, recordingPulse, handleIntentResult]);
+    }, [audioRecorder, groupId, groupName, includedIds, user, recordingPulse, handleIntentResult, showToast]);
 
     const handleVoicePress = useCallback(async () => {
         if (voiceProcessing) return;
@@ -297,41 +300,45 @@ export default function SmartSplitScreen({ navigation }: any) {
         }
 
         if (!groupId) {
-            Alert.alert('Select a group first', 'Choose a group before recording.');
+            showToast('Select a group first');
             return;
         }
 
         try {
-            const { status } = await Audio.requestPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Microphone needed', 'Allow microphone access to use voice input.');
+            const { granted } = await requestRecordingPermissionsAsync();
+            if (!granted) {
+                showToast('Microphone access is needed for voice input');
                 return;
             }
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
-            const recording = new Audio.Recording();
-            await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-            await recording.startAsync();
-            recordingRef.current = recording;
+            await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
+            await (audioRecorder as any).prepareToRecordAsync();
+            audioRecorder.record();
             setIsRecording(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
 
-            // Pulse animation loop
-            const pulse = () => {
-                const anim = Animated.sequence([
-                    Animated.spring(recordingPulse, { toValue: 1.08, damping: 20, stiffness: 320, useNativeDriver: true }),
-                    Animated.spring(recordingPulse, { toValue: 1.0, damping: 20, stiffness: 320, useNativeDriver: true }),
-                ]);
-                recordingPulseAnim.current = anim;
-                anim.start(({ finished }) => { if (finished) pulse(); });
-            };
-            pulse();
+            // Single breathing animation: scale 1.0→1.06→1.0, 1.8s ease-in-out
+            const pulse = Animated.loop(
+                Animated.sequence([
+                    Animated.timing(recordingPulse, {
+                        toValue: 1.06, duration: 900,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                    Animated.timing(recordingPulse, {
+                        toValue: 1.0, duration: 900,
+                        easing: Easing.inOut(Easing.ease),
+                        useNativeDriver: true,
+                    }),
+                ])
+            );
+            recordingPulseAnim.current = pulse;
+            pulse.start();
 
-            // Auto-stop after 30s
-            recordingTimer.current = setTimeout(() => { stopAndSendVoice(); }, 30000);
+            recordingTimer.current = setTimeout(() => stopAndSendVoice(), 30000);
         } catch {
-            Alert.alert('Error', 'Could not start recording.');
+            showToast('Could not start recording');
         }
-    }, [isRecording, voiceProcessing, groupId, recordingPulse, stopAndSendVoice]);
+    }, [isRecording, voiceProcessing, groupId, audioRecorder, recordingPulse, showToast, stopAndSendVoice]);
 
     // ── Group picker logic ────────────────────────────────────────────────────
     const loadGroups = useCallback(() => {
@@ -386,11 +393,11 @@ export default function SmartSplitScreen({ navigation }: any) {
             });
             handleIntentResult(result);
         } catch {
-            setPhase('error');
+            showToast("Something went wrong — try again");
         } finally {
             setParsing(false);
         }
-    }, [groupId, groupName, includedIds, user, handleIntentResult]);
+    }, [groupId, groupName, includedIds, user, handleIntentResult, showToast]);
 
     const handleParse = useCallback(async () => {
         if (!description.trim() || !groupId || parsing) return;
@@ -407,29 +414,27 @@ export default function SmartSplitScreen({ navigation }: any) {
         await _runParse(combined);
     }, [clarifyInput, description, groupId, parsing, _runParse]);
 
-    // ── Long press member chip ────────────────────────────────────────────────
     const handleMemberLongPress = useCallback((m: MemberChip) => {
         if (m.user_id === user?.id) return;
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         openActionSheet({ type: 'remove_from_group', name: m.name, userId: m.user_id });
     }, [user?.id, openActionSheet]);
 
-    // ── Action sheet handlers ─────────────────────────────────────────────────
     const handleActionSheetConfirm = useCallback(async () => {
         if (!actionSheet) return;
 
         if (actionSheet.type === 'add_to_group') {
             closeActionSheet();
-            Alert.prompt(
+            (global as any).Alert?.prompt(
                 `Add ${actionSheet.name}`,
                 `Enter their email to invite them to ${groupName}.`,
-                async (email) => {
+                async (email: string) => {
                     if (!email?.trim() || !groupId) return;
                     try {
                         await groupsApi.addMember(groupId, email.trim());
                         showToast(`Invited ${actionSheet.name} to ${groupName}`);
                     } catch (err: any) {
-                        Alert.alert('Error', err.message || 'Could not add member.');
+                        showToast(err.message || 'Could not add member');
                     }
                 },
                 'plain-text',
@@ -444,32 +449,22 @@ export default function SmartSplitScreen({ navigation }: any) {
                 showToast(`Created group "${actionSheet.name}"`);
                 navigation.navigate('Groups');
             } catch (err: any) {
-                Alert.alert('Error', err.message || 'Could not create group.');
+                showToast(err.message || 'Could not create group');
             }
             return;
         }
 
         if (actionSheet.type === 'remove_from_group' && actionSheet.userId && groupId) {
             closeActionSheet();
-            Alert.alert(
-                `Remove ${actionSheet.name}?`,
-                `This will remove them from ${groupName}. This cannot be undone.`,
-                [
-                    { text: 'Cancel', style: 'cancel' },
-                    {
-                        text: 'Remove', style: 'destructive',
-                        onPress: async () => {
-                            try {
-                                await groupsApi.removeMember(groupId, actionSheet.userId!);
-                                setGroupMembers(prev => prev.filter(m => m.user_id !== actionSheet.userId));
-                                showToast(`Removed ${actionSheet.name} from ${groupName}`);
-                            } catch (err: any) {
-                                Alert.alert('Error', err.message || 'Could not remove member.');
-                            }
-                        },
-                    },
-                ],
-            );
+            const uid = actionSheet.userId;
+            const name = actionSheet.name;
+            try {
+                await groupsApi.removeMember(groupId, uid);
+                setGroupMembers(prev => prev.filter(m => m.user_id !== uid));
+                showToast(`Removed ${name} from ${groupName}`);
+            } catch (err: any) {
+                showToast(err.message || 'Could not remove member');
+            }
         }
     }, [actionSheet, groupId, groupName, closeActionSheet, showToast, navigation]);
 
@@ -478,7 +473,7 @@ export default function SmartSplitScreen({ navigation }: any) {
         if (!groupId || !user || adding) return;
         const total = parseFloat(reviewTotal) || 0;
         if (total <= 0) {
-            Alert.alert('Total required', 'Enter the total amount before adding.');
+            showToast('Enter the total amount first');
             return;
         }
         setAdding(true);
@@ -497,16 +492,25 @@ export default function SmartSplitScreen({ navigation }: any) {
             navigation.goBack();
         } catch (err: any) {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-            Alert.alert('Error', err.message || 'Could not add expense. Please try again.');
+            showToast(err.message || 'Could not add expense');
             setAdding(false);
         }
-    }, [groupId, user, adding, reviewTotal, reviewSplits, reviewTitle, navigation]);
+    }, [groupId, user, adding, reviewTotal, reviewSplits, reviewTitle, showToast, navigation]);
 
     // ── Review derived ────────────────────────────────────────────────────────
     const includedSplits = reviewSplits.filter(s => s.included);
     const splitsSum  = includedSplits.reduce((s, r) => s + (parseFloat(r.amount) || 0), 0);
     const totalNum   = parseFloat(reviewTotal) || 0;
     const remaining  = totalNum > 0 ? parseFloat((totalNum - splitsSum).toFixed(2)) : 0;
+
+    // ── Shared: row shadow style ──────────────────────────────────────────────
+    const rowShadow = {
+        shadowColor: isDark ? '#000' : '#0A3020',
+        shadowOpacity: isDark ? 0.28 : 0.10,
+        shadowRadius: isDark ? 14 : 10,
+        shadowOffset: { width: 0, height: isDark ? 10 : 4 } as const,
+        elevation: isDark ? 6 : 4,
+    };
 
     // ── Render helpers ────────────────────────────────────────────────────────
     const renderToast = () => {
@@ -515,12 +519,17 @@ export default function SmartSplitScreen({ navigation }: any) {
             <Animated.View
                 style={[
                     styles.toast,
-                    { backgroundColor: colors.accent, opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-12, 0] }) }] },
+                    {
+                        backgroundColor: colors.surface,
+                        borderColor: colors.border,
+                        opacity: toastAnim,
+                        transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [-16, 0] }) }],
+                    },
                 ]}
                 pointerEvents="none"
             >
-                <Check size={14} color="#fff" strokeWidth={2.5} />
-                <Text style={[styles.toastText, T.semibold]}>{toastMsg}</Text>
+                <View style={[styles.toastDot, { backgroundColor: colors.accent }]} />
+                <Text style={[styles.toastText, T.semibold, { color: colors.text }]}>{toastMsg}</Text>
             </Animated.View>
         );
     };
@@ -612,7 +621,11 @@ export default function SmartSplitScreen({ navigation }: any) {
                     </View>
 
                     {pickerLoading ? (
-                        <ActivityIndicator color={colors.accent} size="large" style={{ marginTop: vs(28) }} />
+                        <View style={{ paddingHorizontal: scale(24), gap: vs(10), marginTop: vs(8) }}>
+                            <SkeletonBlock width="100%" height={vs(58)} radius={ms(16)} />
+                            <SkeletonBlock width="100%" height={vs(58)} radius={ms(16)} delay={120} />
+                            <SkeletonBlock width="75%" height={vs(58)} radius={ms(16)} delay={240} />
+                        </View>
                     ) : pickerError ? (
                         <View style={styles.pickerEmpty}>
                             <Users size={36} color={colors.secondaryText} style={{ opacity: 0.3, marginBottom: vs(10) }} />
@@ -620,13 +633,13 @@ export default function SmartSplitScreen({ navigation }: any) {
                             <Text style={[styles.pickerEmptySub, T.regular, { color: colors.secondaryText }]}>
                                 Check your connection and try again.
                             </Text>
-                            <TouchableOpacity
+                            <PressableScale
+                                scaleTo={0.97} haptic="medium"
                                 style={[styles.pickerRetryBtn, { backgroundColor: colors.accent }]}
                                 onPress={loadGroups}
-                                activeOpacity={0.82}
                             >
                                 <Text style={[styles.pickerRetryText, T.bold]}>Retry</Text>
-                            </TouchableOpacity>
+                            </PressableScale>
                         </View>
                     ) : pickerGroups.length === 0 ? (
                         <View style={styles.pickerEmpty}>
@@ -660,7 +673,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                             setGroupMembers(full.members);
                                             closePicker();
                                         } catch {
-                                            Alert.alert('Error', 'Could not load group. Try again.');
+                                            showToast('Could not load group — try again');
                                         } finally {
                                             setSelectingGroupId(null);
                                         }
@@ -696,48 +709,6 @@ export default function SmartSplitScreen({ navigation }: any) {
         </Modal>
     );
 
-    // ── Error phase ───────────────────────────────────────────────────────────
-    if (phase === 'error') {
-        return (
-            <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
-                <View style={styles.header}>
-                    <PressableScale
-                        scaleTo={0.97} haptic="light"
-                        onPress={() => setPhase('input')}
-                        style={[styles.backBtn, { backgroundColor: colors.surface }]}
-                    >
-                        <ChevronLeft size={ms(20)} color={colors.text} />
-                    </PressableScale>
-                    <Text style={[styles.screenTitle, T.bold, { color: colors.text }]}>Smart Split</Text>
-                    <View style={styles.headerSpacer} />
-                </View>
-                <View style={styles.errorBody}>
-                    <View style={[styles.errorCard, { backgroundColor: colors.surface }]}>
-                        <CharacterShape shape="round" color="#F59E0B" variant="hero" />
-                        <Text style={[styles.errorTitle, T.bold, { color: colors.text }]}>Couldn't parse that</Text>
-                        <Text style={[styles.errorMsg, T.regular, { color: colors.secondaryText }]}>
-                            Try being more specific — mention amounts and who's included.
-                        </Text>
-                        <PressableScale
-                            scaleTo={0.97} haptic="medium"
-                            style={[styles.retryBtn, { backgroundColor: colors.accent }]}
-                            onPress={() => setPhase('input')}
-                        >
-                            <Text style={[styles.retryBtnText, T.bold]}>Try again</Text>
-                        </PressableScale>
-                        <TouchableOpacity
-                            onPress={() => { setPhase('input'); setDescription(''); }}
-                            activeOpacity={0.7}
-                            style={{ marginTop: vs(10) }}
-                        >
-                            <Text style={[{ fontSize: ms(14), color: colors.secondaryText }, T.regular]}>Start over</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </SafeAreaView>
-        );
-    }
-
     // ── Review phase ──────────────────────────────────────────────────────────
     if (phase === 'review') {
         return (
@@ -760,7 +731,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         keyboardShouldPersistTaps="handled"
                     >
                         {/* Title + Total card */}
-                        <View style={[styles.titleCard, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.titleCard, { backgroundColor: colors.surface }, rowShadow]}>
                             <TextInput
                                 value={reviewTitle}
                                 onChangeText={setReviewTitle}
@@ -769,11 +740,12 @@ export default function SmartSplitScreen({ navigation }: any) {
                                 placeholderTextColor={colors.tertiaryText}
                                 maxLength={40}
                             />
+                            <View style={[styles.dividerLine, { backgroundColor: colors.border, marginVertical: vs(6) }]} />
                             <View style={[
                                 styles.totalRow,
                                 needsTotal && {
                                     borderWidth: 1.5, borderColor: colors.warning,
-                                    borderRadius: ms(12), padding: scale(8), marginTop: vs(4),
+                                    borderRadius: ms(12), padding: scale(8),
                                 },
                             ]}>
                                 <Text style={[styles.dollarSign, T.extrabold, { color: colors.accent }]}>$</Text>
@@ -794,75 +766,72 @@ export default function SmartSplitScreen({ navigation }: any) {
                         </View>
 
                         {/* Split breakdown */}
-                        <View style={[styles.splitsCard, { backgroundColor: colors.surface }]}>
-                            <Text style={[styles.splitsHeader, T.semibold, { color: colors.secondaryText }]}>
-                                SPLIT BREAKDOWN
-                            </Text>
-                            {reviewSplits.map((s, i) => (
-                                <View
-                                    key={`${s.user_id}-${i}`}
-                                    style={[
-                                        styles.splitRow,
-                                        !s.included && { opacity: 0.38 },
-                                        i < reviewSplits.length - 1 && {
-                                            borderBottomWidth: 1, borderBottomColor: colors.border,
-                                        },
-                                    ]}
-                                >
-                                    <CharacterShape shape={s.character_shape} color={s.character_color} variant="mini" />
-                                    <View style={styles.splitRowInfo}>
-                                        <Text style={[
-                                            styles.splitName, T.semibold, { color: colors.text },
-                                            !s.included && { textDecorationLine: 'line-through' },
-                                        ]}>
-                                            {s.name}
+                        <Text style={[styles.sectionLabel, T.semibold, { color: colors.secondaryText }]}>
+                            SPLIT BREAKDOWN
+                        </Text>
+
+                        {reviewSplits.map((s, i) => (
+                            <View
+                                key={`${s.user_id}-${i}`}
+                                style={[
+                                    styles.splitRow,
+                                    { backgroundColor: colors.surface },
+                                    rowShadow,
+                                    !s.included && { opacity: 0.38 },
+                                ]}
+                            >
+                                <CharacterShape shape={s.character_shape} color={s.character_color} variant="mini" />
+                                <View style={styles.splitRowInfo}>
+                                    <Text style={[
+                                        styles.splitName, T.semibold, { color: colors.text },
+                                        !s.included && { textDecorationLine: 'line-through' },
+                                    ]}>
+                                        {s.name}
+                                    </Text>
+                                    {!!s.note && (
+                                        <Text style={[styles.splitNote, T.regular, { color: colors.secondaryText }]}>
+                                            {s.note}
                                         </Text>
-                                        {!!s.note && (
-                                            <Text style={[styles.splitNote, T.regular, { color: colors.secondaryText }]}>
-                                                {s.note}
-                                            </Text>
-                                        )}
-                                        {!s.included && (
-                                            <Text style={[styles.splitNote, T.regular, { color: colors.tertiaryText }]}>excluded</Text>
-                                        )}
-                                    </View>
-                                    {s.included && (
-                                        <View style={[styles.amountPill, { backgroundColor: colors.accentBg }]}>
-                                            <Text style={[styles.dollarSignSmall, T.extrabold, { color: colors.accent }]}>$</Text>
-                                            <TextInput
-                                                value={s.amount}
-                                                onChangeText={val => {
-                                                    setReviewSplits(prev =>
-                                                        prev.map((r, j) => j === i ? { ...r, amount: val } : r)
-                                                    );
-                                                }}
-                                                style={[styles.amountInput, T.extrabold, { color: colors.accent }]}
-                                                keyboardType="decimal-pad"
-                                            />
-                                        </View>
+                                    )}
+                                    {!s.included && (
+                                        <Text style={[styles.splitNote, T.regular, { color: colors.tertiaryText }]}>excluded</Text>
                                     )}
                                 </View>
-                            ))}
+                                {s.included && (
+                                    <View style={[styles.amountPill, { backgroundColor: colors.accentBg }]}>
+                                        <Text style={[styles.dollarSignSmall, T.extrabold, { color: colors.accent }]}>$</Text>
+                                        <TextInput
+                                            value={s.amount}
+                                            onChangeText={val => {
+                                                setReviewSplits(prev =>
+                                                    prev.map((r, j) => j === i ? { ...r, amount: val } : r)
+                                                );
+                                            }}
+                                            style={[styles.amountInput, T.extrabold, { color: colors.accent }]}
+                                            keyboardType="decimal-pad"
+                                        />
+                                    </View>
+                                )}
+                            </View>
+                        ))}
 
-                            {totalNum > 0 && Math.abs(remaining) > 0.01 && (
-                                <View style={[styles.remainingRow, { backgroundColor: colors.dangerBg }]}>
-                                    <Text style={[styles.remainingText, T.semibold, { color: colors.danger }]}>
-                                        Amounts don't add up — ${Math.abs(remaining).toFixed(2)}{' '}
-                                        {remaining > 0 ? 'remaining' : 'over budget'}
-                                    </Text>
-                                </View>
-                            )}
-                        </View>
+                        {totalNum > 0 && Math.abs(remaining) > 0.01 && (
+                            <View style={[styles.remainingBanner, { backgroundColor: colors.dangerBg, borderColor: colors.danger + '40' }]}>
+                                <Text style={[styles.remainingText, T.semibold, { color: colors.danger }]}>
+                                    ${Math.abs(remaining).toFixed(2)} {remaining > 0 ? 'remaining' : 'over budget'}
+                                </Text>
+                            </View>
+                        )}
 
                         <PressableScale
                             scaleTo={0.97} haptic="medium"
-                            style={[styles.submitBtn, { backgroundColor: colors.accent, opacity: adding ? 0.75 : 1 }]}
+                            style={[styles.ctaBtn, { backgroundColor: colors.accent, opacity: adding ? 0.75 : 1 }]}
                             onPress={handleAddExpense}
                             disabled={adding}
                         >
                             {adding
                                 ? <ActivityIndicator color="#fff" />
-                                : <Text style={[styles.submitBtnText, T.semibold]}>Add Expense</Text>
+                                : <Text style={[styles.ctaBtnText, T.semibold]}>Add Expense</Text>
                             }
                         </PressableScale>
 
@@ -938,79 +907,109 @@ export default function SmartSplitScreen({ navigation }: any) {
                         </View>
                     )}
 
-                    {/* Text input + voice button row */}
-                    <View style={styles.inputRow}>
-                        <View style={[styles.inputWrap, { flex: 1 }]}>
-                            <TextInput
-                                multiline
-                                value={description}
-                                onChangeText={setDescription}
-                                onFocus={() => setInputFocused(true)}
-                                onBlur={() => setInputFocused(false)}
-                                style={[
-                                    styles.textInput,
-                                    T.regular,
-                                    {
-                                        backgroundColor: colors.surface,
-                                        borderColor: inputFocused ? colors.accent : colors.border,
-                                        color: colors.text,
-                                    },
-                                ]}
-                                textAlignVertical="top"
-                                editable={!isRecording && !voiceProcessing}
-                            />
-                            {/* Fake placeholder / recording indicator */}
-                            {!description ? (
-                                <View style={styles.fakePlaceholderWrap} pointerEvents="none">
-                                    {isRecording ? (
-                                        <View style={styles.recordingIndicator}>
-                                            <View style={[styles.recordingDot, { backgroundColor: colors.danger }]} />
-                                            <Text style={[styles.fakePlaceholder, T.regular, { color: colors.danger }]}>
-                                                Listening...
-                                            </Text>
-                                        </View>
-                                    ) : voiceProcessing ? (
-                                        <View style={styles.recordingIndicator}>
-                                            <SkeletonBlock width={scale(80)} height={vs(12)} radius={ms(6)} />
-                                            <Text style={[styles.fakePlaceholder, T.regular, { color: colors.secondaryText }]}>
-                                                Processing...
-                                            </Text>
-                                        </View>
-                                    ) : (
-                                        <Animated.Text
-                                            style={[styles.fakePlaceholder, T.regular, { color: colors.tertiaryText, opacity: placeholderOpacity }]}
-                                        >
-                                            {PLACEHOLDERS[placeholderIdx]}
-                                        </Animated.Text>
-                                    )}
-                                </View>
-                            ) : null}
-                        </View>
+                    {/* Text input */}
+                    <View style={styles.inputWrap}>
+                        <TextInput
+                            multiline
+                            value={description}
+                            onChangeText={setDescription}
+                            onFocus={() => setInputFocused(true)}
+                            onBlur={() => setInputFocused(false)}
+                            style={[
+                                styles.textInput,
+                                T.regular,
+                                {
+                                    backgroundColor: colors.surface,
+                                    borderColor: inputFocused ? colors.accent : colors.border,
+                                    color: colors.text,
+                                },
+                            ]}
+                            textAlignVertical="top"
+                            editable={!isRecording && !voiceProcessing}
+                        />
+                        {/* Placeholder / state indicator */}
+                        {!description ? (
+                            <View style={styles.fakePlaceholderWrap} pointerEvents="none">
+                                {isRecording ? (
+                                    <View style={styles.recordingIndicator}>
+                                        <View style={[styles.recordingDot, { backgroundColor: colors.danger }]} />
+                                        <Text style={[styles.fakePlaceholder, T.regular, { color: colors.danger }]}>
+                                            Listening…
+                                        </Text>
+                                    </View>
+                                ) : voiceProcessing ? (
+                                    <View style={styles.recordingIndicator}>
+                                        <SkeletonBlock width={scale(80)} height={vs(12)} radius={ms(6)} />
+                                        <Text style={[styles.fakePlaceholder, T.regular, { color: colors.secondaryText }]}>
+                                            Processing…
+                                        </Text>
+                                    </View>
+                                ) : (
+                                    <Animated.Text
+                                        style={[styles.fakePlaceholder, T.regular, { color: colors.tertiaryText, opacity: placeholderOpacity }]}
+                                    >
+                                        {PLACEHOLDERS[placeholderIdx]}
+                                    </Animated.Text>
+                                )}
+                            </View>
+                        ) : null}
+                    </View>
 
-                        {/* Voice / stop button */}
-                        <Animated.View style={{ transform: [{ scale: recordingPulse }] }}>
+                    {/* Voice input — equal-weight alternative to text */}
+                    <View style={styles.voiceDivider}>
+                        <View style={[styles.voiceDividerLine, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.voiceDividerText, T.regular, { color: colors.tertiaryText }]}>
+                            or speak
+                        </Text>
+                        <View style={[styles.voiceDividerLine, { backgroundColor: colors.border }]} />
+                    </View>
+
+                    <View style={styles.voiceArea}>
+                        {/* Breathing ring (behind the button when recording) */}
+                        <View style={styles.micWrapper}>
+                            {isRecording && (
+                                <Animated.View
+                                    pointerEvents="none"
+                                    style={[
+                                        styles.micRing,
+                                        {
+                                            borderColor: colors.danger + '55',
+                                            transform: [{ scale: recordingPulse }],
+                                        },
+                                    ]}
+                                />
+                            )}
                             <PressableScale
                                 scaleTo={0.96}
-                                haptic="light"
-                                style={[
-                                    styles.voiceBtn,
-                                    {
-                                        backgroundColor: isRecording ? colors.dangerBg : colors.surface,
-                                        borderColor: isRecording ? colors.danger : colors.border,
-                                    },
-                                ]}
+                                haptic="medium"
                                 onPress={handleVoicePress}
                                 disabled={voiceProcessing}
+                                style={[
+                                    styles.micBtn,
+                                    {
+                                        backgroundColor: isRecording
+                                            ? colors.dangerBg
+                                            : colors.surface,
+                                        borderColor: isRecording ? colors.danger : colors.border,
+                                        borderWidth: StyleSheet.hairlineWidth,
+                                    },
+                                ]}
                             >
                                 {voiceProcessing ? (
                                     <ActivityIndicator size="small" color={colors.accent} />
                                 ) : isRecording ? (
-                                    <MicOff size={ms(20)} color={colors.danger} />
+                                    <View style={[styles.recDot, { backgroundColor: colors.danger }]} />
                                 ) : (
-                                    <Mic size={ms(20)} color={colors.secondaryText} />
+                                    <Mic size={ms(22)} color={colors.secondaryText} />
                                 )}
                             </PressableScale>
-                        </Animated.View>
+                        </View>
+                        <Text style={[
+                            styles.voiceTapLabel, T.regular,
+                            { color: isRecording ? colors.danger : colors.tertiaryText },
+                        ]}>
+                            {voiceProcessing ? 'Processing…' : isRecording ? 'Tap to stop' : 'Tap to speak'}
+                        </Text>
                     </View>
 
                     {/* Clarify card */}
@@ -1032,7 +1031,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                 <TextInput
                                     value={clarifyInput}
                                     onChangeText={setClarifyInput}
-                                    placeholder="Type your answer..."
+                                    placeholder="Type your answer…"
                                     placeholderTextColor={colors.tertiaryText}
                                     style={[styles.clarifyInput, T.regular, { color: colors.text, borderColor: colors.border }]}
                                     returnKeyType="send"
@@ -1118,12 +1117,12 @@ export default function SmartSplitScreen({ navigation }: any) {
                         </View>
                     )}
 
-                    {/* Submit */}
+                    {/* CTA */}
                     <PressableScale
                         scaleTo={0.97}
                         haptic="medium"
                         style={[
-                            styles.submitBtn,
+                            styles.ctaBtn,
                             {
                                 backgroundColor: colors.accent,
                                 opacity: (!description.trim() || !groupId || parsing || isRecording || voiceProcessing) ? 0.5 : 1,
@@ -1135,12 +1134,12 @@ export default function SmartSplitScreen({ navigation }: any) {
                         {parsing ? (
                             <View style={styles.parsingRow}>
                                 <SkeletonBlock width={scale(80)} height={vs(14)} radius={ms(7)} />
-                                <Text style={[styles.submitBtnText, T.semibold]}>Parsing your bill...</Text>
+                                <Text style={[styles.ctaBtnText, T.semibold]}>Parsing your bill…</Text>
                             </View>
                         ) : (
-                            <View style={styles.submitBtnInner}>
+                            <View style={styles.ctaBtnInner}>
                                 <Sparkles size={18} color="#FFFFFF" strokeWidth={2} />
-                                <Text style={[styles.submitBtnText, T.semibold]}>Split it →</Text>
+                                <Text style={[styles.ctaBtnText, T.semibold]}>Split it →</Text>
                             </View>
                         )}
                     </PressableScale>
@@ -1178,19 +1177,20 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    // ── Input ─────────────────────────────────────────────────────────────────
+    // ── Input phase ───────────────────────────────────────────────────────────
     scrollContent: {
         paddingHorizontal: scale(20),
         paddingBottom: vs(100),
         gap: vs(14),
     },
     subtitle: { fontSize: ms(14) },
+
     groupPickerBtn: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(10),
         borderRadius: ms(14),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(16),
         paddingVertical: vs(14),
     },
@@ -1206,17 +1206,12 @@ const styles = StyleSheet.create({
     },
     groupChipText: { fontSize: ms(13) },
 
-    // Input row with voice button
-    inputRow: {
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        gap: scale(8),
-    },
+    // Text input
     inputWrap: { position: 'relative' },
     textInput: {
-        minHeight: vs(140),
+        minHeight: vs(130),
         borderRadius: ms(20),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         fontSize: ms(16),
         padding: scale(18),
         lineHeight: ms(24),
@@ -1226,10 +1221,7 @@ const styles = StyleSheet.create({
         top: 0, left: 0, right: 0, bottom: 0,
         padding: scale(18),
     },
-    fakePlaceholder: {
-        fontSize: ms(16),
-        lineHeight: ms(24),
-    },
+    fakePlaceholder: { fontSize: ms(16), lineHeight: ms(24) },
     recordingIndicator: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1241,20 +1233,59 @@ const styles = StyleSheet.create({
         borderRadius: 4,
     },
 
-    voiceBtn: {
-        width: scale(44),
-        height: scale(44),
-        borderRadius: ms(14),
-        borderWidth: 1,
+    // Voice area
+    voiceDivider: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: scale(10),
+    },
+    voiceDividerLine: {
+        flex: 1,
+        height: StyleSheet.hairlineWidth,
+    },
+    voiceDividerText: {
+        fontSize: ms(12),
+        letterSpacing: 0.3,
+    },
+    voiceArea: {
+        alignItems: 'center',
+        paddingVertical: vs(8),
+        gap: vs(10),
+    },
+    micWrapper: {
+        width: ms(60),
+        height: ms(60),
         alignItems: 'center',
         justifyContent: 'center',
-        alignSelf: 'flex-end',
+    },
+    micRing: {
+        position: 'absolute',
+        width: ms(84),
+        height: ms(84),
+        borderRadius: ms(42),
+        borderWidth: 1.5,
+    },
+    micBtn: {
+        width: ms(60),
+        height: ms(60),
+        borderRadius: ms(30),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    recDot: {
+        width: ms(14),
+        height: ms(14),
+        borderRadius: ms(7),
+    },
+    voiceTapLabel: {
+        fontSize: ms(13),
+        letterSpacing: 0.2,
     },
 
     // Clarify card
     clarifyCard: {
         borderRadius: ms(16),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         padding: scale(14),
         gap: vs(10),
     },
@@ -1263,11 +1294,7 @@ const styles = StyleSheet.create({
         alignItems: 'flex-start',
         gap: scale(8),
     },
-    clarifyQuestion: {
-        flex: 1,
-        fontSize: ms(14),
-        lineHeight: 20,
-    },
+    clarifyQuestion: { flex: 1, fontSize: ms(14), lineHeight: 20 },
     clarifyInputRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1277,7 +1304,7 @@ const styles = StyleSheet.create({
         flex: 1,
         height: vs(40),
         borderRadius: ms(10),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         paddingHorizontal: scale(12),
         fontSize: ms(14),
     },
@@ -1289,6 +1316,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
 
+    // Member chips
     chipsSection: { gap: vs(8) },
     chipsLabel: {
         fontSize: ms(11),
@@ -1307,60 +1335,65 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(10),
         paddingVertical: vs(8),
         borderRadius: 999,
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
     },
     chipName: { fontSize: ms(13) },
 
-    submitBtn: {
+    // CTA button
+    ctaBtn: {
         height: vs(54),
-        borderRadius: 99,
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
     },
-    submitBtnInner: {
+    ctaBtnInner: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(8),
     },
-    submitBtnText: { fontSize: 17, color: '#FFFFFF' },
+    ctaBtnText: { fontSize: 17, color: '#FFFFFF' },
     parsingRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(10),
     },
 
-    // ── Review ────────────────────────────────────────────────────────────────
+    // ── Review phase ──────────────────────────────────────────────────────────
     reviewScroll: {
         paddingHorizontal: scale(20),
         paddingBottom: vs(100),
-        gap: vs(14),
+        gap: vs(12),
     },
-    titleCard: { borderRadius: ms(20), padding: scale(20), gap: vs(6) },
+    titleCard: {
+        borderRadius: ms(20),
+        padding: scale(20),
+    },
+    dividerLine: { height: StyleSheet.hairlineWidth },
     titleInput: { fontSize: ms(18), letterSpacing: -0.3, padding: 0 },
     totalRow: { flexDirection: 'row', alignItems: 'baseline' },
     dollarSign: { fontSize: ms(22), letterSpacing: -0.5, marginRight: scale(2) },
     totalInput: { fontSize: ms(32), letterSpacing: -1.2, flex: 1, padding: 0 },
     totalHint: { fontSize: ms(12), marginTop: vs(2) },
 
-    splitsCard: { borderRadius: ms(20), overflow: 'hidden' },
-    splitsHeader: {
+    sectionLabel: {
         fontSize: ms(11),
         letterSpacing: 0.5,
         textTransform: 'uppercase',
-        paddingHorizontal: scale(16),
-        paddingTop: vs(14),
-        paddingBottom: vs(6),
+        marginTop: vs(4),
+        marginBottom: vs(2),
     },
+
+    // Each split row matches GroupDetailScreen expense row style
     splitRow: {
         flexDirection: 'row',
         alignItems: 'center',
         gap: scale(12),
-        paddingHorizontal: scale(16),
-        minHeight: vs(56),
+        padding: scale(14),
+        borderRadius: ms(20),
     },
-    splitRowInfo: { flex: 1 },
-    splitName: { fontSize: ms(15) },
-    splitNote: { fontSize: ms(12), marginTop: vs(1) },
+    splitRowInfo: { flex: 1, minWidth: 0 },
+    splitName: { fontSize: ms(16) },
+    splitNote: { fontSize: ms(12), marginTop: vs(2) },
     amountPill: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -1370,54 +1403,49 @@ const styles = StyleSheet.create({
     },
     dollarSignSmall: { fontSize: ms(14), marginRight: scale(1) },
     amountInput: { fontSize: ms(15), minWidth: scale(48), padding: 0 },
-    remainingRow: { paddingHorizontal: scale(16), paddingVertical: vs(10) },
+
+    remainingBanner: {
+        borderRadius: ms(12),
+        borderWidth: StyleSheet.hairlineWidth,
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(10),
+        alignItems: 'center',
+    },
     remainingText: { fontSize: ms(13) },
+
     startOverBtn: { alignItems: 'center', paddingVertical: vs(8) },
     startOverText: { fontSize: ms(14) },
 
-    // ── Error ─────────────────────────────────────────────────────────────────
-    errorBody: {
-        flex: 1, alignItems: 'center', justifyContent: 'center',
-        paddingHorizontal: scale(28),
-    },
-    errorCard: {
-        width: '100%', alignItems: 'center', padding: scale(28),
-        borderRadius: ms(28), gap: vs(10),
-        shadowColor: '#000', shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.10, shadowRadius: 20, elevation: 8,
-    },
-    errorTitle: { fontSize: ms(20), letterSpacing: -0.3, marginTop: vs(8) },
-    errorMsg: { fontSize: ms(14), textAlign: 'center', lineHeight: 20, opacity: 0.8 },
-    retryBtn: {
-        borderRadius: ms(14), paddingVertical: vs(13),
-        paddingHorizontal: scale(32), marginTop: vs(8),
-    },
-    retryBtnText: { fontSize: ms(15), color: '#fff' },
-
-    // ── Toast ─────────────────────────────────────────────────────────────────
+    // ── Toast (banner style) ──────────────────────────────────────────────────
     toast: {
         position: 'absolute',
         top: vs(12),
         alignSelf: 'center',
         flexDirection: 'row',
         alignItems: 'center',
-        gap: scale(6),
+        gap: scale(8),
         paddingHorizontal: scale(16),
-        paddingVertical: vs(9),
-        borderRadius: 999,
+        paddingVertical: vs(10),
+        borderRadius: ms(14),
+        borderWidth: StyleSheet.hairlineWidth,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.18,
+        shadowOpacity: 0.12,
         shadowRadius: 12,
         elevation: 8,
     },
-    toastText: { fontSize: ms(13), color: '#fff' },
+    toastDot: {
+        width: scale(7),
+        height: scale(7),
+        borderRadius: scale(4),
+    },
+    toastText: { fontSize: ms(13) },
 
     // ── Action sheet ──────────────────────────────────────────────────────────
     actionSheet: {
         position: 'absolute',
         bottom: 0, left: 0, right: 0,
-        height: SHEET_HEIGHT_THIRDEIGHT_HALF,
+        height: SHEET_HEIGHT_THIRD,
         borderTopLeftRadius: ms(28),
         borderTopRightRadius: ms(28),
         shadowColor: '#000',
@@ -1438,7 +1466,7 @@ const styles = StyleSheet.create({
     actionSheetBtn: {
         width: '100%',
         height: vs(50),
-        borderRadius: 99,
+        borderRadius: ms(14),
         alignItems: 'center',
         justifyContent: 'center',
         marginTop: vs(10),
@@ -1466,7 +1494,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         borderRadius: ms(16),
-        borderWidth: 1,
+        borderWidth: StyleSheet.hairlineWidth,
         padding: scale(14),
         marginBottom: vs(8),
     },
@@ -1477,6 +1505,6 @@ const styles = StyleSheet.create({
     pickerEmpty:   { alignItems: 'center', paddingHorizontal: scale(36), marginTop: vs(28) },
     pickerEmptyTitle: { fontSize: ms(16), marginBottom: vs(6) },
     pickerEmptySub:   { fontSize: ms(13), textAlign: 'center', lineHeight: 20, opacity: 0.7 },
-    pickerRetryBtn:   { paddingVertical: vs(11), paddingHorizontal: scale(32), borderRadius: ms(12), marginTop: vs(16) },
+    pickerRetryBtn:   { paddingVertical: vs(11), paddingHorizontal: scale(32), borderRadius: ms(14), marginTop: vs(16) },
     pickerRetryText:  { fontSize: ms(14), color: '#fff' },
 });
