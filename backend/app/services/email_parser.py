@@ -1,9 +1,10 @@
 """
 Interac e-Transfer confirmation email parser.
 
-Supports RBC, TD, Scotia, BMO, CIBC, NBC, Wealthsimple, Tangerine, and a
-generic credit-union fallback. Returns a ParsedInteracEmail dataclass or
-None if no pattern matches.
+Supports Interac central (notify@payments.interac.ca), RBC, TD, Scotia,
+BMO, CIBC, NBC, Wealthsimple, Tangerine, and a generic credit-union
+fallback. Returns a ParsedInteracEmail dataclass or None if no pattern
+matches.
 
 Usage:
     subject, body = parse_email_body(raw_mime_string)
@@ -89,6 +90,58 @@ def parse_email_body(raw_mime: str) -> tuple[str, str]:
 
 
 # ── Per-bank parsers ──────────────────────────────────────────────────────────
+
+def _try_interac_central(subject: str, body: str) -> Optional[ParsedInteracEmail]:
+    """Interac's own notification system (notify@payments.interac.ca).
+
+    Auto-deposit confirmations from this sender include a structured
+    Transfer Details table with clean Sent From: / Amount: (CAD) fields.
+    Checked first — higher precision than any bank-specific heuristic.
+    """
+    # Primary path: structured Transfer Details table
+    m_name = re.search(
+        r'Sent From:\s*\n?\s*([A-Z][A-Z\s]+?)(?:\n|Amount:|\r)',
+        body,
+    )
+    m_amount = re.search(
+        r'Amount:\s*\$?([\d,]+\.?\d*)\s*\(CAD\)',
+        body, re.IGNORECASE,
+    )
+
+    if m_name and m_amount:
+        name = _clean_name(m_name.group(1))
+        try:
+            amount = Decimal(m_amount.group(1).replace(',', ''))
+        except InvalidOperation:
+            return None
+        if amount <= 0 or amount >= 10000:
+            return None
+        return ParsedInteracEmail(
+            bank='interac', direction='received', amount=amount,
+            counterparty_name=name, confidence='high',
+        )
+
+    # Fallback: subject line "received $X from NAME and ..."
+    # The regex already terminates at " and" so no further truncation needed.
+    m_subj = re.search(
+        r'received \$([\d,]+\.?\d*) from ([A-Z][A-Z\s]+?) and',
+        subject,
+    )
+    if m_subj:
+        try:
+            amount = Decimal(m_subj.group(1).replace(',', ''))
+        except InvalidOperation:
+            return None
+        if amount <= 0 or amount >= 10000:
+            return None
+        name = _clean_name(m_subj.group(2))
+        return ParsedInteracEmail(
+            bank='interac', direction='received', amount=amount,
+            counterparty_name=name, confidence='high',
+        )
+
+    return None
+
 
 def _try_rbc(subject: str, body: str) -> Optional[ParsedInteracEmail]:
     subj_sent     = re.search(r'you sent an interac e-transfer', subject, re.IGNORECASE)
@@ -376,7 +429,7 @@ def _try_generic(subject: str, body: str) -> Optional[ParsedInteracEmail]:
 
 # ── Public entry point ────────────────────────────────────────────────────────
 
-_PARSERS = [_try_rbc, _try_td, _try_scotia, _try_bmo, _try_cibc, _try_nbc, _try_wealthsimple, _try_tangerine, _try_generic]
+_PARSERS = [_try_interac_central, _try_rbc, _try_td, _try_scotia, _try_bmo, _try_cibc, _try_nbc, _try_wealthsimple, _try_tangerine, _try_generic]
 
 
 def parse_interac_email(subject: str, body_text: str) -> Optional[ParsedInteracEmail]:
