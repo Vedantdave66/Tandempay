@@ -107,14 +107,13 @@ export default function ProHubScreen({ navigation }: any) {
                 <View style={styles.body}>
                     {/* Pro card */}
                     <View style={[styles.proCard, { borderColor: colors.border }]}>
-                        <LinearGradient colors={colors.heroGradient as any} style={styles.proHeader}>
-                            <View style={[StyleSheet.absoluteFillObject, { backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: ms(16) }]} pointerEvents="none" />
+                        <LinearGradient colors={['#1C1C1E', '#141416', '#0A0A0C']} style={styles.proHeader}>
                             <View style={styles.proHeaderRow}>
                                 <Crown size={20} color="#fff" />
                                 <Text style={styles.proTitle}>TandemPay Pro</Text>
                             </View>
-                            <View style={[styles.priceChip, { backgroundColor: colors.accentBg }]}>
-                                <Text style={[styles.priceChipText, { color: colors.accent, fontWeight: '600' }, T.body]}>$4.99/mo</Text>
+                            <View style={[styles.priceChip, { backgroundColor: colors.accent }]}>
+                                <Text style={[styles.priceChipText, { color: '#fff', fontWeight: '600' }, T.body]}>$4.99/mo</Text>
                             </View>
                         </LinearGradient>
                         <View style={[styles.proBody, { backgroundColor: colors.surface }]}>
@@ -132,7 +131,7 @@ export default function ProHubScreen({ navigation }: any) {
                             onPress={() => navigation.navigate('Subscription')}
                             style={styles.upgradeBtn}
                         >
-                            <View style={[styles.upgradeBtnInner, { borderColor: 'rgba(255,255,255,0.25)' }]}>
+                            <View style={[styles.upgradeBtnInner, { backgroundColor: colors.accent, borderWidth: 0 }]}>
                                 <Text style={[styles.upgradeBtnText, T.bold]}>
                                     {isPro ? 'Manage subscription →' : 'Upgrade to Pro →'}
                                 </Text>
