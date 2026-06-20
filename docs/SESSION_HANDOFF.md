@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-17
+**Last updated:** 2026-06-20
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -18,6 +18,7 @@
 - **June 13 sprint shipped via PRs #184–#195** — P0 fixes, receipt scanner rebuilt on Gemini 2.5 Flash, onboarding/landing redesign, group invite links, and escalating nudge system. See section below.
 - **Pro screens + design spec session (2026-06-13) shipped via PRs #197–#204** — `DESIGN_SPEC.md` added, `SubscriptionScreen` built, `ExportScreen` and `RecurringScreen` fully wired to real API endpoints, all "Coming Soon" alerts replaced with proper states/upsell cards, light-mode Pro card and hero card border fixes. PRs #202 and #203 are still **open**. See section below.
 - **Smart Split shipped via PRs #205–#207** — Gemini NLP backend route, full 3-phase mobile UI (input → review → error), logging/retry robustness, conversational intents, and voice input via Gemini multimodal. All merged. See section below.
+- **2026-06-20 session shipped via PRs #211–#212** — theme crossfade animation, edit expense UI restoration, timezone import fix, SQLAlchemy lazy-load guard in settlements, and Wealthsimple/Tangerine/Interac central email parsers. See section below.
 - **Latest Alembic head: `20260613_add_nudge_fields_to_settlement_records`** (chain: `... → a107c01bd8f1` → `20260612_add_push_token_to_users` → `20260613_add_invite_token_to_groups` → `20260613_add_nudge_fields_to_settlement_records`). Both new migrations have been run against prod Supabase.
 
 ---
@@ -365,6 +366,36 @@ All PRs are **merged** into `main`.
 
 ---
 
+## 2026-06-20 session — PRs #211–#212
+
+### PR #211 — feat/theme-crossfade → theme crossfade animation *(open)*
+- **`ThemeContext.tsx`**: added `themeOpacity: Animated.Value` to the context interface; created a `themeOpacity` ref (`useRef(new Animated.Value(1)).current`); added `fadeTransition(callback)` helper — runs `Animated.sequence([fade→0 120ms, fade→1 180ms])` and calls the state-update callback via `setTimeout(callback, 120)` so the re-render lands exactly at the opacity=0 midpoint; wrapped both `setTheme` and `setAccent` to call `fadeTransition` before persisting to AsyncStorage; exported `themeOpacity` from the provider value.
+- **`RootNavigator.tsx`**: destructured `themeOpacity` from `useTheme()`; replaced `<Fragment>` wrapper with `<Animated.View style={{ flex: 1, opacity: themeOpacity }}>` so every theme/accent change produces a smooth 120ms fade-out / 180ms fade-in crossfade across the entire navigator tree.
+
+### PR #212 — fix/edit-expense-ui → edit expense UI + backend fixes *(open)*
+
+**Mobile — edit expense UI restored (`GroupDetailScreen.tsx`, `api.ts`)**
+- `GroupDetailScreen.tsx`: added `Keyboard` to RN imports, `Pencil` to lucide imports, `PressableScale` import. Added edit state variables (`editTarget`, `editTitle`, `editAmount`, `editSaving`, `toastMsg`, `toastAnim`). Added `showToast` callback (200ms fade in, 1800ms hold, 200ms fade out). Added `handleEditSave`: validates non-empty title and positive amount, calls `expensesApi.patch`, applies optimistic update to local expense list, dismisses sheet, shows toast. Added Pencil icon (16px, `colors.textSecondary`) in every expense row's `rowEnd` — visible to all members, not just `paidByMe`. Added edit bottom-sheet `<Modal animationType="slide" transparent>` with handle pill, two `TextInput`s (title/amount), `PressableScale` Save button, Cancel link. Added inline `<Animated.View>` toast overlay. Added styles: `editOverlay`, `editSheet` (`borderTopRadius ms(28)`), `editHandle`, `editSheetTitle`, `editLabel`, `editInput`, `editSaveBtn`, `editSaveBtnText`, `editCancelLink`, `editCancelText`, `toast`, `toastText`.
+- `api.ts`: added `patch` method to `expensesApi` → `PATCH /expenses/{expenseId}` with `{ title?, amount? }` body, typed return as `Expense`.
+
+**Backend — `timezone` import fix (`models.py`)**
+- `from datetime import datetime, date` → `from datetime import datetime, date, timezone`. Fixes `NameError: name 'timezone' is not defined` at the `Column(default=lambda: datetime.now(timezone.utc))` on the `InteracEmailLog` model.
+
+**Backend — SQLAlchemy lazy-load guard (`settlements.py`)**
+- Added `await db.refresh(current_user)` as the first line of `create_settlement` body; extracted `user_id = current_user.id` immediately after. Replaced all 8 subsequent references to `current_user.id` within the function with `user_id`. Prevents `MissingGreenlet` errors from SQLAlchemy trying to lazy-load an expired attribute outside the async greenlet context.
+
+**Backend — Wealthsimple + Tangerine email parsers (`email_parser.py`)**
+- Added `_truncate_name(raw)` helper after `_clean_name`: splits at `[\r\n]`, then at `\b(and|has|from)\b`, then calls `_clean_name`. Prevents names bleeding into email body copy.
+- Added `_try_wealthsimple`: matches `interac e-transfer` subject; extracts name/amount from `"e-Transfer of $X from [Name] has been deposited"`, `"[Name] sent you $X"`, or `"you sent … to [Name]"` patterns; `bank='wealthsimple'`, `confidence='high'`.
+- Added `_try_tangerine`: matches `interac e-transfer` subject; extracts from `"[Name] has sent you an Interac e-Transfer for $X"` or `"you sent … to [Name]"`; `bank='tangerine'`, `confidence='high'`.
+- Applied `_truncate_name` to the `_try_generic` name extraction path (was using bare `_clean_name`).
+- Added `_try_interac_central` as the **highest-priority parser** for `notify@payments.interac.ca`: primary pattern reads structured `Transfer Details` table (`Sent From:\s*\n?\s*([A-Z][A-Z\s]+?)` and `Amount:\s*\$?([\d,]+\.?\d*)\s*\(CAD\)`); fallback reads subject line (`received \$([\d,]+\.?\d*) from ([A-Z][A-Z\s]+?) and`); `bank='interac'`, `confidence='high'`. Placed first in `_PARSERS` list so it intercepts before any bank-specific parsers.
+- Updated `_PARSERS = [_try_interac_central, _try_rbc, _try_td, _try_scotia, _try_bmo, _try_cibc, _try_nbc, _try_wealthsimple, _try_tangerine, _try_generic]`.
+
+**Note on parser chain ordering**: `_try_wealthsimple` and `_try_tangerine` are still intercepted by `_try_td`/`_try_scotia` in integration tests because those parsers also check for generic `interac e-transfer` subject. In production this is handled by route-level domain filtering on `notify@wealthsimple.com` / `tangerine.ca` before the chain runs. The parsers work correctly when called directly.
+
+---
+
 ## Pre-Launch Checklist (non-code)
 
 1. Register Canadian business entity
@@ -392,18 +423,20 @@ All PRs are **merged** into `main`.
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the June 13 sprint (PRs #184–#195), the Pro screens + design spec session (PRs #197–#207), and Smart Split (PRs #205–#207) are all merged into `main`. Two PRs are currently **open**: PR #202 (add Export/Recurring to ProHub nav, polish Subscription Pro card) and PR #203 (full Me-section redesign to Apple HIG + DESIGN_SPEC). Run `gh pr list` to confirm current state. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. Smart Split is live with voice input via Gemini multimodal. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist."
+> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the June 13 sprint (PRs #184–#195), the Pro screens + design spec session (PRs #197–#207), and Smart Split (PRs #205–#207) are all merged into `main`. Four PRs are currently **open**: PR #202 (ProHub nav + Subscription Pro card polish), PR #203 (full Me-section redesign to Apple HIG + DESIGN_SPEC), PR #211 (theme crossfade animation), and PR #212 (edit expense UI + backend fixes). Run `gh pr list` to confirm current state. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. Smart Split is live with voice input via Gemini multimodal. The 2026-06-20 session added Wealthsimple/Tangerine/Interac central email parsers and restored the edit expense bottom-sheet UI. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist."
 
 ## Open items / things to double-check next session
 
 1. **PR #202 + PR #203 need review/merge** — #202 adds Export/Recurring to ProHub nav and polishes the Subscription Pro card; #203 is the full Me-section redesign to Apple HIG + DESIGN_SPEC. Both are open on the `fix/prohub-nav-subscription-polish` and `feat/me-section-redesign` branches.
-2. **RevenueCat IAP** — `SubscriptionScreen` CTA is stubbed (`purchasePro()` logs TODO). Wire RevenueCat before launching Pro billing in production.
-3. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
-4. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
-5. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
-6. **Define R6+** — the roadmap table is fully done; no documented next phase.
-7. **Nudge job on Vercel (serverless)** — `run_nudge_job` is registered via APScheduler which only runs on long-lived servers. On Vercel (serverless), the `is_serverless` guard skips the scheduler entirely. If prod runs on Vercel, the nudge cron needs an external trigger (e.g. Vercel Cron, GitHub Actions schedule hitting `POST /api/debug/run-nudge-job` — but that endpoint was deleted in PR #195). Decide: add a lightweight authenticated cron endpoint, or move to a Render/Railway worker.
-8. **Invite link deep link on iOS** — `tandempay://join/{token}` requires the app to be installed. Universal links (`https://tandempay.ca/join/{token}`) would fall back to the web `JoinPage`. Not yet wired.
-9. **Smart Split voice on device** — `expo-av` recording and the Gemini multimodal voice pipeline are untested on a physical device. Verify mic permissions, 30s auto-stop, and that transcription preview appears in the input field before the result is processed.
-10. ~~**Prod migration check**~~ — ✅ Confirmed. All migrations through `20260613_add_nudge_fields_to_settlement_records` applied to prod Supabase.
-11. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`.
+2. **PR #211 (theme crossfade) + PR #212 (edit expense UI + backend) need review/merge** — both open, targeting `main`.
+3. **RevenueCat IAP** — `SubscriptionScreen` CTA is stubbed (`purchasePro()` logs TODO). Wire RevenueCat before launching Pro billing in production.
+4. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
+5. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.
+6. **Pre-launch checklist** — still open non-code work (business registration, legal docs, FINTRAC, Stripe Connect).
+7. **Define R6+** — the roadmap table is fully done; no documented next phase.
+8. **Nudge job on Vercel (serverless)** — `run_nudge_job` is registered via APScheduler which only runs on long-lived servers. On Vercel (serverless), the `is_serverless` guard skips the scheduler entirely. If prod runs on Vercel, the nudge cron needs an external trigger (e.g. Vercel Cron, GitHub Actions schedule hitting `POST /api/debug/run-nudge-job` — but that endpoint was deleted in PR #195). Decide: add a lightweight authenticated cron endpoint, or move to a Render/Railway worker.
+9. **Invite link deep link on iOS** — `tandempay://join/{token}` requires the app to be installed. Universal links (`https://tandempay.ca/join/{token}`) would fall back to the web `JoinPage`. Not yet wired.
+10. **Smart Split voice on device** — `expo-av` recording and the Gemini multimodal voice pipeline are untested on a physical device. Verify mic permissions, 30s auto-stop, and that transcription preview appears in the input field before the result is processed.
+11. **Edit expense — all members see Pencil** — by design the Pencil icon is shown on all expense rows to all group members (not just the creator). If the intention is owner-only editing, add a `paidByMe` or `createdBy` guard before showing the icon.
+12. ~~**Prod migration check**~~ — ✅ Confirmed. All migrations through `20260613_add_nudge_fields_to_settlement_records` applied to prod Supabase.
+13. ~~**Accent theming completeness**~~ — ✅ Fixed in PR #149. `accentBg`, `accentBgFaint`, `accentLight` now computed dynamically from the current accent hex in `ThemeContext`.
