@@ -148,10 +148,10 @@ export default function SmartSplitScreen({ navigation }: any) {
     const showToast = useCallback((msg: string) => {
         if (toastTimer.current) clearTimeout(toastTimer.current);
         setToastMsg(msg);
-        toastAnim.setValue(0);
-        Animated.timing(toastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        toastAnim.current.setValue(0);
+        Animated.timing(toastAnim.current, { toValue: 1, duration: 280, useNativeDriver: true }).start();
         toastTimer.current = setTimeout(() => {
-            Animated.timing(toastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+            Animated.timing(toastAnim.current, { toValue: 0, duration: 280, useNativeDriver: true })
                 .start(() => setToastMsg(null));
         }, 2800);
     }, [toastAnim]);

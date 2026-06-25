@@ -25,7 +25,7 @@ import { buildMembersList } from '../utils/helpers';
 type Phase = 'idle' | 'parsing' | 'result' | 'error';
 
 const { height: SCREEN_H } = Dimensions.get('window');
-const SHEET_HEIGHT_HALFEIGHT_HALF = SCREEN_H * 0.55;
+const SHEET_HEIGHT_HALF = SCREEN_H * 0.55;
 
 interface MemberEntry {
   user_id: string;

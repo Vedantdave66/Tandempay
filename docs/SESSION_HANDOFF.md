@@ -323,11 +323,11 @@ All PRs listed below are **merged** into `main` unless otherwise noted.
   - `ExportScreen` + `RecurringScreen` + `ProUpgradeScreen`: all `Linking.openURL` Pro-gate redirects replaced with `navigation.navigate('Subscription')`.
   - `PaymentsScreen`: Stripe Connect Alert replaced with `Linking.openURL` to `tandempay.ca/account`.
 
-### PR #202 — fix: add Export/Recurring to ProHub nav, polish SubscriptionScreen Pro card *(OPEN)*
+### PR #202 — fix: add Export/Recurring to ProHub nav, polish SubscriptionScreen Pro card *(merged)*
 - `ProHubScreen`: Export and Recurring rows added between Notifications and Invite a friend (FileDown/RefreshCw icons); price pill gets shimmer animation (opacity 0.7→1.0 loop, 1800ms).
 - `SubscriptionScreen` Pro card: feature order rewritten (AI Receipt Scanning → Recurring → Export → Priority Support); CTA label shows price (`Go Pro at $4.99/mo`); social proof line ("Trusted by roommates across Canada") added below features.
 
-### PR #203 — feat: redesign Me section screens to Apple HIG + DESIGN_SPEC standard *(OPEN)*
+### PR #203 — feat: redesign Me section screens to Apple HIG + DESIGN_SPEC standard *(merged)*
 Full redesign of all five Me-section screens (`ProHubScreen`, `AppearanceScreen`, `ExportScreen`, `RecurringScreen`, `SubscriptionScreen`) to share the same primitives as `DashboardScreen`/`GroupDetailScreen`:
 - `ProHubScreen`: `LinearGradient(heroGradient)` hero card, shimmer price pill, four labeled settings sections (Account / Preferences / Social / Support) in `ms(20)` surface cards with row dividers, `PressableScale` on every row.
 - `AppearanceScreen`: 3×2 spring-animated accent swatch grid, two-option Light/Dark pill cards, live preview card showing heroGradient + cardGradient + tab bar mock.
@@ -407,10 +407,11 @@ All PRs are **merged** into `main`.
 
 ## Working agreements with Claude
 
-1. **No direct code edits.** Claude produces scoped Antigravity prompts. Vedant pastes, Antigravity executes.
-2. **No git operations from bash.** Hand off to Antigravity.
+1. **No direct code edits.** Claude produces scoped Claude Code prompts. Vedant pastes, Claude Code executes.
+2. **No git operations from bash.** Hand off to Claude Code.
 3. **Conserve usage.** Short responses when sufficient. Skip mockups unless requested.
 4. **One prompt at a time.** Don't merge unrelated changes into mega-prompts.
+5. **Always open prompts with a graphify check.** Every prompt handed to Claude Code must start with an instruction to check the graphify report in `graphify-out/` before reading any source files. This lets Claude Code orient from the pre-built knowledge graph rather than re-reading files cold, saving significant token usage.
 
 ## Critical reference points
 
