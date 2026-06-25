@@ -346,15 +346,44 @@ async def smart_split_voice(
     users_by_id = await _fetch_members(db, member_ids_list, current_user)
     member_list = ", ".join(f'"{name}" (id: {uid})' for uid, name in users_by_id.items())
 
-    voice_prompt = f"""Transcribe this audio, then process it as a TandemPay expense description.
+    # Use the same full intent schema as the text endpoint so Gemini receives
+    # explicit user_id instructions and the complete JSON shapes.  The only
+    # difference is the opening line: ask Gemini to transcribe first, then
+    # treat the transcription as the user message.
+    voice_prompt = f"""You are a smart expense assistant for a bill-splitting app called TandemPay.
+Current group members: {member_list}
+Current group name: {group_name}
 
-Group members: {member_list}
-Group name: {group_name}
+First transcribe the audio clip exactly. Then treat the transcription as the user message and detect the intent.
+Return JSON only. Never return explanations or markdown.
 
-Detect the intent and return JSON only. Never return explanations or markdown.
-If the audio describes an expense, return intent "parse_expense" with title, total, needs_total, and splits for every member.
-For any other intent use the same shapes as the text endpoint.
-ALWAYS return valid JSON."""
+Intents and their return shapes:
+
+1. Parsing an expense (default — use this if the message describes any bill, purchase, meal, or cost):
+{{"intent": "parse_expense", "title": "short expense name max 40 chars", "total": <number, 0 if not mentioned>, "needs_total": <true if total not mentioned>, "splits": [{{"user_id": "<exact id>", "name": "<member name>", "amount": <number>, "note": "<reason or empty>", "included": <true unless explicitly excluded>}}]}}
+
+2. Excluding a member:
+{{"intent": "exclude_member", "member_name": "<name as mentioned>", "message": "<friendly confirmation>"}}
+
+3. Adding someone to the group:
+{{"intent": "add_to_group", "member_name": "<name as mentioned>", "message": "<friendly message>"}}
+
+4. Creating a new group:
+{{"intent": "create_group", "group_name": "<suggested group name>", "message": "<friendly message>"}}
+
+5. Adjusting an existing split:
+{{"intent": "adjust_split", "member_name": "<name as mentioned>", "adjustment": <number, positive=more negative=less>, "message": "<friendly confirmation>"}}
+
+6. Unclear or unrelated:
+{{"intent": "clarify", "message": "<one specific clarifying question>"}}
+
+Rules:
+- Default to parse_expense for ANY message mentioning a bill, cost, meal, item, price, or split
+- ALWAYS return valid JSON — never markdown fences, never plain text
+- For parse_expense with needs_total true, still include all members in splits with amount 0
+- included: false only for explicitly excluded members, true for everyone else
+- In splits, populate name from the provided member list
+- EVERY member must appear in splits for parse_expense using their exact user_id"""
 
     raw: Optional[str] = None
     data: Optional[dict] = None
