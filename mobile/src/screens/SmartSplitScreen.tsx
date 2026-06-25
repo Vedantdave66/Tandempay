@@ -311,7 +311,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                 return;
             }
             await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
-            await (audioRecorder as any).prepareToRecordAsync();
+            await audioRecorder.prepareToRecordAsync();
             audioRecorder.record();
             setIsRecording(true);
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -360,6 +360,9 @@ export default function SmartSplitScreen({ navigation }: any) {
 
     useEffect(() => {
         if (pickerVisible) {
+            // Reset to off-screen before animating in — prevents glitch if a
+            // close animation was still in-flight when the picker re-opened.
+            sheetAnim.setValue(SHEET_HEIGHT_HALF);
             Animated.spring(sheetAnim, {
                 toValue: 0, damping: 24, stiffness: 220, useNativeDriver: true,
             }).start();
@@ -751,7 +754,23 @@ export default function SmartSplitScreen({ navigation }: any) {
                                 <Text style={[styles.dollarSign, T.extrabold, { color: colors.accent }]}>$</Text>
                                 <TextInput
                                     value={reviewTotal}
-                                    onChangeText={v => { setReviewTotal(v); setNeedsTotal(false); }}
+                                    onChangeText={v => {
+                                    setReviewTotal(v);
+                                    setNeedsTotal(false);
+                                    // Proportionally re-derive split amounts when total changes.
+                                    const newTotal = parseFloat(v);
+                                    const oldTotal = parseFloat(reviewTotal) || 0;
+                                    if (newTotal > 0 && oldTotal > 0 && reviewSplits.length > 0) {
+                                        setReviewSplits(prev =>
+                                            prev.map(s => ({
+                                                ...s,
+                                                amount: s.included
+                                                    ? ((parseFloat(s.amount) || 0) * newTotal / oldTotal).toFixed(2)
+                                                    : s.amount,
+                                            }))
+                                        );
+                                    }
+                                }}
                                     style={[styles.totalInput, T.extrabold, { color: colors.accent }]}
                                     keyboardType="decimal-pad"
                                     placeholder="0.00"
@@ -825,9 +844,12 @@ export default function SmartSplitScreen({ navigation }: any) {
 
                         <PressableScale
                             scaleTo={0.97} haptic="medium"
-                            style={[styles.ctaBtn, { backgroundColor: colors.accent, opacity: adding ? 0.75 : 1 }]}
+                            style={[styles.ctaBtn, {
+                                backgroundColor: colors.accent,
+                                opacity: (adding || (totalNum > 0 && Math.abs(remaining) > 0.01)) ? 0.5 : 1,
+                            }]}
                             onPress={handleAddExpense}
-                            disabled={adding}
+                            disabled={adding || (totalNum > 0 && Math.abs(remaining) > 0.01)}
                         >
                             {adding
                                 ? <ActivityIndicator color="#fff" />
