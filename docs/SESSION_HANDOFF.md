@@ -1,5 +1,5 @@
 # TandemPay — Session Handoff for Claude
-**Last updated:** 2026-06-20
+**Last updated:** 2026-06-25
 **Repo:** https://github.com/Vedantdave66/Tandempay
 **Stack:** FastAPI backend (Vercel Python) · React/Vite frontend (Vercel) · React Native mobile (Expo/EAS)
 **Prod URLs:** `https://tandempay.ca` (frontend) · `https://api.tandempay.ca` (backend)
@@ -17,8 +17,9 @@
 - **Canvas Mode + Apple HIG polish session (2026-06-08/09) shipped via PRs #142–#149** — splash animation, gradient tokens, hardcoded-green audit, CanvasModeView redesign, HIG pass across all 14 screens, floating liquid glass tab bar, AppearanceScreen, accent color fix (accentBg/accentBgFaint/accentLight now dynamic), CanvasModeView carousel dock with direct-drag. All merged into `main`.
 - **June 13 sprint shipped via PRs #184–#195** — P0 fixes, receipt scanner rebuilt on Gemini 2.5 Flash, onboarding/landing redesign, group invite links, and escalating nudge system. See section below.
 - **Pro screens + design spec session (2026-06-13) shipped via PRs #197–#204** — `DESIGN_SPEC.md` added, `SubscriptionScreen` built, `ExportScreen` and `RecurringScreen` fully wired to real API endpoints, all "Coming Soon" alerts replaced with proper states/upsell cards, light-mode Pro card and hero card border fixes. PRs #202 and #203 are still **open**. See section below.
-- **Smart Split shipped via PRs #205–#207** — Gemini NLP backend route, full 3-phase mobile UI (input → review → error), logging/retry robustness, conversational intents, and voice input via Gemini multimodal. All merged. See section below.
-- **2026-06-20 session shipped via PRs #211–#212** — theme crossfade animation, edit expense UI restoration, timezone import fix, SQLAlchemy lazy-load guard in settlements, and Wealthsimple/Tangerine/Interac central email parsers. See section below.
+- **Smart Split shipped via PRs #205–#207** — Gemini NLP backend route, full 3-phase mobile UI (input → review → error), logging/retry robustness, conversational intents, and voice input via Gemini multimodal. All merged. See section below. **Redesigned in PR #214** (expo-audio migration, breathing mic, toast error state).
+- **2026-06-18/19 session shipped via PRs #208–#210** — Smart Split robustness fixes, caption/body typography tokens wired to fee UI, and a codebase-wide cleanup (AI slop removal, Gemini util consolidation, security log fixes). All merged. See section below.
+- **2026-06-20 session shipped via PRs #211–#214** — theme crossfade animation, edit expense UI restoration (and follow-up fix), SmartSplitScreen full redesign with expo-audio migration, timezone import fix, SQLAlchemy lazy-load guard in settlements, and Wealthsimple/Tangerine/Interac central email parsers. All merged. See section below.
 - **Latest Alembic head: `20260613_add_nudge_fields_to_settlement_records`** (chain: `... → a107c01bd8f1` → `20260612_add_push_token_to_users` → `20260613_add_invite_token_to_groups` → `20260613_add_nudge_fields_to_settlement_records`). Both new migrations have been run against prod Supabase.
 
 ---
@@ -323,11 +324,11 @@ All PRs listed below are **merged** into `main` unless otherwise noted.
   - `ExportScreen` + `RecurringScreen` + `ProUpgradeScreen`: all `Linking.openURL` Pro-gate redirects replaced with `navigation.navigate('Subscription')`.
   - `PaymentsScreen`: Stripe Connect Alert replaced with `Linking.openURL` to `tandempay.ca/account`.
 
-### PR #202 — fix: add Export/Recurring to ProHub nav, polish SubscriptionScreen Pro card *(OPEN)*
+### PR #202 — fix: add Export/Recurring to ProHub nav, polish SubscriptionScreen Pro card *(merged)*
 - `ProHubScreen`: Export and Recurring rows added between Notifications and Invite a friend (FileDown/RefreshCw icons); price pill gets shimmer animation (opacity 0.7→1.0 loop, 1800ms).
 - `SubscriptionScreen` Pro card: feature order rewritten (AI Receipt Scanning → Recurring → Export → Priority Support); CTA label shows price (`Go Pro at $4.99/mo`); social proof line ("Trusted by roommates across Canada") added below features.
 
-### PR #203 — feat: redesign Me section screens to Apple HIG + DESIGN_SPEC standard *(OPEN)*
+### PR #203 — feat: redesign Me section screens to Apple HIG + DESIGN_SPEC standard *(merged)*
 Full redesign of all five Me-section screens (`ProHubScreen`, `AppearanceScreen`, `ExportScreen`, `RecurringScreen`, `SubscriptionScreen`) to share the same primitives as `DashboardScreen`/`GroupDetailScreen`:
 - `ProHubScreen`: `LinearGradient(heroGradient)` hero card, shimmer price pill, four labeled settings sections (Account / Preferences / Social / Support) in `ms(20)` surface cards with row dividers, `PressableScale` on every row.
 - `AppearanceScreen`: 3×2 spring-animated accent swatch grid, two-option Light/Dark pill cards, live preview card showing heroGradient + cardGradient + tab bar mock.
@@ -366,13 +367,33 @@ All PRs are **merged** into `main`.
 
 ---
 
-## 2026-06-20 session — PRs #211–#212
+## 2026-06-18/19 session — PRs #208–#210
 
-### PR #211 — feat/theme-crossfade → theme crossfade animation *(open)*
+All PRs are **merged** into `main`.
+
+### PR #208 — Fix/smart split robustness *(merged)*
+- Follow-up robustness fixes to the Smart Split feature after the initial #205–#207 launch. See GitHub for full diff (body was not recorded).
+
+### PR #209 — feat: add caption and body typography tokens, wire to fee UI *(merged)*
+- **`typography.ts`**: added `T.caption` (12/16sp, regular, `PlusJakartaSans_400Regular`) and `T.body` (14/20sp, regular) to the typography scale.
+- **`GroupDetailScreen.tsx`**: `T.caption` wired to the amber info banner ("Paying by card? Add $X.XX to cover processing fees") beneath each settlement row in the Settle tab.
+- **`SettleUpScreen.tsx`**: fee breakdown rows ("Subtotal / Stripe fee (2.9% + $0.30) / Total charged") now use `T.body` + `fontVariant: ['tabular-nums']`; fee value rendered in `colors.warning`.
+
+### PR #210 — chore: codebase cleanup — remove AI slop, consolidate utils, fix security logs *(merged)*
+- **Security**: removed token-logging PRE-REQUEST block from `SmartSplitScreen`; deleted unregistered `debug_routes.py`; surfaced silent auth errors in `AuthContext` and the `auth.py` JWTError handler.
+- **Consolidation**: extracted shared `GEMINI_API_KEY`, `GEMINI_URL`, `extract_json`, and `coerce_amount` into `backend/app/utils/gemini.py`; added `DEFAULT_TAX_RATE` to `config.py`; created `mobile/src/utils/helpers.ts` with canonical `toArray`, `timeAgo`, `buildMembersList` — consumed by 6 screens.
+- **Cleanup**: trimmed 14-line docstrings to 1-liners, removed curl examples from admin endpoints, stripped section-divider comments, removed dead `MIME_MAP`, replaced hardcoded hex/rgba with theme tokens, renamed `SHEET_H` → `SHEET_HEIGHT_HALF`/`SHEET_HEIGHT_THIRD`.
+- **Bug fix**: standardised `buildMembersList` sentinel to `user?.id ?? ''` (was `'me'` in `ReceiptScanScreen`), removing the `m.user_id === 'me' ? user.id : m.user_id` workaround.
+
+---
+
+## 2026-06-20 session — PRs #211–#214
+
+### PR #211 — feat/theme-crossfade → theme crossfade animation *(merged)*
 - **`ThemeContext.tsx`**: added `themeOpacity: Animated.Value` to the context interface; created a `themeOpacity` ref (`useRef(new Animated.Value(1)).current`); added `fadeTransition(callback)` helper — runs `Animated.sequence([fade→0 120ms, fade→1 180ms])` and calls the state-update callback via `setTimeout(callback, 120)` so the re-render lands exactly at the opacity=0 midpoint; wrapped both `setTheme` and `setAccent` to call `fadeTransition` before persisting to AsyncStorage; exported `themeOpacity` from the provider value.
 - **`RootNavigator.tsx`**: destructured `themeOpacity` from `useTheme()`; replaced `<Fragment>` wrapper with `<Animated.View style={{ flex: 1, opacity: themeOpacity }}>` so every theme/accent change produces a smooth 120ms fade-out / 180ms fade-in crossfade across the entire navigator tree.
 
-### PR #212 — fix/edit-expense-ui → edit expense UI + backend fixes *(open)*
+### PR #212 — fix/edit-expense-ui → edit expense UI + backend fixes *(merged)*
 
 **Mobile — edit expense UI restored (`GroupDetailScreen.tsx`, `api.ts`)**
 - `GroupDetailScreen.tsx`: added `Keyboard` to RN imports, `Pencil` to lucide imports, `PressableScale` import. Added edit state variables (`editTarget`, `editTitle`, `editAmount`, `editSaving`, `toastMsg`, `toastAnim`). Added `showToast` callback (200ms fade in, 1800ms hold, 200ms fade out). Added `handleEditSave`: validates non-empty title and positive amount, calls `expensesApi.patch`, applies optimistic update to local expense list, dismisses sheet, shows toast. Added Pencil icon (16px, `colors.textSecondary`) in every expense row's `rowEnd` — visible to all members, not just `paidByMe`. Added edit bottom-sheet `<Modal animationType="slide" transparent>` with handle pill, two `TextInput`s (title/amount), `PressableScale` Save button, Cancel link. Added inline `<Animated.View>` toast overlay. Added styles: `editOverlay`, `editSheet` (`borderTopRadius ms(28)`), `editHandle`, `editSheetTitle`, `editLabel`, `editInput`, `editSaveBtn`, `editSaveBtnText`, `editCancelLink`, `editCancelText`, `toast`, `toastText`.
@@ -394,6 +415,18 @@ All PRs are **merged** into `main`.
 
 **Note on parser chain ordering**: `_try_wealthsimple` and `_try_tangerine` are still intercepted by `_try_td`/`_try_scotia` in integration tests because those parsers also check for generic `interac e-transfer` subject. In production this is handled by route-level domain filtering on `notify@wealthsimple.com` / `tangerine.ca` before the chain runs. The parsers work correctly when called directly.
 
+### PR #213 — Fix/edit expense UI *(merged)*
+- Follow-up fix to the edit expense bottom-sheet introduced in PR #212. See GitHub for full diff (body was not recorded).
+
+### PR #214 — feat: redesign SmartSplitScreen — expo-audio migration + polished native UI *(merged)*
+- **expo-av → expo-audio (SDK 54)**: replaced deprecated `Audio.Recording` API with `useAudioRecorder` hook, `requestRecordingPermissionsAsync`, and `setAudioModeAsync` from `expo-audio ~1.1.1`.
+- **Voice input redesign**: mic moved from inline side-button into its own centered section, separated from the text input by an `— or speak —` divider. Both modes now have equal visual weight.
+- **Breathing animation**: single clean `Animated.loop` (timing 1.0 → 1.06 → 1.0, 1.8s, `Easing.inOut(Easing.ease)`) replaces the recursive spring pulse loop; an `ms(84)` border ring behind the mic scales with the breath when recording.
+- **Review splits**: each split row now matches `GroupDetailScreen` expense rows exactly — `colors.surface`, `borderRadius: ms(20)`, `padding: scale(14)`, same shadow values.
+- **Error state → toast**: dedicated `'error'` phase removed; `parse_failed` and catch paths call `showToast()` with a surface-colored banner (accent dot + `colors.text`).
+- **Design token compliance**: all borders `StyleSheet.hairlineWidth`, CTA `borderRadius: ms(14)`, typography via `T.*`, spacing via `ms()` / `scale()` / `vs()`, colors via `useTheme()`.
+- **Bug fix**: `SHEET_HEIGHT_THIRDEIGHT_HALF` / `SHEET_HEIGHT_HALFEIGHT_*` were undefined variable references causing the action sheet to animate from `undefined` — corrected to `SHEET_HEIGHT_HALF` (0.55) and `SHEET_HEIGHT_THIRD` (0.32).
+
 ---
 
 ## Pre-Launch Checklist (non-code)
@@ -407,10 +440,11 @@ All PRs are **merged** into `main`.
 
 ## Working agreements with Claude
 
-1. **No direct code edits.** Claude produces scoped Antigravity prompts. Vedant pastes, Antigravity executes.
-2. **No git operations from bash.** Hand off to Antigravity.
+1. **No direct code edits.** Claude produces scoped Claude Code prompts. Vedant pastes, Claude Code executes.
+2. **No git operations from bash.** Hand off to Claude Code.
 3. **Conserve usage.** Short responses when sufficient. Skip mockups unless requested.
 4. **One prompt at a time.** Don't merge unrelated changes into mega-prompts.
+5. **Always open prompts with a graphify check.** Every prompt handed to Claude Code must start with an instruction to check the graphify report in `graphify-out/` before reading any source files. This lets Claude Code orient from the pre-built knowledge graph rather than re-reading files cold, saving significant token usage.
 
 ## Critical reference points
 
@@ -423,12 +457,12 @@ All PRs are **merged** into `main`.
 
 ## What to open with in the new session
 
-> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the June 13 sprint (PRs #184–#195), the Pro screens + design spec session (PRs #197–#207), and Smart Split (PRs #205–#207) are all merged into `main`. Four PRs are currently **open**: PR #202 (ProHub nav + Subscription Pro card polish), PR #203 (full Me-section redesign to Apple HIG + DESIGN_SPEC), PR #211 (theme crossfade animation), and PR #212 (edit expense UI + backend fixes). Run `gh pr list` to confirm current state. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. Smart Split is live with voice input via Gemini multimodal. The 2026-06-20 session added Wealthsimple/Tangerine/Interac central email parsers and restored the edit expense bottom-sheet UI. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist."
+> "TandemPay's R1–R5 roadmap, all mobile UI revamp PRs (#123–#149), the June 13 sprint (PRs #184–#195), the Pro screens + design spec session (PRs #197–#207), Smart Split (PRs #205–#207), and the 2026-06-18/19 + 2026-06-20 sessions (PRs #208–#214) are all merged into `main`. Run `gh pr list --state open` to confirm there are no remaining open PRs. Alembic head is `20260613_add_nudge_fields_to_settlement_records` — confirmed applied to prod. Smart Split is live with voice input via Gemini multimodal and was fully redesigned (expo-audio migration, breathing mic animation, toast error state) in PR #214. The edit expense bottom-sheet UI is live (PR #212 + #213). Typography scale has `T.caption` and `T.body` tokens. Gemini utils consolidated into `backend/app/utils/gemini.py`. The two remaining non-code blockers before closed beta are the Interac end-to-end test and the pre-launch legal/business checklist."
 
 ## Open items / things to double-check next session
 
-1. **PR #202 + PR #203 need review/merge** — #202 adds Export/Recurring to ProHub nav and polishes the Subscription Pro card; #203 is the full Me-section redesign to Apple HIG + DESIGN_SPEC. Both are open on the `fix/prohub-nav-subscription-polish` and `feat/me-section-redesign` branches.
-2. **PR #211 (theme crossfade) + PR #212 (edit expense UI + backend) need review/merge** — both open, targeting `main`.
+1. ~~**PR #202 + PR #203 need review/merge**~~ — ✅ Both merged into `main` (2026-06-19).
+2. ~~**PR #211 (theme crossfade) + PR #212 (edit expense UI + backend) need review/merge**~~ — ✅ Both merged into `main` (2026-06-20). Follow-up #213 also merged.
 3. **RevenueCat IAP** — `SubscriptionScreen` CTA is stubbed (`purchasePro()` logs TODO). Wire RevenueCat before launching Pro billing in production.
 4. **Canvas drag UX on device** — vertical-priority `PanResponder` (`|dy| > 6 && |dy| > |dx| × 1.3`) is untested on a physical device. Confirm horizontal swipes scroll the carousel and upward drags launch the ghost. Adjust threshold if needed.
 5. **Interac end-to-end test** — no record found of a real e-Transfer being forwarded through `inbound.tandempay.ca` to verify the full auto-confirm pipeline in production.

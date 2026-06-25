@@ -35,6 +35,7 @@ from app.routes import audit_log
 from app.routes import subscription_routes
 from app.routes import recurring_routes
 from app.routes import export_routes
+from app.routes import cron_routes
 from app.services import balance_service
 from app.services.reconciliation import router as reconciliation_router
 from app.services.reminder_scheduler import process_due_reminders
@@ -157,6 +158,13 @@ async def lifespan(app: FastAPI):
     # every serverless cold start before any request is handled.
 
     is_serverless = os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")
+
+    _startup_settings = get_settings()
+    if not _startup_settings.CRON_SECRET:
+        logger.warning(
+            "[cron] CRON_SECRET is not set — POST /api/cron/nudge will always return 401. "
+            "Add CRON_SECRET to Vercel backend env vars."
+        )
 
     # Database migrations managed by Alembic. Run: alembic upgrade head
     # Schema changes must be made via: alembic revision --autogenerate -m "description"
@@ -342,6 +350,7 @@ app.include_router(export_routes.router)
 app.include_router(interac_routes.router)
 app.include_router(receipts_router)
 app.include_router(smart_split_router)
+app.include_router(cron_routes.router, prefix="/api/cron", tags=["cron"])
 
 @app.get("/")
 async def root():
