@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    RefreshControl, ScrollView, Animated, Easing, Alert, Modal,
+    RefreshControl, ScrollView, Animated, Easing, Alert, Modal, Clipboard,
 } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -170,6 +171,10 @@ export default function DashboardScreen({ navigation }: any) {
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [showNetModal, setShowNetModal] = useState(false);
+    const [interacSheetVisible, setInteracSheetVisible] = useState(false);
+    const interacToastAnim = useRef(new Animated.Value(0)).current;
+    const [interacToastMsg, setInteracToastMsg] = useState<string | null>(null);
+    const interacToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const activityAnims = useRef(
         Array.from({ length: 5 }, () => new Animated.Value(0))
@@ -226,6 +231,11 @@ export default function DashboardScreen({ navigation }: any) {
         } finally {
             setLoading(false);
             setRefreshing(false);
+            if (user?.interac_token) {
+                AsyncStorage.getItem('@interac_setup_seen').then(seen => {
+                    if (!seen) setInteracSheetVisible(true);
+                });
+            }
         }
     };
 
@@ -237,6 +247,25 @@ export default function DashboardScreen({ navigation }: any) {
     const onRefresh = () => {
         setRefreshing(true);
         loadGroups();
+    };
+
+    const handleCopyInteracAddress = () => {
+        const address = `${user?.interac_token}@inbound.tandempay.ca`;
+        Clipboard.setString(address);
+        Haptics.selectionAsync();
+        if (interacToastTimer.current) clearTimeout(interacToastTimer.current);
+        setInteracToastMsg('Copied!');
+        interacToastAnim.setValue(0);
+        Animated.timing(interacToastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        interacToastTimer.current = setTimeout(() => {
+            Animated.timing(interacToastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+                .start(() => setInteracToastMsg(null));
+        }, 2000);
+    };
+
+    const dismissInteracSheet = async () => {
+        await AsyncStorage.setItem('@interac_setup_seen', 'true');
+        setInteracSheetVisible(false);
     };
 
     const handleGroupMore = (item: GroupListItem) => {
@@ -508,6 +537,71 @@ export default function DashboardScreen({ navigation }: any) {
                 balanceMap={balanceMap}
                 userId={user?.id ?? ''}
             />
+
+            {/* ── Interac Auto-Confirm one-time setup sheet ─────────────────────── */}
+            <Modal
+                visible={interacSheetVisible}
+                transparent
+                animationType="slide"
+                onRequestClose={dismissInteracSheet}
+            >
+                <TouchableOpacity
+                    style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+                    activeOpacity={1}
+                    onPress={dismissInteracSheet}
+                />
+                <View style={[styles.interacSheet, { backgroundColor: colors.surface }]}>
+                    <View style={styles.interacHandle}>
+                        <View style={[styles.interacHandlePill, { backgroundColor: colors.border }]} />
+                    </View>
+
+                    <View style={[styles.interacIconWrap, { backgroundColor: colors.accentBg }]}>
+                        <CheckCheck size={ms(22)} color={colors.accent} />
+                    </View>
+                    <Text style={[styles.interacTitle, T.extrabold, { color: colors.text }]}>
+                        Auto-Confirm Payments
+                    </Text>
+                    <Text style={[styles.interacSub, T.regular, { color: colors.secondaryText }]}>
+                        Set this as your Interac notification email in your bank's settings — TandemPay will confirm payments the moment they land. No tapping required.
+                    </Text>
+
+                    <PressableScale
+                        scaleTo={0.97}
+                        haptic="light"
+                        onPress={handleCopyInteracAddress}
+                        style={[styles.interacAddressChip, { backgroundColor: colors.accentBg, borderColor: colors.accent + '40' }]}
+                    >
+                        <Text
+                            style={[styles.interacAddressText, T.semibold, { color: colors.accent }]}
+                            numberOfLines={1}
+                            adjustsFontSizeToFit
+                        >
+                            {user?.interac_token}@inbound.tandempay.ca
+                        </Text>
+                    </PressableScale>
+
+                    {interacToastMsg && (
+                        <Animated.View style={[styles.interacToast, { backgroundColor: colors.surface, borderColor: colors.border, opacity: interacToastAnim }]}>
+                            <Text style={[T.semibold, { color: colors.accent, fontSize: ms(13) }]}>✓ Copied!</Text>
+                        </Animated.View>
+                    )}
+
+                    <PressableScale
+                        scaleTo={0.97}
+                        haptic="medium"
+                        style={[styles.interacCopyBtn, { backgroundColor: colors.accent }]}
+                        onPress={handleCopyInteracAddress}
+                    >
+                        <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Copy address</Text>
+                    </PressableScale>
+
+                    <TouchableOpacity onPress={dismissInteracSheet} activeOpacity={0.7} style={{ paddingVertical: vs(10) }}>
+                        <Text style={[T.regular, { color: colors.secondaryText, fontSize: ms(14), textAlign: 'center' }]}>
+                            I'll do this later
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </Modal>
         </SafeAreaView>
     );
 }
@@ -716,5 +810,77 @@ const styles = StyleSheet.create({
     modalRowAmount: {
         fontSize: ms(17),
         letterSpacing: -0.4,
+    },
+
+    // Interac Auto-Confirm setup sheet
+    interacSheet: {
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
+        paddingHorizontal: scale(24),
+        paddingBottom: vs(36),
+        alignItems: 'center',
+        gap: vs(10),
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -6 },
+        shadowOpacity: 0.18,
+        shadowRadius: 24,
+        elevation: 24,
+    },
+    interacHandle: {
+        width: '100%',
+        alignItems: 'center',
+        paddingTop: vs(12),
+        paddingBottom: vs(4),
+    },
+    interacHandlePill: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: 2,
+    },
+    interacIconWrap: {
+        width: ms(52),
+        height: ms(52),
+        borderRadius: ms(16),
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginTop: vs(4),
+    },
+    interacTitle: {
+        fontSize: ms(20),
+        letterSpacing: -0.4,
+        textAlign: 'center',
+    },
+    interacSub: {
+        fontSize: ms(14),
+        lineHeight: 21,
+        textAlign: 'center',
+        opacity: 0.75,
+    },
+    interacAddressChip: {
+        borderWidth: 1,
+        borderRadius: ms(12),
+        paddingHorizontal: scale(14),
+        paddingVertical: vs(10),
+        width: '100%',
+        alignItems: 'center',
+    },
+    interacAddressText: {
+        fontSize: ms(13),
+    },
+    interacToast: {
+        position: 'absolute',
+        top: vs(12),
+        alignSelf: 'center',
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(8),
+        borderRadius: ms(12),
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    interacCopyBtn: {
+        width: '100%',
+        height: vs(50),
+        borderRadius: ms(14),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 });
