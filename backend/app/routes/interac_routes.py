@@ -22,16 +22,18 @@ Security note:
 """
 
 import logging
+import re
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
 from app.limiter import limiter
-from app.models import InteracEmailLog
+from app.models import InteracEmailLog, User
 from app.services.email_parser import parse_email_body, parse_interac_email
 from app.services.interac_matcher import confirm_settlement, match_settlement
 
@@ -39,6 +41,8 @@ logger = logging.getLogger("tandempay.interac")
 settings = get_settings()
 
 router = APIRouter(prefix="/api/interac", tags=["Interac"])
+
+_INBOUND_TOKEN_RE = re.compile(r'([a-zA-Z0-9_-]+)@inbound\.tandempay\.ca', re.IGNORECASE)
 
 
 @router.post("/inbound")
@@ -81,6 +85,24 @@ async def interac_inbound(
                 sender, raw_subject,
             )
 
+    # Resolve creditor from unique inbound token in the `to` address.
+    # This is the preferred path — avoids all from_email fuzzy matching.
+    creditor_from_token: Optional[User] = None
+    _token_match = _INBOUND_TOKEN_RE.search(recipient)
+    if _token_match:
+        _token = _token_match.group(1)
+        _token_result = await db.execute(select(User).where(User.interac_token == _token))
+        creditor_from_token = _token_result.scalars().first()
+        if creditor_from_token:
+            logger.info(
+                "interac_inbound: creditor identified via token=%s user_id=%s",
+                _token, creditor_from_token.id,
+            )
+        else:
+            logger.warning(
+                "interac_inbound: token=%s in `to` address did not match any user", _token
+            )
+
     # Attempt to extract Interac signal from the email content.
     parsed = parse_interac_email(parsed_subject, body_text)
 
@@ -115,7 +137,7 @@ async def interac_inbound(
     )
 
     # Attempt to match against a pending settlement.
-    settlement = await match_settlement(parsed, sender, db)
+    settlement = await match_settlement(parsed, sender, db, creditor=creditor_from_token)
 
     if settlement is None:
         log.failure_reason = "no_matching_settlement"

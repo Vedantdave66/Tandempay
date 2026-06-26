@@ -63,6 +63,7 @@ async def match_settlement(
     parsed: ParsedInteracEmail,
     from_email: str,
     db: AsyncSession,
+    creditor: Optional[User] = None,   # pre-resolved from inbound token
 ) -> Optional[SettlementRecord]:
     """
     Find the SettlementRecord that best matches a parsed Interac email.
@@ -70,25 +71,26 @@ async def match_settlement(
     Returns None if the creditor cannot be resolved, the debtor name falls
     below the fuzzy-match threshold, or no settlement matches by payee+amount.
     """
-    # Step 1: extract bare email address from the From header
-    m = _EMAIL_RE.search(from_email)
-    if not m:
-        logger.info(
-            "interac_matcher: could not extract email from from_email=%r", from_email
-        )
-        return None
-    creditor_email = m.group(0).lower().strip()
+    if creditor is None:
+        # Legacy path: resolve creditor from from_email
+        m = _EMAIL_RE.search(from_email)
+        if not m:
+            logger.info(
+                "interac_matcher: could not extract email from from_email=%r", from_email
+            )
+            return None
+        creditor_email = m.group(0).lower().strip()
 
-    # Step 2: look up creditor (the person who received the Interac money)
-    creditor = await _resolve_user_by_email(creditor_email, db)
-    if not creditor:
+        creditor = await _resolve_user_by_email(creditor_email, db)
+        if not creditor:
+            logger.info(
+                "interac_matcher: creditor not found for email=%s", creditor_email
+            )
+            return None
         logger.info(
-            "interac_matcher: creditor not found for email=%s", creditor_email
+            "interac_matcher: creditor found user_id=%s email=%s", creditor.id, creditor_email
         )
-        return None
-    logger.info(
-        "interac_matcher: creditor found user_id=%s email=%s", creditor.id, creditor_email
-    )
+    # else: creditor already known from inbound token — skip resolution
 
     # Step 3: fuzzy-match parsed counterparty name against all users to find debtor
     all_result = await db.execute(select(User))
@@ -135,10 +137,10 @@ async def match_settlement(
 
     if not candidates:
         logger.info(
-            "interac_matcher: no settlement found for payee=%s amount=%s (±%s)",
-            creditor.id, parsed.amount, _AMOUNT_TOLERANCE,
+            "interac_matcher: no pending settlement found for payee=%s amount=%s — attempting auto-create",
+            creditor.id, parsed.amount,
         )
-        return None
+        return await _auto_create_settlement(creditor, debtor, parsed.amount, db)
 
     # Prefer the row whose payer matches the identified debtor
     for settlement in candidates:
@@ -155,6 +157,73 @@ async def match_settlement(
         "interac_matcher: settlement matched (payer mismatch, best-effort) "
         "settlement_id=%s payee=%s expected_payer=%s",
         settlement.id, creditor.id, debtor.id,
+    )
+    return settlement
+
+
+# ── Internal: auto-create ─────────────────────────────────────────────────────
+
+async def _auto_create_settlement(
+    creditor: User,
+    debtor: Optional[User],
+    amount: Decimal,
+    db: AsyncSession,
+) -> Optional[SettlementRecord]:
+    """
+    Create a new SettlementRecord when the debtor sent money without pressing
+    Settle Up in the app.  Finds the group both users share; if multiple groups
+    exist, picks the first one and logs a warning (best-effort for v1).
+    Returns None if debtor is unknown or they share no group.
+    """
+    if debtor is None:
+        logger.info(
+            "interac_matcher: auto-create skipped — debtor could not be resolved"
+        )
+        return None
+
+    from sqlalchemy import select as _select
+    from app.models import GroupMember as _GM
+
+    creditor_gids_result = await db.execute(
+        _select(_GM.group_id).where(_GM.user_id == creditor.id)
+    )
+    creditor_gids = {row[0] for row in creditor_gids_result.all()}
+
+    debtor_gids_result = await db.execute(
+        _select(_GM.group_id).where(_GM.user_id == debtor.id)
+    )
+    debtor_gids = {row[0] for row in debtor_gids_result.all()}
+
+    shared = creditor_gids & debtor_gids
+    if not shared:
+        logger.info(
+            "interac_matcher: auto-create skipped — no shared group "
+            "creditor=%s debtor=%s", creditor.id, debtor.id,
+        )
+        return None
+
+    group_id = next(iter(shared))
+    if len(shared) > 1:
+        logger.warning(
+            "interac_matcher: auto-create ambiguous — %d shared groups for "
+            "creditor=%s debtor=%s — using group=%s",
+            len(shared), creditor.id, debtor.id, group_id,
+        )
+
+    settlement = SettlementRecord(
+        payer_id=debtor.id,
+        payee_id=creditor.id,
+        group_id=group_id,
+        amount=amount,
+        method="interac",
+        status="pending",
+        auto_confirmed=False,
+    )
+    db.add(settlement)
+    await db.flush()
+    logger.info(
+        "interac_matcher: auto-created settlement=%s creditor=%s debtor=%s amount=%s group=%s",
+        settlement.id, creditor.id, debtor.id, amount, group_id,
     )
     return settlement
 

@@ -9,14 +9,17 @@ import {
     Animated,
     Easing,
     TouchableOpacity,
+    Modal,
+    Clipboard,
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
+import * as Haptics from 'expo-haptics';
 import { scale, vs, ms } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw } from 'lucide-react-native';
+import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw, Mail } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import PressableScale from '../components/PressableScale';
@@ -52,6 +55,10 @@ export default function ProHubScreen({ navigation }: any) {
     const { colors, isDark } = useTheme();
     const isPro = user?.subscription_tier === 'pro';
     const [showCharModal, setShowCharModal] = useState(false);
+    const [showInteracModal, setShowInteracModal] = useState(false);
+    const [interacToastMsg, setInteracToastMsg] = useState<string | null>(null);
+    const interacToastAnim = useRef(new Animated.Value(0)).current;
+    const interacToastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
     const shimmerAnim = useRef(new Animated.Value(0.7)).current;
 
     useEffect(() => {
@@ -87,6 +94,20 @@ export default function ProHubScreen({ navigation }: any) {
             { text: 'Cancel', style: 'cancel' },
             { text: 'Sign out', style: 'destructive', onPress: () => logout() },
         ]);
+    };
+
+    const handleCopyInteracAddress = () => {
+        const address = `${user?.interac_token}@inbound.tandempay.ca`;
+        Clipboard.setString(address);
+        Haptics.selectionAsync();
+        if (interacToastTimer.current) clearTimeout(interacToastTimer.current);
+        setInteracToastMsg('Copied!');
+        interacToastAnim.setValue(0);
+        Animated.timing(interacToastAnim, { toValue: 1, duration: 280, useNativeDriver: true }).start();
+        interacToastTimer.current = setTimeout(() => {
+            Animated.timing(interacToastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
+                .start(() => setInteracToastMsg(null));
+        }, 2000);
     };
 
     return (
@@ -179,9 +200,60 @@ export default function ProHubScreen({ navigation }: any) {
                                 </TouchableOpacity>
                             );
                         })}
+                    {user?.interac_token && (
+                        <TouchableOpacity
+                            style={[styles.settingsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                            onPress={() => setShowInteracModal(true)}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.settingsIconWrap, { backgroundColor: colors.accentBg }]}>
+                                <Mail size={17} color={colors.accent} />
+                            </View>
+                            <Text style={[styles.settingsLabel, { color: colors.text }]}>Interac Auto-Confirm</Text>
+                            <ChevronRight size={16} color={colors.faintText} />
+                        </TouchableOpacity>
+                    )}
                     </View>
 
             </ScrollView>
+
+            <Modal
+                visible={showInteracModal}
+                transparent
+                animationType="slide"
+                onRequestClose={() => setShowInteracModal(false)}
+            >
+                <View style={styles.modalOverlay}>
+                    <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
+                        <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
+                        <Text style={[styles.modalTitle, T.extrabold, { color: colors.text }]}>Interac Auto-Confirm</Text>
+                        <Text style={[styles.modalSubtitle, T.regular, { color: colors.secondaryText }]}>
+                            Set this as your notification email in your bank's Interac settings. TandemPay will automatically confirm payments — no action needed in the app.
+                        </Text>
+                        <View style={[styles.tokenChip, { backgroundColor: colors.accentBg }]}>
+                            <Text style={[styles.tokenText, T.semibold, { color: colors.accent }]} selectable>
+                                {user?.interac_token}@inbound.tandempay.ca
+                            </Text>
+                        </View>
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="light"
+                            onPress={handleCopyInteracAddress}
+                            style={[styles.copyBtn, { backgroundColor: colors.accent }]}
+                        >
+                            <Text style={[styles.copyBtnText, T.semibold]}>Copy address</Text>
+                        </PressableScale>
+                        {interacToastMsg && (
+                            <Animated.View style={[styles.interacToast, { opacity: interacToastAnim, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                                <Text style={[T.semibold, { color: colors.text, fontSize: ms(13) }]}>{interacToastMsg}</Text>
+                            </Animated.View>
+                        )}
+                        <PressableScale onPress={() => setShowInteracModal(false)} style={styles.doneLink}>
+                            <Text style={[T.semibold, { color: colors.accent, fontSize: ms(15) }]}>Done</Text>
+                        </PressableScale>
+                    </View>
+                </View>
+            </Modal>
 
             <CharacterSetupModal
                 visible={showCharModal}
@@ -349,4 +421,64 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     settingsLabel: { flex: 1, fontSize: ms(15) },
+
+    // Interac Auto-Confirm modal
+    modalOverlay: {
+        flex: 1,
+        justifyContent: 'flex-end',
+        backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    modalSheet: {
+        borderTopLeftRadius: ms(28),
+        borderTopRightRadius: ms(28),
+        paddingHorizontal: scale(24),
+        paddingTop: vs(12),
+        paddingBottom: vs(40),
+        gap: vs(16),
+        alignItems: 'center',
+    },
+    modalHandle: {
+        width: scale(36),
+        height: vs(4),
+        borderRadius: 99,
+        marginBottom: vs(8),
+    },
+    modalTitle: {
+        fontSize: ms(18),
+        letterSpacing: -0.2,
+    },
+    modalSubtitle: {
+        fontSize: ms(14),
+        lineHeight: vs(20),
+        textAlign: 'center',
+    },
+    tokenChip: {
+        borderRadius: ms(12),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(12),
+        width: '100%',
+    },
+    tokenText: {
+        fontSize: ms(14),
+        textAlign: 'center',
+    },
+    copyBtn: {
+        borderRadius: ms(14),
+        paddingVertical: vs(14),
+        width: '100%',
+        alignItems: 'center',
+    },
+    copyBtnText: {
+        fontSize: ms(15),
+        color: '#fff',
+    },
+    interacToast: {
+        borderRadius: ms(12),
+        paddingHorizontal: scale(16),
+        paddingVertical: vs(8),
+        borderWidth: StyleSheet.hairlineWidth,
+    },
+    doneLink: {
+        paddingVertical: vs(6),
+    },
 });
