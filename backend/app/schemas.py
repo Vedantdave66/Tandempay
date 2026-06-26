@@ -159,6 +159,7 @@ class UserOut(BaseModel):
     character_color: Optional[str] = '#34D399'
     character_nickname: Optional[str] = None
     push_token: Optional[str] = None
+    interac_token: Optional[str] = None
 
 
 class UserUpdate(BaseModel):

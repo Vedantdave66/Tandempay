@@ -60,6 +60,7 @@ export interface User {
     character_shape?: string | null;
     character_color?: string | null;
     character_nickname?: string | null;
+    interac_token?: string;
 }
 
 export interface Token {
