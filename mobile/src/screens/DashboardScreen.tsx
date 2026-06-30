@@ -653,6 +653,19 @@ export default function DashboardScreen({ navigation }: any) {
                         <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Copy address</Text>
                     </PressableScale>
 
+                    <TouchableOpacity
+                        onPress={() => {
+                            dismissInteracSheet();
+                            navigation.navigate('Tutorial' as never, { mode: 'interac' } as never);
+                        }}
+                        activeOpacity={0.7}
+                        style={{ paddingVertical: vs(6) }}
+                    >
+                        <Text style={[T.semibold, { color: colors.accent, fontSize: ms(14), textAlign: 'center' }]}>
+                            How it works →
+                        </Text>
+                    </TouchableOpacity>
+
                     <TouchableOpacity onPress={dismissInteracSheet} activeOpacity={0.7} style={{ paddingVertical: vs(10) }}>
                         <Text style={[T.regular, { color: colors.secondaryText, fontSize: ms(14), textAlign: 'center' }]}>
                             I'll do this later

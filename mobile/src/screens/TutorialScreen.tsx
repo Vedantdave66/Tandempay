@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
-import { Users, Receipt, Send, CheckCircle2, ArrowLeft } from 'lucide-react-native';
+import { Users, Receipt, Send, CheckCircle2, ArrowLeft, Mail, Settings, CheckCheck } from 'lucide-react-native';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -51,8 +51,48 @@ const STEPS = [
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function TutorialScreen({ navigation }: any) {
+export default function TutorialScreen({ navigation, route }: any) {
     const { colors } = useTheme();
+
+    const mode = route.params?.mode;
+
+    const INTERAC_STEPS = [
+        {
+            icon: Mail,
+            color: colors.accent,
+            bgColor: colors.accentLight,
+            title: 'Your personal payment address',
+            lines: [
+                'TandemPay gives you a unique email address — like a3f9b2@inbound.tandempay.ca.',
+                'It\'s yours permanently. No one else has it.',
+                'Copy it from the TandemPay app anytime under Profile → Interac Auto-Confirm.',
+            ],
+        },
+        {
+            icon: Settings,
+            color: colors.indigo,
+            bgColor: colors.indigo + '1F',
+            title: 'Set it in your bank — once',
+            lines: [
+                'In your bank\'s app, go to Interac e-Transfer settings.',
+                'Add your TandemPay address as the email for incoming transfer notifications.',
+                'This takes about 60 seconds and you only do it once.',
+            ],
+        },
+        {
+            icon: CheckCheck,
+            color: colors.accent,
+            bgColor: colors.accentLight,
+            title: 'Payments confirm themselves',
+            lines: [
+                'When your roommate sends you money via Interac, your bank emails your TandemPay address.',
+                'TandemPay sees it instantly and marks the debt as settled — automatically.',
+                'You get a push notification. No tapping "I received it." No manual confirmation.',
+            ],
+        },
+    ];
+
+    const steps = mode === 'interac' ? INTERAC_STEPS : STEPS;
 
     return (
         <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -65,7 +105,9 @@ export default function TutorialScreen({ navigation }: any) {
                 >
                     <ArrowLeft color={colors.text} size={20} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>How TandemPay Works</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                    {mode === 'interac' ? 'How Auto-Confirm Works' : 'How TandemPay Works'}
+                </Text>
                 {/* Spacer balances the back button */}
                 <View style={styles.headerSpacer} />
             </View>
@@ -83,7 +125,7 @@ export default function TutorialScreen({ navigation }: any) {
                 </View>
 
                 {/* Steps */}
-                {STEPS.map((step, idx) => {
+                {steps.map((step, idx) => {
                     const Icon = step.icon;
                     return (
                         <View
