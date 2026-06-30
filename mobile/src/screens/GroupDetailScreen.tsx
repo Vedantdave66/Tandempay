@@ -16,6 +16,8 @@ import {
   Animated,
   Easing,
   Share,
+  PanResponder,
+  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
@@ -24,7 +26,7 @@ import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info, BellRing, Pencil } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -32,6 +34,118 @@ import SkeletonBlock from '../components/SkeletonBlock';
 import PressableScale from '../components/PressableScale';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
+
+// ─── swipe constants ──────────────────────────────────────────────────────────
+const ACTION_BTN_W = scale(68);
+const SWIPE_THRESH = scale(36);
+
+// ─── SwipeableExpenseRow ──────────────────────────────────────────────────────
+interface SwipeableExpenseRowProps {
+    children: React.ReactNode;
+    paidByMe: boolean;
+    onNudge: () => void;
+    onEdit: () => void;
+    onDelete: () => void;
+}
+
+function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: SwipeableExpenseRowProps) {
+    const REVEAL = paidByMe ? ACTION_BTN_W * 3 : ACTION_BTN_W;
+    const translateX = useRef(new Animated.Value(0)).current;
+    const isOpen = useRef(false);
+
+    const close = useCallback(() => {
+        Animated.spring(translateX, {
+            toValue: 0, useNativeDriver: true, damping: 20, stiffness: 260,
+        }).start(() => { isOpen.current = false; });
+    }, [translateX]);
+
+    const open = useCallback(() => {
+        Animated.spring(translateX, {
+            toValue: -REVEAL, useNativeDriver: true, damping: 20, stiffness: 260,
+        }).start(() => { isOpen.current = true; });
+    }, [translateX, REVEAL]);
+
+    const panResponder = useRef(PanResponder.create({
+        onMoveShouldSetPanResponder: (_, g) =>
+            Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
+        onPanResponderGrant: () => { translateX.extractOffset(); },
+        onPanResponderMove: (_, g) => {
+            translateX.setValue(Math.min(0, Math.max(-REVEAL, g.dx)));
+        },
+        onPanResponderRelease: (_, g) => {
+            translateX.flattenOffset();
+            const cur = (translateX as any)._value as number;
+            if (cur < -SWIPE_THRESH) open(); else close();
+        },
+        onPanResponderTerminate: () => { translateX.flattenOffset(); close(); },
+    })).current;
+
+    return (
+        <View style={swipeStyles.container}>
+            <View style={[swipeStyles.actionsWrap, { width: REVEAL }]}>
+                {paidByMe && (
+                    <TouchableOpacity
+                        style={[swipeStyles.btn, { backgroundColor: '#F59E0B' }]}
+                        onPress={() => { close(); onNudge(); }}
+                        activeOpacity={0.8}
+                    >
+                        <BellRing size={ms(17)} color="#fff" />
+                        <Text style={[swipeStyles.btnLabel, T.semibold]}>Nudge</Text>
+                    </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                    style={[swipeStyles.btn, { backgroundColor: '#3B82F6' }]}
+                    onPress={() => { close(); onEdit(); }}
+                    activeOpacity={0.8}
+                >
+                    <Pencil size={ms(17)} color="#fff" />
+                    <Text style={[swipeStyles.btnLabel, T.semibold]}>Edit</Text>
+                </TouchableOpacity>
+                {paidByMe && (
+                    <TouchableOpacity
+                        style={[swipeStyles.btn, { backgroundColor: '#E05252' }]}
+                        onPress={() => { close(); onDelete(); }}
+                        activeOpacity={0.8}
+                    >
+                        <Trash2 size={ms(17)} color="#fff" />
+                        <Text style={[swipeStyles.btnLabel, T.semibold]}>Delete</Text>
+                    </TouchableOpacity>
+                )}
+            </View>
+            <Animated.View
+                {...panResponder.panHandlers}
+                style={{ transform: [{ translateX }] }}
+            >
+                {children}
+            </Animated.View>
+        </View>
+    );
+}
+
+const swipeStyles = StyleSheet.create({
+    container: {
+        position: 'relative',
+        borderRadius: ms(20),
+        overflow: 'hidden',
+    },
+    actionsWrap: {
+        position: 'absolute',
+        right: 0,
+        top: 0,
+        bottom: 0,
+        flexDirection: 'row',
+    },
+    btn: {
+        width: ACTION_BTN_W,
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: vs(4),
+    },
+    btnLabel: {
+        color: '#fff',
+        fontSize: ms(11),
+    },
+});
 
 export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
@@ -71,6 +185,13 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [removingMemberId, setRemovingMemberId] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [shareLoading, setShareLoading] = useState(false);
+
+    const [editTarget, setEditTarget] = useState<Expense | null>(null);
+    const [editTitle, setEditTitle] = useState('');
+    const [editAmount, setEditAmount] = useState('');
+    const [editSaving, setEditSaving] = useState(false);
+    const [toastMsg, setToastMsg] = useState<string | null>(null);
+    const toastAnim = useRef(new Animated.Value(0)).current;
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -218,6 +339,15 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 },
             ]
         );
+    };
+
+    const handleNudgeExpense = async (expense: Expense) => {
+        try {
+            await expensesApi.nudge(groupId, expense.id);
+            Alert.alert('Nudge sent', `Reminder sent to participants of "${expense.title}".`);
+        } catch {
+            Alert.alert('Error', 'Could not send nudge. Try again.');
+        }
     };
 
     const handleShareInvite = async () => {
@@ -507,61 +637,54 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const paidByMe = expense.paid_by === user?.id;
                         return (
                             <Animated.View key={expense.id} style={{ opacity: expenseAnims[expIdx] ?? 1 }}>
-                            <View style={[styles.row, {
-                                backgroundColor: colors.surface,
-                                shadowColor: isDark ? '#000' : '#0A3020',
-                                shadowOpacity: isDark ? 0.28 : 0.10,
-                                shadowRadius: isDark ? 14 : 10,
-                                shadowOffset: { width: 0, height: isDark ? 10 : 4 },
-                                elevation: isDark ? 6 : 4,
-                            }]}>
-                                <CharacterShape
-                                    shape={c?.character_shape ?? 'rect'}
-                                    color={c?.character_color ?? expense.payer_avatar_color ?? '#6B7280'}
-                                    variant="mini"
-                                />
-                                <View style={styles.rowInfo}>
-                                    <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={1}>{expense.title}</Text>
-                                    <Text style={[styles.rowMeta, { color: colors.secondaryText }, T.regular]}>
-                                        {expense.payer_name} paid · split {expense.participants.length} ways
-                                    </Text>
-                                </View>
-                                <View style={styles.rowEnd}>
-                                    <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontVariant: ['tabular-nums'] }, T.bold]}>
-                                        ${formatCurrency(expense.amount)}
-                                    </Text>
-                                    <Text style={[styles.rowDate, { color: colors.faintText }, T.regular]}>
-                                        {new Date(expense.created_at).toLocaleDateString()}
-                                    </Text>
-                                    <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>${formatCurrency(each)} each</Text>
-                                    {paidByMe && (
-                                        <TouchableOpacity
-                                            onPress={() => handleDeleteExpense(expense)}
-                                            disabled={deletingId === expense.id}
-                                            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
-                                            activeOpacity={0.7}
-                                            style={{ marginTop: vs(4), opacity: deletingId === expense.id ? 0.4 : 1 }}
-                                        >
-                                            {deletingId === expense.id
-                                                ? <ActivityIndicator size="small" color={colors.danger} />
-                                                : <Trash2 size={ms(15)} color={colors.danger} />
-                                            }
-                                        </TouchableOpacity>
-                                    )}
-                                    <TouchableOpacity
-                                        onPress={() => {
-                                            setEditTarget(expense);
-                                            setEditTitle(expense.title);
-                                            setEditAmount(String(expense.amount));
-                                        }}
-                                        hitSlop={{ top: 12, bottom: 12, left: 8, right: 8 }}
-                                        activeOpacity={0.7}
-                                        style={{ marginTop: vs(4) }}
-                                    >
-                                        <Pencil size={ms(15)} color={colors.secondaryText} />
-                                    </TouchableOpacity>
-                                </View>
-                            </View>
+                                <SwipeableExpenseRow
+                                    paidByMe={paidByMe}
+                                    onNudge={() => handleNudgeExpense(expense)}
+                                    onEdit={() => {
+                                        setEditTarget(expense);
+                                        setEditTitle(expense.title);
+                                        setEditAmount(String(expense.amount));
+                                    }}
+                                    onDelete={() => handleDeleteExpense(expense)}
+                                >
+                                    <View style={[styles.row, {
+                                        backgroundColor: colors.surface,
+                                        shadowColor: isDark ? '#000' : '#0A3020',
+                                        shadowOpacity: isDark ? 0.28 : 0.10,
+                                        shadowRadius: isDark ? 14 : 10,
+                                        shadowOffset: { width: 0, height: isDark ? 10 : 4 },
+                                        elevation: isDark ? 6 : 4,
+                                        marginBottom: 0,
+                                    }]}>
+                                        <CharacterShape
+                                            shape={c?.character_shape ?? 'rect'}
+                                            color={c?.character_color ?? expense.payer_avatar_color ?? '#6B7280'}
+                                            variant="mini"
+                                        />
+                                        <View style={styles.rowInfo}>
+                                            <Text
+                                                style={[styles.rowTitle, { color: colors.text }, T.semibold]}
+                                                numberOfLines={2}
+                                            >
+                                                {expense.title}
+                                            </Text>
+                                            <Text style={[styles.rowMeta, { color: colors.secondaryText }, T.regular]}>
+                                                {expense.payer_name} paid · split {expense.participants.length} ways
+                                            </Text>
+                                        </View>
+                                        <View style={styles.rowEnd}>
+                                            <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontVariant: ['tabular-nums'] }, T.bold]}>
+                                                ${formatCurrency(expense.amount)}
+                                            </Text>
+                                            <Text style={[styles.rowDate, { color: colors.faintText }, T.regular]}>
+                                                {new Date(expense.created_at).toLocaleDateString()}
+                                            </Text>
+                                            <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>
+                                                ${formatCurrency(each)} each
+                                            </Text>
+                                        </View>
+                                    </View>
+                                </SwipeableExpenseRow>
                             </Animated.View>
                         );
                     })

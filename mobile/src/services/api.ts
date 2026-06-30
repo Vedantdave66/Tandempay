@@ -191,6 +191,11 @@ export const expensesApi = {
         request<void>(`/groups/${groupId}/expenses/${expenseId}`, {
             method: 'DELETE',
         }),
+    nudge: (groupId: string, expenseId: string) =>
+        request<{ nudged: number }>(`/groups/${groupId}/expenses/${expenseId}/nudge`, {
+            method: 'POST',
+            body: JSON.stringify({}),
+        }),
     patch: (expenseId: string, data: { title?: string; amount?: number }) =>
         request<Expense>(`/expenses/${expenseId}`, {
             method: 'PATCH',

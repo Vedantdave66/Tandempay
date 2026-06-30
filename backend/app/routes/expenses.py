@@ -376,3 +376,71 @@ async def delete_expense(
         },
     )
     return None
+
+
+@router.post("/{expense_id}/nudge")
+async def nudge_expense_participants(
+    group_id: str,
+    expense_id: str,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Send a push reminder to every non-paying participant. Only the payer can trigger this."""
+    await _verify_membership(group_id, current_user.id, db)
+
+    expense_result = await db.execute(
+        select(Expense).where(Expense.id == expense_id, Expense.group_id == group_id)
+    )
+    expense = expense_result.scalar_one_or_none()
+    if not expense:
+        raise HTTPException(status_code=404, detail="Expense not found")
+    if expense.paid_by != current_user.id:
+        raise HTTPException(status_code=403, detail="Only the payer can send a nudge")
+
+    parts_result = await db.execute(
+        select(ExpenseParticipant).where(
+            ExpenseParticipant.expense_id == expense_id,
+            ExpenseParticipant.user_id != current_user.id,
+        )
+    )
+    participants = parts_result.scalars().all()
+
+    if not participants:
+        return {"nudged": 0}
+
+    participant_user_ids = [p.user_id for p in participants]
+    users_result = await db.execute(select(User).where(User.id.in_(participant_user_ids)))
+    users_by_id = {u.id: u for u in users_result.scalars().all()}
+
+    nudged = 0
+    for p in participants:
+        user_obj = users_by_id.get(p.user_id)
+        if not user_obj:
+            continue
+        notif = Notification(
+            user_id=p.user_id,
+            type="expense_nudge",
+            title="Friendly reminder 👋",
+            message=(
+                f"{current_user.name} is waiting on your share "
+                f"(${float(p.share_amount):.2f}) for \"{expense.title}\""
+            ),
+            group_id=group_id,
+            reference_id=expense_id,
+        )
+        db.add(notif)
+        await db.flush()
+        try:
+            await push_for_user(user_obj, notif.title, notif.message, notif.id)
+            nudged += 1
+        except Exception:
+            logger.warning(
+                "nudge_expense: push failed for user_id=%s expense_id=%s",
+                p.user_id, expense_id,
+            )
+
+    logger.info(
+        "nudge_expense: expense_id=%s payer=%s nudged=%d",
+        expense_id, current_user.id, nudged,
+    )
+    return {"nudged": nudged}
