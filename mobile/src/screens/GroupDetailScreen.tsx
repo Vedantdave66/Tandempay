@@ -52,6 +52,14 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
     const REVEAL = paidByMe ? ACTION_BTN_W * 3 : ACTION_BTN_W;
     const translateX = useRef(new Animated.Value(0)).current;
     const isOpen = useRef(false);
+    const startX = useRef(0);
+
+    // Kept in refs so the panResponder (created once) always calls fresh functions
+    // and always targets the current REVEAL value even if paidByMe changes.
+    const revealRef = useRef(REVEAL);
+    const openRef  = useRef<() => void>(() => {});
+    const closeRef = useRef<() => void>(() => {});
+    revealRef.current = REVEAL;
 
     const close = useCallback(() => {
         Animated.spring(translateX, {
@@ -61,23 +69,31 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
 
     const open = useCallback(() => {
         Animated.spring(translateX, {
-            toValue: -REVEAL, useNativeDriver: true, damping: 20, stiffness: 260,
+            toValue: -revealRef.current, useNativeDriver: true, damping: 20, stiffness: 260,
         }).start(() => { isOpen.current = true; });
-    }, [translateX, REVEAL]);
+    }, [translateX]);
+
+    openRef.current  = open;
+    closeRef.current = close;
 
     const panResponder = useRef(PanResponder.create({
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) =>
-            Math.abs(g.dx) > 6 && Math.abs(g.dx) > Math.abs(g.dy) * 1.5,
-        onPanResponderGrant: () => { translateX.extractOffset(); },
+            Math.abs(g.dx) > 8 && Math.abs(g.dx) > Math.abs(g.dy) * 2,
+        onPanResponderGrant: () => {
+            // Capture where the row is right now (no extractOffset to avoid accumulation bugs)
+            startX.current = (translateX as any)._value as number;
+        },
         onPanResponderMove: (_, g) => {
-            translateX.setValue(Math.min(0, Math.max(-REVEAL, g.dx)));
+            // startX + g.dx correctly handles both open-start and closed-start gestures
+            const next = Math.min(0, Math.max(-revealRef.current, startX.current + g.dx));
+            translateX.setValue(next);
         },
-        onPanResponderRelease: (_, g) => {
-            translateX.flattenOffset();
+        onPanResponderRelease: () => {
             const cur = (translateX as any)._value as number;
-            if (cur < -SWIPE_THRESH) open(); else close();
+            if (cur < -SWIPE_THRESH) openRef.current(); else closeRef.current();
         },
-        onPanResponderTerminate: () => { translateX.flattenOffset(); close(); },
+        onPanResponderTerminate: () => { closeRef.current(); },
     })).current;
 
     return (
