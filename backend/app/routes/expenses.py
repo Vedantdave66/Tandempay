@@ -385,77 +385,65 @@ async def nudge_expense_participants(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Send a push reminder to every non-paying participant. Only the payer can trigger this."""
-    await _verify_membership(group_id, current_user.id, db)
+    """Send a push reminder to every other participant of an expense."""
+    try:
+        await _verify_membership(group_id, current_user.id, db)
 
-    logger.info(
-        "nudge_expense: querying expense_id=%s group_id=%s user=%s",
-        expense_id, group_id, current_user.id,
-    )
-
-    expense_result = await db.execute(
-        select(Expense).where(Expense.id == expense_id, Expense.group_id == group_id)
-    )
-    expense = expense_result.scalar_one_or_none()
-    if not expense:
-        logger.warning(
-            "nudge_expense: expense not found expense_id=%s group_id=%s",
-            expense_id, group_id,
+        logger.info(
+            "nudge_expense: start expense_id=%s group_id=%s user=%s",
+            expense_id, group_id, current_user.id,
         )
-        raise HTTPException(status_code=404, detail="Expense not found")
-    if expense.paid_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the payer can send a nudge")
 
-    parts_result = await db.execute(
-        select(ExpenseParticipant).where(
-            ExpenseParticipant.expense_id == expense_id,
-            ExpenseParticipant.user_id != current_user.id,
+        expense_result = await db.execute(
+            select(Expense).where(Expense.id == expense_id)
         )
-    )
-    participants = parts_result.scalars().all()
+        expense = expense_result.scalar_one_or_none()
+        if not expense:
+            logger.warning("nudge_expense: expense not found expense_id=%s", expense_id)
+            raise HTTPException(status_code=404, detail="Expense not found")
 
-    if not participants:
-        return {"nudged": 0}
-
-    participant_user_ids = [p.user_id for p in participants]
-    users_result = await db.execute(select(User).where(User.id.in_(participant_user_ids)))
-    users_by_id = {u.id: u for u in users_result.scalars().all()}
-
-    nudged = 0
-    for p in participants:
-        user_obj = users_by_id.get(p.user_id)
-        if not user_obj:
-            continue
-        share = float(p.share_amount)
-        title_text = expense.title
-        notif = Notification(
-            user_id=p.user_id,
-            type="expense_nudge",
-            title="Friendly reminder",
-            message=(
-                current_user.name
-                + " is waiting on your share"
-                + " ($" + f"{share:.2f}" + ")"
-                + " for " + title_text
-            ),
-            group_id=group_id,
-            reference_id=expense_id,
+        logger.info(
+            "nudge_expense: found expense paid_by=%s current_user=%s",
+            expense.paid_by, current_user.id,
         )
-        db.add(notif)
-        await db.flush()
-        try:
-            await push_for_user(user_obj, notif.title, notif.message, notif.id)
-            nudged += 1
-        except Exception:
-            logger.warning(
-                "nudge_expense: push failed for user_id=%s expense_id=%s",
-                p.user_id,
-                expense_id,
+
+        parts_result = await db.execute(
+            select(ExpenseParticipant).where(
+                ExpenseParticipant.expense_id == expense_id,
+                ExpenseParticipant.user_id != current_user.id,
             )
+        )
+        participants = parts_result.scalars().all()
+        logger.info("nudge_expense: participant_count=%d", len(participants))
 
-    await db.commit()
-    logger.info(
-        "nudge_expense: expense_id=%s payer=%s nudged=%d",
-        expense_id, current_user.id, nudged,
-    )
-    return {"nudged": nudged}
+        if not participants:
+            return {"nudged": 0}
+
+        participant_user_ids = [p.user_id for p in participants]
+        users_result = await db.execute(
+            select(User).where(User.id.in_(participant_user_ids))
+        )
+        users_by_id = {u.id: u for u in users_result.scalars().all()}
+
+        nudged = 0
+        for p in participants:
+            user_obj = users_by_id.get(p.user_id)
+            if not user_obj:
+                continue
+            try:
+                msg = current_user.name + " is waiting on your share for " + expense.title
+                await push_for_user(user_obj, "Friendly reminder", msg, expense_id)
+                nudged += 1
+            except Exception as push_err:
+                logger.warning(
+                    "nudge_expense: push failed user=%s err=%s", p.user_id, push_err
+                )
+
+        logger.info("nudge_expense: complete nudged=%d", nudged)
+        return {"nudged": nudged}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("nudge_expense: unexpected error expense_id=%s: %s", expense_id, exc)
+        raise HTTPException(status_code=500, detail="Internal server error")
