@@ -388,13 +388,20 @@ async def nudge_expense_participants(
     """Send a push reminder to every non-paying participant. Only the payer can trigger this."""
     await _verify_membership(group_id, current_user.id, db)
 
-    logger.info("nudge_expense: querying expense_id=%r group_id=%r user=%s", expense_id, group_id, current_user.id)
+    logger.info(
+        "nudge_expense: querying expense_id=%s group_id=%s user=%s",
+        expense_id, group_id, current_user.id,
+    )
+
     expense_result = await db.execute(
         select(Expense).where(Expense.id == expense_id, Expense.group_id == group_id)
     )
     expense = expense_result.scalar_one_or_none()
     if not expense:
-        logger.warning("nudge_expense: expense not found expense_id=%r group_id=%r", expense_id, group_id)
+        logger.warning(
+            "nudge_expense: expense not found expense_id=%s group_id=%s",
+            expense_id, group_id,
+        )
         raise HTTPException(status_code=404, detail="Expense not found")
     if expense.paid_by != current_user.id:
         raise HTTPException(status_code=403, detail="Only the payer can send a nudge")
@@ -419,13 +426,17 @@ async def nudge_expense_participants(
         user_obj = users_by_id.get(p.user_id)
         if not user_obj:
             continue
+        share = float(p.share_amount)
+        title_text = expense.title
         notif = Notification(
             user_id=p.user_id,
             type="expense_nudge",
-            title="Friendly reminder 👋",
+            title="Friendly reminder",
             message=(
-                f"{current_user.name} is waiting on your share "
-                f"(${float(p.share_amount):.2f}) for '{expense.title}'"
+                current_user.name
+                + " is waiting on your share"
+                + " ($" + f"{share:.2f}" + ")"
+                + " for " + title_text
             ),
             group_id=group_id,
             reference_id=expense_id,
@@ -438,12 +449,13 @@ async def nudge_expense_participants(
         except Exception:
             logger.warning(
                 "nudge_expense: push failed for user_id=%s expense_id=%s",
-                p.user_id, expense_id,
+                p.user_id,
+                expense_id,
             )
 
+    await db.commit()
     logger.info(
         "nudge_expense: expense_id=%s payer=%s nudged=%d",
         expense_id, current_user.id, nudged,
     )
-    await db.commit()
     return {"nudged": nudged}
