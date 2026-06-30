@@ -388,11 +388,13 @@ async def nudge_expense_participants(
     """Send a push reminder to every non-paying participant. Only the payer can trigger this."""
     await _verify_membership(group_id, current_user.id, db)
 
+    logger.info("nudge_expense: querying expense_id=%r group_id=%r user=%s", expense_id, group_id, current_user.id)
     expense_result = await db.execute(
         select(Expense).where(Expense.id == expense_id, Expense.group_id == group_id)
     )
     expense = expense_result.scalar_one_or_none()
     if not expense:
+        logger.warning("nudge_expense: expense not found expense_id=%r group_id=%r", expense_id, group_id)
         raise HTTPException(status_code=404, detail="Expense not found")
     if expense.paid_by != current_user.id:
         raise HTTPException(status_code=403, detail="Only the payer can send a nudge")
