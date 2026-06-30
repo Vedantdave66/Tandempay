@@ -425,7 +425,7 @@ async def nudge_expense_participants(
             title="Friendly reminder 👋",
             message=(
                 f"{current_user.name} is waiting on your share "
-                f"(${float(p.share_amount):.2f}) for \"{expense.title}\""
+                f"(${float(p.share_amount):.2f}) for '{expense.title}'"
             ),
             group_id=group_id,
             reference_id=expense_id,
@@ -445,4 +445,5 @@ async def nudge_expense_participants(
         "nudge_expense: expense_id=%s payer=%s nudged=%d",
         expense_id, current_user.id, nudged,
     )
+    await db.commit()
     return {"nudged": nudged}
