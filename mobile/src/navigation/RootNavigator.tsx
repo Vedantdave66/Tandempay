@@ -7,7 +7,6 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { scale } from '../utils/responsive';
-import { groupsApi } from '../services/api';
 
 import MainTabNavigator from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
@@ -30,6 +29,7 @@ import ReceiptScanScreen from '../screens/ReceiptScanScreen';
 import SmartSplitScreen from '../screens/SmartSplitScreen';
 import FriendsScreen from '../screens/FriendsScreen';
 import SubscriptionScreen from '../screens/SubscriptionScreen';
+import JoinGroupScreen from '../screens/JoinGroupScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -112,19 +112,14 @@ export default function RootNavigator() {
             const token = match[1];
 
             if (user) {
-                try {
-                    const result = await groupsApi.joinByToken(token);
-                    const tryNav = () => {
-                        if (navRef.current?.isReady()) {
-                            navRef.current.navigate('Group' as never, { groupId: result.group_id } as never);
-                        } else {
-                            setTimeout(tryNav, 100);
-                        }
-                    };
-                    tryNav();
-                } catch (err: any) {
-                    Alert.alert('Could not join group', err.message || 'Invalid invite link.');
-                }
+                const tryNav = () => {
+                    if (navRef.current?.isReady()) {
+                        navRef.current.navigate('JoinGroup' as never, { token } as never);
+                    } else {
+                        setTimeout(tryNav, 100);
+                    }
+                };
+                tryNav();
             } else {
                 await AsyncStorage.setItem('@pending_invite_token', token);
             }
@@ -133,6 +128,23 @@ export default function RootNavigator() {
         Linking.getInitialURL().then(url => { if (url) handleURL(url); });
         const sub = Linking.addEventListener('url', ({ url }) => handleURL(url));
         return () => sub.remove();
+    }, [user, loading]);
+
+    // Consume any pending invite token saved before the user was logged in
+    useEffect(() => {
+        if (!user || loading) return;
+        AsyncStorage.getItem('@pending_invite_token').then(token => {
+            if (!token) return;
+            AsyncStorage.removeItem('@pending_invite_token');
+            const tryNav = () => {
+                if (navRef.current?.isReady()) {
+                    navRef.current.navigate('JoinGroup' as never, { token } as never);
+                } else {
+                    setTimeout(tryNav, 100);
+                }
+            };
+            tryNav();
+        });
     }, [user, loading]);
 
     if (loading || (!user && onboardingSeen === null)) {
@@ -253,6 +265,11 @@ export default function RootNavigator() {
                             name="Subscription"
                             component={SubscriptionScreen}
                             options={{ animation: 'slide_from_right' }}
+                        />
+                        <Stack.Screen
+                            name="JoinGroup"
+                            component={JoinGroupScreen}
+                            options={{ animation: 'slide_from_bottom' }}
                         />
                     </Stack.Group>
                 )}
