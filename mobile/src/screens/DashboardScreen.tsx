@@ -15,6 +15,7 @@ import {
 } from '../services/api';
 import {
     Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake, ChevronRight, X,
+    Users, Plus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useNotifications } from '../context/NotificationContext';
@@ -450,13 +451,70 @@ export default function DashboardScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>
 
-                {groups.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
-                            Your squads live here. Make one and stop doing tab math in the group chat.
+                {groups.length === 0 && !loading ? (
+                    <View style={styles.emptyWrap}>
+                        <CharacterShape
+                            shape={user?.character_shape ?? 'round'}
+                            color={user?.character_color ?? '#3ECF8E'}
+                            variant="hero"
+                        />
+
+                        <Text style={[styles.emptyHeadline, T.extrabold, { color: colors.text }]}>
+                            Welcome to TandemPay 👋
                         </Text>
+                        <Text style={[styles.emptySub, T.regular, { color: colors.secondaryText }]}>
+                            The easiest way to split bills and settle up with friends — all via Interac, totally free.
+                        </Text>
+
+                        {[
+                            {
+                                icon: Users,
+                                color: '#6366F1',
+                                title: 'Create a group',
+                                body: 'Roommates, a trip, a dinner — any shared expense works.',
+                            },
+                            {
+                                icon: Receipt,
+                                color: colors.gold,
+                                title: 'Log expenses together',
+                                body: 'Add what you paid. TandemPay tracks who owes what automatically.',
+                            },
+                            {
+                                icon: CheckCheck,
+                                color: colors.accent,
+                                title: 'Settle up — automatically',
+                                body: 'Set your unique Interac address once. Payments confirm the moment they land.',
+                            },
+                        ].map((step, i) => (
+                            <View
+                                key={i}
+                                style={[styles.emptyStep, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                            >
+                                <View style={[styles.emptyStepIcon, { backgroundColor: step.color + '18' }]}>
+                                    <step.icon size={ms(20)} color={step.color} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.emptyStepTitle, T.semibold, { color: colors.text }]}>
+                                        {step.title}
+                                    </Text>
+                                    <Text style={[styles.emptyStepBody, T.regular, { color: colors.secondaryText }]}>
+                                        {step.body}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="medium"
+                            style={[styles.emptyBtn, { backgroundColor: colors.accent }]}
+                            onPress={() => navigation.navigate('CreateGroup' as never)}
+                        >
+                            <Plus size={ms(18)} color="#fff" />
+                            <Text style={[T.bold, { color: '#fff', fontSize: ms(15) }]}>Create your first group</Text>
+                        </PressableScale>
                     </View>
-                ) : (
+                ) : groups.length > 0 ? (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -480,7 +538,7 @@ export default function DashboardScreen({ navigation }: any) {
                             );
                         })}
                     </ScrollView>
-                )}
+                ) : null}
 
                 {/* Recent activity — inset grouped list */}
                 <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(36), marginBottom: vs(16) }, T.bold]}>
@@ -709,17 +767,63 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(20),
         gap: scale(12),
     },
-    emptyState: {
-        marginHorizontal: scale(20),
-        padding: scale(32),
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
-        alignItems: 'center',
-    },
     emptyText: {
         fontSize: ms(13),
         textAlign: 'center',
         lineHeight: ms(20),
+    },
+    emptyWrap: {
+        paddingHorizontal: scale(4),
+        paddingTop: vs(8),
+        gap: vs(14),
+        alignItems: 'center',
+    },
+    emptyHeadline: {
+        fontSize: ms(24),
+        letterSpacing: -0.5,
+        textAlign: 'center',
+    },
+    emptySub: {
+        fontSize: ms(14),
+        lineHeight: 21,
+        textAlign: 'center',
+        opacity: 0.8,
+        paddingHorizontal: scale(8),
+    },
+    emptyStep: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(12),
+        borderRadius: ms(16),
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: scale(14),
+    },
+    emptyStepIcon: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: ms(12),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyStepTitle: {
+        fontSize: ms(14),
+        marginBottom: vs(2),
+    },
+    emptyStepBody: {
+        fontSize: ms(12),
+        lineHeight: 18,
+        opacity: 0.85,
+    },
+    emptyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(8),
+        height: vs(50),
+        borderRadius: ms(14),
+        width: '100%',
+        marginTop: vs(4),
     },
 
     // Activity — inset grouped list
