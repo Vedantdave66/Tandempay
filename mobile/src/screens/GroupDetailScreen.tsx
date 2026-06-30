@@ -367,19 +367,17 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     };
 
     const handleShareInvite = async () => {
-        if (!group) return;
-        setShareLoading(true);
+        if (!group?.invite_token) return;
+        const link = `tandempay://join/${group.invite_token}`;
         try {
-            const result = await groupsApi.generateInvite(groupId);
             await Share.share({
-                message: `Join ${group.name} on TandemPay! Split bills and settle free via Interac. ${result.invite_url}`,
+                message: `Join me on TandemPay! Tap the link to join "${group.name}": ${link}`,
+                title: `Join ${group.name} on TandemPay`,
             });
         } catch (err: any) {
             if (err.message !== 'The user did not share') {
-                Alert.alert('Error', err.message || 'Could not generate invite link.');
+                Alert.alert('Error', err.message || 'Could not share invite link.');
             }
-        } finally {
-            setShareLoading(false);
         }
     };
 
@@ -592,25 +590,17 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         <Send size={15} color={colors.gold} />
                         <Text style={[styles.ghostBtnText, { color: colors.gold }, T.bold]}>Settle up</Text>
                     </TouchableOpacity>
-                    {user?.id === group?.created_by && (
-                        <TouchableOpacity
-                            style={[styles.ghostBtn, { borderColor: colors.accent, opacity: shareLoading ? 0.6 : 1 }]}
-                            onPress={() => {
-                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                                handleShareInvite();
-                            }}
-                            disabled={shareLoading}
-                            activeOpacity={0.82}
-                        >
-                            {shareLoading
-                                ? <ActivityIndicator size="small" color={colors.accent} />
-                                : <Share2 size={15} color={colors.accent} />
-                            }
-                            {!shareLoading && (
-                                <Text style={[styles.ghostBtnText, { color: colors.accent }, T.bold]}>Invite</Text>
-                            )}
-                        </TouchableOpacity>
-                    )}
+                    <TouchableOpacity
+                        style={[styles.ghostBtn, { borderColor: colors.accent }]}
+                        onPress={() => {
+                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                            handleShareInvite();
+                        }}
+                        activeOpacity={0.82}
+                    >
+                        <Share2 size={15} color={colors.accent} />
+                        <Text style={[styles.ghostBtnText, { color: colors.accent }, T.bold]}>Invite</Text>
+                    </TouchableOpacity>
                 </View>
 
                 <View style={styles.tabRow}>
