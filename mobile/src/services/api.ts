@@ -108,6 +108,7 @@ export interface Group {
     created_at: string;
     members: GroupMember[];
     total_expenses: number;
+    invite_token?: string;
 }
 
 export interface GroupListItem {
@@ -147,6 +148,8 @@ export const groupsApi = {
         }),
     generateInvite: (groupId: string) =>
         request<GroupInvite>(`/groups/${groupId}/invite/generate`, { method: 'POST' }),
+    previewInvite: (token: string) =>
+        request<GroupPreview>(`/groups/join/${token}`),
     joinByToken: (token: string) =>
         request<{ group_id: string }>(`/groups/join/${token}`, { method: 'POST' }),
     deleteGroup: (groupId: string) =>
