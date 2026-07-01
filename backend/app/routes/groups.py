@@ -194,9 +194,7 @@ async def get_group(group_id: str, current_user: User = Depends(get_current_user
         created_at=group.created_at,
         members=members_out,
         total_expenses=total,
-        # Expose invite_token to the creator only; None for all other members
-        # so the token is never leaked to non-creators via this endpoint.
-        invite_token=group.invite_token if group.created_by == current_user.id else None,
+        invite_token=group.invite_token,
     )
 
 
