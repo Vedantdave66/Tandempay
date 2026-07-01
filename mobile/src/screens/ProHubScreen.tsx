@@ -35,10 +35,10 @@ type SectionRow = {
 };
 
 const PRO_FEATURES = [
-    'AI Receipt Scanning — itemized splits instantly',
-    'Recurring Expenses — auto-split on a schedule',
-    'Export Data — CSV & PDF history',
-    'Priority Support — dedicated queue',
+    'Receipt scanning, split by item',
+    'Recurring expenses, auto-split',
+    'Export history as CSV or PDF',
+    'Priority support',
 ];
 
 const SETTINGS_ROWS = [
@@ -72,7 +72,7 @@ export default function ProHubScreen({ navigation }: any) {
 
     const handleRowPress = (row: SectionRow) => {
         if (row.special === 'invite') return handleInvite();
-        if (row.special === 'tutorial') return Alert.alert('Tutorial', 'Guided tutorial coming soon!');
+        if (row.special === 'tutorial') return Alert.alert('Tutorial', 'Guided tutorial coming soon.');
         if (row.special === 'signout') return handleSignOut();
         if (row.nav) navigation.navigate(row.nav);
     };
@@ -84,7 +84,7 @@ export default function ProHubScreen({ navigation }: any) {
             return;
         }
         await Share.share({
-            message: `Hey! I'm using TandemPay to split expenses with roommates. Join me: https://tandempay.ca/invite`,
+            message: `I'm using TandemPay to split expenses with roommates. Join me: https://tandempay.ca/invite`,
             title: 'Join me on TandemPay',
         });
     };
@@ -133,7 +133,7 @@ export default function ProHubScreen({ navigation }: any) {
                         onPress={() => setShowCharModal(true)}
                         style={[styles.customiseChip, { backgroundColor: colors.accentBg }]}
                     >
-                        <Text style={[styles.customiseChipText, { color: colors.accent }, T.semibold]}>✏ Customise character</Text>
+                        <Text style={[styles.customiseChipText, { color: colors.accent }, T.semibold]}>Customise character</Text>
                     </PressableScale>
                 </LinearGradient>
 
@@ -166,7 +166,7 @@ export default function ProHubScreen({ navigation }: any) {
                         >
                             <View style={[styles.upgradeBtnInner, { borderColor: 'rgba(255,255,255,0.25)' }]}>
                                 <Text style={[styles.upgradeBtnText, T.bold]}>
-                                    {isPro ? 'Manage subscription →' : 'Upgrade to Pro →'}
+                                    {isPro ? 'Manage subscription' : 'Upgrade to Pro'}
                                 </Text>
                             </View>
                         </PressableScale>
@@ -226,9 +226,9 @@ export default function ProHubScreen({ navigation }: any) {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalSheet, { backgroundColor: colors.surface }]}>
                         <View style={[styles.modalHandle, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.modalTitle, T.extrabold, { color: colors.text }]}>Interac Auto-Confirm</Text>
+                        <Text style={[styles.modalTitle, T.bold, { color: colors.text }]}>Interac Auto-Confirm</Text>
                         <Text style={[styles.modalSubtitle, T.regular, { color: colors.secondaryText }]}>
-                            Set this as your notification email in your bank's Interac settings. TandemPay will automatically confirm payments — no action needed in the app.
+                            Add this as your Interac notification email. TandemPay confirms payments automatically.
                         </Text>
                         <View style={[styles.tokenChip, { backgroundColor: colors.accentBg }]}>
                             <Text style={[styles.tokenText, T.semibold, { color: colors.accent }]} selectable>

@@ -152,7 +152,7 @@ export default function NotificationsScreen() {
                 </View>
                 {unreadCount > 0 && (
                     <TouchableOpacity onPress={handleMarkAllRead} activeOpacity={0.75} style={styles.markAllBtn}>
-                        <Text style={[styles.markAllText, { color: colors.accent }, T.semibold]}>Mark All Read</Text>
+                        <Text style={[styles.markAllText, { color: colors.accent }, T.semibold]}>Mark all read</Text>
                     </TouchableOpacity>
                 )}
             </View>
@@ -247,7 +247,7 @@ const styles = StyleSheet.create({
     },
     rowMessage: {
         fontSize: ms(14),
-        lineHeight: 19,
+        lineHeight: 20,
     },
     timeText: {
         fontSize: ms(12),

@@ -115,7 +115,7 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
                     <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }]} />
 
                     <View style={styles.modalHeader}>
-                        <Text style={[styles.modalTitle, T.semibold, { color: colors.text }]}>Balance Breakdown</Text>
+                        <Text style={[styles.modalTitle, T.semibold, { color: colors.text }]}>Balance breakdown</Text>
                         <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn} activeOpacity={0.70}>
                             <X size={18} color={colors.secondaryText} />
                         </TouchableOpacity>
@@ -273,7 +273,7 @@ export default function DashboardScreen({ navigation }: any) {
         const isCreator = item.created_by === user?.id;
         if (isCreator) {
             Alert.alert(
-                'Delete Group',
+                'Delete group',
                 `"${item.name}" will be permanently deleted for all members.`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -285,7 +285,7 @@ export default function DashboardScreen({ navigation }: any) {
             );
         } else {
             Alert.alert(
-                'Leave Group',
+                'Leave group',
                 `You'll be removed from "${item.name}".`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -460,10 +460,10 @@ export default function DashboardScreen({ navigation }: any) {
                         />
 
                         <Text style={[styles.emptyHeadline, T.extrabold, { color: colors.text }]}>
-                            Welcome to TandemPay 👋
+                            Welcome to TandemPay
                         </Text>
                         <Text style={[styles.emptySub, T.regular, { color: colors.secondaryText }]}>
-                            The easiest way to split bills and settle up with friends — all via Interac, totally free.
+                            Split bills. Track balances. Settle up via Interac.
                         </Text>
 
                         {[
@@ -471,19 +471,19 @@ export default function DashboardScreen({ navigation }: any) {
                                 icon: Users,
                                 color: '#6366F1',
                                 title: 'Create a group',
-                                body: 'Roommates, a trip, a dinner — any shared expense works.',
+                                body: 'Rent, trips, dinners. Any shared cost.',
                             },
                             {
                                 icon: Receipt,
                                 color: colors.gold,
                                 title: 'Log expenses together',
-                                body: 'Add what you paid. TandemPay tracks who owes what automatically.',
+                                body: 'Log what you paid. Balances update instantly.',
                             },
                             {
                                 icon: CheckCheck,
                                 color: colors.accent,
-                                title: 'Settle up — automatically',
-                                body: 'Set your unique Interac address once. Payments confirm the moment they land.',
+                                title: 'Settle up',
+                                body: 'Set your Interac address once. TandemPay does the rest.',
                             },
                         ].map((step, i) => (
                             <View
@@ -548,7 +548,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={[styles.activityGroup, { backgroundColor: colors.surface }]}>
                     {recentActivity.length === 0 ? (
                         <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }, T.regular]}>
-                            Nothing yet — expenses and payments from your squads will land here.
+                            No activity yet.
                         </Text>
                     ) : (
                         recentActivity.map((n, i) => {
@@ -616,11 +616,11 @@ export default function DashboardScreen({ navigation }: any) {
                     <View style={[styles.interacIconWrap, { backgroundColor: colors.accentBg }]}>
                         <CheckCheck size={ms(22)} color={colors.accent} />
                     </View>
-                    <Text style={[styles.interacTitle, T.extrabold, { color: colors.text }]}>
+                    <Text style={[styles.interacTitle, T.bold, { color: colors.text }]}>
                         Auto-Confirm Payments
                     </Text>
                     <Text style={[styles.interacSub, T.regular, { color: colors.secondaryText }]}>
-                        Set this as your Interac notification email in your bank's settings — TandemPay will confirm payments the moment they land. No tapping required.
+                        Add this as your Interac notification email in your bank. TandemPay confirms payments the moment they arrive.
                     </Text>
 
                     <PressableScale
@@ -798,7 +798,7 @@ const styles = StyleSheet.create({
     },
     emptySub: {
         fontSize: ms(14),
-        lineHeight: 21,
+        lineHeight: 22,
         textAlign: 'center',
         opacity: 0.8,
         paddingHorizontal: scale(8),
@@ -969,7 +969,7 @@ const styles = StyleSheet.create({
     },
     interacSub: {
         fontSize: ms(14),
-        lineHeight: 21,
+        lineHeight: 22,
         textAlign: 'center',
         opacity: 0.75,
     },
