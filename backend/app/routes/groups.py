@@ -241,13 +241,15 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
 
 @router.post("/{group_id}/invite/generate")
 async def generate_invite(group_id: str, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Idempotent: returns existing token or generates a new one. Creator only."""
-    result = await db.execute(select(Group).where(Group.id == group_id))
+    """Idempotent: returns existing token or generates a new one. Any group member can call this."""
+    result = await db.execute(
+        select(Group).where(Group.id == group_id).options(selectinload(Group.members))
+    )
     group = result.scalar_one_or_none()
     if not group:
         raise HTTPException(status_code=404, detail="Group not found")
-    if group.created_by != current_user.id:
-        raise HTTPException(status_code=403, detail="Only the group creator can generate invite links")
+    if not any(m.user_id == current_user.id for m in group.members):
+        raise HTTPException(status_code=403, detail="Not a member of this group")
 
     if not group.invite_token:
         group.invite_token = secrets.token_urlsafe(12)
