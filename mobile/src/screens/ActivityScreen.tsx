@@ -201,7 +201,7 @@ export default function ActivityScreen({ navigation }: any) {
                             <CharacterShape shape="semi" color={colors.accent} variant="mini" />
                             <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Quiet in here</Text>
                             <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
-                                When your squads add expenses or settle up, you'll see it here first.
+                                Expenses and payments from your groups show up here.
                             </Text>
                         </View>
                     }
@@ -263,7 +263,7 @@ const styles = StyleSheet.create({
     },
     rowTitle: { fontSize: ms(15), flex: 1, marginRight: scale(8) },
     rowTime:  { fontSize: ms(12) },
-    rowMsg:   { fontSize: ms(14), lineHeight: 19 },
+    rowMsg:   { fontSize: ms(14), lineHeight: 20 },
     separator: { height: StyleSheet.hairlineWidth, marginLeft: scale(40) },
     empty: {
         alignItems: 'center',

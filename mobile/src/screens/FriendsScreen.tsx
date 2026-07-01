@@ -269,7 +269,7 @@ export default function FriendsScreen() {
                 ) : activeTab === 'friends' ? (
                     <>
                         <View style={styles.addFriendSection}>
-                            <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>ADD BY EMAIL</Text>
+                            <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>Add by email</Text>
                             <View style={styles.inputRow}>
                                 <TextInput
                                     style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, ...T.regular }]}
@@ -298,7 +298,7 @@ export default function FriendsScreen() {
                             <View style={[styles.emptyState, { marginTop: vs(24) }]}>
                                 <CharacterShape shape="round" color={colors.accent} variant="mini" />
                                 <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>Your crew goes here</Text>
-                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add someone by email above and splitting stops being math homework.</Text>
+                                <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>Add a friend by email to start splitting.</Text>
                             </View>
                         ) : (
                             friends.map(friend => (
@@ -336,7 +336,7 @@ export default function FriendsScreen() {
                     <>
                         {requests.received.length > 0 && (
                             <View style={{ marginBottom: vs(28) }}>
-                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>RECEIVED</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>Received</Text>
                                 {requests.received.map(req => (
                                     <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface }]}>
                                         <View style={styles.friendTop}>
@@ -361,7 +361,7 @@ export default function FriendsScreen() {
 
                         {requests.sent.length > 0 && (
                             <View>
-                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>SENT</Text>
+                                <Text style={[styles.sectionTitle, { color: colors.secondaryText }, T.semibold]}>Sent</Text>
                                 {requests.sent.map(req => (
                                     <View key={req.id} style={[styles.friendCard, { backgroundColor: colors.surface }]}>
                                         <View style={styles.friendTop}>

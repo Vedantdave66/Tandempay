@@ -40,8 +40,8 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
     const handleSubmit = async () => {
         const trimTitle = title.trim();
         const parsedAmount = parseFloat(amount);
-        if (!trimTitle) { Alert.alert('Error', 'Please enter a title.'); return; }
-        if (isNaN(parsedAmount) || parsedAmount <= 0) { Alert.alert('Error', 'Please enter a valid amount.'); return; }
+        if (!trimTitle) { Alert.alert('Error', 'Enter a title.'); return; }
+        if (isNaN(parsedAmount) || parsedAmount <= 0) { Alert.alert('Error', 'Enter a valid amount.'); return; }
         if (selectedIds.length === 0) { Alert.alert('Error', 'Select at least one participant.'); return; }
 
         setLoading(true);
@@ -149,7 +149,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
                                 style={[styles.cta, { backgroundColor: colors.accent, opacity: canAdvance ? 1 : 0.4 }]}
                                 activeOpacity={0.85}
                             >
-                                <Text style={styles.ctaText}>Next: who's splitting? →</Text>
+                                <Text style={styles.ctaText}>Next</Text>
                             </TouchableOpacity>
                         </>
                     ) : (
@@ -207,7 +207,7 @@ export default function AddExpenseScreen({ navigation, route }: Props) {
                                 style={[styles.cta, { backgroundColor: colors.accent, opacity: selectedIds.length === 0 ? 0.4 : 1 }]}
                                 activeOpacity={0.85}
                             >
-                                {loading ? <ActivityIndicator color="#0A5F30" /> : <Text style={styles.ctaText}>Add expense ✓</Text>}
+                                {loading ? <ActivityIndicator color="#0A5F30" /> : <Text style={styles.ctaText}>Add expense</Text>}
                             </TouchableOpacity>
                         </>
                     )}
