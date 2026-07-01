@@ -36,16 +36,16 @@ const FREE_FEATURES = [
 
 const PRO_FEATURES = [
     'Everything in Free',
-    'Recurring expenses — auto-split on a schedule',
-    'Export data — CSV & PDF history',
-    'AI receipt scanning — itemized splits',
+    'Recurring expenses, auto-split on a schedule',
+    'Export history as CSV or PDF',
+    'Receipt scanning, split by item',
     'Multi-currency tracking',
     'Priority support',
 ];
 
 function purchasePro() {
     console.log('TODO: wire RevenueCat');
-    Alert.alert('Payment coming soon', 'In-app purchase not configured yet — check back soon!');
+    Alert.alert('Coming soon', 'In-app purchases are not configured yet.');
 }
 
 export default function SubscriptionScreen({ navigation }: any) {
@@ -117,7 +117,7 @@ export default function SubscriptionScreen({ navigation }: any) {
                             activeOpacity={0.7}
                         >
                             <Text style={[styles.manageLink, T.semibold, { color: colors.accent }]}>
-                                Manage subscription →
+                                Manage subscription
                             </Text>
                         </TouchableOpacity>
                     </View>

@@ -60,7 +60,7 @@ const SHEET_HEIGHT_HALF  = SCREEN_H * 0.55;
 const SHEET_HEIGHT_THIRD = SCREEN_H * 0.32;
 
 const PLACEHOLDERS = [
-    'Thai for 4, Lakshit skipped drinks — $85 total',
+    'Thai for 4, Lakshit skipped drinks, $85 total',
     'Groceries $120, Maya got extra items',
     'Uber $34 split 3 ways, I paid',
 ];
@@ -174,7 +174,7 @@ export default function SmartSplitScreen({ navigation }: any) {
     // ── Intent handler ────────────────────────────────────────────────────────
     const handleIntentResult = useCallback((result: SmartSplitResponse) => {
         if (result.parse_failed) {
-            showToast("Couldn't parse that — try being more specific");
+            showToast("Couldn't parse that. Try being more specific.");
             return;
         }
 
@@ -252,7 +252,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                 break;
 
             default:
-                showToast("Couldn't understand that — try rephrasing");
+                showToast("Couldn't understand that. Try rephrasing.");
         }
     }, [allMembers, colors.accent, user?.id, showToast, openActionSheet]);
 
@@ -285,7 +285,7 @@ export default function SmartSplitScreen({ navigation }: any) {
             });
             handleIntentResult(result);
         } catch {
-            showToast("Couldn't process audio — try typing instead");
+            showToast("Couldn't process audio. Try typing instead.");
         } finally {
             setVoiceProcessing(false);
         }
@@ -396,7 +396,7 @@ export default function SmartSplitScreen({ navigation }: any) {
             });
             handleIntentResult(result);
         } catch {
-            showToast("Something went wrong — try again");
+            showToast("Something went wrong. Try again.");
         } finally {
             setParsing(false);
         }
@@ -486,7 +486,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                 .filter(s => s.included)
                 .map(s => s.user_id);
             await expensesApi.create(groupId, {
-                title: reviewTitle.trim() || 'Shared Expense',
+                title: reviewTitle.trim() || 'Shared expense',
                 amount: total,
                 paid_by: user.id,
                 participant_ids: participantIds,
@@ -617,7 +617,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         <View style={[styles.handlePill, { backgroundColor: colors.border }]} />
                     </View>
                     <View style={{ paddingHorizontal: scale(24), paddingBottom: vs(14) }}>
-                        <Text style={[styles.pickerTitle, T.extrabold, { color: colors.text }]}>Which group?</Text>
+                        <Text style={[styles.pickerTitle, T.bold, { color: colors.text }]}>Which group?</Text>
                         <Text style={[styles.pickerSub, T.regular, { color: colors.secondaryText }]}>
                             Choose the group to split with
                         </Text>
@@ -676,7 +676,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                                             setGroupMembers(full.members);
                                             closePicker();
                                         } catch {
-                                            showToast('Could not load group — try again');
+                                            showToast('Could not load group. Try again.');
                                         } finally {
                                             setSelectingGroupId(null);
                                         }
@@ -724,7 +724,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                     >
                         <ChevronLeft size={ms(20)} color={colors.text} />
                     </PressableScale>
-                    <Text style={[styles.screenTitle, T.bold, { color: colors.text }]}>Review Split</Text>
+                    <Text style={[styles.screenTitle, T.bold, { color: colors.text }]}>Review split</Text>
                     <View style={styles.headerSpacer} />
                 </View>
                 <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
@@ -786,7 +786,7 @@ export default function SmartSplitScreen({ navigation }: any) {
 
                         {/* Split breakdown */}
                         <Text style={[styles.sectionLabel, T.semibold, { color: colors.secondaryText }]}>
-                            SPLIT BREAKDOWN
+                            Split breakdown
                         </Text>
 
                         {reviewSplits.map((s, i) => (
@@ -853,7 +853,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         >
                             {adding
                                 ? <ActivityIndicator color="#fff" />
-                                : <Text style={[styles.ctaBtnText, T.semibold]}>Add Expense</Text>
+                                : <Text style={[styles.ctaBtnText, T.semibold]}>Add expense</Text>
                             }
                         </PressableScale>
 
@@ -1079,7 +1079,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                     {groupId && allMembers.length > 0 && (
                         <View style={styles.chipsSection}>
                             <Text style={[styles.chipsLabel, T.semibold, { color: colors.secondaryText }]}>
-                                SPLITTING WITH
+                                Splitting with
                             </Text>
                             <ScrollView
                                 horizontal
@@ -1161,7 +1161,7 @@ export default function SmartSplitScreen({ navigation }: any) {
                         ) : (
                             <View style={styles.ctaBtnInner}>
                                 <Sparkles size={18} color="#FFFFFF" strokeWidth={2} />
-                                <Text style={[styles.ctaBtnText, T.semibold]}>Split it →</Text>
+                                <Text style={[styles.ctaBtnText, T.semibold]}>Split it</Text>
                             </View>
                         )}
                     </PressableScale>

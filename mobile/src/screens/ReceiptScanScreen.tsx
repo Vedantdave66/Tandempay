@@ -127,7 +127,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       const { status } = await ImagePicker.requestCameraPermissionsAsync();
       if (status !== 'granted') {
         Alert.alert(
-          'Camera Access Required',
+          'Camera access required',
           'TandemPay needs camera access to scan receipts. Enable it in Settings.',
           [
             { text: 'Cancel', style: 'cancel' },
@@ -160,7 +160,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       );
       const base64Image = compressed.base64 ?? '';
       if (!base64Image) {
-        Alert.alert('Error', 'Could not process image. Please try again.');
+        Alert.alert('Error', 'Could not process image. Try again.');
         return;
       }
 
@@ -188,7 +188,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       }
     } catch (err: any) {
       cameraOpenPending.current = false;
-      Alert.alert('Camera Error', err?.message || 'Could not open the camera. Please try again.');
+      Alert.alert('Camera error', err?.message || 'Could not open the camera. Try again.');
     }
   }, []);
 
@@ -249,7 +249,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
     try {
       const participantIds = allMembers.map(m => m.user_id);
       await expensesApi.create(groupId, {
-        title: 'Shared Receipt',
+        title: 'Shared receipt',
         amount: parseResult.total,
         paid_by: user.id,
         participant_ids: participantIds,
@@ -258,7 +258,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
       navigation.navigate('MainTabs', { screen: 'Groups' });
     } catch (err: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert('Error', err.message || 'Could not add expense. Please try again.');
+      Alert.alert('Error', err.message || 'Could not add expense. Try again.');
       setAdding(false);
     }
   }, [groupId, parseResult, user, allMembers, navigation]);
@@ -286,7 +286,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
             <View style={[styles.handlePill, { backgroundColor: colors.border }]} />
           </View>
           <View style={{ paddingHorizontal: scale(24), paddingBottom: vs(14) }}>
-            <Text style={[styles.pickerTitle, T.extrabold, { color: colors.text }]}>Which group?</Text>
+            <Text style={[styles.pickerTitle, T.bold, { color: colors.text }]}>Which group?</Text>
             <Text style={[styles.pickerSub, T.regular, { color: colors.secondaryText }]}>
               Choose the group to split this receipt with
             </Text>
@@ -400,7 +400,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
               <Camera size={42} color={colors.accent} strokeWidth={1.6} />
             </View>
           </LinearGradient>
-          <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a Receipt</Text>
+          <Text style={[styles.idleTitle, T.extrabold, { color: colors.text }]}>Scan a receipt</Text>
           <Text style={[styles.idleSub, T.regular, { color: colors.secondaryText }]}>
             Snap a photo and split the bill in seconds.
           </Text>
@@ -410,7 +410,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
             onPress={() => { if (!groupId) setPickerVisible(true); else openCamera(); }}
           >
             <Camera size={19} color="#fff" strokeWidth={2.2} />
-            <Text style={[styles.scanBtnText, T.bold]}>Scan Receipt</Text>
+            <Text style={[styles.scanBtnText, T.bold]}>Scan receipt</Text>
           </TouchableOpacity>
           {groupName ? (
             <TouchableOpacity
@@ -487,7 +487,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
         <View style={styles.errorBody}>
           <View style={[styles.errorCard, { backgroundColor: colors.surface }]}>
             <ReceiptText size={40} color="#EF4444" strokeWidth={1.4} style={{ marginBottom: vs(14) }} />
-            <Text style={[styles.errorTitle, T.bold, { color: colors.text }]}>Scan Failed</Text>
+            <Text style={[styles.errorTitle, T.bold, { color: colors.text }]}>Scan failed</Text>
             <Text style={[styles.errorMsg, T.regular, { color: colors.secondaryText }]}>
               {parseError}
             </Text>
@@ -497,7 +497,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
               activeOpacity={0.82}
             >
               <Camera size={17} color="#fff" />
-              <Text style={[styles.errorBtnText, T.bold]}>Try Again</Text>
+              <Text style={[styles.errorBtnText, T.bold]}>Try again</Text>
             </TouchableOpacity>
             {groupId && (
               <TouchableOpacity
@@ -552,7 +552,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
           {/* Total */}
           <View style={{ marginBottom: vs(18) }}>
             <Text style={[styles.receiptLabel, T.regular, { color: colors.secondaryText }]}>
-              RECEIPT TOTAL
+              Receipt total
             </Text>
             <Text style={[styles.receiptTotal, T.extrabold, { color: colors.text }]}>
               ${parseResult?.total.toFixed(2)}
@@ -617,7 +617,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
             <View style={[styles.itemsList, { borderColor: colors.border }]}>
               {(parseResult?.items ?? []).length === 0 ? (
                 <Text style={[{ fontSize: ms(13), color: colors.secondaryText, padding: scale(12) }, T.regular]}>
-                  No individual items detected — using total only.
+                  No line items detected. Using the total.
                 </Text>
               ) : (parseResult?.items ?? []).map(item => {
                 const isClaimed = claimed.has(item.id);
@@ -680,7 +680,7 @@ export default function ReceiptScanScreen({ navigation, route }: any) {
             ) : (
               <>
                 <Text style={[styles.addExpenseBtnText, T.bold]}>
-                  Add Expense · ${parseResult?.total.toFixed(2)}
+                  Add expense · ${parseResult?.total.toFixed(2)}
                 </Text>
                 <ChevronRight size={18} color="#fff" strokeWidth={2.4} />
               </>
