@@ -367,16 +367,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     };
 
     const handleShareInvite = async () => {
-        if (!group?.invite_token) return;
-        const link = `tandempay://join/${group.invite_token}`;
+        if (!group) return;
         try {
+            let token = group.invite_token;
+            if (!token) {
+                // Group predates invite tokens — generate one on demand
+                const res = await groupsApi.generateInvite(group.id);
+                token = res.token;
+            }
+            const link = `https://tandempay.ca/join/${token}`;
             await Share.share({
-                message: `Join me on TandemPay! Tap the link to join "${group.name}": ${link}`,
+                message: `Join me on TandemPay! Tap to join "${group.name}": ${link}`,
                 title: `Join ${group.name} on TandemPay`,
             });
         } catch (err: any) {
-            if (err.message !== 'The user did not share') {
-                Alert.alert('Error', err.message || 'Could not share invite link.');
+            if (err?.message !== 'The user did not share') {
+                Alert.alert('Error', err?.message || 'Could not share invite link.');
             }
         }
     };

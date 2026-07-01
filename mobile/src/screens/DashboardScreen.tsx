@@ -408,8 +408,8 @@ export default function DashboardScreen({ navigation }: any) {
                     </Animated.View>
                 </View>
 
-                {/* Net balance — the widget speaks, the number answers */}
-                <PressableScale
+                {/* Net balance — hidden when user has no groups yet */}
+                {(groups.length > 0 || loading) && <PressableScale
                     haptic="light"
                     scaleTo={0.98}
                     style={[styles.netBalanceBtn, {
@@ -432,10 +432,10 @@ export default function DashboardScreen({ navigation }: any) {
                         )}
                     </View>
                     <ChevronRight size={16} color={colors.faintText} strokeWidth={2} />
-                </PressableScale>
+                </PressableScale>}
 
-                {/* Your squads */}
-                <View style={styles.sectionHeader}>
+                {/* Your squads — hidden when user has no groups yet */}
+                {(groups.length > 0 || loading) && <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
                         <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Your squads</Text>
                         <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
@@ -449,7 +449,7 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Text style={[styles.newButtonText, { color: colors.accent }, T.semibold]}>+ New</Text>
                     </TouchableOpacity>
-                </View>
+                </View>}
 
                 {groups.length === 0 && !loading ? (
                     <View style={styles.emptyWrap}>
@@ -652,6 +652,19 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Copy address</Text>
                     </PressableScale>
+
+                    <TouchableOpacity
+                        onPress={() => {
+                            dismissInteracSheet();
+                            navigation.navigate('Tutorial' as never, { mode: 'interac' } as never);
+                        }}
+                        activeOpacity={0.7}
+                        style={{ paddingVertical: vs(6) }}
+                    >
+                        <Text style={[T.semibold, { color: colors.accent, fontSize: ms(14), textAlign: 'center' }]}>
+                            How it works →
+                        </Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity onPress={dismissInteracSheet} activeOpacity={0.7} style={{ paddingVertical: vs(10) }}>
                         <Text style={[T.regular, { color: colors.secondaryText, fontSize: ms(14), textAlign: 'center' }]}>
