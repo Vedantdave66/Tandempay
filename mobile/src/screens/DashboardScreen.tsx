@@ -15,6 +15,7 @@ import {
 } from '../services/api';
 import {
     Bell, Receipt, Send, CheckCheck, ShieldAlert, UserPlus, Check, Handshake, ChevronRight, X,
+    Users, Plus,
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useNotifications } from '../context/NotificationContext';
@@ -114,7 +115,7 @@ function NetBreakdownModal({ visible, onClose, groups, balanceMap, userId }: Net
                     <View style={[styles.modalHandle, { backgroundColor: isDark ? 'rgba(255,255,255,0.25)' : 'rgba(0,0,0,0.18)' }]} />
 
                     <View style={styles.modalHeader}>
-                        <Text style={[styles.modalTitle, T.semibold, { color: colors.text }]}>Balance Breakdown</Text>
+                        <Text style={[styles.modalTitle, T.semibold, { color: colors.text }]}>Balance breakdown</Text>
                         <TouchableOpacity onPress={onClose} style={styles.modalCloseBtn} activeOpacity={0.70}>
                             <X size={18} color={colors.secondaryText} />
                         </TouchableOpacity>
@@ -272,7 +273,7 @@ export default function DashboardScreen({ navigation }: any) {
         const isCreator = item.created_by === user?.id;
         if (isCreator) {
             Alert.alert(
-                'Delete Group',
+                'Delete group',
                 `"${item.name}" will be permanently deleted for all members.`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -284,7 +285,7 @@ export default function DashboardScreen({ navigation }: any) {
             );
         } else {
             Alert.alert(
-                'Leave Group',
+                'Leave group',
                 `You'll be removed from "${item.name}".`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -407,8 +408,8 @@ export default function DashboardScreen({ navigation }: any) {
                     </Animated.View>
                 </View>
 
-                {/* Net balance — the widget speaks, the number answers */}
-                <PressableScale
+                {/* Net balance — hidden when user has no groups yet */}
+                {(groups.length > 0 || loading) && <PressableScale
                     haptic="light"
                     scaleTo={0.98}
                     style={[styles.netBalanceBtn, {
@@ -431,10 +432,10 @@ export default function DashboardScreen({ navigation }: any) {
                         )}
                     </View>
                     <ChevronRight size={16} color={colors.faintText} strokeWidth={2} />
-                </PressableScale>
+                </PressableScale>}
 
-                {/* Your squads */}
-                <View style={styles.sectionHeader}>
+                {/* Your squads — hidden when user has no groups yet */}
+                {(groups.length > 0 || loading) && <View style={styles.sectionHeader}>
                     <View style={styles.sectionTitleRow}>
                         <Text style={[styles.sectionTitle, { color: colors.text }, T.bold]}>Your squads</Text>
                         <View style={[styles.countBadge, { backgroundColor: colors.surface }]}>
@@ -448,15 +449,72 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Text style={[styles.newButtonText, { color: colors.accent }, T.semibold]}>+ New</Text>
                     </TouchableOpacity>
-                </View>
+                </View>}
 
-                {groups.length === 0 ? (
-                    <View style={[styles.emptyState, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.emptyText, { color: colors.secondaryText }, T.regular]}>
-                            Your squads live here. Make one and stop doing tab math in the group chat.
+                {groups.length === 0 && !loading ? (
+                    <View style={styles.emptyWrap}>
+                        <CharacterShape
+                            shape={user?.character_shape ?? 'round'}
+                            color={user?.character_color ?? '#3ECF8E'}
+                            variant="hero"
+                        />
+
+                        <Text style={[styles.emptyHeadline, T.extrabold, { color: colors.text }]}>
+                            Welcome to TandemPay
                         </Text>
+                        <Text style={[styles.emptySub, T.regular, { color: colors.secondaryText }]}>
+                            Split bills. Track balances. Settle up via Interac.
+                        </Text>
+
+                        {[
+                            {
+                                icon: Users,
+                                color: '#6366F1',
+                                title: 'Create a group',
+                                body: 'Rent, trips, dinners. Any shared cost.',
+                            },
+                            {
+                                icon: Receipt,
+                                color: colors.gold,
+                                title: 'Log expenses together',
+                                body: 'Log what you paid. Balances update instantly.',
+                            },
+                            {
+                                icon: CheckCheck,
+                                color: colors.accent,
+                                title: 'Settle up',
+                                body: 'Set your Interac address once. TandemPay does the rest.',
+                            },
+                        ].map((step, i) => (
+                            <View
+                                key={i}
+                                style={[styles.emptyStep, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                            >
+                                <View style={[styles.emptyStepIcon, { backgroundColor: step.color + '18' }]}>
+                                    <step.icon size={ms(20)} color={step.color} />
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={[styles.emptyStepTitle, T.semibold, { color: colors.text }]}>
+                                        {step.title}
+                                    </Text>
+                                    <Text style={[styles.emptyStepBody, T.regular, { color: colors.secondaryText }]}>
+                                        {step.body}
+                                    </Text>
+                                </View>
+                            </View>
+                        ))}
+
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="medium"
+                            style={[styles.emptyBtn, { backgroundColor: colors.accent }]}
+                            onPress={() => navigation.navigate('CreateGroup' as never)}
+                        >
+                            <Plus size={ms(18)} color="#fff" />
+                            <Text style={[T.bold, { color: '#fff', fontSize: ms(15) }]}>Create your first group</Text>
+                        </PressableScale>
                     </View>
-                ) : (
+                ) : groups.length > 0 ? (
                     <ScrollView
                         horizontal
                         showsHorizontalScrollIndicator={false}
@@ -480,7 +538,7 @@ export default function DashboardScreen({ navigation }: any) {
                             );
                         })}
                     </ScrollView>
-                )}
+                ) : null}
 
                 {/* Recent activity — inset grouped list */}
                 <Text style={[styles.sectionTitle, { color: colors.text, marginHorizontal: scale(20), marginTop: vs(36), marginBottom: vs(16) }, T.bold]}>
@@ -490,7 +548,7 @@ export default function DashboardScreen({ navigation }: any) {
                 <View style={[styles.activityGroup, { backgroundColor: colors.surface }]}>
                     {recentActivity.length === 0 ? (
                         <Text style={[styles.emptyText, { color: colors.secondaryText, padding: scale(20), textAlign: 'center' }, T.regular]}>
-                            Nothing yet — expenses and payments from your squads will land here.
+                            No activity yet.
                         </Text>
                     ) : (
                         recentActivity.map((n, i) => {
@@ -558,11 +616,11 @@ export default function DashboardScreen({ navigation }: any) {
                     <View style={[styles.interacIconWrap, { backgroundColor: colors.accentBg }]}>
                         <CheckCheck size={ms(22)} color={colors.accent} />
                     </View>
-                    <Text style={[styles.interacTitle, T.extrabold, { color: colors.text }]}>
+                    <Text style={[styles.interacTitle, T.bold, { color: colors.text }]}>
                         Auto-Confirm Payments
                     </Text>
                     <Text style={[styles.interacSub, T.regular, { color: colors.secondaryText }]}>
-                        Set this as your Interac notification email in your bank's settings — TandemPay will confirm payments the moment they land. No tapping required.
+                        Add this as your Interac notification email in your bank. TandemPay confirms payments the moment they arrive.
                     </Text>
 
                     <PressableScale
@@ -594,6 +652,19 @@ export default function DashboardScreen({ navigation }: any) {
                     >
                         <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Copy address</Text>
                     </PressableScale>
+
+                    <TouchableOpacity
+                        onPress={() => {
+                            dismissInteracSheet();
+                            navigation.navigate('Tutorial' as never, { mode: 'interac' } as never);
+                        }}
+                        activeOpacity={0.7}
+                        style={{ paddingVertical: vs(6) }}
+                    >
+                        <Text style={[T.semibold, { color: colors.accent, fontSize: ms(14), textAlign: 'center' }]}>
+                            How it works →
+                        </Text>
+                    </TouchableOpacity>
 
                     <TouchableOpacity onPress={dismissInteracSheet} activeOpacity={0.7} style={{ paddingVertical: vs(10) }}>
                         <Text style={[T.regular, { color: colors.secondaryText, fontSize: ms(14), textAlign: 'center' }]}>
@@ -709,17 +780,63 @@ const styles = StyleSheet.create({
         paddingHorizontal: scale(20),
         gap: scale(12),
     },
-    emptyState: {
-        marginHorizontal: scale(20),
-        padding: scale(32),
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
-        alignItems: 'center',
-    },
     emptyText: {
         fontSize: ms(13),
         textAlign: 'center',
         lineHeight: ms(20),
+    },
+    emptyWrap: {
+        paddingHorizontal: scale(4),
+        paddingTop: vs(8),
+        gap: vs(14),
+        alignItems: 'center',
+    },
+    emptyHeadline: {
+        fontSize: ms(24),
+        letterSpacing: -0.5,
+        textAlign: 'center',
+    },
+    emptySub: {
+        fontSize: ms(14),
+        lineHeight: 22,
+        textAlign: 'center',
+        opacity: 0.8,
+        paddingHorizontal: scale(8),
+    },
+    emptyStep: {
+        width: '100%',
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(12),
+        borderRadius: ms(16),
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: scale(14),
+    },
+    emptyStepIcon: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: ms(12),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    emptyStepTitle: {
+        fontSize: ms(14),
+        marginBottom: vs(2),
+    },
+    emptyStepBody: {
+        fontSize: ms(12),
+        lineHeight: 18,
+        opacity: 0.85,
+    },
+    emptyBtn: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scale(8),
+        height: vs(50),
+        borderRadius: ms(14),
+        width: '100%',
+        marginTop: vs(4),
     },
 
     // Activity — inset grouped list
@@ -852,7 +969,7 @@ const styles = StyleSheet.create({
     },
     interacSub: {
         fontSize: ms(14),
-        lineHeight: 21,
+        lineHeight: 22,
         textAlign: 'center',
         opacity: 0.75,
     },

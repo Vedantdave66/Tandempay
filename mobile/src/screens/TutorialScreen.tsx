@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
-import { Users, Receipt, Send, CheckCircle2, ArrowLeft } from 'lucide-react-native';
+import { Users, Receipt, Send, CheckCircle2, ArrowLeft, Mail, Settings, CheckCheck } from 'lucide-react-native';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -18,7 +18,7 @@ const STEPS = [
         icon: Users,
         color: '#6366F1',        // indigo — matches groupsApi palette
         bgColor: 'rgba(99, 102, 241, 0.1)',
-        title: '1. Create a Group & Add Friends',
+        title: '1. Create a group and add friends',
         lines: [
             'Tap the + button on the Dashboard to create a new group (e.g. "Trip to Montreal").',
             'Open the group, tap the Members icon in the top-right, and add friends by email or from your friends list.',
@@ -29,7 +29,7 @@ const STEPS = [
         icon: Receipt,
         color: '#F59E0B',        // amber — matches expense palette
         bgColor: 'rgba(245, 158, 11, 0.1)',
-        title: '2. Add Expenses & Split Them',
+        title: '2. Add expenses and split them',
         lines: [
             'Inside a group, tap the green + button to add an expense.',
             'Enter the title, total amount, and who paid. Select which members to split it among.',
@@ -40,19 +40,59 @@ const STEPS = [
         icon: Send,
         color: '#3ECF8E',        // accent green — matches settle palette
         bgColor: 'rgba(62, 207, 142, 0.1)',
-        title: '3. Settle Up & Confirm Payments',
+        title: '3. Settle up and confirm payments',
         lines: [
             'Tap "Settle Up" in the Balances section to see who owes what.',
             'Select a debt and tap "Record Payment". The payee receives a notification.',
-            'Once you\'ve sent the money, tap "Mark as Sent". The payee confirms receipt — the balance clears.',
+            'Once you\'ve sent the money, tap "Mark as Sent". The payee confirms receipt and the balance clears.',
         ],
     },
 ];
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function TutorialScreen({ navigation }: any) {
+export default function TutorialScreen({ navigation, route }: any) {
     const { colors } = useTheme();
+
+    const mode = route.params?.mode;
+
+    const INTERAC_STEPS = [
+        {
+            icon: Mail,
+            color: colors.accent,
+            bgColor: colors.accentLight,
+            title: 'Your personal payment address',
+            lines: [
+                'TandemPay gives you a unique email address, like a3f9b2@inbound.tandempay.ca.',
+                'It\'s yours permanently. No one else has it.',
+                'Copy it from the TandemPay app anytime under Profile → Interac Auto-Confirm.',
+            ],
+        },
+        {
+            icon: Settings,
+            color: colors.indigo,
+            bgColor: colors.indigo + '1F',
+            title: 'Set it in your bank once',
+            lines: [
+                'In your bank\'s app, go to Interac e-Transfer settings.',
+                'Add your TandemPay address as the email for incoming transfer notifications.',
+                'This takes about 60 seconds and you only do it once.',
+            ],
+        },
+        {
+            icon: CheckCheck,
+            color: colors.accent,
+            bgColor: colors.accentLight,
+            title: 'Payments confirm themselves',
+            lines: [
+                'When your roommate sends you money via Interac, your bank emails your TandemPay address.',
+                'TandemPay sees it instantly and marks the debt settled.',
+                'You get a push notification. The debt clears itself.',
+            ],
+        },
+    ];
+
+    const steps = mode === 'interac' ? INTERAC_STEPS : STEPS;
 
     return (
         <SafeAreaView style={[styles.safe, { backgroundColor: colors.background }]}>
@@ -65,7 +105,9 @@ export default function TutorialScreen({ navigation }: any) {
                 >
                     <ArrowLeft color={colors.text} size={20} />
                 </TouchableOpacity>
-                <Text style={[styles.headerTitle, { color: colors.text }]}>How TandemPay Works</Text>
+                <Text style={[styles.headerTitle, { color: colors.text }]}>
+                    {mode === 'interac' ? 'How Auto-Confirm works' : 'How TandemPay works'}
+                </Text>
                 {/* Spacer balances the back button */}
                 <View style={styles.headerSpacer} />
             </View>
@@ -83,7 +125,7 @@ export default function TutorialScreen({ navigation }: any) {
                 </View>
 
                 {/* Steps */}
-                {STEPS.map((step, idx) => {
+                {steps.map((step, idx) => {
                     const Icon = step.icon;
                     return (
                         <View
@@ -115,7 +157,7 @@ export default function TutorialScreen({ navigation }: any) {
 
                 {/* Tip */}
                 <View style={[styles.tip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                    <Text style={[styles.tipLabel, { color: colors.accent }]}>💡 TIP</Text>
+                    <Text style={[styles.tipLabel, { color: colors.accent }]}>Tip</Text>
                     <Text style={[styles.tipText, { color: colors.secondaryText }]}>
                         Pull down to refresh any screen for the latest balances. All data syncs live from the server.
                     </Text>
@@ -128,7 +170,7 @@ export default function TutorialScreen({ navigation }: any) {
                     activeOpacity={0.85}
                 >
                     <CheckCircle2 color="#064E3B" size={20} />
-                    <Text style={styles.gotItText}>Got it!</Text>
+                    <Text style={styles.gotItText}>Got it</Text>
                 </TouchableOpacity>
             </ScrollView>
         </SafeAreaView>
@@ -174,8 +216,8 @@ const styles = StyleSheet.create({
     },
     heroText: {
         fontSize: ms(20),
-        fontWeight: '800',
-        letterSpacing: -0.3,
+        fontWeight: '700',
+        letterSpacing: -0.5,
     },
 
     card: {
@@ -199,10 +241,10 @@ const styles = StyleSheet.create({
     },
     cardTitle: {
         fontSize: ms(15),
-        fontWeight: '800',
+        fontWeight: '700',
         flex: 1,
         flexWrap: 'wrap',
-        lineHeight: 20,
+        lineHeight: 21,
     },
 
     bulletRow: {
@@ -231,8 +273,8 @@ const styles = StyleSheet.create({
     },
     tipLabel: {
         fontSize: ms(12),
-        fontWeight: '800',
-        letterSpacing: 0.5,
+        fontWeight: '600',
+        letterSpacing: 0.3,
     },
     tipText: {
         fontSize: ms(13),
@@ -251,6 +293,6 @@ const styles = StyleSheet.create({
     gotItText: {
         color: '#064E3B',
         fontSize: ms(16),
-        fontWeight: '900',
+        fontWeight: '600',
     },
 });

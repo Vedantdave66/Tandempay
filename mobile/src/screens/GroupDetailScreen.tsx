@@ -367,16 +367,22 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     };
 
     const handleShareInvite = async () => {
-        if (!group?.invite_token) return;
-        const link = `tandempay://join/${group.invite_token}`;
+        if (!group) return;
         try {
+            let token = group.invite_token;
+            if (!token) {
+                // Group predates invite tokens — generate one on demand
+                const res = await groupsApi.generateInvite(group.id);
+                token = res.token;
+            }
+            const link = `https://tandempay.ca/join/${token}`;
             await Share.share({
-                message: `Join me on TandemPay! Tap the link to join "${group.name}": ${link}`,
+                message: `Join me on TandemPay! Tap to join "${group.name}": ${link}`,
                 title: `Join ${group.name} on TandemPay`,
             });
         } catch (err: any) {
-            if (err.message !== 'The user did not share') {
-                Alert.alert('Error', err.message || 'Could not share invite link.');
+            if (err?.message !== 'The user did not share') {
+                Alert.alert('Error', err?.message || 'Could not share invite link.');
             }
         }
     };
@@ -384,7 +390,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const handleInviteByEmail = async () => {
         const email = inviteEmail.trim().toLowerCase();
         if (!email || !email.includes('@')) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+            Alert.alert('Invalid email', 'Enter a valid email address.');
             return;
         }
         setInviteLoading(true);
@@ -415,7 +421,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         if (!editTarget) return;
         const trimTitle = editTitle.trim();
         const parsedAmount = parseFloat(editAmount);
-        if (!trimTitle) return void Alert.alert('Title required', 'Please enter a title.');
+        if (!trimTitle) return void Alert.alert('Title required', 'Enter a title.');
         if (isNaN(parsedAmount) || parsedAmount <= 0) return void Alert.alert('Invalid amount', 'Enter a value greater than 0.');
         setEditSaving(true);
         Keyboard.dismiss();
@@ -520,8 +526,8 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         }]}>
                             {isOwe || isOwed ? (
                                 <>
-                                    <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }, T.extrabold]}>
-                                        {isOwe ? 'YOU OWE' : "YOU'RE OWED"}
+                                    <Text style={[styles.balanceChipLabel, { color: isOwe ? colors.warningBright : colors.accent }, T.semibold]}>
+                                        {isOwe ? 'You owe' : "You're owed"}
                                     </Text>
                                     <Text style={[styles.balanceChipValue, { color: isOwe ? colors.warningBright : colors.accent, fontVariant: ['tabular-nums'] }, T.extrabold]}>
                                         ${formatCurrency(Math.abs(myNet))}
@@ -553,7 +559,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 ? <Orbit size={13} color={colors.accent} />
                                 : <LayoutList size={13} color='#8A918E' />
                             }
-                            <Text style={[styles.canvasToggleText, { color: canvasMode ? colors.accent : '#8A918E' }, T.bold]}>
+                            <Text style={[styles.canvasToggleText, { color: canvasMode ? colors.accent : colors.secondaryText }, T.bold]}>
                                 {canvasMode ? 'Canvas' : 'List'}
                             </Text>
                         </TouchableOpacity>
@@ -819,15 +825,15 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <View style={styles.modalOverlay}>
                     <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
                         <View style={styles.modalHeader}>
-                            <Text style={[styles.modalTitle, { color: colors.text }, T.extrabold]}>Members</Text>
+                            <Text style={[styles.modalTitle, { color: colors.text }, T.bold]}>Members</Text>
                             <TouchableOpacity onPress={() => setMembersModalVisible(false)} style={[styles.closeModalBtn, { backgroundColor: colors.border }]} activeOpacity={0.88}>
                                 <X size={20} color={colors.text} />
                             </TouchableOpacity>
                         </View>
 
                         <View style={{ marginBottom: vs(16) }}>
-                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), ...T.extrabold, textTransform: 'uppercase', letterSpacing: 1.3, marginBottom: vs(10) }}>
-                                Current Members
+                            <Text style={{ color: colors.secondaryText, fontSize: ms(11), ...T.semibold, textTransform: 'uppercase', letterSpacing: 1.3, marginBottom: vs(10) }}>
+                                Current members
                             </Text>
                             {(group?.members || []).map(m => {
                                 const isCreator = m.user_id === group?.created_by;
@@ -839,7 +845,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         </View>
                                         <View style={{ flex: 1 }}>
                                             <Text style={{ color: colors.text, fontSize: ms(15), ...T.semibold }}>
-                                                {m.name}{isCreator ? ' 👑' : ''}
+                                                {m.name}
                                             </Text>
                                             <Text style={{ color: colors.secondaryText, fontSize: ms(12), ...T.regular }}>{m.email}</Text>
                                         </View>
@@ -876,7 +882,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 activeOpacity={0.82}
                             >
                                 <Mail size={14} color={membersTab === 'invite' ? '#fff' : colors.secondaryText} style={{ marginRight: scale(6) }} />
-                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }, T.semibold]}>Invite by Email</Text>
+                                <Text style={[styles.tabSwitchBtnText, { color: membersTab === 'invite' ? '#fff' : colors.secondaryText }, T.semibold]}>Invite by email</Text>
                             </TouchableOpacity>
                         </View>
 
@@ -887,7 +893,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 ) : friends.length === 0 ? (
                                     <View style={{ alignItems: 'center', padding: scale(32) }}>
                                         <CheckCircle2 size={40} color={colors.accent} style={{ marginBottom: vs(12) }} />
-                                        <Text style={{ color: colors.text, fontSize: ms(16), marginBottom: vs(6), ...T.bold }}>All friends added!</Text>
+                                        <Text style={{ color: colors.text, fontSize: ms(16), marginBottom: vs(6), ...T.bold }}>All friends added</Text>
                                         <Text style={{ color: colors.secondaryText, textAlign: 'center', fontSize: ms(13), ...T.regular }}>All your TandemPay friends are already in this group, or you have no friends yet.</Text>
                                     </View>
                                 ) : (
@@ -946,7 +952,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 >
                                     {inviteLoading
                                         ? <ActivityIndicator color="#fff" />
-                                        : <Text style={{ color: '#fff', fontSize: ms(15), ...T.bold }}>Add to Group</Text>
+                                        : <Text style={{ color: '#fff', fontSize: ms(15), ...T.bold }}>Add to group</Text>
                                     }
                                 </TouchableOpacity>
                             </View>
@@ -965,7 +971,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 <View style={styles.editOverlay}>
                     <View style={[styles.editSheet, { backgroundColor: colors.surface }]}>
                         <View style={[styles.editHandle, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>Edit Expense</Text>
+                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>Edit expense</Text>
                         <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Title</Text>
                         <TextInput
                             style={[styles.editInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, T.regular]}

@@ -60,7 +60,7 @@ export default function GroupsScreen({ navigation }: any) {
 
         if (isCreator) {
             Alert.alert(
-                'Delete Group',
+                'Delete group',
                 `"${item.name}" will be permanently deleted for all members. This cannot be undone.`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -80,7 +80,7 @@ export default function GroupsScreen({ navigation }: any) {
             );
         } else {
             Alert.alert(
-                'Leave Group',
+                'Leave group',
                 `You'll be removed from "${item.name}".`,
                 [
                     { text: 'Cancel', style: 'cancel' },
@@ -136,7 +136,7 @@ export default function GroupsScreen({ navigation }: any) {
                             <CharacterShape shape="round" color={colors.accent} variant="hero" />
                             <Text style={[styles.emptyTitle, { color: colors.text }, T.semibold]}>No squads yet</Text>
                             <Text style={[styles.emptyDesc, { color: colors.secondaryText }, T.regular]}>
-                                Roommates, road trips, group dinners — make a squad and stop doing math.
+                                Create a group for any shared expense.
                             </Text>
                             <TouchableOpacity onPress={() => navigation.navigate('CreateGroup')} activeOpacity={0.75}>
                                 <Text style={[styles.emptyAction, { color: colors.accent }, T.semibold]}>Create one</Text>

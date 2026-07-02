@@ -18,7 +18,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     const handleSubmit = async () => {
         const trimmed = email.trim().toLowerCase();
         if (!trimmed || !trimmed.includes('@')) {
-            Alert.alert('Invalid Email', 'Please enter a valid email address.');
+            Alert.alert('Invalid email', 'Enter a valid email address.');
             return;
         }
         setLoading(true);
@@ -56,7 +56,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                     <View style={styles.logoWrap}>
                         <Logo size={20} />
                     </View>
-                    <Text style={[styles.title, { color: colors.text }]}>Forgot Password?</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Forgot password?</Text>
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
                         Enter your email and we'll send you a reset link.
                     </Text>
@@ -64,12 +64,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                     {sent ? (
                         <View style={[styles.successBox, { backgroundColor: `${colors.accent}18`, borderColor: `${colors.accent}40` }]}>
                             <Text style={[styles.successText, { color: colors.accent }]}>
-                                ✓ If that email exists in our system, a reset link has been sent. Check your inbox.
+                                ✓ If that email exists, we sent a reset link. Check your inbox.
                             </Text>
                         </View>
                     ) : (
                         <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                            <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+                            <Text style={[styles.label, { color: colors.text }]}>Email address</Text>
                             <TextInput
                                 style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                                 placeholder="you@example.com"
@@ -87,14 +87,14 @@ export default function ForgotPasswordScreen({ navigation }: any) {
                             >
                                 {loading
                                     ? <ActivityIndicator color="#1A1A1A" />
-                                    : <Text style={styles.btnText}>Send Reset Link</Text>
+                                    : <Text style={styles.btnText}>Send reset link</Text>
                                 }
                             </TouchableOpacity>
                         </View>
                     )}
 
                     <TouchableOpacity onPress={() => navigation.navigate('Login')} style={styles.backToLogin}>
-                        <Text style={[styles.backToLoginText, { color: colors.accent }]}>← Back to Sign In</Text>
+                        <Text style={[styles.backToLoginText, { color: colors.accent }]}>← Back to sign in</Text>
                     </TouchableOpacity>
                 </View>
             </KeyboardAvoidingView>
