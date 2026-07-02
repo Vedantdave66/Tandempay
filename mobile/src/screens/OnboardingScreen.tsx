@@ -157,7 +157,7 @@ export default function OnboardingScreen({ navigation }: any) {
                             Your bills,{'\n'}handled.
                         </Text>
                         <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                            Add expenses, split fairly, settle{'\n'}for free. Built for Canadian roommates.
+                            Split expenses. Settle free.{'\n'}Built for Canadian roommates.
                         </Text>
                     </View>
                 </View>
@@ -167,9 +167,9 @@ export default function OnboardingScreen({ navigation }: any) {
         // ── Slide 2: Your crew. Your way ──
         if (index === 1) {
             const crewRow = [
-                { ...CREW[0], chip: '🦁 Vedant', balance: '+$34', owed: true },
-                { ...CREW[1], chip: '🌊 Sarah',  balance: '−$21', owed: false },
-                { ...CREW[2], chip: '🌅 Mike',   balance: '+$12', owed: true },
+                { ...CREW[0], chip: 'Vedant', balance: '+$34', owed: true },
+                { ...CREW[1], chip: 'Sarah',  balance: '−$21', owed: false },
+                { ...CREW[2], chip: 'Mike',   balance: '+$12', owed: true },
             ];
             return (
                 <View style={{ width: SCREEN_W, flex: 1, backgroundColor: colors.background }}>
@@ -191,14 +191,14 @@ export default function OnboardingScreen({ navigation }: any) {
                         </View>
                         <View style={[styles.expenseCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Text style={[styles.expenseCardText, { color: colors.text }, T.semibold]}>
-                                🍕 Pizza Night · Split 3 ways · $48.00
+                                Pizza night · Split 3 ways · $48.00
                             </Text>
                         </View>
                         <Text style={[styles.headline, { color: colors.text }, T.extrabold]}>
                             Your crew.{'\n'}Your way.
                         </Text>
                         <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                            Everyone gets their own character.{'\n'}Nicknames, colors, shapes — all yours.
+                            Pick a shape, color, and nickname.{'\n'}This is how your friends will see you.
                         </Text>
                     </View>
                 </View>
@@ -224,13 +224,13 @@ export default function OnboardingScreen({ navigation }: any) {
                             <Text style={[styles.interacPillText, T.semibold]}>Auto-confirmed via Interac ✓</Text>
                         </View>
                         <Text style={[styles.settleCaption, T.regular]}>
-                            🇨🇦 Free · ~30 seconds · No fees
+                            Free · ~30 seconds · No fees
                         </Text>
                         <Text style={[styles.headline, { color: '#FFFFFF' }, T.extrabold]}>
                             Settle free.{'\n'}Automatically.
                         </Text>
                         <Text style={[styles.sub, { color: 'rgba(255,255,255,0.70)' }, T.regular]}>
-                            Interac e-Transfer is free and instant.{'\n'}We confirm it for you.
+                            Interac e-Transfers, free and instant.{'\n'}We confirm them for you.
                         </Text>
                     </View>
                 </View>
@@ -298,7 +298,7 @@ export default function OnboardingScreen({ navigation }: any) {
                         onPress={handleLetsGo}
                         activeOpacity={0.85}
                     >
-                        <Text style={[styles.ctaText, T.semibold]}>Let's go →</Text>
+                        <Text style={[styles.ctaText, T.semibold]}>Get started</Text>
                     </TouchableOpacity>
                 </View>
             </View>

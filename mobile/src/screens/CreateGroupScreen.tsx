@@ -16,7 +16,7 @@ export default function CreateGroupScreen({ navigation }: any) {
     const handleCreate = async () => {
         const trimmed = name.trim();
         if (!trimmed) {
-            Alert.alert('Error', 'Please enter a group name.');
+            Alert.alert('Error', 'Enter a group name.');
             return;
         }
         setLoading(true);
@@ -39,7 +39,7 @@ export default function CreateGroupScreen({ navigation }: any) {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={[styles.closeBtn, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                         <X color={colors.text} size={20} />
                     </TouchableOpacity>
-                    <Text style={[styles.headerTitle, { color: colors.text }]}>New Group</Text>
+                    <Text style={[styles.headerTitle, { color: colors.text }]}>New group</Text>
                     <View style={{ width: 40 }} />
                 </View>
 
@@ -49,17 +49,17 @@ export default function CreateGroupScreen({ navigation }: any) {
                         <Users color={colors.accent} size={36} />
                     </View>
 
-                    <Text style={[styles.title, { color: colors.text }]}>Create a Group</Text>
+                    <Text style={[styles.title, { color: colors.text }]}>Create a group</Text>
                     <Text style={[styles.subtitle, { color: colors.secondaryText }]}>
-                        Give your group a name — like "Miami Trip" or "Apartment".
+                        Name your group. e.g. "Miami Trip" or "Apartment 3B"
                     </Text>
 
                     {/* Input */}
                     <View style={styles.fieldWrap}>
-                        <Text style={[styles.label, { color: colors.secondaryText }]}>Group Name</Text>
+                        <Text style={[styles.label, { color: colors.secondaryText }]}>Group name</Text>
                         <TextInput
                             style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
-                            placeholder="e.g. Miami Trip 🌴"
+                            placeholder="e.g. Miami Trip"
                             placeholderTextColor={colors.secondaryText}
                             value={name}
                             onChangeText={setName}
@@ -78,7 +78,7 @@ export default function CreateGroupScreen({ navigation }: any) {
                     >
                         {loading
                             ? <ActivityIndicator color="#064E3B" />
-                            : <Text style={styles.btnText}>Create Group</Text>
+                            : <Text style={styles.btnText}>Create group</Text>
                         }
                     </TouchableOpacity>
                 </ScrollView>
@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
         alignItems: 'center', justifyContent: 'center',
         borderWidth: StyleSheet.hairlineWidth, marginBottom: vs(24),
     },
-    title: { fontSize: ms(26), fontWeight: '900', marginBottom: vs(8) },
+    title: { fontSize: ms(26), fontWeight: '800', marginBottom: vs(8) },
     subtitle: { fontSize: ms(15), textAlign: 'center', marginBottom: vs(36), lineHeight: 22 },
     fieldWrap: { width: '100%', marginBottom: vs(24) },
     label: { fontSize: ms(13), fontWeight: '600', marginBottom: vs(8), textTransform: 'uppercase', letterSpacing: 0.5 },
@@ -120,5 +120,5 @@ const styles = StyleSheet.create({
         width: '100%', paddingVertical: vs(17), borderRadius: ms(16),
         alignItems: 'center',
     },
-    btnText: { color: '#064E3B', fontWeight: '800', fontSize: ms(16) },
+    btnText: { color: '#064E3B', fontWeight: '600', fontSize: ms(16) },
 });

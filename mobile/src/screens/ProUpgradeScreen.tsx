@@ -16,27 +16,27 @@ const PRO_FEATURES = [
     {
         icon: RefreshCw,
         title: 'Recurring expenses',
-        description: 'Auto-split monthly bills without lifting a finger',
+        description: 'Auto-split regular bills on a schedule.',
     },
     {
         icon: FileDown,
         title: 'CSV & PDF exports',
-        description: 'Download your full expense history anytime',
+        description: 'Download your full expense history.',
     },
     {
         icon: Camera,
-        title: 'Receipt OCR',
-        description: 'Scan and split itemized receipts instantly',
+        title: 'Receipt scanning',
+        description: 'Scan receipts and split by item.',
     },
     {
         icon: SlidersHorizontal,
         title: 'Advanced splits',
-        description: 'Percentages, weights, and itemized breakdowns',
+        description: 'Percentages, weights, and itemized breakdowns.',
     },
     {
         icon: Zap,
-        title: 'Auto Interac confirmation',
-        description: 'No manual tap required for e-Transfer confirmation',
+        title: 'Auto-Confirm',
+        description: 'Interac payments confirm without any input.',
     },
 ];
 
@@ -52,10 +52,9 @@ export default function ProUpgradeScreen({ navigation }: any) {
                     <ArrowLeft color={colors.text} size={24} />
                 </TouchableOpacity>
                 <View style={styles.proConfirmContainer}>
-                    <Text style={styles.crownEmoji}>👑</Text>
                     <Text style={[styles.proTitle, { color: colors.text }]}>You're on Pro ✓</Text>
                     <Text style={[styles.proSubtitle, { color: colors.secondaryText }]}>
-                        You have access to all Pro features.
+                        All Pro features are unlocked.
                     </Text>
                 </View>
             </SafeAreaView>
@@ -69,10 +68,9 @@ export default function ProUpgradeScreen({ navigation }: any) {
             </TouchableOpacity>
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.heroContainer}>
-                    <Text style={styles.crownEmoji}>👑</Text>
-                    <Text style={[styles.heroTitle, { color: colors.text }]}>Upgrade to Pro</Text>
+                    <Text style={[styles.heroTitle, { color: colors.text }]}>TandemPay Pro</Text>
                     <Text style={[styles.heroSubtitle, { color: colors.secondaryText }]}>
-                        Unlock the full TandemPay experience
+                        More power for active groups.
                     </Text>
                 </View>
 
@@ -179,7 +177,7 @@ const styles = StyleSheet.create({
     },
     featureDesc: {
         fontSize: ms(13),
-        lineHeight: 18,
+        lineHeight: 19,
     },
     pricingContainer: {
         flexDirection: 'row',
@@ -211,7 +209,7 @@ const styles = StyleSheet.create({
     upgradeButtonText: {
         color: '#1A1A1A',
         fontSize: ms(17),
-        fontWeight: '700',
+        fontWeight: '600',
     },
     disclaimer: {
         fontSize: ms(12),

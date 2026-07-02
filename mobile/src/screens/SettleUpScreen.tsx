@@ -252,7 +252,7 @@ export default function SettleUpScreen() {
                                     </View>
                                 </View>
                                 <View style={[styles.freePill, { backgroundColor: t.green }]}>
-                                    <Text style={[styles.freePillText, { color: t.greenInk }]}>FREE</Text>
+                                    <Text style={[styles.freePillText, { color: t.greenInk }]}>Free</Text>
                                 </View>
                             </View>
 
@@ -298,7 +298,7 @@ export default function SettleUpScreen() {
                         {/* OR divider */}
                         <View style={styles.orRow}>
                             <View style={[styles.orLine, { backgroundColor: t.cardBorder }]} />
-                            <Text style={[styles.orText, { color: t.sub }]}>OR</Text>
+                            <Text style={[styles.orText, { color: t.sub }]}>or</Text>
                             <View style={[styles.orLine, { backgroundColor: t.cardBorder }]} />
                         </View>
 
@@ -545,7 +545,7 @@ const styles = StyleSheet.create({
     hint: {
         fontSize: ms(15),
         lineHeight: 22,
-        ...Font.semibold,
+        ...Font.regular,
     },
 
     primaryBtn: {

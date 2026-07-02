@@ -20,7 +20,7 @@ export default function LoginScreen({ navigation }: any) {
 
     const handleLogin = async () => {
         if (!email || !password) {
-            setError('Please fill in all fields');
+            setError('Fill in all fields');
             return;
         }
 
@@ -78,7 +78,7 @@ export default function LoginScreen({ navigation }: any) {
                     ) : null}
 
                     <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+                        <Text style={[styles.label, { color: colors.text }]}>Email address</Text>
                         <TextInput
                             style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="you@example.com"
@@ -115,7 +115,7 @@ export default function LoginScreen({ navigation }: any) {
                             onPress={() => navigation.navigate('ForgotPassword')}
                             style={styles.forgotRow}
                         >
-                            <Text style={[styles.forgotText, { color: colors.accent }]}>Forgot Password?</Text>
+                            <Text style={[styles.forgotText, { color: colors.accent }]}>Forgot password?</Text>
                         </TouchableOpacity>
 
                         <TouchableOpacity
@@ -126,7 +126,7 @@ export default function LoginScreen({ navigation }: any) {
                             {loading ? (
                                 <ActivityIndicator color="#1A1A1A" />
                             ) : (
-                                <Text style={[styles.buttonText, { color: '#1A1A1A' }]}>Sign In</Text>
+                                <Text style={[styles.buttonText, { color: '#1A1A1A' }]}>Sign in</Text>
                             )}
                         </TouchableOpacity>
                     </View>

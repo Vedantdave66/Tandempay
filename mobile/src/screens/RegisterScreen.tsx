@@ -35,7 +35,7 @@ export default function RegisterScreen({ navigation, route }: any) {
 
     const handleRegister = async () => {
         if (!name || !email || !password) {
-            setError('Please fill in all fields');
+            setError('Fill in all fields');
             return;
         }
 
@@ -87,7 +87,7 @@ export default function RegisterScreen({ navigation, route }: any) {
                         <View style={[styles.logoContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                             <Wallet size={32} color={colors.accent} />
                         </View>
-                        <Text style={[styles.title, { color: colors.text }]}>Create Account</Text>
+                        <Text style={[styles.title, { color: colors.text }]}>Create account</Text>
                         <Logo size={20} />
                     </View>
 
@@ -98,7 +98,7 @@ export default function RegisterScreen({ navigation, route }: any) {
                     ) : null}
 
                     <View style={[styles.form, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        <Text style={[styles.label, { color: colors.text }]}>Full Name</Text>
+                        <Text style={[styles.label, { color: colors.text }]}>Full name</Text>
                         <TextInput
                             style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="John Doe"
@@ -108,7 +108,7 @@ export default function RegisterScreen({ navigation, route }: any) {
                             autoCapitalize="words"
                         />
 
-                        <Text style={[styles.label, { color: colors.text }]}>Email Address</Text>
+                        <Text style={[styles.label, { color: colors.text }]}>Email address</Text>
                         <TextInput
                             style={[styles.input, { backgroundColor: colors.background, borderColor: colors.border, color: colors.text }]}
                             placeholder="you@example.com"
@@ -172,7 +172,7 @@ export default function RegisterScreen({ navigation, route }: any) {
                             {loading ? (
                                 <ActivityIndicator color={isDark ? "#064E3B" : "white"} />
                             ) : (
-                                <Text style={[styles.buttonText, { color: isDark ? "#064E3B" : "white" }]}>Sign Up</Text>
+                                <Text style={[styles.buttonText, { color: isDark ? "#064E3B" : "white" }]}>Sign up</Text>
                             )}
                         </TouchableOpacity>
                     </View>
@@ -228,7 +228,7 @@ const styles = StyleSheet.create({
     },
     title: {
         fontSize: ms(32),
-        fontWeight: '900',
+        fontWeight: '800',
         marginBottom: vs(8),
     },
     subtitle: {

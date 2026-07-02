@@ -107,9 +107,8 @@ async def parse_receipt(
         ],
         "generationConfig": {
             "temperature": 0.1,
-            "maxOutputTokens": 1024,
+            "maxOutputTokens": 2048,
             "response_mime_type": "application/json",
-            "response_schema": _RESPONSE_SCHEMA,
         },
     }
 
