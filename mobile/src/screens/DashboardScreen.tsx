@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
     View, Text, StyleSheet, TouchableOpacity,
-    RefreshControl, ScrollView, Animated, Easing, Alert, Modal, Clipboard,
+    RefreshControl, ScrollView, Animated, Easing, Alert, Modal, Clipboard, Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { scale, vs, ms } from '../utils/responsive';
@@ -262,6 +262,16 @@ export default function DashboardScreen({ navigation }: any) {
             Animated.timing(interacToastAnim, { toValue: 0, duration: 280, useNativeDriver: true })
                 .start(() => setInteracToastMsg(null));
         }, 2000);
+    };
+
+    const handleShareInteracAddress = async () => {
+        const address = `${user?.interac_token}@inbound.tandempay.ca`;
+        try {
+            await Share.share({
+                message: `Add this as your Interac notification email in your bank app to enable Auto-Confirm on TandemPay:\n\n${address}`,
+                title: 'My TandemPay Auto-Confirm Address',
+            });
+        } catch (_) {}
     };
 
     const dismissInteracSheet = async () => {
@@ -644,14 +654,24 @@ export default function DashboardScreen({ navigation }: any) {
                         </Animated.View>
                     )}
 
-                    <PressableScale
-                        scaleTo={0.97}
-                        haptic="medium"
-                        style={[styles.interacCopyBtn, { backgroundColor: colors.accent }]}
-                        onPress={handleCopyInteracAddress}
-                    >
-                        <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Copy address</Text>
-                    </PressableScale>
+                    <View style={styles.interacBtnRow}>
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="medium"
+                            style={[styles.interacActionBtn, { backgroundColor: colors.accentBg }]}
+                            onPress={handleCopyInteracAddress}
+                        >
+                            <Text style={[T.semibold, { color: colors.accent, fontSize: ms(15) }]}>Copy</Text>
+                        </PressableScale>
+                        <PressableScale
+                            scaleTo={0.97}
+                            haptic="medium"
+                            style={[styles.interacActionBtn, { backgroundColor: colors.accent }]}
+                            onPress={handleShareInteracAddress}
+                        >
+                            <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Share</Text>
+                        </PressableScale>
+                    </View>
 
                     <TouchableOpacity
                         onPress={() => {
@@ -993,8 +1013,13 @@ const styles = StyleSheet.create({
         borderRadius: ms(12),
         borderWidth: StyleSheet.hairlineWidth,
     },
-    interacCopyBtn: {
+    interacBtnRow: {
+        flexDirection: 'row',
+        gap: scale(10),
         width: '100%',
+    },
+    interacActionBtn: {
+        flex: 1,
         height: vs(50),
         borderRadius: ms(14),
         alignItems: 'center',
