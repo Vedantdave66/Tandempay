@@ -110,6 +110,16 @@ export default function ProHubScreen({ navigation }: any) {
         }, 2000);
     };
 
+    const handleShareInteracAddress = async () => {
+        const address = `${user?.interac_token}@inbound.tandempay.ca`;
+        try {
+            await Share.share({
+                message: `Add this as your Interac notification email in your bank app to enable Auto-Confirm on TandemPay:\n\n${address}`,
+                title: 'My TandemPay Auto-Confirm Address',
+            });
+        } catch (_) {}
+    };
+
     return (
         <SafeAreaView edges={['top']} style={[styles.safe, { backgroundColor: colors.background }]}>
             <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
@@ -235,19 +245,41 @@ export default function ProHubScreen({ navigation }: any) {
                                 {user?.interac_token}@inbound.tandempay.ca
                             </Text>
                         </View>
-                        <PressableScale
-                            scaleTo={0.97}
-                            haptic="light"
-                            onPress={handleCopyInteracAddress}
-                            style={[styles.copyBtn, { backgroundColor: colors.accent }]}
-                        >
-                            <Text style={[styles.copyBtnText, T.semibold]}>Copy address</Text>
-                        </PressableScale>
+                        <View style={styles.interacBtnRow}>
+                            <PressableScale
+                                scaleTo={0.97}
+                                haptic="medium"
+                                onPress={handleCopyInteracAddress}
+                                style={[styles.interacActionBtn, { backgroundColor: colors.accentBg }]}
+                            >
+                                <Text style={[T.semibold, { color: colors.accent, fontSize: ms(15) }]}>Copy</Text>
+                            </PressableScale>
+                            <PressableScale
+                                scaleTo={0.97}
+                                haptic="medium"
+                                onPress={handleShareInteracAddress}
+                                style={[styles.interacActionBtn, { backgroundColor: colors.accent }]}
+                            >
+                                <Text style={[T.semibold, { color: '#fff', fontSize: ms(15) }]}>Share</Text>
+                            </PressableScale>
+                        </View>
                         {interacToastMsg && (
                             <Animated.View style={[styles.interacToast, { opacity: interacToastAnim, backgroundColor: colors.surface, borderColor: colors.border }]}>
                                 <Text style={[T.semibold, { color: colors.text, fontSize: ms(13) }]}>{interacToastMsg}</Text>
                             </Animated.View>
                         )}
+                        <TouchableOpacity
+                            onPress={() => {
+                                setShowInteracModal(false);
+                                navigation.navigate('Tutorial' as never, { mode: 'interac' } as never);
+                            }}
+                            activeOpacity={0.7}
+                            style={{ paddingVertical: vs(6) }}
+                        >
+                            <Text style={[T.semibold, { color: colors.accent, fontSize: ms(14), textAlign: 'center' }]}>
+                                How it works →
+                            </Text>
+                        </TouchableOpacity>
                         <PressableScale onPress={() => setShowInteracModal(false)} style={styles.doneLink}>
                             <Text style={[T.semibold, { color: colors.accent, fontSize: ms(15) }]}>Done</Text>
                         </PressableScale>
@@ -462,15 +494,17 @@ const styles = StyleSheet.create({
         fontSize: ms(14),
         textAlign: 'center',
     },
-    copyBtn: {
-        borderRadius: ms(14),
-        paddingVertical: vs(14),
+    interacBtnRow: {
+        flexDirection: 'row',
+        gap: scale(10),
         width: '100%',
-        alignItems: 'center',
     },
-    copyBtnText: {
-        fontSize: ms(15),
-        color: '#fff',
+    interacActionBtn: {
+        flex: 1,
+        height: vs(50),
+        borderRadius: ms(14),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
     interacToast: {
         borderRadius: ms(12),
