@@ -89,6 +89,8 @@ class Group(Base):
     # nullable=True so the column can be added to an existing table without a DEFAULT;
     # the migration backfills existing rows. All new rows receive a token from the lambda.
     invite_token: Mapped[str] = mapped_column(String(32), nullable=True, default=lambda: secrets.token_urlsafe(16))
+    # Short free-text note any member can set (e.g. "Bali trip 2026 — split 6 ways").
+    notes: Mapped[Optional[str]] = mapped_column(String(300), nullable=True)
 
     members: Mapped[list["GroupMember"]] = relationship(back_populates="group", cascade="all, delete-orphan")
     expenses: Mapped[list["Expense"]] = relationship(back_populates="group", cascade="all, delete-orphan")
