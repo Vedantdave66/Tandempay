@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     View,
     Text,
@@ -9,11 +9,22 @@ import {
 } from 'react-native';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
+import { T } from '../utils/typography';
+import PressableScale from '../components/PressableScale';
 import { Users, Receipt, Send, CheckCircle2, ArrowLeft, Mail, Settings, CheckCheck } from 'lucide-react-native';
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
-const STEPS = [
+type TutorialStep = {
+    icon: any;
+    color: string;
+    bgColor: string;
+    title: string;
+    lines: string[];
+    bankPicker?: boolean;
+};
+
+const STEPS: TutorialStep[] = [
     {
         icon: Users,
         color: '#6366F1',        // indigo — matches groupsApi palette
@@ -56,7 +67,66 @@ export default function TutorialScreen({ navigation, route }: any) {
 
     const mode = route.params?.mode;
 
-    const INTERAC_STEPS = [
+    const [selectedBank, setSelectedBank] = useState<string | null>(null);
+
+    const BANKS = [
+        {
+            id: 'td',
+            name: 'TD',
+            steps: [
+                'Open the TD app → More → Interac e-Transfer.',
+                'Tap "Settings", then "Notification Preferences".',
+                'Add your TandemPay address as the notification email.',
+            ],
+        },
+        {
+            id: 'rbc',
+            name: 'RBC',
+            steps: [
+                'Open the RBC app → Pay & Transfer → Interac e-Transfer.',
+                'Tap the gear icon → "Settings".',
+                'Under "Email Notifications", add your TandemPay address.',
+            ],
+        },
+        {
+            id: 'scotiabank',
+            name: 'Scotiabank',
+            steps: [
+                'Open the Scotia app → Move Money → Interac e-Transfer.',
+                'Tap "Transfer Settings".',
+                'Add your TandemPay address as the notification email.',
+            ],
+        },
+        {
+            id: 'bmo',
+            name: 'BMO',
+            steps: [
+                'Open the BMO app → Transfers → Interac e-Transfer.',
+                'Tap "Settings" or "Manage".',
+                'Add your TandemPay address under email notifications.',
+            ],
+        },
+        {
+            id: 'cibc',
+            name: 'CIBC',
+            steps: [
+                'Open the CIBC app → Pay & Transfer → Interac e-Transfer.',
+                'Tap "Settings".',
+                'Add your TandemPay address as your notification email.',
+            ],
+        },
+        {
+            id: 'other',
+            name: 'Other',
+            steps: [
+                'Open your bank app and go to Interac e-Transfer settings.',
+                'Find "Notification Email" or "Transfer Preferences".',
+                'Add your TandemPay address and save.',
+            ],
+        },
+    ];
+
+    const INTERAC_STEPS: TutorialStep[] = [
         {
             icon: Mail,
             color: colors.accent,
@@ -73,11 +143,8 @@ export default function TutorialScreen({ navigation, route }: any) {
             color: colors.indigo,
             bgColor: colors.indigo + '1F',
             title: 'Set it in your bank once',
-            lines: [
-                'In your bank\'s app, go to Interac e-Transfer settings.',
-                'Add your TandemPay address as the email for incoming transfer notifications.',
-                'This takes about 60 seconds and you only do it once.',
-            ],
+            lines: [],
+            bankPicker: true,
         },
         {
             icon: CheckCheck,
@@ -151,6 +218,52 @@ export default function TutorialScreen({ navigation, route }: any) {
                                     </Text>
                                 </View>
                             ))}
+
+                            {/* Bank picker */}
+                            {step.bankPicker && (
+                                selectedBank === null ? (
+                                    <View style={styles.bankGrid}>
+                                        {BANKS.map((bank) => (
+                                            <PressableScale
+                                                key={bank.id}
+                                                scaleTo={0.97}
+                                                haptic="light"
+                                                onPress={() => setSelectedBank(bank.id)}
+                                                style={[styles.bankChip, { borderColor: colors.border, backgroundColor: colors.surface }]}
+                                            >
+                                                <Text style={[T.semibold, { fontSize: ms(14), color: colors.text }]}>
+                                                    {bank.name}
+                                                </Text>
+                                            </PressableScale>
+                                        ))}
+                                    </View>
+                                ) : (
+                                    <View>
+                                        <PressableScale
+                                            scaleTo={0.97}
+                                            haptic="light"
+                                            onPress={() => setSelectedBank(null)}
+                                            style={styles.bankBackChip}
+                                        >
+                                            <Text style={[T.semibold, { fontSize: ms(12), color: colors.accent }]}>
+                                                ← All banks
+                                            </Text>
+                                        </PressableScale>
+                                        {BANKS.find((b) => b.id === selectedBank)?.steps.map((bankStep, stepIdx) => (
+                                            <View key={stepIdx} style={styles.bankStepRow}>
+                                                <View style={[styles.bankStepCircle, { backgroundColor: colors.accentBg }]}>
+                                                    <Text style={[T.bold, { fontSize: ms(12), color: colors.accent }]}>
+                                                        {stepIdx + 1}
+                                                    </Text>
+                                                </View>
+                                                <Text style={[T.regular, { fontSize: ms(14), color: colors.text, flex: 1, lineHeight: 20 }]}>
+                                                    {bankStep}
+                                                </Text>
+                                            </View>
+                                        ))}
+                                    </View>
+                                )
+                            )}
                         </View>
                     );
                 })}
@@ -263,6 +376,37 @@ const styles = StyleSheet.create({
         fontSize: ms(14),
         lineHeight: 21,
         flex: 1,
+    },
+
+    bankGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: scale(8),
+        marginTop: vs(12),
+    },
+    bankChip: {
+        paddingVertical: vs(10),
+        paddingHorizontal: scale(16),
+        borderRadius: ms(12),
+        borderWidth: 1,
+    },
+    bankBackChip: {
+        alignSelf: 'flex-start',
+        paddingVertical: vs(4),
+        marginBottom: vs(10),
+    },
+    bankStepRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        gap: scale(10),
+        marginBottom: vs(10),
+    },
+    bankStepCircle: {
+        width: scale(24),
+        height: scale(24),
+        borderRadius: scale(12),
+        alignItems: 'center',
+        justifyContent: 'center',
     },
 
     tip: {
