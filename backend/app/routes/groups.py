@@ -1,5 +1,7 @@
 import secrets
+from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func as sa_func, literal
 from sqlalchemy.orm import selectinload
@@ -16,9 +18,13 @@ logger = logging.getLogger("tandempay.groups")
 router = APIRouter(prefix="/api/groups", tags=["groups"])
 
 
+class GroupNotesUpdate(BaseModel):
+    notes: Optional[str] = Field(default=None, max_length=300)
+
+
 @router.post("", response_model=GroupOut)
 async def create_group(data: GroupCreate, current_user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    group = Group(name=data.name, created_by=current_user.id)
+    group = Group(name=data.name, created_by=current_user.id, notes=data.notes.strip() if data.notes else None)
     db.add(group)
     await db.flush()
 
@@ -50,6 +56,7 @@ async def create_group(data: GroupCreate, current_user: User = Depends(get_curre
         total_expenses=0,
         # Always show token to creator — they need it to share with invitees.
         invite_token=group.invite_token,
+        notes=group.notes,
     )
 
 
@@ -195,6 +202,7 @@ async def get_group(group_id: str, current_user: User = Depends(get_current_user
         members=members_out,
         total_expenses=total,
         invite_token=group.invite_token,
+        notes=group.notes,
     )
 
 
@@ -237,6 +245,29 @@ async def add_member(group_id: str, data: MemberAdd, current_user: User = Depend
         character_color=user_to_add.character_color,
         character_nickname=user_to_add.character_nickname,
     )
+
+
+@router.patch("/{group_id}/notes")
+async def update_group_notes(
+    group_id: str,
+    body: GroupNotesUpdate,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """Set, replace, or clear the group note. Any group member can update it."""
+    result = await db.execute(
+        select(Group).where(Group.id == group_id).options(selectinload(Group.members))
+    )
+    group = result.scalar_one_or_none()
+    if not group:
+        raise HTTPException(status_code=404, detail="Group not found")
+    if not any(m.user_id == current_user.id for m in group.members):
+        raise HTTPException(status_code=403, detail="Not a member of this group")
+
+    stripped = body.notes.strip() if body.notes else None
+    group.notes = stripped or None
+    await db.flush()
+    return {"notes": group.notes}
 
 
 @router.post("/{group_id}/invite/generate")

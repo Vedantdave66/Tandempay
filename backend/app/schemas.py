@@ -195,6 +195,7 @@ class UserUpdate(BaseModel):
 
 class GroupCreate(BaseModel):
     name: ShortName
+    notes: Optional[str] = Field(default=None, max_length=300)
 
 
 class MemberAdd(BaseModel):
@@ -230,6 +231,7 @@ class GroupOut(BaseModel):
     total_expenses: Decimal = Decimal("0")
     # Only populated for the group creator. None for all other members.
     invite_token: Optional[str] = None
+    notes: Optional[str] = None
 
 
 class GroupListOut(BaseModel):

@@ -109,6 +109,7 @@ export interface Group {
     members: GroupMember[];
     total_expenses: number;
     invite_token?: string;
+    notes?: string | null;
 }
 
 export interface GroupListItem {
@@ -141,6 +142,11 @@ export const groupsApi = {
         request<GroupMember>(`/groups/${groupId}/members`, {
             method: 'POST',
             body: JSON.stringify({ email }),
+        }),
+    updateNotes: (groupId: string, notes: string | null) =>
+        request<{ notes: string | null }>(`/groups/${groupId}/notes`, {
+            method: 'PATCH',
+            body: JSON.stringify({ notes }),
         }),
     join: (groupId: string) =>
         request<GroupMember>(`/groups/${groupId}/join`, {
