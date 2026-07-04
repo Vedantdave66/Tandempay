@@ -492,7 +492,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             const result = await groupsApi.updateNotes(group.id, notesInput.trim() || null);
             setGroup(prev => prev ? { ...prev, notes: result.notes } : prev);
             setNotesModalVisible(false);
-            setTimeout(() => showToast('Note saved'), 700);
+            showToast('Note saved');
         } catch {
             Alert.alert('Error', 'Could not save note. Try again.');
         } finally {
@@ -1134,7 +1134,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         await groupsApi.updateNotes(group.id, null);
                                         setGroup(prev => prev ? { ...prev, notes: null } : prev);
                                         setNotesModalVisible(false);
-                                        setTimeout(() => showToast('Note removed'), 700);
+                                        showToast('Note removed');
                                     } catch {
                                         Alert.alert('Error', 'Could not remove note.');
                                     } finally {
@@ -1155,11 +1155,23 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
-            {toastMsg && (
-                <Animated.View style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.border, opacity: toastAnim }]}>
-                    <Text style={[styles.toastText, { color: colors.text }, T.semibold]}>{toastMsg}</Text>
-                </Animated.View>
-            )}
+            <Modal
+                visible={!!toastMsg}
+                transparent
+                animationType="none"
+                statusBarTranslucent
+            >
+                <View
+                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
+                    pointerEvents="none"
+                >
+                    <Animated.View style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.border, opacity: toastAnim }]}>
+                        <Text style={[styles.toastText, { color: colors.text }, T.semibold]}>
+                            {toastMsg}
+                        </Text>
+                    </Animated.View>
+                </View>
+            </Modal>
 
             {canvasMode && (
                 <CanvasModeView
@@ -1475,9 +1487,6 @@ const styles = StyleSheet.create({
         fontSize: ms(14),
     },
     toast: {
-        position: 'absolute',
-        top: '38%',
-        alignSelf: 'center',
         paddingHorizontal: scale(20),
         paddingVertical: vs(10),
         borderRadius: ms(20),
