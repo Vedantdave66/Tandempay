@@ -47,9 +47,10 @@ interface SwipeableExpenseRowProps {
     onNudge: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    hintProgress?: Animated.Value;
 }
 
-function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: SwipeableExpenseRowProps) {
+function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete, hintProgress }: SwipeableExpenseRowProps) {
     const REVEAL = paidByMe ? ACTION_BTN_W * 3 : ACTION_BTN_W;
     const translateX = useRef(new Animated.Value(0)).current;
     const isOpen = useRef(false);
@@ -97,6 +98,10 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
         onPanResponderTerminate: () => { closeRef.current(); },
     })).current;
 
+    // Hint offset (if any) rides on top of the gesture-driven translateX, so the
+    // action strip stays put while the row content slides to reveal it.
+    const combinedX = hintProgress ? Animated.add(translateX, hintProgress) : translateX;
+
     return (
         <View style={swipeStyles.container}>
             <View style={[swipeStyles.actionsWrap, { width: REVEAL }]}>
@@ -131,7 +136,7 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
             </View>
             <Animated.View
                 {...panResponder.panHandlers}
-                style={{ transform: [{ translateX }] }}
+                style={{ transform: [{ translateX: combinedX }] }}
             >
                 {children}
             </Animated.View>
@@ -686,15 +691,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const paidByMe = expense.paid_by === user?.id;
                         const isFirstHint = expIdx === 0 && !swipeHintDone;
                         return (
-                            <Animated.View
-                                key={expense.id}
-                                style={{
-                                    opacity: expenseAnims[expIdx] ?? 1,
-                                    transform: isFirstHint ? [{ translateX: hintAnim }] : [],
-                                }}
-                            >
+                            <Animated.View key={expense.id} style={{ opacity: expenseAnims[expIdx] ?? 1 }}>
                                 <SwipeableExpenseRow
                                     paidByMe={paidByMe}
+                                    hintProgress={isFirstHint ? hintAnim : undefined}
                                     onNudge={() => handleNudgeExpense(expense)}
                                     onEdit={() => {
                                         setEditTarget(expense);
