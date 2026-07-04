@@ -216,6 +216,35 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     const [editTarget, setEditTarget] = useState<Expense | null>(null);
 
+    // Collapsible header: secondary content (member cluster, action buttons)
+    // shrinks away as the list scrolls. JS-driven (useNativeDriver: false)
+    // because height can't run on the native driver; the swipe gesture's
+    // native-driven translateX lives on a separate Animated.Value.
+    const scrollY = useRef(new Animated.Value(0)).current;
+    const scrollRef = useRef<ScrollView>(null);
+    const [collapsibleHeight, setCollapsibleHeight] = useState(0);
+
+    const COLLAPSE_AT = vs(72); // scroll distance to fully collapse
+
+    const collapsibleAnim = scrollY.interpolate({
+        inputRange: [0, COLLAPSE_AT],
+        outputRange: [collapsibleHeight, 0],
+        extrapolate: 'clamp',
+    });
+
+    const collapsibleOpacity = scrollY.interpolate({
+        inputRange: [0, COLLAPSE_AT * 0.6],
+        outputRange: [1, 0],
+        extrapolate: 'clamp',
+    });
+
+    useEffect(() => {
+        // Re-expand when switching tabs; also reset the shared ScrollView's
+        // offset so the first scroll event doesn't snap the header shut.
+        scrollY.setValue(0);
+        scrollRef.current?.scrollTo({ y: 0, animated: false });
+    }, [activeTab]);
+
     // One-time swipe-to-reveal hint: peek the first row's action strip, then spring back
     const [swipeHintDone, setSwipeHintDone] = useState(false);
     const hintAnim = useRef(new Animated.Value(0)).current;
@@ -536,23 +565,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         <Text style={[styles.groupName, { color: colors.text }, T.extrabold]} numberOfLines={1}>
                             {group?.name || 'Group'}
                         </Text>
-                        <View style={styles.clusterRow}>
-                            {(group?.members ?? []).slice(0, 4).map((m, i) => {
-                                const c = charFor(m.user_id);
-                                return (
-                                    <View key={m.user_id} style={[styles.clusterAvatar, i > 0 && { marginLeft: -8 }]}>
-                                        <CharacterShape
-                                            shape={c?.character_shape ?? 'rect'}
-                                            color={c?.character_color ?? m.avatar_color ?? '#6B7280'}
-                                            variant="cluster"
-                                        />
-                                    </View>
-                                );
-                            })}
-                            <Text style={[styles.memberSummary, { color: colors.secondaryText }, T.semibold]}>
-                                {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
-                            </Text>
-                        </View>
                     </TouchableOpacity>
 
                     <View style={styles.headerRightCol}>
@@ -606,48 +618,79 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                     </View>
                 </View>
 
-                <View style={styles.actionRow}>
-                    <TouchableOpacity
-                        style={[styles.primaryBtn, {
-                            backgroundColor: colors.accent,
-                            shadowColor: colors.accent,
-                            shadowOpacity: 0.22,
-                            shadowRadius: 8,
-                            shadowOffset: { width: 0, height: 6 },
-                            elevation: 6,
-                        }]}
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            navigation.navigate('AddExpense', { groupId, members: group?.members || [] });
-                        }}
-                        activeOpacity={0.82}
-                    >
-                        <Plus size={16} color="#fff" />
-                        <Text style={[styles.primaryBtnText, { color: '#fff' }, T.bold]}>Add expense</Text>
+                <Animated.View
+                    onLayout={e => {
+                        const h = e.nativeEvent.layout.height;
+                        if (h > 0 && collapsibleHeight === 0) setCollapsibleHeight(h);
+                    }}
+                    style={{
+                        overflow: 'hidden',
+                        opacity: collapsibleOpacity,
+                        height: collapsibleHeight === 0 ? undefined : collapsibleAnim,
+                    }}
+                >
+                    <TouchableOpacity activeOpacity={0.88} onPress={openMembersModal}>
+                        <View style={styles.clusterRow}>
+                            {(group?.members ?? []).slice(0, 4).map((m, i) => {
+                                const c = charFor(m.user_id);
+                                return (
+                                    <View key={m.user_id} style={[styles.clusterAvatar, i > 0 && { marginLeft: -8 }]}>
+                                        <CharacterShape
+                                            shape={c?.character_shape ?? 'rect'}
+                                            color={c?.character_color ?? m.avatar_color ?? '#6B7280'}
+                                            variant="cluster"
+                                        />
+                                    </View>
+                                );
+                            })}
+                            <Text style={[styles.memberSummary, { color: colors.secondaryText }, T.semibold]}>
+                                {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
+                            </Text>
+                        </View>
                     </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.ghostBtn, { borderColor: colors.gold }]}
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            setActiveTab('settle');
-                        }}
-                        activeOpacity={0.82}
-                    >
-                        <Send size={15} color={colors.gold} />
-                        <Text style={[styles.ghostBtnText, { color: colors.gold }, T.bold]}>Settle up</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        style={[styles.ghostBtn, { borderColor: colors.accent }]}
-                        onPress={() => {
-                            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                            handleShareInvite();
-                        }}
-                        activeOpacity={0.82}
-                    >
-                        <Share2 size={15} color={colors.accent} />
-                        <Text style={[styles.ghostBtnText, { color: colors.accent }, T.bold]}>Invite</Text>
-                    </TouchableOpacity>
-                </View>
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity
+                            style={[styles.primaryBtn, {
+                                backgroundColor: colors.accent,
+                                shadowColor: colors.accent,
+                                shadowOpacity: 0.22,
+                                shadowRadius: 8,
+                                shadowOffset: { width: 0, height: 6 },
+                                elevation: 6,
+                            }]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                navigation.navigate('AddExpense', { groupId, members: group?.members || [] });
+                            }}
+                            activeOpacity={0.82}
+                        >
+                            <Plus size={16} color="#fff" />
+                            <Text style={[styles.primaryBtnText, { color: '#fff' }, T.bold]}>Add expense</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.ghostBtn, { borderColor: colors.gold }]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                setActiveTab('settle');
+                            }}
+                            activeOpacity={0.82}
+                        >
+                            <Send size={15} color={colors.gold} />
+                            <Text style={[styles.ghostBtnText, { color: colors.gold }, T.bold]}>Settle up</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={[styles.ghostBtn, { borderColor: colors.accent }]}
+                            onPress={() => {
+                                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                                handleShareInvite();
+                            }}
+                            activeOpacity={0.82}
+                        >
+                            <Share2 size={15} color={colors.accent} />
+                            <Text style={[styles.ghostBtnText, { color: colors.accent }, T.bold]}>Invite</Text>
+                        </TouchableOpacity>
+                    </View>
+                </Animated.View>
 
                 <View style={styles.tabRow}>
                     {([
@@ -674,8 +717,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             </LinearGradient>
 
             <ScrollView
+                ref={scrollRef}
                 refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.accent} />}
                 contentContainerStyle={styles.scrollContent}
+                onScroll={Animated.event(
+                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                    { useNativeDriver: false }
+                )}
+                scrollEventThrottle={16}
             >
                 {activeTab === 'expenses' && (
                     expenses.length === 0 ? (
