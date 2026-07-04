@@ -20,6 +20,7 @@ import {
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
@@ -208,6 +209,43 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [editSaving, setEditSaving] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const toastAnim = useRef(new Animated.Value(0)).current;
+
+    // One-time swipe-to-reveal hint: peek the first row's action strip, then spring back
+    const [swipeHintDone, setSwipeHintDone] = useState(false);
+    const hintAnim = useRef(new Animated.Value(0)).current;
+
+    const runSwipeHint = useCallback(() => {
+        const peekDistance = -scale(60); // just enough to show the action strip
+        Animated.sequence([
+            Animated.spring(hintAnim, {
+                toValue: peekDistance,
+                useNativeDriver: true,
+                damping: 18,
+                stiffness: 200,
+            }),
+            Animated.delay(520),
+            Animated.spring(hintAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                damping: 20,
+                stiffness: 260,
+            }),
+        ]).start(() => {
+            AsyncStorage.setItem('@swipe_hint_seen', 'true');
+            setSwipeHintDone(true);
+        });
+    }, [hintAnim]);
+
+    useEffect(() => {
+        if (expenses.length === 0 || swipeHintDone) return;
+        let hintTimer: ReturnType<typeof setTimeout> | undefined;
+        AsyncStorage.getItem('@swipe_hint_seen').then(seen => {
+            if (seen) { setSwipeHintDone(true); return; }
+            // Delay so the list has fully rendered before animating
+            hintTimer = setTimeout(() => runSwipeHint(), 800);
+        });
+        return () => { if (hintTimer) clearTimeout(hintTimer); };
+    }, [expenses.length]);
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -646,8 +684,15 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const c = charFor(expense.paid_by);
                         const each = expense.amount / Math.max(expense.participants.length, 1);
                         const paidByMe = expense.paid_by === user?.id;
+                        const isFirstHint = expIdx === 0 && !swipeHintDone;
                         return (
-                            <Animated.View key={expense.id} style={{ opacity: expenseAnims[expIdx] ?? 1 }}>
+                            <Animated.View
+                                key={expense.id}
+                                style={{
+                                    opacity: expenseAnims[expIdx] ?? 1,
+                                    transform: isFirstHint ? [{ translateX: hintAnim }] : [],
+                                }}
+                            >
                                 <SwipeableExpenseRow
                                     paidByMe={paidByMe}
                                     onNudge={() => handleNudgeExpense(expense)}
