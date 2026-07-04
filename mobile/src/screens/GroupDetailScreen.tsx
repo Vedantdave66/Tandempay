@@ -492,7 +492,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             const result = await groupsApi.updateNotes(group.id, notesInput.trim() || null);
             setGroup(prev => prev ? { ...prev, notes: result.notes } : prev);
             setNotesModalVisible(false);
-            showToast('Note saved');
+            setTimeout(() => showToast('Note saved'), 700);
         } catch {
             Alert.alert('Error', 'Could not save note. Try again.');
         } finally {
@@ -1134,7 +1134,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         await groupsApi.updateNotes(group.id, null);
                                         setGroup(prev => prev ? { ...prev, notes: null } : prev);
                                         setNotesModalVisible(false);
-                                        showToast('Note removed');
+                                        setTimeout(() => showToast('Note removed'), 700);
                                     } catch {
                                         Alert.alert('Error', 'Could not remove note.');
                                     } finally {
