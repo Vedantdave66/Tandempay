@@ -20,13 +20,14 @@ import {
   Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
-import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, Info, BellRing, Pencil } from 'lucide-react-native';
+import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, BellRing, Pencil } from 'lucide-react-native';
 import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
@@ -46,9 +47,10 @@ interface SwipeableExpenseRowProps {
     onNudge: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    hintProgress?: Animated.Value;
 }
 
-function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: SwipeableExpenseRowProps) {
+function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete, hintProgress }: SwipeableExpenseRowProps) {
     const REVEAL = paidByMe ? ACTION_BTN_W * 3 : ACTION_BTN_W;
     const translateX = useRef(new Animated.Value(0)).current;
     const isOpen = useRef(false);
@@ -96,6 +98,10 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
         onPanResponderTerminate: () => { closeRef.current(); },
     })).current;
 
+    // Hint offset (if any) rides on top of the gesture-driven translateX, so the
+    // action strip stays put while the row content slides to reveal it.
+    const combinedX = hintProgress ? Animated.add(translateX, hintProgress) : translateX;
+
     return (
         <View style={swipeStyles.container}>
             <View style={[swipeStyles.actionsWrap, { width: REVEAL }]}>
@@ -130,7 +136,7 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete }: 
             </View>
             <Animated.View
                 {...panResponder.panHandlers}
-                style={{ transform: [{ translateX }] }}
+                style={{ transform: [{ translateX: combinedX }] }}
             >
                 {children}
             </Animated.View>
@@ -208,6 +214,43 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [editSaving, setEditSaving] = useState(false);
     const [toastMsg, setToastMsg] = useState<string | null>(null);
     const toastAnim = useRef(new Animated.Value(0)).current;
+
+    // One-time swipe-to-reveal hint: peek the first row's action strip, then spring back
+    const [swipeHintDone, setSwipeHintDone] = useState(false);
+    const hintAnim = useRef(new Animated.Value(0)).current;
+
+    const runSwipeHint = useCallback(() => {
+        const peekDistance = -scale(60); // just enough to show the action strip
+        Animated.sequence([
+            Animated.spring(hintAnim, {
+                toValue: peekDistance,
+                useNativeDriver: true,
+                damping: 18,
+                stiffness: 200,
+            }),
+            Animated.delay(520),
+            Animated.spring(hintAnim, {
+                toValue: 0,
+                useNativeDriver: true,
+                damping: 20,
+                stiffness: 260,
+            }),
+        ]).start(() => {
+            AsyncStorage.setItem('@swipe_hint_seen', 'true');
+            setSwipeHintDone(true);
+        });
+    }, [hintAnim]);
+
+    useEffect(() => {
+        if (expenses.length === 0 || swipeHintDone) return;
+        let hintTimer: ReturnType<typeof setTimeout> | undefined;
+        AsyncStorage.getItem('@swipe_hint_seen').then(seen => {
+            if (seen) { setSwipeHintDone(true); return; }
+            // Delay so the list has fully rendered before animating
+            hintTimer = setTimeout(() => runSwipeHint(), 800);
+        });
+        return () => { if (hintTimer) clearTimeout(hintTimer); };
+    }, [expenses.length]);
 
     function toArray<T>(raw: any): T[] {
         if (Array.isArray(raw)) return raw;
@@ -475,7 +518,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const myNet = Number(myBalance?.net_balance ?? 0);
     const isOwe = myNet < -0.01;
     const isOwed = myNet > 0.01;
-    const maxBalance = Math.max(...balances.map(b => Math.abs(Number(b.net_balance))), 1);
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -647,10 +689,12 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const c = charFor(expense.paid_by);
                         const each = expense.amount / Math.max(expense.participants.length, 1);
                         const paidByMe = expense.paid_by === user?.id;
+                        const isFirstHint = expIdx === 0 && !swipeHintDone;
                         return (
                             <Animated.View key={expense.id} style={{ opacity: expenseAnims[expIdx] ?? 1 }}>
                                 <SwipeableExpenseRow
                                     paidByMe={paidByMe}
+                                    hintProgress={isFirstHint ? hintAnim : undefined}
                                     onNudge={() => handleNudgeExpense(expense)}
                                     onEdit={() => {
                                         setEditTarget(expense);
@@ -662,10 +706,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     <View style={[styles.row, {
                                         backgroundColor: colors.surface,
                                         shadowColor: isDark ? '#000' : '#0A3020',
-                                        shadowOpacity: isDark ? 0.28 : 0.10,
-                                        shadowRadius: isDark ? 14 : 10,
-                                        shadowOffset: { width: 0, height: isDark ? 10 : 4 },
-                                        elevation: isDark ? 6 : 4,
+                                        shadowOpacity: isDark ? 0.12 : 0.05,
+                                        shadowRadius: isDark ? 6 : 4,
+                                        shadowOffset: { width: 0, height: isDark ? 4 : 2 },
+                                        elevation: isDark ? 2 : 1,
                                         marginBottom: 0,
                                     }]}>
                                         <CharacterShape
@@ -685,11 +729,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                             </Text>
                                         </View>
                                         <View style={styles.rowEnd}>
-                                            <Text style={[styles.rowAmount, { color: paidByMe ? colors.accent : colors.gold, fontVariant: ['tabular-nums'] }, T.bold]}>
+                                            <Text style={[styles.rowAmount, { color: colors.text, fontVariant: ['tabular-nums'] }, T.bold]}>
                                                 ${formatCurrency(expense.amount)}
                                             </Text>
                                             <Text style={[styles.rowDate, { color: colors.faintText }, T.regular]}>
-                                                {new Date(expense.created_at).toLocaleDateString()}
+                                                {new Date(expense.created_at).toLocaleDateString('en-CA', { month: 'short', day: 'numeric' })}
                                             </Text>
                                             <Text style={[styles.rowEach, { color: colors.accent, fontVariant: ['tabular-nums'] }, T.semibold]}>
                                                 ${formatCurrency(each)} each
@@ -705,15 +749,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 {activeTab === 'balances' && balances.map(b => {
                     const net = Number(b.net_balance);
                     const owesB = net < -0.01;
-                    const fillColor = owesB ? colors.warningBright : colors.accent;
                     return (
                         <View key={b.user_id} style={[styles.row, styles.balanceRow, {
                             backgroundColor: colors.surface,
                             shadowColor: isDark ? '#000' : '#0A3020',
-                            shadowOpacity: isDark ? 0.18 : 0.07,
-                            shadowRadius: 8,
-                            shadowOffset: { width: 0, height: 4 },
-                            elevation: isDark ? 4 : 2,
+                            shadowOpacity: isDark ? 0.12 : 0.05,
+                            shadowRadius: isDark ? 6 : 4,
+                            shadowOffset: { width: 0, height: isDark ? 4 : 2 },
+                            elevation: isDark ? 2 : 1,
                         }]}>
                             <View style={styles.balanceTopRow}>
                                 <CharacterShape shape={b.character_shape ?? 'rect'} color={b.character_color ?? '#6B7280'} variant="mini" />
@@ -725,9 +768,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         {owesB ? `owes $${formatCurrency(Math.abs(net))}` : `gets back $${formatCurrency(Math.abs(net))}`}
                                     </Text>
                                 </View>
-                            </View>
-                            <View style={[styles.progressTrack, { backgroundColor: colors.border }]}>
-                                <View style={[styles.progressFill, { backgroundColor: fillColor, width: `${Math.min(Math.abs(net) / maxBalance * 100, 100)}%` }]} />
                             </View>
                             {owesB && b.user_id === user?.id && (
                                 <TouchableOpacity
@@ -752,14 +792,15 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                         const fr = charFor(s.from_user_id);
                         const to = charFor(s.to_user_id);
                         const isMine = s.from_user_id === user?.id;
+                        const toName = group?.members?.find((m: any) => m.user_id === s.to_user_id)?.name ?? 'member';
                         return (
                             <View key={idx} style={[styles.row, {
                                 backgroundColor: colors.surface,
                                 shadowColor: isDark ? '#000' : '#0A3020',
-                                shadowOpacity: isDark ? 0.28 : 0.10,
-                                shadowRadius: isDark ? 14 : 10,
-                                shadowOffset: { width: 0, height: isDark ? 10 : 4 },
-                                elevation: isDark ? 6 : 4,
+                                shadowOpacity: isDark ? 0.12 : 0.05,
+                                shadowRadius: isDark ? 6 : 4,
+                                shadowOffset: { width: 0, height: isDark ? 4 : 2 },
+                                elevation: isDark ? 2 : 1,
                                 flexDirection: 'column',
                                 alignItems: 'stretch',
                                 gap: vs(8),
@@ -770,7 +811,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     <CharacterShape shape={to?.character_shape ?? 'rect'} color={to?.character_color ?? s.to_avatar_color ?? '#6B7280'} variant="mini" />
                                     <View style={styles.rowInfo}>
                                         <Text style={[styles.rowTitle, { color: colors.text }, T.semibold]} numberOfLines={2}>
-                                            Pay ${formatCurrency(s.amount)} via Interac e-Transfer
+                                            Pay ${formatCurrency(s.amount)}
+                                        </Text>
+                                        <Text style={[styles.rowMeta, { color: colors.secondaryText }, T.regular]}>
+                                            to {s.to_user_id === user?.id ? 'you' : toName} via Interac
                                         </Text>
                                     </View>
                                     <TouchableOpacity
@@ -796,25 +840,9 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                         }}
                                         activeOpacity={0.82}
                                     >
-                                        <Text style={[styles.settleBtnText, { color: colors.warningBright }, T.bold]}>Settle up</Text>
+                                        <Text style={[styles.settleBtnText, { color: colors.warningBright }, T.bold]}>Pay</Text>
                                     </TouchableOpacity>
                                 </View>
-                                {s.amount > 0 && (
-                                    <View style={{
-                                        flexDirection: 'row',
-                                        alignItems: 'center',
-                                        gap: scale(6),
-                                        backgroundColor: colors.warningBg,
-                                        borderRadius: ms(10),
-                                        paddingVertical: vs(6),
-                                        paddingHorizontal: scale(10),
-                                    }}>
-                                        <Info size={14} color={colors.warning} />
-                                        <Text style={[{ color: colors.warning, flex: 1 }, T.caption]}>
-                                            {'Paying by card? Add $'}{(s.amount * 0.029 + 0.30).toFixed(2)}{' to cover processing fees'}
-                                        </Text>
-                                    </View>
-                                )}
                             </View>
                         );
                     })
@@ -1149,7 +1177,7 @@ const styles = StyleSheet.create({
     rowTitle: { fontSize: ms(16) },
     rowMeta: { fontSize: ms(12), marginTop: vs(2) },
     rowEnd: { alignItems: 'flex-end' },
-    rowAmount: { fontSize: ms(20), letterSpacing: -0.6 },
+    rowAmount: { fontSize: ms(17), letterSpacing: -0.6 },
     rowDate: { fontSize: ms(11), marginTop: vs(2) },
     rowEach: { fontSize: ms(12), marginTop: vs(2) },
 
