@@ -1476,7 +1476,7 @@ const styles = StyleSheet.create({
     },
     toast: {
         position: 'absolute',
-        top: vs(180),
+        top: '38%',
         alignSelf: 'center',
         paddingHorizontal: scale(20),
         paddingVertical: vs(10),
