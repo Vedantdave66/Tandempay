@@ -212,12 +212,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [editTitle, setEditTitle] = useState('');
     const [editAmount, setEditAmount] = useState('');
     const [editSaving, setEditSaving] = useState(false);
-    const [toastMsg, setToastMsg] = useState<string | null>(null);
-    const toastAnim = useRef(new Animated.Value(0)).current;
-
-    const [notesModalVisible, setNotesModalVisible] = useState(false);
-    const [notesInput, setNotesInput]               = useState('');
-    const [notesSaving, setNotesSaving]             = useState(false);
 
     // One-time swipe-to-reveal hint: peek the first row's action strip, then spring back
     const [swipeHintDone, setSwipeHintDone] = useState(false);
@@ -454,16 +448,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const showToast = useCallback((msg: string) => {
-        setToastMsg(msg);
-        toastAnim.setValue(0);
-        Animated.sequence([
-            Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-            Animated.delay(1800),
-            Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
-        ]).start(() => setToastMsg(null));
-    }, [toastAnim]);
-
     const handleEditSave = async () => {
         if (!editTarget) return;
         const trimTitle = editTitle.trim();
@@ -476,27 +460,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             const updated = await expensesApi.patch(editTarget.id, { title: trimTitle, amount: parsedAmount });
             setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
             setEditTarget(null);
-            showToast('Expense updated');
         } catch (err: any) {
             Alert.alert('Error', err.message || 'Could not update expense.');
         } finally {
             setEditSaving(false);
-        }
-    };
-
-    const handleSaveNotes = async () => {
-        if (!group) return;
-        setNotesSaving(true);
-        Keyboard.dismiss();
-        try {
-            const result = await groupsApi.updateNotes(group.id, notesInput.trim() || null);
-            setGroup(prev => prev ? { ...prev, notes: result.notes } : prev);
-            setNotesModalVisible(false);
-            showToast('Note saved');
-        } catch {
-            Alert.alert('Error', 'Could not save note. Try again.');
-        } finally {
-            setNotesSaving(false);
         }
     };
 
@@ -575,26 +542,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                 {group?.members.length ?? 0} members · ${formatCurrency(group?.total_expenses)}
                             </Text>
                         </View>
-                        <TouchableOpacity
-                            onPress={() => {
-                                setNotesInput(group?.notes ?? '');
-                                setNotesModalVisible(true);
-                            }}
-                            activeOpacity={0.75}
-                            style={{ marginTop: vs(8), flexDirection: 'row', alignItems: 'center', gap: scale(5) }}
-                        >
-                            <Pencil size={12} color={group?.notes ? colors.secondaryText : colors.faintText} />
-                            <Text
-                                style={[
-                                    { fontSize: ms(13), flex: 1 },
-                                    T.regular,
-                                    { color: group?.notes ? colors.secondaryText : colors.faintText },
-                                ]}
-                                numberOfLines={2}
-                            >
-                                {group?.notes || 'Add a note...'}
-                            </Text>
-                        </TouchableOpacity>
                     </TouchableOpacity>
 
                     <View style={styles.headerRightCol}>
@@ -1077,102 +1024,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
-            {/* Group note sheet */}
-            <Modal
-                visible={notesModalVisible}
-                animationType="slide"
-                transparent
-                onRequestClose={() => setNotesModalVisible(false)}
-            >
-                <View style={styles.editOverlay}>
-                    <View style={[styles.editSheet, { backgroundColor: colors.surface }]}>
-                        <View style={[styles.editHandle, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>
-                            Group note
-                        </Text>
-                        <TextInput
-                            style={[
-                                styles.editInput,
-                                {
-                                    color: colors.text,
-                                    backgroundColor: colors.background,
-                                    borderColor: colors.border,
-                                    height: vs(100),
-                                    textAlignVertical: 'top',
-                                },
-                                T.regular,
-                            ]}
-                            value={notesInput}
-                            onChangeText={setNotesInput}
-                            placeholder="e.g. Bali trip 2026, split 6 ways"
-                            placeholderTextColor={colors.faintText}
-                            multiline
-                            maxLength={300}
-                            autoFocus
-                            autoCapitalize="sentences"
-                        />
-                        <Text style={[{ fontSize: ms(11), color: colors.faintText, textAlign: 'right' }, T.regular]}>
-                            {notesInput.length}/300
-                        </Text>
-                        <PressableScale
-                            scaleTo={0.97}
-                            haptic="medium"
-                            onPress={handleSaveNotes}
-                            disabled={notesSaving}
-                            style={[styles.editSaveBtn, { backgroundColor: colors.accent, opacity: notesSaving ? 0.7 : 1 }]}
-                        >
-                            {notesSaving
-                                ? <ActivityIndicator color="#fff" size="small" />
-                                : <Text style={[styles.editSaveBtnText, T.bold]}>Save</Text>
-                            }
-                        </PressableScale>
-                        {group?.notes ? (
-                            <TouchableOpacity
-                                onPress={async () => {
-                                    setNotesSaving(true);
-                                    try {
-                                        await groupsApi.updateNotes(group.id, null);
-                                        setGroup(prev => prev ? { ...prev, notes: null } : prev);
-                                        setNotesModalVisible(false);
-                                        showToast('Note removed');
-                                    } catch {
-                                        Alert.alert('Error', 'Could not remove note.');
-                                    } finally {
-                                        setNotesSaving(false);
-                                    }
-                                }}
-                                activeOpacity={0.7}
-                                style={styles.editCancelLink}
-                            >
-                                <Text style={[styles.editCancelText, { color: '#EF4444' }, T.regular]}>Remove note</Text>
-                            </TouchableOpacity>
-                        ) : (
-                            <TouchableOpacity onPress={() => setNotesModalVisible(false)} activeOpacity={0.7} style={styles.editCancelLink}>
-                                <Text style={[styles.editCancelText, { color: colors.secondaryText }, T.regular]}>Cancel</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                </View>
-            </Modal>
-
-            <Modal
-                visible={!!toastMsg}
-                transparent
-                animationType="none"
-                statusBarTranslucent
-            >
-                <View
-                    style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}
-                    pointerEvents="none"
-                >
-                    <Animated.View style={[styles.toast, { backgroundColor: colors.surface, borderColor: colors.border, opacity: toastAnim }]}>
-                        <Text style={[styles.toastText, { color: colors.text }, T.semibold]}>
-                            {toastMsg}
-                        </Text>
-                    </Animated.View>
-                </View>
-            </Modal>
-
             {canvasMode && (
                 <CanvasModeView
                     expenses={expenses}
@@ -1484,19 +1335,6 @@ const styles = StyleSheet.create({
         paddingVertical: vs(8),
     },
     editCancelText: {
-        fontSize: ms(14),
-    },
-    toast: {
-        paddingHorizontal: scale(20),
-        paddingVertical: vs(10),
-        borderRadius: ms(20),
-        borderWidth: StyleSheet.hairlineWidth,
-        shadowColor: '#000',
-        shadowOpacity: 0.15,
-        shadowRadius: 10,
-        elevation: 6,
-    },
-    toastText: {
         fontSize: ms(14),
     },
 });
