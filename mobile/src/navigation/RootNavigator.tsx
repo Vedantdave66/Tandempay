@@ -12,6 +12,7 @@ import MainTabNavigator from './MainTabNavigator';
 import LoginScreen from '../screens/LoginScreen';
 import RegisterScreen from '../screens/RegisterScreen';
 import GroupDetailScreen from '../screens/GroupDetailScreen';
+import ExpenseDetailScreen from '../screens/ExpenseDetailScreen';
 import LandingScreen from '../screens/LandingScreen';
 import OnboardingScreen from '../screens/OnboardingScreen';
 import CreateGroupScreen from '../screens/CreateGroupScreen';
@@ -194,6 +195,7 @@ export default function RootNavigator() {
 
                         {/* Full-screen detail screens */}
                         <Stack.Screen name="Group" component={GroupDetailScreen} options={{ animation: 'slide_from_right' }} />
+                        <Stack.Screen name="ExpenseDetail" component={ExpenseDetailScreen} options={{ animation: 'slide_from_right' }} />
 
                         {/* Modal-style creation screens */}
                         <Stack.Screen

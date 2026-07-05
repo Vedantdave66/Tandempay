@@ -17,7 +17,6 @@ import {
   Easing,
   Share,
   PanResponder,
-  Keyboard,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -32,7 +31,7 @@ import { T } from '../utils/typography';
 import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
 import SkeletonBlock from '../components/SkeletonBlock';
-import PressableScale from '../components/PressableScale';
+import EditExpenseSheet from '../components/EditExpenseSheet';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
 
@@ -209,9 +208,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const [shareLoading, setShareLoading] = useState(false);
 
     const [editTarget, setEditTarget] = useState<Expense | null>(null);
-    const [editTitle, setEditTitle] = useState('');
-    const [editAmount, setEditAmount] = useState('');
-    const [editSaving, setEditSaving] = useState(false);
 
     // One-time swipe-to-reveal hint: peek the first row's action strip, then spring back
     const [swipeHintDone, setSwipeHintDone] = useState(false);
@@ -448,25 +444,6 @@ export default function GroupDetailScreen({ route, navigation }: any) {
         }
     };
 
-    const handleEditSave = async () => {
-        if (!editTarget) return;
-        const trimTitle = editTitle.trim();
-        const parsedAmount = parseFloat(editAmount);
-        if (!trimTitle) return void Alert.alert('Title required', 'Enter a title.');
-        if (isNaN(parsedAmount) || parsedAmount <= 0) return void Alert.alert('Invalid amount', 'Enter a value greater than 0.');
-        setEditSaving(true);
-        Keyboard.dismiss();
-        try {
-            const updated = await expensesApi.patch(editTarget.id, { title: trimTitle, amount: parsedAmount });
-            setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
-            setEditTarget(null);
-        } catch (err: any) {
-            Alert.alert('Error', err.message || 'Could not update expense.');
-        } finally {
-            setEditSaving(false);
-        }
-    };
-
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
 
     if (loading && !refreshing) {
@@ -683,22 +660,26 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                     paidByMe={paidByMe}
                                     hintProgress={isFirstHint ? hintAnim : undefined}
                                     onNudge={() => handleNudgeExpense(expense)}
-                                    onEdit={() => {
-                                        setEditTarget(expense);
-                                        setEditTitle(expense.title);
-                                        setEditAmount(String(expense.amount));
-                                    }}
+                                    onEdit={() => setEditTarget(expense)}
                                     onDelete={() => handleDeleteExpense(expense)}
                                 >
-                                    <View style={[styles.row, {
+                                    <TouchableOpacity
+                                        activeOpacity={0.88}
+                                        onPress={() => navigation.navigate('ExpenseDetail', {
+                                            expense,
+                                            groupId,
+                                            members: group?.members ?? [],
+                                        })}
+                                        style={[styles.row, {
                                         backgroundColor: colors.surface,
                                         shadowColor: isDark ? '#000' : '#0A3020',
                                         shadowOpacity: isDark ? 0.12 : 0.05,
                                         shadowRadius: isDark ? 6 : 4,
-                                        shadowOffset: { width: 0, height: isDark ? 4 : 2 },
-                                        elevation: isDark ? 2 : 1,
-                                        marginBottom: 0,
-                                    }]}>
+                                            shadowOffset: { width: 0, height: isDark ? 4 : 2 },
+                                            elevation: isDark ? 2 : 1,
+                                            marginBottom: 0,
+                                        }]}
+                                    >
                                         <CharacterShape
                                             shape={c?.character_shape ?? 'rect'}
                                             color={c?.character_color ?? expense.payer_avatar_color ?? '#6B7280'}
@@ -726,7 +707,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                                                 ${formatCurrency(each)} each
                                             </Text>
                                         </View>
-                                    </View>
+                                    </TouchableOpacity>
                                 </SwipeableExpenseRow>
                             </Animated.View>
                         );
@@ -976,53 +957,14 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 </View>
             </Modal>
 
-            {/* Edit expense sheet */}
-            <Modal
-                visible={editTarget !== null}
-                animationType="slide"
-                transparent={true}
-                onRequestClose={() => setEditTarget(null)}
-            >
-                <View style={styles.editOverlay}>
-                    <View style={[styles.editSheet, { backgroundColor: colors.surface }]}>
-                        <View style={[styles.editHandle, { backgroundColor: colors.border }]} />
-                        <Text style={[styles.editSheetTitle, { color: colors.text }, T.bold]}>Edit expense</Text>
-                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Title</Text>
-                        <TextInput
-                            style={[styles.editInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, T.regular]}
-                            value={editTitle}
-                            onChangeText={setEditTitle}
-                            placeholder="Expense title"
-                            placeholderTextColor={colors.faintText}
-                            autoCapitalize="sentences"
-                        />
-                        <Text style={[styles.editLabel, { color: colors.secondaryText }, T.semibold]}>Amount</Text>
-                        <TextInput
-                            style={[styles.editInput, { color: colors.text, backgroundColor: colors.background, borderColor: colors.border }, T.regular]}
-                            value={editAmount}
-                            onChangeText={setEditAmount}
-                            placeholder="0.00"
-                            placeholderTextColor={colors.faintText}
-                            keyboardType="decimal-pad"
-                        />
-                        <PressableScale
-                            scaleTo={0.97}
-                            haptic="medium"
-                            onPress={handleEditSave}
-                            disabled={editSaving}
-                            style={[styles.editSaveBtn, { backgroundColor: colors.accent, opacity: editSaving ? 0.7 : 1 }]}
-                        >
-                            {editSaving
-                                ? <ActivityIndicator color="#fff" size="small" />
-                                : <Text style={[styles.editSaveBtnText, T.bold]}>Save changes</Text>
-                            }
-                        </PressableScale>
-                        <TouchableOpacity onPress={() => setEditTarget(null)} activeOpacity={0.7} style={styles.editCancelLink}>
-                            <Text style={[styles.editCancelText, { color: colors.secondaryText }, T.regular]}>Cancel</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+            <EditExpenseSheet
+                expense={editTarget}
+                onClose={() => setEditTarget(null)}
+                onSaved={(updated) => {
+                    setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
+                    setEditTarget(null);
+                }}
+            />
 
             {canvasMode && (
                 <CanvasModeView
@@ -1283,58 +1225,5 @@ const styles = StyleSheet.create({
         borderRadius: ms(26),
         alignItems: 'center',
         justifyContent: 'center',
-    },
-
-    editOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0,0,0,0.5)',
-        justifyContent: 'flex-end',
-    },
-    editSheet: {
-        borderTopLeftRadius: ms(28),
-        borderTopRightRadius: ms(28),
-        padding: scale(20),
-        paddingBottom: vs(36),
-        gap: vs(10),
-    },
-    editHandle: {
-        width: scale(36),
-        height: vs(4),
-        borderRadius: ms(2),
-        alignSelf: 'center',
-        marginBottom: vs(6),
-    },
-    editSheetTitle: {
-        fontSize: ms(20),
-        marginBottom: vs(4),
-    },
-    editLabel: {
-        fontSize: ms(12),
-        textTransform: 'uppercase',
-        letterSpacing: 0.4,
-    },
-    editInput: {
-        borderWidth: 1,
-        borderRadius: ms(14),
-        paddingHorizontal: scale(14),
-        paddingVertical: vs(12),
-        fontSize: ms(15),
-    },
-    editSaveBtn: {
-        borderRadius: ms(16),
-        paddingVertical: vs(15),
-        alignItems: 'center',
-        marginTop: vs(6),
-    },
-    editSaveBtnText: {
-        color: '#fff',
-        fontSize: ms(15),
-    },
-    editCancelLink: {
-        alignItems: 'center',
-        paddingVertical: vs(8),
-    },
-    editCancelText: {
-        fontSize: ms(14),
     },
 });
