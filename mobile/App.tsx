@@ -12,6 +12,7 @@ import * as Sentry from '@sentry/react-native';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import { AuthProvider } from './src/context/AuthContext';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { ToastProvider } from './src/context/ToastContext';
 import { NotificationProvider } from './src/context/NotificationContext';
 import RootNavigator from './src/navigation/RootNavigator';
 import SplashScreen from './src/components/SplashScreen';
@@ -84,13 +85,15 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <NotificationProvider>
-          <StripeProvider publishableKey={stripeKey} merchantIdentifier="merchant.ca.tandempay.app">
-            <ConnectedApp />
-          </StripeProvider>
-        </NotificationProvider>
-      </AuthProvider>
+      <ToastProvider>
+        <AuthProvider>
+          <NotificationProvider>
+            <StripeProvider publishableKey={stripeKey} merchantIdentifier="merchant.ca.tandempay.app">
+              <ConnectedApp />
+            </StripeProvider>
+          </NotificationProvider>
+        </AuthProvider>
+      </ToastProvider>
       {!splashDone && <SplashScreen onComplete={() => setSplashDone(true)} />}
     </ThemeProvider>
   );
