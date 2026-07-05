@@ -4,14 +4,11 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  TouchableWithoutFeedback,
   ActivityIndicator,
   Modal,
   TextInput,
   Alert,
   Keyboard,
-  KeyboardAvoidingView,
-  Platform,
 } from 'react-native';
 import { useTheme } from '../context/ThemeContext';
 import { expensesApi, Expense } from '../services/api';
@@ -69,15 +66,7 @@ export default function EditExpenseSheet({ expense, onClose, onSaved }: EditExpe
             transparent={true}
             onRequestClose={onClose}
         >
-            <KeyboardAvoidingView
-                style={styles.overlay}
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            >
-                {/* Tapping anywhere on the sheet outside an input dismisses the
-                    keyboard without closing the sheet or discarding edits.
-                    Nested touchables (inputs, Save, Cancel) claim their own
-                    taps first, so this only catches dead space. */}
-                <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View style={styles.overlay}>
                 <View style={[styles.sheet, { backgroundColor: colors.surface }]}>
                     <View style={[styles.handle, { backgroundColor: colors.border }]} />
                     <Text style={[styles.sheetTitle, { color: colors.text }, T.bold]}>Edit expense</Text>
@@ -89,8 +78,6 @@ export default function EditExpenseSheet({ expense, onClose, onSaved }: EditExpe
                         placeholder="Expense title"
                         placeholderTextColor={colors.faintText}
                         autoCapitalize="sentences"
-                        returnKeyType="done"
-                        onSubmitEditing={() => Keyboard.dismiss()}
                     />
                     <Text style={[styles.label, { color: colors.secondaryText }, T.semibold]}>Amount</Text>
                     <TextInput
@@ -100,8 +87,6 @@ export default function EditExpenseSheet({ expense, onClose, onSaved }: EditExpe
                         placeholder="0.00"
                         placeholderTextColor={colors.faintText}
                         keyboardType="decimal-pad"
-                        returnKeyType="done"
-                        onSubmitEditing={() => Keyboard.dismiss()}
                     />
                     <PressableScale
                         scaleTo={0.97}
@@ -119,8 +104,7 @@ export default function EditExpenseSheet({ expense, onClose, onSaved }: EditExpe
                         <Text style={[styles.cancelText, { color: colors.secondaryText }, T.regular]}>Cancel</Text>
                     </TouchableOpacity>
                 </View>
-                </TouchableWithoutFeedback>
-            </KeyboardAvoidingView>
+            </View>
         </Modal>
     );
 }
