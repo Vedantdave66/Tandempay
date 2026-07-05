@@ -143,11 +143,6 @@ export const groupsApi = {
             method: 'POST',
             body: JSON.stringify({ email }),
         }),
-    updateNotes: (groupId: string, notes: string | null) =>
-        request<{ notes: string | null }>(`/groups/${groupId}/notes`, {
-            method: 'PATCH',
-            body: JSON.stringify({ notes }),
-        }),
     join: (groupId: string) =>
         request<GroupMember>(`/groups/${groupId}/join`, {
             method: 'POST',
