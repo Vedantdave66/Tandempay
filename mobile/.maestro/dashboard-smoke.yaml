@@ -1,0 +1,34 @@
+# One smoke test: launch -> log in -> confirm the Dashboard renders.
+# See mobile/README.md > "Maestro smoke test" for install/run instructions,
+# how to point the app at a local backend, and how to seed the test account.
+#
+# clearState: true wipes AsyncStorage (token + @onboarding_seen) on every run,
+# so this always exercises a genuinely fresh install rather than whatever
+# state a simulator happens to be in — the onboarding carousel below is not
+# optional, it WILL appear, same as it would for a real first-time user.
+appId: ca.tandempay.app
+env:
+  TEST_EMAIL: e2e-mobile-smoke@dev.tandempay.local
+  TEST_PASSWORD: E2eMobileSmokePassword123!
+---
+- launchApp:
+    clearState: true
+
+# Onboarding carousel (first launch only, guaranteed by clearState above):
+# "Skip" jumps straight to the character-picker slide, which has sensible
+# defaults preselected, so "Get started" is tappable immediately.
+- tapOn: "Skip"
+- tapOn: "Get started"
+
+# Landing screen -> Login screen
+- tapOn: "Log In"
+- tapOn: "you@example.com"
+- inputText: "${TEST_EMAIL}"
+- tapOn: "••••••••"
+- inputText: "${TEST_PASSWORD}"
+- tapOn: "Sign in"
+
+# Dashboard renders. "Recent activity" is always shown here (regardless of
+# whether the seed account has any groups yet), so it's a stable anchor that
+# doesn't depend on the account's data state.
+- assertVisible: "Recent activity"

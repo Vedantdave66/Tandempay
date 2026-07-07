@@ -1,6 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const BASE_URL = "https://api.tandempay.ca/api";
+// Defaults to production. Set EXPO_PUBLIC_API_URL (e.g. in a local .env, picked
+// up by Expo's env var inlining) to point a dev build at a local backend —
+// see mobile/README.md > "Maestro smoke test" for the local-run setup.
+export const BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? "https://api.tandempay.ca/api";
 
 async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
     const token = await AsyncStorage.getItem('token');
