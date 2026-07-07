@@ -25,6 +25,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import * as Haptics from 'expo-haptics';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { groupsApi, expensesApi, balancesApi, settlementsApi, friendsApi, Group, Expense, UserBalance, Settlement, Friend } from '../services/api';
 import { ArrowLeft, Plus, Send, ArrowRight, Receipt, Users, Mail, UserPlus, X, CheckCircle2, LayoutList, Orbit, Trash2, Share2, BellRing, Pencil } from 'lucide-react-native';
 import { T } from '../utils/typography';
@@ -172,6 +173,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     const { groupId } = route.params;
     const { colors, isDark } = useTheme();
     const { user } = useAuth();
+    const { showToast } = useToast();
     const insets = useSafeAreaInsets();
 
     useFocusEffect(useCallback(() => {
@@ -963,6 +965,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                 onSaved={(updated) => {
                     setExpenses(prev => prev.map(e => e.id === updated.id ? updated : e));
                     setEditTarget(null);
+                    showToast('Expense updated');
                 }}
             />
 
