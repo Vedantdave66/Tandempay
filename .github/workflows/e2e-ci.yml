@@ -37,6 +37,9 @@ jobs:
       ADMIN_SECRET: "ci-e2e-admin-secret"
       ENVIRONMENT: "test"
       FRONTEND_URL: "http://localhost:5173"
+      # The disposable service container below has no SSL configured, unlike
+      # Supabase's Transaction Pooler which app/database.py assumes by default.
+      DB_SSL_REQUIRE: "false"
       E2E_TEST_EMAIL: "e2e-smoke@ci.tandempay.ca"
       E2E_TEST_PASSWORD: "E2eSmokePassword123!"
 

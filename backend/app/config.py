@@ -51,6 +51,12 @@ class Settings(BaseSettings):
     # Leave at INFO for production; set DEBUG locally when chasing a bug.
     LOG_LEVEL: str = "INFO"
 
+    # Require SSL on Postgres connections (app/database.py). Defaults to True
+    # to match Supabase's Transaction Pooler requirement — do not change this
+    # default for Vercel/production. Only set to false for a plain, non-SSL
+    # Postgres instance (e.g. the disposable service container in CI).
+    DB_SSL_REQUIRE: bool = True
+
     class Config:
         env_file = ".env"
 
