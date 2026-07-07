@@ -1,7 +1,7 @@
 """Replace uq_payment_settlement_payer with partial unique index.
 
 Revision ID: 20260524_payment_retry_partial_index
-Revises: 20260522_add_subscription_fields
+Revises: 20260522b_widen_alembic_ver
 Create Date: 2026-05-24
 
 Schema changes
@@ -22,7 +22,7 @@ import sqlalchemy as sa
 
 
 revision: str = "20260524_payment_retry_partial_index"
-down_revision: Union[str, Sequence[str], None] = "20260522_add_subscription_fields"
+down_revision: Union[str, Sequence[str], None] = "20260522b_widen_alembic_ver"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
