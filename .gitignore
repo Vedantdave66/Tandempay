@@ -27,6 +27,11 @@ mobile/.env
 .DS_Store
 Thumbs.db
 
+# Playwright
+frontend/test-results/
+frontend/playwright-report/
+frontend/e2e/.auth/
+
 # Build artifacts
 tsconfig.tsbuildinfo
 .claude/

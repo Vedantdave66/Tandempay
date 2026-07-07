@@ -23,7 +23,7 @@ _connect_args = (
     {
         "statement_cache_size": 0,
         "prepared_statement_cache_size": 0,
-        "ssl": "require",
+        **({"ssl": "require"} if settings.DB_SSL_REQUIRE else {}),
     }
     if _is_postgres
     else {}
