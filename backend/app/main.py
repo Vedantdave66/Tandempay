@@ -314,6 +314,7 @@ _allowed_origins = [
 if _cors_settings.ENVIRONMENT != "production":
     _allowed_origins += [
         "http://localhost:3000",
+        "http://localhost:5173",
         "http://localhost:8081",
         "exp://localhost:8081",
     ]
