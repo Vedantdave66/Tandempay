@@ -72,6 +72,19 @@ def upgrade() -> None:
         op.execute(f"CREATE TYPE settlementmethod AS ENUM ({methods})")
         op.execute(f"CREATE TYPE paymentstatus AS ENUM ({pstatuses})")
 
+        # Each of these columns carries a VARCHAR server_default (set in the
+        # initial schema migration). Postgres cannot auto-cast a column's
+        # existing default expression to a new enum type, so ALTER COLUMN
+        # TYPE fails with "default ... cannot be cast automatically" unless
+        # the default is dropped first and re-applied (cast to the enum)
+        # afterward.
+        # uq_active_settlement_per_pair is a partial index whose predicate
+        # references status. Postgres cannot rebuild a predicate expression
+        # in place during ALTER COLUMN TYPE ("functions in index predicate
+        # must be marked IMMUTABLE"), so drop it first and recreate after.
+        op.execute("DROP INDEX IF EXISTS uq_active_settlement_per_pair")
+
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN status DROP DEFAULT")
         op.execute(
             "ALTER TABLE settlement_records "
             "ALTER COLUMN status TYPE settlementstatus "
@@ -79,13 +92,46 @@ def upgrade() -> None:
         )
         op.execute(
             "ALTER TABLE settlement_records "
+            "ALTER COLUMN status SET DEFAULT 'pending'::settlementstatus"
+        )
+
+        op.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_active_settlement_per_pair "
+            "ON settlement_records (group_id, payer_id, payee_id) "
+            "WHERE status IN ('pending', 'sent')"
+        )
+
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN method DROP DEFAULT")
+        op.execute(
+            "ALTER TABLE settlement_records "
             "ALTER COLUMN method TYPE settlementmethod "
             "USING method::settlementmethod"
         )
         op.execute(
+            "ALTER TABLE settlement_records "
+            "ALTER COLUMN method SET DEFAULT 'etransfer'::settlementmethod"
+        )
+
+        # uq_active_payment_settlement_payer (created by
+        # 20260524_payment_retry_partial_index) is likewise a partial index
+        # whose predicate references status — same drop/recreate treatment.
+        op.execute("DROP INDEX IF EXISTS uq_active_payment_settlement_payer")
+
+        op.execute("ALTER TABLE payments ALTER COLUMN status DROP DEFAULT")
+        op.execute(
             "ALTER TABLE payments "
             "ALTER COLUMN status TYPE paymentstatus "
             "USING status::paymentstatus"
+        )
+        op.execute(
+            "ALTER TABLE payments "
+            "ALTER COLUMN status SET DEFAULT 'pending'::paymentstatus"
+        )
+
+        op.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_active_payment_settlement_payer "
+            "ON payments (settlement_id, payer_id) "
+            "WHERE status NOT IN ('expired', 'failed', 'canceled')"
         )
 
 
@@ -95,17 +141,41 @@ def downgrade() -> None:
 
     # ── Revert enum columns to plain VARCHAR (PostgreSQL only) ───────────────
     if is_postgres:
+        op.execute("DROP INDEX IF EXISTS uq_active_payment_settlement_payer")
+
+        op.execute("ALTER TABLE payments ALTER COLUMN status DROP DEFAULT")
         op.execute(
             "ALTER TABLE payments "
             "ALTER COLUMN status TYPE VARCHAR(50) USING status::VARCHAR"
         )
+        op.execute("ALTER TABLE payments ALTER COLUMN status SET DEFAULT 'pending'")
+
+        op.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_active_payment_settlement_payer "
+            "ON payments (settlement_id, payer_id) "
+            "WHERE status NOT IN ('expired', 'failed', 'canceled')"
+        )
+
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN method DROP DEFAULT")
         op.execute(
             "ALTER TABLE settlement_records "
             "ALTER COLUMN method TYPE VARCHAR(20) USING method::VARCHAR"
         )
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN method SET DEFAULT 'etransfer'")
+
+        op.execute("DROP INDEX IF EXISTS uq_active_settlement_per_pair")
+
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN status DROP DEFAULT")
         op.execute(
             "ALTER TABLE settlement_records "
             "ALTER COLUMN status TYPE VARCHAR(20) USING status::VARCHAR"
+        )
+        op.execute("ALTER TABLE settlement_records ALTER COLUMN status SET DEFAULT 'pending'")
+
+        op.execute(
+            "CREATE UNIQUE INDEX IF NOT EXISTS uq_active_settlement_per_pair "
+            "ON settlement_records (group_id, payer_id, payee_id) "
+            "WHERE status IN ('pending', 'sent')"
         )
 
         op.execute("DROP TYPE paymentstatus")
