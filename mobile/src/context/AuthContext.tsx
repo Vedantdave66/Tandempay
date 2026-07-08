@@ -53,6 +53,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     const logout = async () => {
+        // Best-effort server-side revocation — must run before the token is
+        // cleared locally (it's read from storage at call time), but a failed
+        // or offline request should never block signing out locally.
+        try {
+            await authApi.logout();
+        } catch (error) {
+            console.log('Failed to revoke token server-side', error);
+        }
         await AsyncStorage.removeItem('token');
         setUser(null);
     };
