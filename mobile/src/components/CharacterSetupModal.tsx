@@ -297,7 +297,12 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                                 ]}
                                 activeOpacity={0.8}
                             >
-                                <CharacterShape shape={s} color={color} variant="mini" />
+                                <CharacterShape
+                                    shape={s}
+                                    color={color}
+                                    variant="mini"
+                                    eyeStyle={SINGLE_SHAPE_CONFIG[s].eyeType === 'ball' ? 'ball' : 'dot'}
+                                />
                             </TouchableOpacity>
                         );
                     })}
