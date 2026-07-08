@@ -198,7 +198,7 @@ export default function OnboardingScreen({ navigation }: any) {
                             Your crew.{'\n'}Your way.
                         </Text>
                         <Text style={[styles.sub, { color: colors.secondaryText }, T.regular]}>
-                            Pick a shape, color, and nickname.{'\n'}This is how your friends will see you.
+                            Pick a shape and color.{'\n'}This is how your friends will see you.
                         </Text>
                     </View>
                 </View>
@@ -270,7 +270,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                     ]}
                                     activeOpacity={0.8}
                                 >
-                                    <CharacterShape variant="mini" shape={s} color={selectedColor} />
+                                    <CharacterShape variant="mini" shape={s} color={selectedColor} eyeStyle="ball" />
                                 </TouchableOpacity>
                             );
                         })}

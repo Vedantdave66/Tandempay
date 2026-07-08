@@ -203,11 +203,6 @@ export const expensesApi = {
             method: 'POST',
             body: JSON.stringify({}),
         }),
-    patch: (expenseId: string, data: { title?: string; amount?: number }) =>
-        request<Expense>(`/expenses/${expenseId}`, {
-            method: 'PATCH',
-            body: JSON.stringify(data),
-        }),
 };
 
 // --- Balances & Settlements ---
