@@ -960,6 +960,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             </Modal>
 
             <EditExpenseSheet
+                groupId={groupId}
                 expense={editTarget}
                 onClose={() => setEditTarget(null)}
                 onSaved={(updated) => {

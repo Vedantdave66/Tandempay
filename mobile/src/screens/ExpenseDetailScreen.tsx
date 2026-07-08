@@ -171,6 +171,7 @@ export default function ExpenseDetailScreen({ route, navigation }: any) {
             </ScrollView>
 
             <EditExpenseSheet
+                groupId={groupId}
                 expense={editTarget}
                 onClose={() => setEditTarget(null)}
                 onSaved={(updated) => {
