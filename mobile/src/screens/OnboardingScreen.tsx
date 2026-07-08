@@ -270,7 +270,7 @@ export default function OnboardingScreen({ navigation }: any) {
                                     ]}
                                     activeOpacity={0.8}
                                 >
-                                    <CharacterShape variant="mini" shape={s} color={selectedColor} />
+                                    <CharacterShape variant="mini" shape={s} color={selectedColor} eyeStyle="ball" />
                                 </TouchableOpacity>
                             );
                         })}
