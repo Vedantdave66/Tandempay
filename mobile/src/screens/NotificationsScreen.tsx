@@ -12,6 +12,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useNotifications } from '../context/NotificationContext';
+import { useToast } from '../context/ToastContext';
 import * as Haptics from 'expo-haptics';
 import { Bell, Receipt, Send, CheckCircle2, XCircle, Clock } from 'lucide-react-native';
 import { notificationsApi, NotificationOut } from '../services/api';
@@ -29,6 +30,7 @@ function timeAgo(d: string) {
 export default function NotificationsScreen() {
     const { colors, isDark } = useTheme();
     const { clearUnread } = useNotifications();
+    const { showToast } = useToast();
 
     const [notifications, setNotifications] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
@@ -45,11 +47,12 @@ export default function NotificationsScreen() {
             setNotifications(data);
         } catch (err) {
             console.error('Failed to load notifications', err);
+            showToast("Couldn't load notifications");
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, []);
+    }, [showToast]);
 
     useEffect(() => {
         loadData();

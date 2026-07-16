@@ -33,6 +33,7 @@ import CharacterShape from '../components/CharacterShape';
 import CanvasModeView from '../components/CanvasModeView';
 import SkeletonBlock from '../components/SkeletonBlock';
 import EditExpenseSheet from '../components/EditExpenseSheet';
+import InlineErrorState from '../components/InlineErrorState';
 
 type DetailTab = 'expenses' | 'balances' | 'settle';
 
@@ -193,6 +194,10 @@ export default function GroupDetailScreen({ route, navigation }: any) {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    // Ref, not state: read only inside loadData's catch, so it shouldn't
+    // force loadData to re-identify (and thus re-fire the focus effect).
+    const hasLoadedRef = useRef(false);
 
     const [canvasMode, setCanvasMode] = useState(false);
     const expenseAnims = useRef(
@@ -286,13 +291,20 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             setExpenses(toArray<Expense>(expensesRaw).slice().reverse());
             setBalances(toArray<UserBalance>(balancesRaw));
             setSettlements(toArray<Settlement>(settlementsRaw));
+            setLoadError(false);
+            hasLoadedRef.current = true;
         } catch (err) {
             console.error('Failed to load group details', err);
+            if (hasLoadedRef.current) {
+                showToast("Couldn't refresh");
+            } else {
+                setLoadError(true);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [groupId]);
+    }, [groupId, showToast]);
 
     // Refetch on every focus, not just mount — so character edits made in
     // the profile (yours or, since the last visit, a friend's) flow into the
@@ -317,6 +329,7 @@ export default function GroupDetailScreen({ route, navigation }: any) {
             setFriends(allFriends.filter(f => !memberIds.has(f.id)));
         } catch (e) {
             console.error('Failed to load friends', e);
+            showToast("Couldn't load friends");
         } finally {
             setFriendsLoading(false);
         }
@@ -447,6 +460,25 @@ export default function GroupDetailScreen({ route, navigation }: any) {
     };
 
     const charFor = (userId: string) => balances.find(b => b.user_id === userId);
+
+    if (loadError) {
+        // Primary load failed outright — never render a fake "Group" shell
+        // with 0 members / $0 as if it were real.
+        return (
+            <View style={[styles.container, { backgroundColor: colors.background }]}>
+                <View style={{ paddingTop: insets.top + vs(8), paddingHorizontal: scale(20) }}>
+                    <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backRow} activeOpacity={0.70}>
+                        <ArrowLeft size={17} color={isDark ? colors.accent : colors.accentDark} />
+                        <Text style={[styles.backText, { color: isDark ? colors.accent : colors.accentDark }, T.bold]}>Back</Text>
+                    </TouchableOpacity>
+                </View>
+                <InlineErrorState
+                    message="Couldn't load this group"
+                    onRetry={loadData}
+                />
+            </View>
+        );
+    }
 
     if (loading && !refreshing) {
         // Skeleton — the group's silhouette breathing while data arrives.
