@@ -103,6 +103,16 @@ export default function RootNavigator() {
             .catch(() => setOnboardingSeen(true));
     }, []);
 
+    // Set once by AuthContext.login() on any successful login/registration and
+    // never cleared by logout() — lets a signed-out returning user land on
+    // Login instead of being routed back through Landing/Onboarding.
+    const [hasAccount, setHasAccount] = useState<boolean | null>(null);
+    useEffect(() => {
+        AsyncStorage.getItem('@has_account')
+            .then(v => setHasAccount(v === 'true'))
+            .catch(() => setHasAccount(false));
+    }, []);
+
     // Deep link handler: tandempay://join/{token} or https://tandempay.ca/join/{token}
     useEffect(() => {
         if (loading) return;
@@ -148,7 +158,7 @@ export default function RootNavigator() {
         });
     }, [user, loading]);
 
-    if (loading || (!user && onboardingSeen === null)) {
+    if (loading || (!user && (onboardingSeen === null || hasAccount === null))) {
         return <AuthHoldScreen background={colors.background} />;
     }
 
@@ -177,10 +187,17 @@ export default function RootNavigator() {
             >
                 {!user ? (
                     <Stack.Group screenOptions={{ animation: 'fade' }}>
-                        {/* First screen in the group is the initial route */}
-                        {!onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />}
+                        {/* First screen in the group is the initial route.
+                            A returning signed-out user (hasAccount) skips
+                            straight to Login; otherwise fall back to the
+                            existing first-run logic. */}
+                        {hasAccount ? (
+                            <Stack.Screen name="Login" component={LoginScreen} />
+                        ) : (
+                            !onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                        )}
                         <Stack.Screen name="Landing" component={LandingScreen} />
-                        <Stack.Screen name="Login" component={LoginScreen} />
+                        {!hasAccount && <Stack.Screen name="Login" component={LoginScreen} />}
                         <Stack.Screen name="Register" component={RegisterScreen} />
                         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     </Stack.Group>
