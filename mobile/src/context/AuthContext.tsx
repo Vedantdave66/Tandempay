@@ -49,6 +49,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         await AsyncStorage.setItem('token', token);
         const u = await authApi.me();
         setUser(u);
+        // Persists past logout — tells RootNavigator this device has a real
+        // account, so signing out lands on Login rather than the first-run
+        // Landing/Onboarding flow. Covers both login and registration, since
+        // RegisterScreen also completes by calling this same login().
+        await AsyncStorage.setItem('@has_account', 'true');
         registerForPushNotificationsAsync().catch(() => {});
     };
 
