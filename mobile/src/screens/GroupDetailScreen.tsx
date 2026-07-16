@@ -65,13 +65,13 @@ function SwipeableExpenseRow({ children, paidByMe, onNudge, onEdit, onDelete, hi
 
     const close = useCallback(() => {
         Animated.spring(translateX, {
-            toValue: 0, useNativeDriver: true, damping: 20, stiffness: 260,
+            toValue: 0, useNativeDriver: true, damping: 20, stiffness: 260, overshootClamping: true,
         }).start(() => { isOpen.current = false; });
     }, [translateX]);
 
     const open = useCallback(() => {
         Animated.spring(translateX, {
-            toValue: -revealRef.current, useNativeDriver: true, damping: 20, stiffness: 260,
+            toValue: -revealRef.current, useNativeDriver: true, damping: 20, stiffness: 260, overshootClamping: true,
         }).start(() => { isOpen.current = true; });
     }, [translateX]);
 
