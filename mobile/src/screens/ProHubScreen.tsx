@@ -19,7 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw, Mail } from 'lucide-react-native';
+import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw, Mail, LogOut } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import PressableScale from '../components/PressableScale';
@@ -29,9 +29,6 @@ type SectionRow = {
     icon: React.ComponentType<any>;
     label: string;
     nav?: string;
-    special?: string;
-    danger?: boolean;
-    noChevron?: boolean;
 };
 
 const PRO_FEATURES = [
@@ -69,13 +66,6 @@ export default function ProHubScreen({ navigation }: any) {
             ])
         ).start();
     }, []);
-
-    const handleRowPress = (row: SectionRow) => {
-        if (row.special === 'invite') return handleInvite();
-        if (row.special === 'tutorial') return Alert.alert('Tutorial', 'Guided tutorial coming soon.');
-        if (row.special === 'signout') return handleSignOut();
-        if (row.nav) navigation.navigate(row.nav);
-    };
 
     const handleInvite = async () => {
         const { status } = await Contacts.requestPermissionsAsync();
@@ -213,6 +203,16 @@ export default function ProHubScreen({ navigation }: any) {
                             <ChevronRight size={16} color={colors.faintText} />
                         </TouchableOpacity>
                     )}
+                        <TouchableOpacity
+                            style={[styles.settingsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                            onPress={handleSignOut}
+                            activeOpacity={0.7}
+                        >
+                            <View style={[styles.settingsIconWrap, { backgroundColor: colors.dangerBg }]}>
+                                <LogOut size={17} color={colors.danger} />
+                            </View>
+                            <Text style={[styles.settingsLabel, { color: colors.danger }]}>Sign out</Text>
+                        </TouchableOpacity>
                     </View>
 
             </ScrollView>

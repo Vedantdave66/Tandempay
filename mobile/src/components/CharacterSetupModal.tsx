@@ -8,7 +8,10 @@ import { initialWindowMetrics } from 'react-native-safe-area-context';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { authApi } from '../services/api';
+import { T } from '../utils/typography';
+import { ms } from '../utils/responsive';
 import CharacterShape from './CharacterShape';
+import PressableScale from './PressableScale';
 
 interface CharacterSetupModalProps {
     visible: boolean;
@@ -207,15 +210,15 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                         style={[styles.closeBtn, { top: (initialWindowMetrics?.insets.top ?? 44) + 8 }]}
                         activeOpacity={0.7}
                     >
-                        <Text style={[styles.closeBtnText, { color: colors.secondaryText }]}>✕</Text>
+                        <Text style={[styles.closeBtnText, { color: colors.secondaryText }, T.semibold]}>✕</Text>
                     </TouchableOpacity>
                 )}
 
                 {/* Heading */}
-                <Text style={[styles.heading, { color: colors.text }]}>
+                <Text style={[styles.heading, { color: colors.text }, T.extrabold]}>
                     Choose your character
                 </Text>
-                <Text style={[styles.subheading, { color: colors.secondaryText }]}>
+                <Text style={[styles.subheading, { color: colors.secondaryText }, T.regular]}>
                     This is how your friends will see you in groups
                 </Text>
 
@@ -294,7 +297,12 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                                 ]}
                                 activeOpacity={0.8}
                             >
-                                <CharacterShape shape={s} color={color} variant="mini" />
+                                <CharacterShape
+                                    shape={s}
+                                    color={color}
+                                    variant="mini"
+                                    eyeStyle={SINGLE_SHAPE_CONFIG[s].eyeType === 'ball' ? 'ball' : 'dot'}
+                                />
                             </TouchableOpacity>
                         );
                     })}
@@ -328,6 +336,7 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                             borderColor: colors.border,
                             color: colors.text,
                         },
+                        T.regular,
                     ]}
                     placeholder="Give your character a name"
                     placeholderTextColor={colors.secondaryText}
@@ -339,7 +348,9 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                 />
 
                 {/* ── CTA ── */}
-                <TouchableOpacity
+                <PressableScale
+                    scaleTo={0.97}
+                    haptic="medium"
                     onPress={handleSave}
                     disabled={!canSave || saving}
                     style={[
@@ -347,13 +358,12 @@ export default function CharacterSetupModal({ visible, onClose }: CharacterSetup
                         { backgroundColor: colors.accent },
                         (!canSave || saving) && styles.buttonDisabled,
                     ]}
-                    activeOpacity={0.85}
                 >
                     {saving
                         ? <ActivityIndicator color="#fff" />
-                        : <Text style={styles.buttonText}>Let's go</Text>
+                        : <Text style={[styles.buttonText, T.bold]}>Let's go</Text>
                     }
-                </TouchableOpacity>
+                </PressableScale>
             </ScrollView>
         </Modal>
     );
@@ -368,13 +378,12 @@ const styles = StyleSheet.create({
         paddingBottom: 48,
     },
     heading: {
-        fontSize: 32,
-        fontWeight: '800',
+        fontSize: ms(32),
         textAlign: 'center',
         marginBottom: 10,
     },
     subheading: {
-        fontSize: 15,
+        fontSize: ms(15),
         textAlign: 'center',
         marginBottom: 32,
     },
@@ -421,7 +430,7 @@ const styles = StyleSheet.create({
         borderRadius: 14,
         paddingHorizontal: 16,
         paddingVertical: 14,
-        fontSize: 16,
+        fontSize: ms(16),
         marginBottom: 24,
     },
     button: {
@@ -443,12 +452,10 @@ const styles = StyleSheet.create({
         zIndex: 10,
     },
     closeBtnText: {
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: ms(18),
     },
     buttonText: {
         color: '#FFFFFF',
-        fontSize: 17,
-        fontWeight: '700',
+        fontSize: 17, // fixed, not ms() — CTA size is spec'd as a constant (DESIGN_SPEC §2)
     },
 });

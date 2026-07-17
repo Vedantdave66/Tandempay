@@ -91,7 +91,7 @@ const holdStyles = StyleSheet.create({
 });
 
 export default function RootNavigator() {
-    const { user, loading } = useAuth();
+    const { user, loading, hasAccount } = useAuth();
     const { colors, isDark } = useTheme();
     const navRef = useRef<NavigationContainerRef<any>>(null);
 
@@ -177,10 +177,17 @@ export default function RootNavigator() {
             >
                 {!user ? (
                     <Stack.Group screenOptions={{ animation: 'fade' }}>
-                        {/* First screen in the group is the initial route */}
-                        {!onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />}
+                        {/* First screen in the group is the initial route.
+                            A returning signed-out user (hasAccount) skips
+                            straight to Login; otherwise fall back to the
+                            existing first-run logic. */}
+                        {hasAccount ? (
+                            <Stack.Screen name="Login" component={LoginScreen} />
+                        ) : (
+                            !onboardingSeen && <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                        )}
                         <Stack.Screen name="Landing" component={LandingScreen} />
-                        <Stack.Screen name="Login" component={LoginScreen} />
+                        {!hasAccount && <Stack.Screen name="Login" component={LoginScreen} />}
                         <Stack.Screen name="Register" component={RegisterScreen} />
                         <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
                     </Stack.Group>

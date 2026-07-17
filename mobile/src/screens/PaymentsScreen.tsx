@@ -22,15 +22,18 @@ import PressableScale from '../components/PressableScale';
 import { scale, vs, ms } from '../utils/responsive';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 import { Send, CheckCircle2, XCircle, Clock, Check, Wallet, CreditCard, ArrowDownToLine, X, RotateCcw } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { meApi, settlementsApi, SettlementRecordOut, walletApi, WalletTransactionOut } from '../services/api';
 import { T } from '../utils/typography';
+import InlineErrorState from '../components/InlineErrorState';
 
 export default function PaymentsScreen() {
     const navigation = useNavigation<any>();
     const { colors, isDark } = useTheme();
     const { user } = useAuth();
+    const { showToast } = useToast();
 
     const [masterTab, setMasterTab] = useState<'wallet' | 'settle'>('wallet');
     const [settleTab, setSettleTab] = useState<'pending' | 'history'>('pending');
@@ -41,6 +44,16 @@ export default function PaymentsScreen() {
 
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+
+    // Tracks whether each tab has ever loaded real data — distinguishes a
+    // genuine first-load failure (must not fabricate a $0 balance / empty
+    // list) from a refresh failure where the last-good data is still valid.
+    // Refs, not state: read only inside loadData's catch, so they shouldn't
+    // force loadData to re-identify (and thus re-fire the focus effect).
+    const walletLoadedRef = useRef(false);
+    const paymentsLoadedRef = useRef(false);
+    const [walletError, setWalletError] = useState(false);
+    const [paymentsError, setPaymentsError] = useState(false);
 
     const paymentAnims = useRef(Array.from({ length: 5 }, () => new Animated.Value(0))).current;
 
@@ -61,6 +74,8 @@ export default function PaymentsScreen() {
                             ? (raw as any).payments
                             : [];
                 setPayments(payments);
+                paymentsLoadedRef.current = true;
+                setPaymentsError(false);
             } else {
                 const [balanceData, rawTx] = await Promise.all([
                     walletApi.getBalance(),
@@ -75,14 +90,23 @@ export default function PaymentsScreen() {
                             ? (rawTx as any).transactions
                             : [];
                 setWalletTransactions(walletTransactions);
+                walletLoadedRef.current = true;
+                setWalletError(false);
             }
         } catch (err) {
             console.error('Failed to load data', err);
+            if (masterTab === 'settle') {
+                if (paymentsLoadedRef.current) showToast("Couldn't refresh");
+                else setPaymentsError(true);
+            } else {
+                if (walletLoadedRef.current) showToast("Couldn't refresh");
+                else setWalletError(true);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
         }
-    }, [masterTab]);
+    }, [masterTab, showToast]);
 
     useFocusEffect(useCallback(() => {
         setLoading(true);
@@ -313,6 +337,11 @@ export default function PaymentsScreen() {
             >
                 {loading && !refreshing ? (
                     <ActivityIndicator size="large" color={colors.accent} style={{ marginTop: vs(40) }} />
+                ) : masterTab === 'settle' && paymentsError ? (
+                    <InlineErrorState
+                        message="Couldn't load your payments"
+                        onRetry={loadData}
+                    />
                 ) : masterTab === 'settle' ? (
                     <>
                         {(settleTab === 'pending' ? pendingPayments : historyPayments).length === 0 ? (
@@ -335,6 +364,11 @@ export default function PaymentsScreen() {
                         ))
                         )}
                     </>
+                ) : walletError ? (
+                    <InlineErrorState
+                        message="Couldn't load your wallet balance"
+                        onRetry={loadData}
+                    />
                 ) : (
                     <>
                         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.walletCardsScroll}>

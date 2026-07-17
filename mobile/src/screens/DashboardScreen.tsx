@@ -19,11 +19,13 @@ import {
 } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
 import { useNotifications } from '../context/NotificationContext';
+import { useToast } from '../context/ToastContext';
 import { T } from '../utils/typography';
 import GroupCard from '../components/GroupCard';
 import CharacterShape from '../components/CharacterShape';
 import PressableScale from '../components/PressableScale';
 import SkeletonBlock from '../components/SkeletonBlock';
+import InlineErrorState from '../components/InlineErrorState';
 import Logo from '../components/Logo';
 import { formatCurrency } from '../utils/formatCurrency';
 import { timeAgo, toArray } from '../utils/helpers';
@@ -163,6 +165,7 @@ export default function DashboardScreen({ navigation }: any) {
     const { user } = useAuth();
     const { colors, isDark } = useTheme();
     const { unreadCount } = useNotifications();
+    const { showToast } = useToast();
 
     const [groups, setGroups] = useState<GroupListItem[]>([]);
     const [balanceMap, setBalanceMap] = useState<Record<string, UserBalance[]>>({});
@@ -171,6 +174,12 @@ export default function DashboardScreen({ navigation }: any) {
     const [recentActivity, setRecentActivity] = useState<NotificationOut[]>([]);
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [loadError, setLoadError] = useState(false);
+    // Ref, not state: `loadGroups` is registered once via navigation's 'focus'
+    // listener (effect deps are just [navigation]), so it never re-captures a
+    // fresh closure — reading `groups` state directly here would always see
+    // the stale initial (empty) array on every later focus.
+    const hasLoadedRef = useRef(false);
     const [showNetModal, setShowNetModal] = useState(false);
     const [interacSheetVisible, setInteracSheetVisible] = useState(false);
     const interacToastAnim = useRef(new Animated.Value(0)).current;
@@ -196,6 +205,8 @@ export default function DashboardScreen({ navigation }: any) {
             const raw = await groupsApi.list();
             const data: GroupListItem[] = toArray<GroupListItem>(raw);
             setGroups(data);
+            setLoadError(false);
+            hasLoadedRef.current = true;
 
             try {
                 const entries = await Promise.all(
@@ -229,6 +240,11 @@ export default function DashboardScreen({ navigation }: any) {
                 .catch(() => {});
         } catch (err) {
             console.error('[Dashboard] Failed to load groups:', err);
+            if (hasLoadedRef.current) {
+                showToast("Couldn't refresh");
+            } else {
+                setLoadError(true);
+            }
         } finally {
             setLoading(false);
             setRefreshing(false);
@@ -461,7 +477,12 @@ export default function DashboardScreen({ navigation }: any) {
                     </TouchableOpacity>
                 </View>}
 
-                {groups.length === 0 && !loading ? (
+                {groups.length === 0 && !loading && loadError ? (
+                    <InlineErrorState
+                        message="Couldn't load your groups"
+                        onRetry={loadGroups}
+                    />
+                ) : groups.length === 0 && !loading ? (
                     <View style={styles.emptyWrap}>
                         <CharacterShape
                             shape={user?.character_shape ?? 'round'}

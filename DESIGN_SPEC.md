@@ -550,7 +550,7 @@ Screens with hero gradient headers (`GroupDetailScreen`):
 
 ### Modals as Stack Screens
 
-Modals (`CharacterSetupModal`, `ReceiptScanScreen` result, etc.) are presented as stack routes, not native modals, giving consistent animation control via React Navigation.
+Modals (`ReceiptScanScreen` result, etc.) are presented as stack routes, not native modals, giving consistent animation control via React Navigation. Exception: `CharacterSetupModal` is a native `<Modal>` — it doubles as an app-level gate in `RootNavigator` for users without a character, outside any navigator.
 
 ### Loading States
 
