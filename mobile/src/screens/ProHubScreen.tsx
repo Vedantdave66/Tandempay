@@ -14,12 +14,12 @@ import {
 } from 'react-native';
 import * as Contacts from 'expo-contacts';
 import * as Haptics from 'expo-haptics';
-import { scale, vs, ms } from '../utils/responsive';
+import { scale, vs, ms, SCREEN } from '../utils/responsive';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
-import { Crown, Check, Bell, UserPlus, Sun, ChevronRight, Users2, FileDown, RefreshCw, Mail, LogOut } from 'lucide-react-native';
+import { Crown, Check, Bell, UserPlus, Sun, Users2, FileDown, RefreshCw, Mail, LogOut } from 'lucide-react-native';
 import CharacterShape from '../components/CharacterShape';
 import CharacterSetupModal from '../components/CharacterSetupModal';
 import PressableScale from '../components/PressableScale';
@@ -46,6 +46,11 @@ const SETTINGS_ROWS = [
     { icon: UserPlus,    label: 'Invite a friend' },
     { icon: Sun,         label: 'Appearance' },
 ];
+
+// Fixed pixel math instead of percentage widths — keeps the two columns exact
+// regardless of RN's gap/wrap interaction quirks across versions.
+const GRID_GUTTER = scale(12);
+const TILE_W = (SCREEN.w - scale(20) * 2 - GRID_GUTTER) / 2;
 
 export default function ProHubScreen({ navigation }: any) {
     const { user, logout } = useAuth();
@@ -163,52 +168,51 @@ export default function ProHubScreen({ navigation }: any) {
                     </View>
                 </View>
 
-                    {/* Settings list */}
-                    <View style={[styles.settingsCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                        {SETTINGS_ROWS.map((row, index) => {
-                            const Icon = row.icon;
-                            return (
-                                <TouchableOpacity
-                                    key={row.label}
-                                    style={[
-                                        styles.settingsRow,
-                                        index < SETTINGS_ROWS.length - 1 && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.border },
-                                    ]}
-                                    onPress={() => {
-                                        if (row.label === 'Friends') return navigation.navigate('FriendsHub');
-                                        if (row.label === 'Notifications') return navigation.navigate('Notifications');
-                                        if (row.label === 'Invite a friend') return handleInvite();
-                                        if (row.label === 'Appearance') return navigation.navigate('Appearance');
-                                    }}
-                                    activeOpacity={0.7}
-                                >
-                                    <View style={[styles.settingsIconWrap, { backgroundColor: colors.accentBg }]}>
-                                        <Icon size={17} color={colors.accent} />
-                                    </View>
-                                    <Text style={[styles.settingsLabel, { color: colors.text }]}>{row.label}</Text>
-                                    <ChevronRight size={16} color={colors.faintText} />
-                                </TouchableOpacity>
-                            );
-                        })}
-                    {user?.interac_token && (
+                    {/* Settings grid */}
+                    <View style={styles.settingsSection}>
+                        <View style={styles.tileGrid}>
+                            {[
+                                ...SETTINGS_ROWS,
+                                ...(user?.interac_token ? [{ icon: Mail, label: 'Interac Auto-Confirm' }] : []),
+                            ].map((tile, index) => {
+                                const Icon = tile.icon;
+                                return (
+                                    <PressableScale
+                                        key={tile.label}
+                                        scaleTo={0.97}
+                                        haptic="light"
+                                        style={[
+                                            styles.tile,
+                                            {
+                                                backgroundColor: colors.surface,
+                                                borderColor: colors.border,
+                                                shadowColor: colors.cardShadow,
+                                                marginRight: index % 2 === 0 ? GRID_GUTTER : 0,
+                                            },
+                                        ]}
+                                        onPress={() => {
+                                            if (tile.label === 'Friends') return navigation.navigate('FriendsHub');
+                                            if (tile.label === 'Notifications') return navigation.navigate('Notifications');
+                                            if (tile.label === 'Invite a friend') return handleInvite();
+                                            if (tile.label === 'Appearance') return navigation.navigate('Appearance');
+                                            if (tile.label === 'Interac Auto-Confirm') return setShowInteracModal(true);
+                                        }}
+                                    >
+                                        <View style={[styles.tileIconWrap, { backgroundColor: colors.accentBg }]}>
+                                            <Icon size={18} color={colors.accent} />
+                                        </View>
+                                        <Text style={[styles.tileLabel, { color: colors.text }, T.semibold]}>{tile.label}</Text>
+                                    </PressableScale>
+                                );
+                            })}
+                        </View>
+
                         <TouchableOpacity
-                            style={[styles.settingsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
-                            onPress={() => setShowInteracModal(true)}
-                            activeOpacity={0.7}
-                        >
-                            <View style={[styles.settingsIconWrap, { backgroundColor: colors.accentBg }]}>
-                                <Mail size={17} color={colors.accent} />
-                            </View>
-                            <Text style={[styles.settingsLabel, { color: colors.text }]}>Interac Auto-Confirm</Text>
-                            <ChevronRight size={16} color={colors.faintText} />
-                        </TouchableOpacity>
-                    )}
-                        <TouchableOpacity
-                            style={[styles.settingsRow, { borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.border }]}
+                            style={[styles.signOutRow, { backgroundColor: colors.surface, borderColor: colors.border }]}
                             onPress={handleSignOut}
                             activeOpacity={0.7}
                         >
-                            <View style={[styles.settingsIconWrap, { backgroundColor: colors.dangerBg }]}>
+                            <View style={[styles.tileIconWrap, { backgroundColor: colors.dangerBg }]}>
                                 <LogOut size={17} color={colors.danger} />
                             </View>
                             <Text style={[styles.settingsLabel, { color: colors.danger }]}>Sign out</Text>
@@ -364,38 +368,46 @@ const styles = StyleSheet.create({
         color: '#fff',
     },
 
-    // Settings
-    sectionWrap: {
+    // Settings grid
+    settingsSection: {
         paddingHorizontal: scale(20),
         paddingTop: vs(20),
     },
-    sectionHeader: {
-        fontSize: ms(13),
-        letterSpacing: 0.3,
-        textTransform: 'uppercase',
-        marginBottom: vs(8),
+    tileGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
     },
-    sectionCard: {
+    tile: {
+        width: TILE_W,
         borderRadius: ms(20),
-        overflow: 'hidden',
+        borderWidth: StyleSheet.hairlineWidth,
+        padding: scale(16),
+        gap: vs(10),
+        marginBottom: GRID_GUTTER,
+        shadowOffset: { width: 0, height: vs(4) },
+        shadowOpacity: 1,
+        shadowRadius: ms(10),
+        elevation: 3,
     },
-    settingsRow: {
+    tileIconWrap: {
+        width: scale(40),
+        height: scale(40),
+        borderRadius: ms(12),
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    tileLabel: {
+        fontSize: ms(14),
+    },
+    signOutRow: {
         flexDirection: 'row',
         alignItems: 'center',
         minHeight: vs(56),
         paddingHorizontal: scale(16),
         gap: scale(14),
-    },
-    rowIconWrap: {
-        width: scale(36),
-        height: scale(36),
-        borderRadius: ms(10),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
-    rowLabel: {
-        flex: 1,
-        fontSize: ms(15),
+        borderRadius: ms(20),
+        borderWidth: StyleSheet.hairlineWidth,
+        marginTop: vs(8),
     },
 
     // aliases used in JSX
@@ -412,14 +424,6 @@ const styles = StyleSheet.create({
         gap: scale(8),
     },
     proBody: { padding: scale(16), gap: vs(10) },
-    settingsCard: { borderRadius: ms(20), overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth },
-    settingsIconWrap: {
-        width: scale(36),
-        height: scale(36),
-        borderRadius: ms(10),
-        alignItems: 'center',
-        justifyContent: 'center',
-    },
     settingsLabel: { flex: 1, fontSize: ms(15) },
 
     // Interac Auto-Confirm modal
