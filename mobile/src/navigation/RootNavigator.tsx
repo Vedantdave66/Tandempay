@@ -91,7 +91,7 @@ const holdStyles = StyleSheet.create({
 });
 
 export default function RootNavigator() {
-    const { user, loading } = useAuth();
+    const { user, loading, hasAccount } = useAuth();
     const { colors, isDark } = useTheme();
     const navRef = useRef<NavigationContainerRef<any>>(null);
 
@@ -101,16 +101,6 @@ export default function RootNavigator() {
         AsyncStorage.getItem('@onboarding_seen')
             .then(v => setOnboardingSeen(v === 'true'))
             .catch(() => setOnboardingSeen(true));
-    }, []);
-
-    // Set once by AuthContext.login() on any successful login/registration and
-    // never cleared by logout() — lets a signed-out returning user land on
-    // Login instead of being routed back through Landing/Onboarding.
-    const [hasAccount, setHasAccount] = useState<boolean | null>(null);
-    useEffect(() => {
-        AsyncStorage.getItem('@has_account')
-            .then(v => setHasAccount(v === 'true'))
-            .catch(() => setHasAccount(false));
     }, []);
 
     // Deep link handler: tandempay://join/{token} or https://tandempay.ca/join/{token}
@@ -158,7 +148,7 @@ export default function RootNavigator() {
         });
     }, [user, loading]);
 
-    if (loading || (!user && (onboardingSeen === null || hasAccount === null))) {
+    if (loading || (!user && onboardingSeen === null)) {
         return <AuthHoldScreen background={colors.background} />;
     }
 

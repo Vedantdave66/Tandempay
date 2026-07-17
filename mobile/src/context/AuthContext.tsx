@@ -6,6 +6,7 @@ import { registerForPushNotificationsAsync } from '../services/pushService';
 interface AuthContextType {
     user: User | null;
     loading: boolean;
+    hasAccount: boolean;
     login: (token: string) => Promise<void>;
     logout: () => Promise<void>;
     refreshUser: () => Promise<void>;
@@ -14,6 +15,7 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType>({
     user: null,
     loading: true,
+    hasAccount: false,
     login: async () => { },
     logout: async () => { },
     refreshUser: async () => { },
@@ -24,6 +26,14 @@ export const useAuth = () => useContext(AuthContext);
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
+    // Set once login() ever succeeds (login or registration) and never
+    // cleared by logout() — lets RootNavigator route a returning signed-out
+    // user to Login instead of Landing/Onboarding. Lives here, not as a
+    // separate AsyncStorage read in RootNavigator, so login() can update it
+    // in the same render cycle as `user` — a value read independently on
+    // mount elsewhere would go stale the moment login() ran without a
+    // full app restart in between.
+    const [hasAccount, setHasAccount] = useState(false);
 
     useEffect(() => {
         checkToken();
@@ -31,6 +41,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const checkToken = async () => {
         try {
+            const storedHasAccount = await AsyncStorage.getItem('@has_account');
+            setHasAccount(storedHasAccount === 'true');
+
             const token = await AsyncStorage.getItem('token');
             if (token) {
                 const u = await authApi.me();
@@ -54,6 +67,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Landing/Onboarding flow. Covers both login and registration, since
         // RegisterScreen also completes by calling this same login().
         await AsyncStorage.setItem('@has_account', 'true');
+        setHasAccount(true);
         registerForPushNotificationsAsync().catch(() => {});
     };
 
@@ -81,7 +95,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     return (
-        <AuthContext.Provider value={{ user, loading, login, logout, refreshUser }}>
+        <AuthContext.Provider value={{ user, loading, hasAccount, login, logout, refreshUser }}>
             {children}
         </AuthContext.Provider>
     );
