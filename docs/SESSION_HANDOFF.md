@@ -412,6 +412,7 @@ All PRs are **merged** into `main`.
 3. **Conserve usage.** Short responses when sufficient. Skip mockups unless requested.
 4. **One prompt at a time.** Don't merge unrelated changes into mega-prompts.
 5. **Always open prompts with a graphify check.** Every prompt handed to Claude Code must start with an instruction to check the graphify report in `graphify-out/` before reading any source files. This lets Claude Code orient from the pre-built knowledge graph rather than re-reading files cold, saving significant token usage.
+6. **Stay on `main` after a PR merges — don't auto-switch back to WIP branches.** After any PR is opened and merged, stay checked out on `main` (pulled to latest) instead of automatically switching back to the `nickname-consolidation` branch (or any other in-progress feature branch). The local checkout is what gets tested via `expo start --tunnel`, so it needs to reflect the latest merged work by default. Keep WIP branches safe on their own branch or in a stash — only restore one onto the working tree when Vedant explicitly asks to continue that specific work, not automatically after every unrelated fix.
 
 ## Critical reference points
 
