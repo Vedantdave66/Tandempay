@@ -634,11 +634,11 @@ export default function GroupDetailScreen({ route, navigation }: any) {
                             {(group?.members ?? []).slice(0, 4).map((m, i) => {
                                 const c = charFor(m.user_id);
                                 return (
-                                    <View key={m.user_id} style={[styles.clusterAvatar, i > 0 && { marginLeft: -8 }]}>
+                                    <View key={m.user_id} style={[styles.clusterAvatar, { zIndex: 5 - i }, i > 0 && { marginLeft: -14 }]}>
                                         <CharacterShape
                                             shape={c?.character_shape ?? 'rect'}
                                             color={c?.character_color ?? m.avatar_color ?? '#6B7280'}
-                                            variant="cluster"
+                                            variant="mini"
                                         />
                                     </View>
                                 );
@@ -1103,7 +1103,7 @@ const styles = StyleSheet.create({
     clusterAvatar: {
         transform: [{ translateY: 2 }],
     },
-    memberSummary: { fontSize: ms(12), marginLeft: scale(10) },
+    memberSummary: { fontSize: ms(12), marginLeft: scale(12) },
     headerRightCol: {
         alignItems: 'flex-end',
         gap: vs(8),
