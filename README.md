@@ -4,6 +4,12 @@
 
 🌐 **Live:** [tandempay.ca](https://tandempay.ca) &nbsp;|&nbsp; 📡 **API:** [api.tandempay.ca/docs](https://api.tandempay.ca/docs)
 
+## Screenshots
+
+<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/394558b0-ac32-4ffe-b12a-85613ca4e969" />
+
+
+
 ---
 
 ## What It Does
