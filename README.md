@@ -6,7 +6,11 @@
 
 ## Screenshots
 
-<img width="1920" height="1080" alt="image" src="https://github.com/user-attachments/assets/394558b0-ac32-4ffe-b12a-85613ca4e969" />
+<img width="1206" height="2474" alt="IMG_6167" src="https://github.com/user-attachments/assets/d5924f16-6691-4804-a4a5-008a9627d26c" />
+<img width="1206" height="2345" alt="IMG_6169" src="https://github.com/user-attachments/assets/a2bd5df4-87b7-4389-a1aa-ff143a24e2af" />
+<img width="1206" height="2496" alt="IMG_6168" src="https://github.com/user-attachments/assets/2e5413f3-7cc5-44bd-b039-532d2b53143d" />
+<img width="1851" height="1007" alt="image" src="https://github.com/user-attachments/assets/b7705146-34f6-491f-b3db-5ec8002d6819" />
+<img width="3672" height="2000" alt="image" src="https://github.com/user-attachments/assets/63e0d0f5-10c2-4801-9ba4-28238077b8ed" />
 
 
 
